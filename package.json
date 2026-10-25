@@ -1,0 +1,22 @@
+{
+  "name": "phone-google-assistant",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Secure starter API for Google OAuth and WhatsApp Cloud API assistant integrations",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "db:init": "node src/init-db.js",
+    "test": "node --test",
+    "check": "for file in src/*.js test/*.js; do node --check \"$file\" || exit 1; done"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "googleapis": "^150.0.1",
+    "helmet": "^8.1.0",
+    "mysql2": "^3.14.1"
+  }
+}
