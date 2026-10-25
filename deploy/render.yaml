@@ -1,0 +1,68 @@
+# Render Blueprint — FREE tier, no secrets in Git.
+# Import this file in Render Dashboard → Blueprints, then fill every `sync: false`
+# value in the dashboard's secret store. Never paste tokens into this file.
+# NOTE: free web services sleep when idle; verify current free-tier terms/quota.
+# MySQL: point MYSQL_* at a free MySQL-compatible host (or a free always-on VM),
+# enable TLS there, and allowlist the app's outbound IPs. Docker Compose remains
+# the zero-cost local option.
+services:
+  - type: web
+    name: phone-google-assistant
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm ci --omit=dev
+    startCommand: node src/server.js
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+      - key: APP_BASE_URL
+        sync: false            # https://<your-service>.onrender.com
+      - key: APP_API_TOKEN
+        sync: false            # npm run setup generates a valid random value
+      - key: APP_USER_ID
+        value: owner
+      - key: APP_OWNER_EMAIL
+        sync: false            # exact Google account allowed to connect
+      - key: APP_OWNER_PHONE_E164
+        sync: false
+      - key: TOKEN_ENCRYPTION_KEY
+        sync: false            # base64 of exactly 32 bytes; keep stable
+      - key: MYSQL_HOST
+        sync: false
+      - key: MYSQL_PORT
+        value: "3306"
+      - key: MYSQL_DATABASE
+        value: phone_google
+      - key: MYSQL_USER
+        sync: false
+      - key: MYSQL_PASSWORD
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false            # https://<your-service>.onrender.com/auth/google/callback
+      - key: GEMINI_API_KEY
+        sync: false            # optional; leave empty to keep AI replies off
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: GEMINI_BUSINESS_CONTEXT
+        sync: false
+      - key: WHATSAPP_VERIFY_TOKEN
+        sync: false
+      - key: WHATSAPP_APP_SECRET
+        sync: false
+      - key: WHATSAPP_ACCESS_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_API_VERSION
+        value: v23.0
+      - key: WHATSAPP_AUTO_REPLY_ENABLED
+        value: "false"         # flip only after keys + documented consents

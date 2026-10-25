@@ -54,7 +54,7 @@ function handleError(res, error) {
   return res.status(status).json({ error: status === 503 ? 'google_not_configured' : status === 409 ? 'google_not_connected' : 'google_request_failed' });
 }
 
-export function createGoogleRouter({ pool, config }) {
+export function createGoogleRouter({ pool, config, googleApi = google }) {
   const router = express.Router();
 
   router.get('/auth/google', requireApiToken(config), async (req, res, next) => {
@@ -134,7 +134,7 @@ export function createGoogleRouter({ pool, config }) {
       const q = String(req.query.q || '').slice(0, 500);
       if (!q) return res.status(400).json({ error: 'query_required' });
       const client = await getAuthenticatedClient(pool, config, config.userId);
-      const gmail = google.gmail({ version: 'v1', auth: client });
+      const gmail = googleApi.gmail({ version: 'v1', auth: client });
       const listed = await gmail.users.messages.list({ userId: 'me', q, maxResults: 10 });
       const messages = await Promise.all((listed.data.messages || []).map(async ({ id }) => {
         const { data } = await gmail.users.messages.get({ userId: 'me', id, format: 'metadata', metadataHeaders: ['From', 'To', 'Subject', 'Date'] });
@@ -150,7 +150,7 @@ export function createGoogleRouter({ pool, config }) {
       const q = String(req.query.q || '').trim().slice(0, 200);
       if (!q) return res.status(400).json({ error: 'query_required' });
       const client = await getAuthenticatedClient(pool, config, config.userId);
-      const drive = google.drive({ version: 'v3', auth: client });
+      const drive = googleApi.drive({ version: 'v3', auth: client });
       const escaped = q.replaceAll("'", "\\'");
       const { data } = await drive.files.list({
         q: `trashed = false and name contains '${escaped}'`,
@@ -166,7 +166,7 @@ export function createGoogleRouter({ pool, config }) {
     try {
       const days = Math.max(1, Math.min(30, Number(req.query.days) || 7));
       const client = await getAuthenticatedClient(pool, config, config.userId);
-      const calendar = google.calendar({ version: 'v3', auth: client });
+      const calendar = googleApi.calendar({ version: 'v3', auth: client });
       const now = new Date();
       const until = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
       const { data } = await calendar.events.list({
@@ -189,7 +189,7 @@ export function createGoogleRouter({ pool, config }) {
         return res.status(400).json({ error: 'invalid_event_time_range' });
       }
       const client = await getAuthenticatedClient(pool, config, config.userId);
-      const calendar = google.calendar({ version: 'v3', auth: client });
+      const calendar = googleApi.calendar({ version: 'v3', auth: client });
       const { data } = await calendar.events.insert({
         calendarId: 'primary',
         requestBody: { summary: summary.trim().slice(0, 200), start: { dateTime: startDate.toISOString(), ...(timeZone ? { timeZone: String(timeZone).slice(0, 100) } : {}) }, end: { dateTime: endDate.toISOString(), ...(timeZone ? { timeZone: String(timeZone).slice(0, 100) } : {}) } },
@@ -204,7 +204,7 @@ export function createGoogleRouter({ pool, config }) {
       const q = String(req.query.q || '').trim().toLocaleLowerCase().slice(0, 100);
       if (!q) return res.status(400).json({ error: 'query_required' });
       const client = await getAuthenticatedClient(pool, config, config.userId);
-      const people = google.people({ version: 'v1', auth: client });
+      const people = googleApi.people({ version: 'v1', auth: client });
       const { data } = await people.people.connections.list({
         resourceName: 'people/me', pageSize: 100, personFields: 'names,phoneNumbers,emailAddresses'
       });

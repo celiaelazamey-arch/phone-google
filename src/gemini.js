@@ -11,7 +11,9 @@ export async function generateWhatsAppReply({ config, customerMessage }) {
   const { apiKey, model, businessContext } = config.gemini;
   if (!apiKey) throw new Error('Gemini API is not configured');
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
-  const response = await fetch(endpoint, {
+  // The free offline demo injects a local provider; production always uses the real fetch.
+  const doFetch = config.demo?.fetchImpl || globalThis.fetch;
+  const response = await doFetch(endpoint, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
     body: JSON.stringify({

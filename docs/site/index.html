@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مساعد الهاتف + Google — الربط الكامل المجاني 2026</title>
+<style>
+  :root{--bg:#070b16;--card:#111a2e;--line:rgba(148,163,203,.18);--txt:#eaf0ff;--mut:#9aa9c9;--a:#6ee7c7;--b:#8b9dff}
+  *{box-sizing:border-box}body{margin:0;background:radial-gradient(1000px 600px at 80% -10%,#17244d,transparent 60%),var(--bg);color:var(--txt);font:16px/1.9 system-ui,"Segoe UI",Tahoma,sans-serif}
+  .w{width:min(1080px,calc(100% - 36px));margin:auto;position:relative}
+  header{padding:70px 0 40px}h1{font-size:clamp(32px,5vw,54px);margin:0 0 12px;line-height:1.25;background:linear-gradient(100deg,#fff,#9fd8ff,#c4b5fd);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .kicker{color:var(--a);letter-spacing:.2em;font-size:12px;font-weight:700}p.lead{color:var(--mut);max-width:75ch;font-size:17px}
+  .badges{display:flex;gap:10px;flex-wrap:wrap;margin:22px 0}.badge{border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-size:12px;color:var(--a)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;padding-bottom:30px}
+  .card{background:linear-gradient(160deg,rgba(24,34,60,.9),rgba(12,18,34,.9));border:1px solid var(--line);border-radius:18px;padding:24px}
+  h2{font-size:21px;margin:0 0 10px}h3{color:var(--b);font-size:14px;margin:18px 0 6px}
+  p,li{color:var(--mut);font-size:14px}strong{color:var(--txt)}code,pre{font:13px/1.7 ui-monospace,Menlo,Consolas,monospace;direction:ltr;text-align:left}
+  code{background:rgba(139,157,255,.12);padding:2px 6px;border-radius:6px;color:#cfe0ff}
+  pre{background:#060c1b;border:1px solid var(--line);border-radius:12px;padding:16px;overflow:auto;color:#b9d6cf}
+  a{color:var(--a)}
+  table{width:100%;border-collapse:collapse;font-size:13px}th,td{border-bottom:1px solid var(--line);padding:10px;text-align:right;color:var(--mut)}th{color:var(--txt)}
+  .flow{border:1px dashed rgba(110,231,199,.4);border-radius:14px;padding:18px;color:#cdeee5;font-size:14px;line-height:2.2}
+  footer{border-top:1px solid var(--line);padding:26px 0 60px;color:var(--mut);font-size:12px}
+  .note{border-inline-start:3px solid var(--a);padding-inline-start:14px;color:#c9d5ef}
+</style>
+</head>
+<body>
+<div class="w">
+<header>
+  <p class="kicker">FREE · OFFLINE DEMO · ZERO SECRETS · 2026</p>
+  <h1>الربط الكامل المتكامل<br>لمساعد الهاتف + Google</h1>
+  <p class="lead">واجهة API آمنة تربط Google OAuth مع WhatsApp Cloud API وتخزّن الحالة والرسائل في MySQL، مع ردود Gemini الاختيارية المعلّقة على موافقات صريحة. كل شيء يعمل مجانًا: وضع تجريبي كامل بلا حسابات، CI مجاني، وثائق منشورة على GitHub Pages.</p>
+  <div class="badges"><span class="badge">Node.js 20+</span><span class="badge">AES-256-GCM</span><span class="badge">HMAC-SHA256</span><span class="badge">OAuth state وحيد الاستخدام</span><span class="badge">17+ اختبارًا</span><span class="badge">تكلفة صفر</span></div>
+</header>
+
+<div class="grid">
+  <section class="card">
+    <h2>ابدأ خلال دقيقتين</h2>
+    <pre>npm ci
+npm run demo
+# افتح http://localhost:3000</pre>
+    <p>لا حساب Google، لا تطبيق Meta، لا مفتاح Gemini، لا MySQL، ولا اتصال خارجي. نفس مسارات الإنتاج بمزوّدين وهميين داخل العملية.</p>
+    <h3>محليًا مع MySQL حقيقي</h3>
+    <pre>npm run setup
+docker compose up -d mysql
+npm run db:init
+npm test &amp;&amp; npm start</pre>
+  </section>
+
+  <section class="card">
+    <h2>كيف يتدفّق الربط</h2>
+    <div class="flow">
+      Google OAuth ←→ رموز مشفّرة في MySQL<br>
+      ↓ Gmail / Drive / Calendar / Contacts (قراءة + موعد)<br>
+      WhatsApp Webhook ← HMAC-SHA256 + منع التكرار<br>
+      ↓ موافقة WhatsApp + موافقة AI + نافذة 24 ساعة<br>
+      Gemini ←→ رد قصير آمن ←→ إرسال فردي عبر Graph API
+    </div>
+    <p class="note">لا بث جماعي، لا قوالب، لا مرفقات بريد، لا إرسال بريد، ولا معالجة دفع أو بيانات حساسة.</p>
+  </section>
+
+  <section class="card">
+    <h2>حزمة مجانية متكاملة</h2>
+    <table>
+      <tr><th>المكوّن</th><th>الحل المجاني</th></tr>
+      <tr><td>الكود والاختبارات</td><td>GitHub + Actions + Dependabot</td></tr>
+      <tr><td>قاعدة البيانات</td><td>MySQL 8 محليًا / طبقة Serverless مجانية</td></tr>
+      <tr><td>Google APIs</td><td>OAuth + مستخدمو اختبار</td></tr>
+      <tr><td>WhatsApp</td><td>Cloud API + بدل المحادثات المجاني</td></tr>
+      <tr><td>الذكاء الاصطناعي</td><td>طبقة Gemini المجانية</td></tr>
+      <tr><td>الاستضافة والوثائق</td><td>طبقة ويب مجانية + GitHub Pages</td></tr>
+    </table>
+    <p>الطبقات المجانية تتغيّر شروطها؛ راجع تسعير كل مزوّد وراقب الحصص.</p>
+  </section>
+
+  <section class="card">
+    <h2>الأمان مُطبّق في الكود</h2>
+    <ul>
+      <li>تشفير الرموز بـ AES-256-GCM و<code>state</code> م hashed لمدة 10 دقائق.</li>
+      <li>تحقّق التوقيع على البايتات الخام قبل تحليل JSON.</li>
+      <li>منع الإرسال دون موافقة موثّقة، وخارج نافذة 24 ساعة.</li>
+      <li>موافقة منفصلة <code>aiOptedIn</code> قبل إرسال نص العميل إلى Gemini.</li>
+      <li>Helmet، حدود الأحجام، E.164، UTC، إيقاف تشغيلي نظيف.</li>
+      <li>الوضع التجريبي يُرفض في <code>NODE_ENV=production</code>.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>حدود شفافة</h2>
+    <p>الربط الفعلي بحسابك يحتاج بيانات اعتماد تنشئها أنت وتضعها في مخزن أسرار الاستضافة. لا تُرسل في المحادثة ولا تُرفع إلى Git. لا توجد إدارة مستخدمين متعددة، لوحة إدارية، جدولة تذكيرات، أو قوالب معتمدة في هذه النسخة.</p>
+    <p class="note">المستودع لا يحتوي أي سرّ، ولا يملك نطاقًا أو حسابات Google/Meta حقيقية.</p>
+  </section>
+
+  <section class="card">
+    <h2>الوثائق الكاملة</h2>
+    <p><a href="https://github.com/celiaelazamey-arch/phone-google/blob/main/docs/ar/FREE-STACK-2026.md">دليل الربط الكامل المجاني 2026</a></p>
+    <p><a href="https://github.com/celiaelazamey-arch/phone-google/blob/main/docs/ar/DEMO.md">دليل الوضع التجريبي</a></p>
+    <p><a href="https://github.com/celiaelazamey-arch/phone-google/blob/main/README.md">README المشروع</a></p>
+    <p><a href="https://github.com/celiaelazamey-arch/phone-google/blob/main/SECURITY.md">سياسة الأمان والإبلاغ</a></p>
+  </section>
+</div>
+
+<footer>مساعد الهاتف + Google · فرع العمل: arena/d42ad687-phone-google · صُمم ليعمل بتكلفة صفر دون المساس بالخصوصية.</footer>
+</div>
+</body>
+</html>

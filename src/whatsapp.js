@@ -25,7 +25,8 @@ export async function sendWhatsAppText({ config, phone, text }) {
   if (!wa.accessToken || !wa.phoneNumberId || !wa.apiVersion) throw new Error('WhatsApp sending is not configured');
   if (!isValidE164(phone)) throw new Error('Recipient must be a valid E.164 phone number');
   if (typeof text !== 'string' || !text.trim() || text.length > 4096) throw new Error('Message must contain 1–4096 characters');
-  const response = await fetch(`https://graph.facebook.com/${encodeURIComponent(wa.apiVersion)}/${encodeURIComponent(wa.phoneNumberId)}/messages`, {
+  const doFetch = config.demo?.fetchImpl || globalThis.fetch;
+  const response = await doFetch(`https://graph.facebook.com/${encodeURIComponent(wa.apiVersion)}/${encodeURIComponent(wa.phoneNumberId)}/messages`, {
     method: 'POST',
     headers: { authorization: `Bearer ${wa.accessToken}`, 'content-type': 'application/json' },
     body: JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to: phone.slice(1), type: 'text', text: { preview_url: false, body: text.trim() } })

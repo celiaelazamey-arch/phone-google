@@ -2,6 +2,23 @@
 
 نقطة بداية لخادم API يربط Google OAuth مع WhatsApp Cloud API ويخزن حالة التكامل ورسائل WhatsApp في MySQL. المستودع **هيكل قابل للتشغيل محليًا** وليس خدمة منشورة أو مربوطة بحساب Google/WhatsApp بعد.
 
+## 🚀 حزمة الربط الكامل المجاني — 2026
+
+أضيفت حزمة تكامل متكاملة تعمل **بتكلفة صفر** وتُظهر التدفّق كاملًا فورًا، دون أي حساب أو مفتاح أو قاعدة بيانات:
+
+```bash
+npm ci
+npm run demo       # لوحة عربية حية على http://localhost:3000
+```
+
+- **وضع تجريبي كامل (offline):** نفس مسارات الإنتاج مع مزوّدي Google/Gemini/WhatsApp وهميين وقاعدة بيانات في الذاكرة، أسرار عشوائية مؤقتة، تشفير حقيقي، وتحقّق HMAC حقيقي. يُرفض تشغيله في `NODE_ENV=production`.
+- **CI مجاني على GitHub Actions:** فحص بناء الجمل + 17 اختبارًا (منها تدفّق تجريبي كامل) + بناء صورتي Docker + تدقيق اعتماديات + تأكيد عدم تتبّع `.env`، على Node 20 و22.
+- **وثائق عربية كاملة:** [`docs/ar/FREE-STACK-2026.md`](docs/ar/FREE-STACK-2026.md) (خريطة الخدمات المجانية وخطوات التفعيل والحدود)، [`docs/ar/DEMO.md`](docs/ar/DEMO.md)، وموقع ثابت على GitHub Pages في [`docs/site/index.html`](docs/site/index.html).
+- **مخطط نشر مجاني:** [`deploy/render.yaml`](deploy/render.yaml) — كل الأسرار `sync: false` تُملأ من مخزن أسرار الاستضافة فقط.
+- **أسرار محلية آمنة:** `npm run setup` ينشئ `.env` بصلاحيات `0600` وقيم `crypto.randomBytes` (لا تُطبع ولا تُرفع إلى Git).
+
+> الربط الحقيقي بحسابك الشخصي على Google أو WhatsApp Business أو Gemini يتطلب بيانات اعتماد تنشئها أنت وتضيفها في مخزن أسرار بيئة الاستضافة. لا تشاركها في المحادثة ولا تضعها في Git. راجع قسم «حدود النشر والإكمال» أدناه.
+
 ## ما يتضمنه المشروع
 
 - ربط Google OAuth بتدفق state عشوائي أحادي الاستخدام، cookie آمنة، ومدة صلاحية قصيرة.
@@ -18,15 +35,17 @@ Node.js 20+، MySQL 8+، وبيانات اعتماد OAuth من Google وبيا�
 ## التشغيل المحلي
 
 ```bash
-cp .env.example .env
-# عدّل MYSQL_PASSWORD وMYSQL_ROOT_PASSWORD وأنشئ APP_API_TOKEN عشوائيًا بطول 32 حرفًا على الأقل.
-# أنشئ TOKEN_ENCRYPTION_KEY بواسطة: openssl rand -base64 32
+npm run setup       # ينشئ .env بثلاثة أسرار عشوائية (أو: cp .env.example .env)
+# عدّل MYSQL_PASSWORD وMYSQL_ROOT_PASSWORD فقط؛ باقي الأسرار مولّدة آليًا.
+# TOKEN_ENCRYPTION_KEY يجب أن يبقى base64 لـ 32 بايت بالضبط.
 docker compose up -d mysql
-npm install
+npm ci
 npm run db:init
 npm test
 npm start
 ```
+
+للواجهة التجريبية بدون Docker أو MySQL إطلاقًا: `npm run demo` (أو `docker compose -f docker-compose.demo.yml up --build`).
 
 تحقق محليًا من الخادم عبر `GET http://localhost:3000/health`. انسخ `.env.example` إلى `.env` ولا ترفع ملف `.env` أو أي token إلى GitHub.
 

@@ -1,0 +1,16 @@
+# Run the free demo without a database: docker compose -f docker-compose.demo.yml up --build
+services:
+  demo:
+    build:
+      context: .
+      dockerfile: Dockerfile.demo
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: "3000"
+      DEMO_FRAME_ANCESTORS: "${DEMO_FRAME_ANCESTORS:-'self'}"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="demo-token" content="__DEMO_TOKEN__">
+  <meta name="color-scheme" content="dark">
+  <title>مساعد الهاتف + Google — الربط الكامل المجاني 2026</title>
+  <link rel="stylesheet" href="/demo/static/demo.css">
+</head>
+<body>
+  <div class="glow glow-a"></div><div class="glow glow-b"></div>
+
+  <header class="wrap hero">
+    <div>
+      <p class="eyebrow">FREE · OFFLINE · ZERO SECRETS · 2026</p>
+      <h1>الربط الكامل المتكامل</h1>
+      <p class="lead">نسخة تجريبية احترافية تعمل بالكامل داخل هذه الجلسة: نفس مسارات الإنتاج، نفس التشفير، نفس تحقّق HMAC ونفس سياسات الموافقة — بمزوّدين وهميين محليين بلا حسابات ولا تكلفة ولا اتصال خارجي.</p>
+    </div>
+    <div class="hero-side">
+      <div class="pill" id="health-pill">جارٍ الفحص…</div>
+      <div class="mini" id="providers">—</div>
+    </div>
+  </header>
+
+  <main class="wrap grid">
+    <section class="card span-2">
+      <div class="card-head"><h2>① ربط Google (تجريبي)</h2><span class="tag" id="google-state">غير متصل</span></div>
+      <p class="muted">يُخزّن الرمز مشفّرًا بـ AES-256-GCM داخل الذاكرة، تمامًا كما يحدث مع MySQL في الإنتاج. بدونه تُعيد جميع واجهات Google خطأ <code>google_not_connected</code>.</p>
+      <div class="row">
+        <button data-act="google-connect">ربط حساب Google</button>
+        <button class="ghost" data-act="google-disconnect">فصل الحساب</button>
+      </div>
+      <div class="row wrap-row">
+        <button class="chip" data-act="gmail">بحث Gmail</button>
+        <button class="chip" data-act="drive">بحث Drive</button>
+        <button class="chip" data-act="calendar">مواعيد Calendar</button>
+        <button class="chip" data-act="calendar-create">إنشاء موعد</button>
+        <button class="chip" data-act="contacts">بحث جهات الاتصال</button>
+      </div>
+      <pre class="out" id="out-google">النتيجة تظهر هنا…</pre>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>② موافقة العميل</h2><span class="tag">Opt-in</span></div>
+      <p class="muted">لا يُرسل النظام أي رسالة دون موافقة موثّقة، ولا يُرسل نص العميل إلى Gemini دون موافقة منفصلة.</p>
+      <label>رقم العميل (E.164)<input id="phone" value="+14155552671" inputmode="tel"></label>
+      <div class="row">
+        <button data-act="consent-on">تسجيل الموافقتين</button>
+        <button class="ghost" data-act="consent-off">سحب الموافقة</button>
+      </div>
+      <pre class="out" id="out-consent">النتيجة تظهر هنا…</pre>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>③ رسالة واردة + رد ذكي</h2><span class="tag">Webhook</span></div>
+      <p class="muted">تُوقّع الرسالة بـ HMAC-SHA256 ثم تُرسل إلى مسار الـ webhook الحقيقي. عند اكتمال الشروط يُولّد Gemini التجريبي ردًا ويُرسل عبر Graph الوهمي.</p>
+      <label>نص الرسالة<textarea id="message" rows="2">مرحبًا، ما هي مواعيد العمل لديكم؟</textarea></label>
+      <div class="row">
+        <button data-act="inbound">إرسال رسالة موقّعة</button>
+        <button class="ghost" data-act="inbound-bad">بتوقيع خاطئ (اختبار أمني)</button>
+      </div>
+      <div class="row"><button class="chip" data-act="send">إرسال فردي مباشر</button><button class="chip" data-act="duplicate">إعادة إرسال نفس الرسالة</button></div>
+      <pre class="out" id="out-inbound">النتيجة تظهر هنا…</pre>
+    </section>
+
+    <section class="card span-2">
+      <div class="card-head"><h2>④ لوحة الحالة الحيّة</h2><div class="row"><button class="ghost small" data-act="refresh">تحديث</button><button class="ghost small" data-act="reset">تصفير البيانات</button></div></div>
+      <div class="stats" id="stats"></div>
+      <div class="tables">
+        <div><h3>جهات الاتصال</h3><pre class="out tall" id="out-contacts">—</pre></div>
+        <div><h3>الرسائل المسجّلة</h3><pre class="out tall" id="out-messages">—</pre></div>
+        <div><h3>صندوق الصادر (WhatsApp)</h3><pre class="out tall" id="out-outbox">—</pre></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap foot">
+    <p><strong>حدود شفافة:</strong> الربط الفعلي بحساب Google أو رقم WhatsApp Business أو مفتاح Gemini الحقيقي يحتاج بيانات اعتماد تضيفها أنت في مخزن أسرار بيئة الاستضافة — ولا تُرسل أبدًا في هذه المحادثة أو إلى Git. هذه النسخة تثبت أن الكود والتدفّق والسياسات تعمل كاملًا مجانًا.</p>
+    <p class="muted">المستودع: celiaelazamey-arch/phone-google · الترخيص والوثائق داخل README · كل الأسرار هنا عشوائية ومؤقتة وتُولّد عند كل تشغيل.</p>
+  </footer>
+
+  <script src="/demo/static/demo.js"></script>
+</body>
+</html>
