@@ -4,6 +4,15 @@
 
 ## 🚀 حزمة الربط الكامل المجاني — 2026
 
+### 🔗 رابط عام يعمل من أي متصفح / هاتف (خارج Arena أيضًا)
+
+**[https://htmlpreview.github.io/?https://raw.githubusercontent.com/celiaelazamey-arch/phone-google/arena/d42ad687-phone-google/docs/site/demo.html](https://htmlpreview.github.io/?https://raw.githubusercontent.com/celiaelazamey-arch/phone-google/arena/d42ad687-phone-google/docs/site/demo.html)**
+
+هذه صفحة مستقلة محمولة من المستودع وتعمل بلا سيرفر: تشفير AES-256-GCM وHMAC-SHA256 حقيقيان داخل المتصفح، مع كامل تدفّق Google/Meta/Gemini التجريبي. افتحها من هاتفك مباشرة — لا تحتاج أي حساب أو تثبيت. (معاينة Arena الحية تعمل داخل المحادثة فقط؛ الرابط أعلاه هو البديل العام.)
+
+نسخة بديلة محفوظة على Google Drive (يمكن تنزيلها وفتحها أوفلاين): [https://drive.google.com/uc?export=download&id=1wZcf-yezciZliMTyU1ua3mZp06BJ4S-Q](https://drive.google.com/uc?export=download&id=1wZcf-yezciZliMTyU1ua3mZp06BJ4S-Q)
+
+
 أضيفت حزمة تكامل متكاملة تعمل **بتكلفة صفر** وتُظهر التدفّق كاملًا فورًا، دون أي حساب أو مفتاح أو قاعدة بيانات:
 
 ```bash

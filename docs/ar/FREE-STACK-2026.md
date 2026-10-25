@@ -40,6 +40,11 @@ WhatsApp Cloud API  ──webhook موقّع HMAC──►  تسجيل الرس�
 
 ### المستوى A — الوضع التجريبي (الموصى به للبدء)
 
+**رابط عام جاهز بلا أي تثبيت (يعمل من الهاتف مباشرة):**
+
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/celiaelazamey-arch/phone-google/arena/d42ad687-phone-google/docs/site/demo.html
+
+
 ```bash
 npm ci
 npm run demo

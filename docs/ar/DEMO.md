@@ -4,6 +4,13 @@
 
 ## التشغيل
 
+نسخة بديلة على Drive للتنزيل والعمل أوفلاين: https://drive.google.com/uc?export=download&id=1wZcf-yezciZliMTyU1ua3mZp06BJ4S-Q
+
+**الأسرع — رابط عام يعمل من أي متصفح أو هاتف بلا تثبيت:**
+
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/celiaelazamey-arch/phone-google/arena/d42ad687-phone-google/docs/site/demo.html
+
+
 ```bash
 npm ci
 npm run demo

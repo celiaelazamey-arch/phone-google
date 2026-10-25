@@ -1,4 +1,4 @@
-name: Docs (GitHub Pages)
+name: Docs (build, artifact, optional Pages deploy)
 
 on:
   push:
@@ -25,9 +25,21 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/configure-pages@v6
+      # Pages must be enabled once by the repo owner (Settings → Pages).
+      # Until then, the site is still validated and published as a CI artifact.
+      - id: configure
+        uses: actions/configure-pages@v6
+        continue-on-error: true
+      - name: Validate the static site needs no external resources
+        run: |
+          test -f docs/site/index.html && test -f docs/site/demo.html
+          if grep -EI 'src="https?://|href="https?://[^"]*\.css|@import.*https?://' docs/site/*.html; then
+            echo "Static site must not depend on third-party runtime assets." && exit 1
+          fi
+          echo "Static site is self-contained."
       - uses: actions/upload-pages-artifact@v5
         with:
           path: docs/site
       - id: deployment
+        if: steps.configure.outcome == 'success'
         uses: actions/deploy-pages@v5
