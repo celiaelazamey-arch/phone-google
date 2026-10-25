@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>الربط الكامل — نسخة متصفح مستقلة (بدون سيرفر)</title>
+<style>
+  :root{--bg:#070b16;--card:rgba(18,25,45,.82);--line:rgba(148,163,203,.17);--txt:#eaf0ff;--mut:#9aa9c9;--a:#6ee7c7;--b:#8b9dff;--bad:#ff8f9c}
+  *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(1100px 700px at 80% -10%,#17244d,transparent 60%),radial-gradient(800px 600px at -10% 40%,#0d3040,transparent 55%),var(--bg);color:var(--txt);font:15px/1.75 system-ui,-apple-system,"Segoe UI","Noto Kufi Arabic",Tahoma,sans-serif}
+  .w{width:min(1180px,calc(100% - 32px));margin:auto;position:relative}
+  header{padding:44px 0 24px;display:flex;gap:20px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+  h1{font-size:clamp(27px,5vw,46px);line-height:1.25;margin:0 0 12px;background:linear-gradient(100deg,#fff,#9fd8ff 45%,#c4b5fd);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .kicker{color:var(--a);letter-spacing:.2em;font-size:11px;font-weight:700;margin:0 0 8px}
+  .lead{color:var(--mut);max-width:74ch;margin:0}
+  .pill{border:1px solid var(--line);background:rgba(110,231,199,.08);color:var(--a);padding:9px 16px;border-radius:999px;font-weight:700;font-size:12px;white-space:nowrap}
+  .notice{border:1px solid rgba(110,231,199,.35);background:rgba(110,231,199,.06);border-radius:14px;padding:12px 16px;margin-bottom:20px;color:#cdeee5;font-size:13px}
+  .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;padding-bottom:28px}
+  .span2{grid-column:1/-1}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px;backdrop-filter:blur(12px)}
+  .head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+  h2{font-size:18px;margin:0}h3{font-size:12px;color:var(--b);margin:0 0 8px}
+  .tag{font-size:11px;color:var(--b);border:1px solid var(--line);border-radius:999px;padding:4px 11px}
+  .mut{color:var(--mut);font-size:12.5px;margin:0 0 14px}
+  label{display:block;font-size:12px;color:var(--mut);margin:10px 0}
+  input,textarea{width:100%;display:block;margin-top:6px;background:#0a1224;color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;direction:ltr;text-align:left}
+  textarea{resize:vertical}input:focus,textarea:focus{outline:2px solid rgba(110,231,199,.4)}
+  .row{display:flex;gap:9px;flex-wrap:wrap;margin:13px 0}
+  button{cursor:pointer;border:0;border-radius:11px;padding:9px 16px;font:inherit;font-weight:700;font-size:12.5px;color:#04121a;background:linear-gradient(120deg,var(--a),#7dd3fc);transition:transform .15s,filter .15s}
+  button:hover{transform:translateY(-2px);filter:brightness(1.08)}button:active{transform:none}
+  button.ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}
+  button.chip{background:rgba(139,157,255,.12);color:#c8d3ff;border:1px solid var(--line);font-size:11.5px;padding:7px 12px}
+  button.small{padding:6px 12px;font-size:11.5px}
+  button.danger{background:rgba(255,143,156,.14);color:var(--bad);border:1px solid rgba(255,143,156,.3)}
+  .out{background:#060c1b;border:1px solid var(--line);border-radius:12px;padding:12px 14px;color:#b9d6cf;font:11.5px/1.65 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;max-height:200px;overflow:auto;direction:ltr;text-align:left;margin:10px 0 0}
+  .out.tall{max-height:230px;min-height:110px}
+  .tables{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+  .stats{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:14px}
+  .stat{border:1px solid var(--line);border-radius:12px;padding:8px 14px;min-width:110px}.stat b{display:block;font-size:20px;color:var(--a)}.stat span{font-size:10.5px;color:var(--mut)}
+  code{background:rgba(139,157,255,.12);padding:1px 5px;border-radius:5px;font-size:11px}
+  footer{border-top:1px solid var(--line);padding:20px 0 50px;color:var(--mut);font-size:12px}
+  @media(max-width:850px){.grid,.tables{grid-template-columns:1fr}.span2{grid-column:auto}}
+</style>
+</head>
+<body>
+<div class="w">
+<header>
+  <div>
+    <p class="kicker">STANDALONE · OFFLINE · ZERO SERVER · ZERO COST · 2026</p>
+    <h1>الربط الكامل — يعمل داخل متصفحك</h1>
+    <p class="lead">صفحة واحدة مستقلة تمامًا: نفس منطق Google OAuth المشفّر، نفس تحقّق HMAC-SHA256 الحقيقي، نفس سياسات الموافقة ونافذة 24 ساعة، ونفس رد Gemini الآمن — كلها تُنفّذ داخل المتصفح بلا سيرفر، بلا إنترنت، بلا حسابات، وبلا أي سرّ حقيقي.</p>
+  </div>
+  <div class="pill" id="engine">جارٍ تهيئة المحرك…</div>
+</header>
+
+<div class="notice" id="notice">✅ تعمل هذه الصفحة من أي متصفح أو هاتف مباشرة (حتى بدون اتصال). كل المفاتيح أدناه عشوائية ومؤقتة وتختفي عند إغلاق الصفحة. لا يتم إرسال أي بيانات إلى أي خادم.</div>
+
+<div class="grid">
+  <section class="card span2">
+    <div class="head"><h2>① ربط Google وتشفير الرموز</h2><span class="tag" id="g-state">غير متصل</span></div>
+    <p class="mut">يُولّد مفتاح AES-256-GCM عشوائي ويُشفّر رموز OAuth الوهمية، ثم يُخزّن <code>state</code> كقيمة SHA-256 صالحة 10 دقائق. بدون الربط تُعيد واجهات Google حالة <code>google_not_connected</code>.</p>
+    <div class="row"><button data-act="connect">ربط حساب Google</button><button class="ghost" data-act="disconnect">فصل الحساب</button></div>
+    <div class="row">
+      <button class="chip" data-act="gmail">بحث Gmail</button>
+      <button class="chip" data-act="drive">بحث Drive</button>
+      <button class="chip" data-act="calendar">مواعيد Calendar</button>
+      <button class="chip" data-act="event">إنشاء موعد</button>
+      <button class="chip" data-act="contacts">جهات الاتصال</button>
+    </div>
+    <pre class="out" id="o-google">النتيجة تظهر هنا…</pre>
+  </section>
+
+  <section class="card">
+    <div class="head"><h2>② موافقة العميل</h2><span class="tag">Opt-in</span></div>
+    <p class="mut">لا إرسال دون موافقة موثّقة، ولا إرسال نص العميل إلى Gemini دون موافقة منفصلة.</p>
+    <label>رقم العميل (E.164)<input id="phone" value="+14155552671" inputmode="tel"></label>
+    <div class="row"><button data-act="consent">تسجيل الموافقتين</button><button class="ghost" data-act="withdraw">سحب الموافقة</button></div>
+    <pre class="out" id="o-consent">النتيجة تظهر هنا…</pre>
+  </section>
+
+  <section class="card">
+    <div class="head"><h2>③ Webhook + رد ذكي</h2><span class="tag">HMAC</span></div>
+    <p class="mut">تُحسب توقيعات HMAC-SHA256 الحقيقية على البايتات الخام، ثم تُطبَّق سياسات منع التكرار والموافقة والنافذة الزمنية.</p>
+    <label>نص الرسالة<textarea id="msg" rows="2">مرحبًا، ما هي مواعيد العمل لديكم؟</textarea></label>
+    <div class="row"><button data-act="inbound">إرسال رسالة موقّعة</button><button class="danger" data-act="forged">توقيع مزوّر</button></div>
+    <div class="row"><button class="chip" data-act="send">إرسال فردي مباشر</button><button class="chip" data-act="duplicate">إعادة إرسال نفس الرسالة</button></div>
+    <pre class="out" id="o-inbound">النتيجة تظهر هنا…</pre>
+  </section>
+
+  <section class="card span2">
+    <div class="head"><h2>④ لوحة الحالة الحيّة</h2><div class="row"><button class="ghost small" data-act="refresh">تحديث</button><button class="ghost small" data-act="reset">تصفير</button></div></div>
+    <div class="stats" id="stats"></div>
+    <div class="tables">
+      <div><h3>جهات الاتصال</h3><pre class="out tall" id="o-contacts">—</pre></div>
+      <div><h3>الرسائل المسجّلة</h3><pre class="out tall" id="o-messages">—</pre></div>
+      <div><h3>صندوق صادر WhatsApp</h3><pre class="out tall" id="o-outbox">—</pre></div>
+    </div>
+  </section>
+</div>
+
+<footer>
+  <strong>حدود شفافة:</strong> هذه محاكاة متصفحية للمنطق الحقيقي؛ الربط الفعلي بحساب Google أو WhatsApp Business أو Gemini يتطلب بيانات اعتماد تضيفها أنت في مخزن أسرار الاستضافة. لا تشارك الأسرار في المحادثات ولا ترفعها إلى Git.<br>
+  النسخة التي تعمل على سيرفر حقيقي: <code>npm run demo</code> داخل المستودع · <a href="index.html" style="color:#6ee7c7">العودة للوثائق</a>
+</footer>
+</div>
+
+<script>
+/* ---------- tiny pure-JS SHA-256 + HMAC-SHA256 (works on file:// too) ---------- */
+const K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+const rotr=(x,n)=>(x>>>n)|(x<<(32-n));
+function sha256(bytes){
+  const H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  const len=bytes.length,total=((len+9+63)>>6)<<6;
+  const buf=new Uint8Array(total);buf.set(bytes);buf[len]=0x80;
+  const dv=new DataView(buf.buffer);dv.setUint32(total-8,Math.floor(len*8/0x100000000));dv.setUint32(total-4,(len*8)>>>0);
+  const w=new Uint32Array(64);
+  for(let off=0;off<total;off+=64){
+    for(let i=0;i<16;i++)w[i]=dv.getUint32(off+i*4);
+    for(let i=16;i<64;i++){const s0=rotr(w[i-15],7)^rotr(w[i-15],18)^(w[i-15]>>>3),s1=rotr(w[i-2],17)^rotr(w[i-2],19)^(w[i-2]>>>10);w[i]=(w[i-16]+s0+w[i-7]+s1)>>>0;}
+    let [a,b,c,d,e,f,g,h]=H;
+    for(let i=0;i<64;i++){const S1=rotr(e,6)^rotr(e,11)^rotr(e,25),ch=(e&f)^(~e&g),t1=(h+S1+ch+K[i]+w[i])>>>0,S0=rotr(a,2)^rotr(a,13)^rotr(a,22),maj=(a&b)^(a&c)^(b&c),t2=(S0+maj)>>>0;h=g;g=f;f=e;e=(d+t1)>>>0;d=c;c=b;b=a;a=(t1+t2)>>>0;}
+    H[0]=(H[0]+a)>>>0;H[1]=(H[1]+b)>>>0;H[2]=(H[2]+c)>>>0;H[3]=(H[3]+d)>>>0;H[4]=(H[4]+e)>>>0;H[5]=(H[5]+f)>>>0;H[6]=(H[6]+g)>>>0;H[7]=(H[7]+h)>>>0;
+  }
+  const out=new Uint8Array(32),o=new DataView(out.buffer);H.forEach((v,i)=>o.setUint32(i*4,v));return out;
+}
+const hex=b=>[...b].map(x=>x.toString(16).padStart(2,'0')).join('');
+const enc=new TextEncoder();
+function hmac(keyBytes,msgBytes){
+  let k=keyBytes.length>64?sha256(keyBytes):keyBytes;const kp=new Uint8Array(64);kp.set(k);
+  const ip=new Uint8Array(64+msgBytes.length),op=new Uint8Array(96);
+  for(let i=0;i<64;i++){ip[i]=kp[i]^0x36;op[i]=kp[i]^0x5c;}
+  ip.set(msgBytes,64);op.set(sha256(ip),64);return sha256(op);
+}
+const randomHex=n=>{const b=new Uint8Array(n);crypto.getRandomValues(b);return hex(b);};
+const b64=b=>btoa(String.fromCharCode(...b));
+
+/* ---------- demo state ---------- */
+let S;
+function initial(){
+  return {connected:false,sealed:'',stateHash:'',key:null,secret:randomHex(24),verifyToken:randomHex(12),
+    contacts:new Map(),messages:new Map(),rows:[],outbox:[],events:[{id:'evt-1',summary:'اجتماع متابعة المشروع'}],
+    lastInboundId:'',log:[]};
+}
+const GMAIL=[{id:'msg-1',subject:'طلب عرض خدمات',from:'شركة النور',snippet:'مرحبًا، أرسلنا لكم عرض الخدمات المطلوب...'},{id:'msg-2',subject:'Monthly report',from:'reports@example.com',snippet:'Your monthly report is ready.'}];
+const DRIVE=[{id:'f-1',name:'دليل-الخدمات.pdf',mimeType:'application/pdf'},{id:'f-2',name:'عروض-الأسعار.xlsx',mimeType:'spreadsheet'}];
+const CONTACTS=[{name:'أحمد مصطفى',phone:'+14155552671',email:'ahmed@example.com'},{name:'Sara Ali',phone:'+14155552672',email:'sara@example.com'}];
+const $=(id)=>document.getElementById(id);
+const show=(id,v)=>$(id).textContent=typeof v==='string'?v:JSON.stringify(v,null,2);
+const phone=()=>{const v=$('phone').value.trim();return v?(v.startsWith('+')?v:'+'+v):'+14155552671';};
+const text=()=>$('msg').value.trim()||'مرحبًا';
+const validPhone=p=>/^\+[1-9]\d{7,14}$/.test(p);
+const withinWindow=t=>t&&Date.now()-t<86400000&&t<=Date.now();
+function reply(text){return /سعر|تكلف|دفع|طلب|شحن|مخزون|استرجاع|شكوى|كلمة سر|رمز|بطاق/i.test(text.toLowerCase())
+  ?'شكرًا لتواصلك. سأحوّل رسالتك إلى أحد أفراد الفريق للرد عليك بدقة.'
+  :'أهلًا بك! وصلت رسالتك، ويسعدني الإجابة عن استفساراتك العامة عن خدماتنا.';}
+function log(entry){S.log.unshift({at:new Date().toISOString(),...entry});S.log=S.log.slice(0,25);}
+
+/* ---------- actions ---------- */
+const actions={
+  async connect(){
+    const state=randomHex(32);S.stateHash=hex(sha256(enc.encode(state)));
+    const tokens={access_token:'demo-access',refresh_token:'demo-refresh',scope:'gmail.readonly drive.readonly calendar.events contacts.readonly'};
+    if(crypto.subtle){
+      S.key=await crypto.subtle.generateKey({name:'AES-GCM',length:256},true,['encrypt']);
+      const nonce=crypto.getRandomValues(new Uint8Array(12));
+      const cipher=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv:nonce},S.key,enc.encode(JSON.stringify(tokens))));
+      const tag=cipher.slice(-16),body=cipher.slice(0,-16);
+      S.sealed=['v1',b64(nonce),b64(tag),b64(body)].join('.');
+    }else{S.sealed='v1.'+b64(enc.encode(randomHex(48)))+'.simulated(HTTPS-required)';}
+    S.connected=true;log({event:'google.connected',stateHash:S.stateHash.slice(0,16)+'…'});
+    show('o-google',{connected:true,sealed:S.sealed.slice(0,90)+'…',algorithm:'AES-256-GCM',oauthState:'SHA-256 · صالح 10 دقائق · استخدام واحد',note:'مفتاح التشفير عشوائي ومؤقت داخل هذه الصفحة فقط.'});
+  },
+  disconnect(){S.connected=false;S.sealed='';show('o-google',{connected:false,note:'تم مسح الرموز المشفّرة من الذاكرة.'});},
+  gmail(){if(!S.connected)return show('o-google',{status:409,error:'google_not_connected'});show('o-google',{status:200,messages:GMAIL});},
+  drive(){if(!S.connected)return show('o-google',{status:409,error:'google_not_connected'});show('o-google',{status:200,files:DRIVE});},
+  calendar(){if(!S.connected)return show('o-google',{status:409,error:'google_not_connected'});show('o-google',{status:200,events:S.events});},
+  event(){if(!S.connected)return show('o-google',{status:409,error:'google_not_connected'});const e={id:'evt-'+(S.events.length+1),summary:'موعد تجريبي'};S.events.push(e);show('o-google',{status:201,event:e});},
+  contacts(){if(!S.connected)return show('o-google',{status:409,error:'google_not_connected'});show('o-google',{status:200,contacts:CONTACTS});},
+  consent(){const p=phone();if(!validPhone(p))return show('o-consent',{status:400,error:'invalid_phone'});
+    const c=S.contacts.get(p)||{};S.contacts.set(p,{...c,optedIn:true,aiOptedIn:true,source:'نموذج موافقة موثق',consentedAt:new Date().toISOString(),lastInboundAt:c.lastInboundAt||null});
+    show('o-consent',{status:200,phone:p,optedIn:true,aiOptedIn:true});},
+  withdraw(){const p=phone();const c=S.contacts.get(p)||{};S.contacts.set(p,{...c,optedIn:false,aiOptedIn:false,source:null});show('o-consent',{status:200,phone:p,optedIn:false});},
+  inbound(){webhook(false);},
+  forged(){webhook(true);},
+  duplicate(){webhook(false,S.lastInboundId||'wamid.duplicate');},
+  send(){const p=phone();const c=S.contacts.get(p);
+    if(!c?.optedIn)return show('o-inbound',{status:403,error:'recipient_has_not_opted_in'});
+    if(!withinWindow(c.lastInboundAt))return show('o-inbound',{status:403,error:'outside_customer_service_window_use_approved_template'});
+    const id='wamid.out.'+randomHex(5);S.outbox.push({id,to:p,text:'رسالة فردية من لوحة التحكم.',created_at:new Date().toISOString()});
+    storeMessage(id,'outbound','sent','رسالة فردية من لوحة التحكم.',p);
+    show('o-inbound',{status:202,providerMessageId:id});},
+  refresh(){render();},
+  reset(){S=initial();show('o-google','تم التصفير.');show('o-consent','—');show('o-inbound','—');render();}
+};
+
+function storeMessage(id,direction,status,body,p){if(S.messages.has(id))return 0;const row={id,phone:p,direction,status,body,at:new Date().toISOString()};S.messages.set(id,row);S.rows.unshift(row);return 1;}
+
+function webhook(forged,reuseId){
+  const p=phone(),body=text();
+  if(!validPhone(p))return show('o-inbound',{status:400,error:'invalid_phone'});
+  const id=reuseId||('wamid.in.'+randomHex(6));S.lastInboundId=id;
+  const raw=JSON.stringify({object:'whatsapp_business_account',entry:[{id:'demo',changes:[{field:'messages',value:{messages:[{id,from:p.slice(1),type:'text',text:{body}}]}}]}]});
+  const good='sha256='+hex(hmac(enc.encode(S.secret),enc.encode(raw)));
+  const supplied=forged?'sha256='+'0'.repeat(64):good;
+  const match=supplied.length===good.length&&supplied===good;
+  if(!match){log({event:'webhook.rejected',reason:'invalid_hmac'});return show('o-inbound',{status:401,error:'invalid_signature',signatureSent:supplied.slice(0,20)+'…',note:'تم رفض الرسالة قبل تحليل JSON — لم يُسجّل أي شيء.'});}
+  if(!storeMessage(id,'inbound','received',body,p)){return show('o-inbound',{status:200,duplicate:true,messageId:id,note:'تكرار من المزوّد — تم تجاهله بلا رد جديد.'});}
+  const c=S.contacts.get(p)||{};c.lastInboundAt=Date.now();S.contacts.set(p,c);
+  log({event:'webhook.accepted',messageId:id,signature:good.slice(0,24)+'…'});
+  let ai=null;
+  if(c.optedIn&&c.aiOptedIn&&withinWindow(c.lastInboundAt)){
+    ai=reply(body);const oid='wamid.out.'+randomHex(5);
+    S.outbox.push({id:oid,to:p,text:ai,created_at:new Date().toISOString()});
+    storeMessage(oid,'outbound','sent',ai,p);
+    log({event:'gemini.reply',providerMessageId:oid});
+  }
+  show('o-inbound',{status:200,accepted:true,messageId:id,signature:'HMAC-SHA256 ✓',consent:{optedIn:!!c.optedIn,aiOptedIn:!!c.aiOptedIn,within24h:withinWindow(c.lastInboundAt)},reply:ai||'لا رد: شروط الموافقة أو النافذة غير مكتملة.'});
+}
+
+function render(){
+  $('g-state').textContent=S.connected?'متصل · رموز مشفّرة':'غير متصل';
+  $('engine').textContent='المحرك يعمل محليًا ✓';
+  const stats=[['جهات الاتصال',S.contacts.size],['الرسائل',S.messages.size],['صادر WhatsApp',S.outbox.length],['مفتاح HMAC',S.secret.slice(0,8)+'…']];
+  $('stats').innerHTML=stats.map(([l,v])=>`<div class="stat"><b>${v}</b><span>${l}</span></div>`).join('');
+  show('o-contacts',S.contacts.size?[...S.contacts.entries()].map(([k,v])=>({phone:k,...v})):'لا توجد جهات اتصال.');
+  show('o-messages',S.rows.length?S.rows:'لا توجد رسائل.');
+  show('o-outbox',S.outbox.length?[...S.outbox].reverse():'صندوق الصادر فارغ.');
+}
+
+document.addEventListener('click',async e=>{const b=e.target.closest('button[data-act]');if(!b)return;b.disabled=true;try{await actions[b.dataset.act]();render();}catch(err){console.error(err);}finally{b.disabled=false;}});
+S=initial();render();
+</script>
+</body>
+</html>

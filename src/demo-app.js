@@ -89,9 +89,11 @@ export async function createDemoApp({ env = process.env } = {}) {
   };
 
   const demoRouter = await createDemoRouter({ pool, config, outbox });
-  // A demo dashboard is often shown inside a hosted preview iframe. Allow that
-  // origin explicitly (comma-separated) while keeping the rest of Helmet's CSP.
-  const frameAncestors = String(env.DEMO_FRAME_ANCESTORS || "'self'")
+  // A demo dashboard is often shown inside a hosted preview iframe whose origin
+  // is not known in advance (Arena, e2b, local, ...). The demo holds NO real
+  // secrets or user data, so framing is open by default; set
+  // DEMO_FRAME_ANCESTORS to a comma-separated allowlist to lock it down.
+  const frameAncestors = String(env.DEMO_FRAME_ANCESTORS || '*')
     .split(',').map((item) => item.trim()).filter(Boolean);
   const helmetOptions = {
     contentSecurityPolicy: { directives: { frameAncestors } },
