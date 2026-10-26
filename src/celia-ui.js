@@ -70,6 +70,15 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, conf
     res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'app.js'));
   });
 
+  // صفحات live/skills تستخدم ملفات خارجية بدل السكربتات المضمّنة حتى تتوافق مع CSP (script-src 'self').
+  router.get('/live.js', (_req, res) => {
+    res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'live.js'));
+  });
+
+  router.get('/skills.js', (_req, res) => {
+    res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'skills.js'));
+  });
+
   // Live JSON endpoints — no auth, shows system live on ground
   router.get('/healthz', async (_req, res) => {
     const summary = await buildStatusSummary(sandboxPool, config, { probeOllama: false });
