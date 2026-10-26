@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">سيليا</title>
+  <defs>
+    <linearGradient id="bg" x1="8" y1="4" x2="56" y2="60" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#20242f"/>
+      <stop offset="1" stop-color="#0b0c10"/>
+    </linearGradient>
+    <linearGradient id="orb" x1="18" y1="14" x2="48" y2="50" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f0a184"/>
+      <stop offset=".42" stop-color="#d97757"/>
+      <stop offset=".76" stop-color="#a78bfa"/>
+      <stop offset="1" stop-color="#38bdf8"/>
+    </linearGradient>
+    <radialGradient id="shine" cx="0" cy="0" r="1" gradientTransform="translate(24 20) rotate(48) scale(31)">
+      <stop stop-color="#fff" stop-opacity=".65"/>
+      <stop offset=".45" stop-color="#fff" stop-opacity=".08"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="3"/>
+    </filter>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="18" fill="url(#bg)" stroke="#fff" stroke-opacity=".16" stroke-width="2"/>
+  <circle cx="32" cy="32" r="16" fill="url(#orb)" opacity=".45" filter="url(#glow)"/>
+  <circle cx="32" cy="32" r="14" fill="url(#orb)"/>
+  <circle cx="32" cy="32" r="14" fill="url(#shine)"/>
+  <circle cx="27" cy="26" r="3" fill="#fff" fill-opacity=".72"/>
+</svg>

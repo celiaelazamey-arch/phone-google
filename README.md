@@ -12,7 +12,15 @@ CELIA_MCP_HOST=0.0.0.0 CELIA_MCP_PORT=3010 node src/celia-mcp.js
 
 هذا الأمر يشغّل الواجهة العربية + خادم MCP (١٢ أداة) + مختبر التشفير على ذاكرة مؤقتة، وهو نفس ما يعمل في المعاينة الحيّة.
 
-**صفحة الهبوط الفاخرة (تسويقية، مركّزة على التحويل):** افتح `http://localhost:3010/landing` محليًا — وعلى GitHub Pages تصبح على `https://celiaelazamey-arch.github.io/phone-google/landing.html`. ملفاتها `public/landing.html` + `landing.css` + `landing.js` (أصول خارجية فقط لتوافق CSP)، وتُبنى تلقائيًا ضمن `dist/`، وخطتها المنفَّذة في [`docs/خطة-نشر-صفحة-الهبوط.md`](docs/خطة-نشر-صفحة-الهبوط.md).
+**صفحة الهبوط الفاخرة (تسويقية، مركّزة على التحويل):** افتح `http://localhost:3010/landing` محليًا — وعلى GitHub Pages تصبح على `https://celiaelazamey-arch.github.io/phone-google/landing.html`. ملفاتها `public/landing.html` + `landing.css` + `landing.js`، مع خطوط عربية محلية (`fonts.css` + `public/fonts/`) وبطاقة مشاركة `og-celia.png`؛ لا تعتمد على أي أصل خارجي. تُبنى تلقائيًا ضمن `dist/`، وخطتها المنفَّذة في [`docs/خطة-نشر-صفحة-الهبوط.md`](docs/خطة-نشر-صفحة-الهبوط.md).
+
+لجعل الصفحة التسويقية هي الواجهة الافتراضية مع إبقاء مساحة الوكيل على `/studio`:
+
+```bash
+CELIA_LANDING_ROOT=true CELIA_MCP_DISABLE_MYSQL=true CELIA_MCP_API_TOKEN=$(openssl rand -hex 32) \
+CELIA_MCP_HOST=0.0.0.0 CELIA_MCP_PORT=3010 node src/celia-mcp.js
+# / = صفحة الهبوط · /studio = مساحة الوكيل
+```
 
 **نشر دائم مجاني:** نسخة ثابتة جاهزة لـ GitHub Pages (`npm run build:pages` + سير عمل جاهز؛ التفعيل الأول يحتاج نقرة واحدة من المالك: Settings → Pages → Source: GitHub Actions)، وبديل خادم كامل عبر `render.yaml` + `Dockerfile.mcp` على طبقة Render المجانية. التفاصيل وسبب الحاجة للنقرة في [`docs/خطة-النشر-المجاني.md`](docs/خطة-النشر-المجاني.md).
 
