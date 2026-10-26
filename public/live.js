@@ -32,6 +32,14 @@ async function rpcLiveView(){
   const r = await fetch('./ui/workspace/rpc',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
   const j = await r.json(); return j;
 }
+function escapeHtml(value){
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
 function renderStats(health, live){
   const p = health.providers || {};
   els.pillStorage.textContent = 'التخزين: ' + (health.storage==='memory'?'ذاكرة حية (Memory)':'MySQL');
@@ -46,7 +54,7 @@ function renderStats(health, live){
     {t:'Google OAuth',v: p.google?.oauthConfigured ? 'مُهيأ':'تجريبي', s: p.google?.encryptionReady?'مفتاح 32 بايت جاهز':'—'},
     {t:'WhatsApp',v: (p.whatsapp?.webhookConfigured?'Webhook ✓':'بدون') + ' · ' + (p.whatsapp?.cloudApiConfigured?'Cloud API':'sandbox'), s: p.whatsapp?.autoReplyEnabled?'رد تلقائي مفعّل':'رد تلقائي متوقف (آمن)'}
   ];
-  els.stats.innerHTML = cards.map(c=> `<div class="stat-card"><h4>${c.t}</h4><div class="val">${c.v}</div><div class="sub">${c.s}</div></div>`).join('');
+  els.stats.innerHTML = cards.map(c=> `<div class="stat-card"><h4>${escapeHtml(c.t)}</h4><div class="val">${escapeHtml(c.v)}</div><div class="sub">${escapeHtml(c.s)}</div></div>`).join('');
   if(live){
     els.liveTime.textContent = new Date(live.telemetry?.timestamp || live.timestamp || Date.now()).toLocaleString('ar-EG');
     els.liveUptime.textContent = live.telemetry?.uptime || '—';
@@ -60,12 +68,15 @@ function renderSkills(data){
   els.skillsGrid.innerHTML = skills.map(s=> `
     <div class="skill-card">
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
-        <strong>${s.name}</strong>
-        <span class="skill-tag">${(s.tags||[]).join(' · ') || 'system'}</span>
+        <strong>${escapeHtml(s.name)}</strong>
+        <span class="skill-tag">${escapeHtml((s.tags||[]).join(' · ') || 'system')}</span>
       </div>
-      <div class="meta">${s.description}</div>
-      <div style="font-size:.78rem;color:var(--text-muted)">استدعاء: <code style="direction:ltr;display:inline-block">${s.invocation}</code></div>
-      <details><summary style="cursor:pointer;font-size:.8rem">مخطط الإدخال (inputSchema)</summary><pre style="white-space:pre-wrap;font-size:.75rem;background:var(--bg-code);padding:8px;border-radius:8px;direction:ltr;text-align:left">${JSON.stringify(s.inputSchema, null, 2)}</pre></details>
+      <div class="meta">${escapeHtml(s.description)}</div>
+      <div style="font-size:.78rem;color:var(--text-muted)">استدعاء: <code style="direction:ltr;display:inline-block">${escapeHtml(s.invocation)}</code></div>
+      <details><summary style="cursor:pointer;font-size:.8rem">مخطط الإدخال (inputSchema)</summary><pre style="white-space:pre-wrap;font-size:.75rem;background:var(--bg-code);padding:8px;border-radius:8px;direction:ltr;text-align:left">${escapeHtml(JSON.stringify(s.inputSchema, null, 2))}</pre></details>
+      <div style="margin-top:4px;display:flex;justify-content:flex-end">
+        <button type="button" class="icon-btn" data-try-skill="${escapeHtml(s.name)}" style="font-size:.78rem;padding:6px 10px">تجربة عبر الاستوديو →</button>
+      </div>
     </div>
   `).join('') || '<div style="color:var(--text-muted)">لا توجد نتائج — جرّب كلمة أخرى أو اختر \"كل الفئات\".</div>';
 }
@@ -98,6 +109,12 @@ document.getElementById('btn-refresh').onclick = refreshAll;
 document.getElementById('btn-copy-live').onclick = ()=> navigator.clipboard.writeText(els.liveJson.textContent).then(()=> alert('تم نسخ تقرير Live JSON ✓'));
 
 els.q.addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('btn-find').click(); });
+els.skillsGrid.addEventListener('click', (event)=>{
+  const tryBtn = event.target.closest('[data-try-skill]');
+  if (!tryBtn) return;
+  const studioBase = window.CeliaStatic ? './index.html' : './studio';
+  location.href = `${studioBase}#tool=${encodeURIComponent(tryBtn.dataset.trySkill)}`;
+});
 
 // initial load
 refreshAll();

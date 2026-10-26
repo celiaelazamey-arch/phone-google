@@ -45,7 +45,7 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, conf
 
   const sandboxHandler = createMcpHandler({ pool: sandboxPool, config: sandboxConfig });
 
-  const landingAtRoot = process.env.CELIA_LANDING_ROOT === 'true';
+  const landingAtRoot = Boolean(config?.landingRoot || process.env.CELIA_LANDING_ROOT === 'true');
   router.get('/', (_req, res) => {
     res.sendFile(path.join(PUBLIC_DIR, landingAtRoot ? 'landing.html' : 'index.html'));
   });
@@ -125,7 +125,14 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, conf
   });
   router.get('/api/live', async (_req, res) => {
     const summary = await buildStatusSummary(sandboxPool, config, { probeOllama: true });
-    res.json({ live: true, message: 'نظامك حي على أرض الواقع — Find Skills و System Live View يعملان الآن', summary, timestamp: new Date().toISOString() });
+    res.json({
+      live: true,
+      message: 'نظامك حي على أرض الواقع — Find Skills و System Live View يعملان الآن',
+      summary,
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      tools: summary.toolsCount
+    });
   });
   router.get('/api/skills', async (req, res) => {
     const query = String(req.query.q || req.query.query || '').trim();

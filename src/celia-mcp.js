@@ -55,6 +55,7 @@ export function loadCeliaMcpConfig(env = process.env, { requireToken = true } = 
     ownerPhone: (env.APP_OWNER_PHONE_E164 || '').trim() || null,
     encryptionKey: hasValidEncryptionKey ? rawEncryptionKey : '',
     envDisableMysql: env.CELIA_MCP_DISABLE_MYSQL === 'true',
+    landingRoot: env.CELIA_LANDING_ROOT === 'true',
     celia: Object.freeze({
       apiToken: mcpToken,
       aiProvider: ((env.CELIA_AI_PROVIDER || 'auto').trim() || 'auto').toLowerCase()
@@ -327,6 +328,7 @@ export async function buildStatusSummary(pool, config, { probeOllama = false } =
     service: SERVER_INFO.name,
     version: SERVER_INFO.version,
     protocolVersion: MCP_PROTOCOL_VERSION,
+    toolsCount: MCP_TOOLS.length,
     storage: pool.isMemory ? 'memory' : 'mysql',
     providers: {
       configuredMode: config.celia.aiProvider,
@@ -516,11 +518,22 @@ export function createCeliaMcpHandler({ pool, config }) {
         const category = String(args?.category || 'all').toLowerCase();
         const liveCheck = args?.liveCheck !== false;
         const categoryMap = {
-          google: ['gmail', 'drive', 'calendar', 'contacts', 'google'],
-          whatsapp: ['whatsapp', 'واتساب'],
+          google: ['gmail', 'drive', 'calendar', 'contacts', 'google', 'بريد', 'ملفات', 'تقويم', 'مواعيد', 'جهات'],
+          whatsapp: ['whatsapp', 'واتساب', 'إرسال'],
           ai: ['ai', 'reply', 'celia_ai', 'ذكاء', 'رد'],
-          security: ['consent', 'crypto', 'تشفير', 'موافقة'],
-          system: ['status', 'celia_status', 'find_skills', 'system_live', 'live_view', 'نظام']
+          security: ['consent', 'crypto', 'celia_status', 'تشفير', 'موافقة', 'أمان'],
+          system: ['status', 'celia_status', 'find_skills', 'system_live', 'live_view', 'نظام', 'حالة']
+        };
+        const synonymExpansions = {
+          تقويم: ['calendar', 'مواعيد', 'موعد'],
+          بريد: ['gmail', 'رسائل'],
+          ملفات: ['drive', 'ملف'],
+          جهات: ['contacts', 'اتصال'],
+          تشفير: ['security', 'consent', 'celia_status', 'system_live_view'],
+          أمان: ['security', 'consent', 'celia_status'],
+          إرسال: ['send', 'whatsapp_send_text'],
+          ذكاء: ['ai', 'celia_ai_reply'],
+          حالة: ['status', 'celia_status', 'system_live_view']
         };
         const allToolsDetailed = MCP_TOOLS.map((t) => ({
           name: t.name,
@@ -535,8 +548,11 @@ export function createCeliaMcpHandler({ pool, config }) {
           filtered = filtered.filter((t) => t.tags.includes(category) || (category === 'system' && ['find_skills','system_live_view','celia_status'].includes(t.name)));
         }
         if (query) {
-          const q = query.toLowerCase();
-          filtered = filtered.filter((t) => t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q) || t.tags.join(' ').includes(q));
+          const terms = [query, ...(synonymExpansions[query] || [])];
+          filtered = filtered.filter((t) => {
+            const haystack = `${t.name.toLowerCase()} ${t.description.toLowerCase()} ${t.tags.join(' ')}`;
+            return terms.some((term) => haystack.includes(term));
+          });
         }
         let liveStatus = null;
         if (liveCheck) {
@@ -559,7 +575,6 @@ export function createCeliaMcpHandler({ pool, config }) {
         const now = new Date();
         const uptimeSec = Math.floor(process.uptime());
         const demoPhone = config.ownerPhone || '+201065217834';
-        const baseUrl = config.google?.redirectUri?.replace(/\/auth\/google\/callback.*/, '') || `http://localhost:${config.port || 3010}`;
         const telemetry = includeTelemetry ? {
           timestamp: now.toISOString(),
           uptime: `${Math.floor(uptimeSec / 3600)}h ${Math.floor((uptimeSec % 3600) / 60)}m ${uptimeSec % 60}s`,
@@ -568,7 +583,11 @@ export function createCeliaMcpHandler({ pool, config }) {
           storage: status.storage,
           ownerPhoneDemo: demoPhone,
           liveEndpoints: {
-            ui: '/',
+            ui: '/studio',
+            landing: '/landing',
+            live: '/live',
+            skills: '/skills',
+            apiLive: '/api/live',
             health: '/health',
             mcp: '/mcp',
             sandboxRpc: '/ui/workspace/rpc',
@@ -795,10 +814,6 @@ export function createCeliaMcpApp({ pool, config }) {
   app.get('/health', async (_req, res) => {
     const summary = await buildStatusSummary(pool, config, { probeOllama: true });
     res.json(summary);
-  });
-  app.get('/live', async (_req, res) => {
-    const summary = await buildStatusSummary(pool, config, { probeOllama: true });
-    res.json({ live: true, message: 'نظامك حي على أرض الواقع — Celia MCP يعمل الآن', summary, timestamp: new Date().toISOString(), uptime: process.uptime(), tools: MCP_TOOLS.length });
   });
   app.get('/api/skills/find', async (req, res) => {
     const q = String(req.query.q || req.query.query || '').trim();

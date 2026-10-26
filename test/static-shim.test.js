@@ -49,7 +49,19 @@ test('صفحة الهبوط مكتملة وكل أصولها المحلية تد
   assert.match(landingHtml, /id="cta"/);
   assert.match(landingHtml, /href="\.\/fonts\.css"/);
   assert.match(landingHtml, /href="\.\/index\.html"/);
-  assert.doesNotMatch(landingHtml, /href="\.\/studio"/);
+  assert.match(landingHtml, /href="\.\/index\.html#view=whatsapp"/);
+  assert.match(landingHtml, /href="\.\/index\.html#view=tools&amp;cat=google"/);
+  assert.doesNotMatch(landingHtml, /href="\.\/studio/);
+
+  const liveHtml = await readFile(path.join(DIST_DIR, 'live.html'), 'utf8');
+  assert.match(liveHtml, /href="\.\/index\.html"/);
+  assert.match(liveHtml, /href="\.\/landing\.html"/);
+  assert.doesNotMatch(liveHtml, /href="\.\/studio/);
+
+  const skillsHtml = await readFile(path.join(DIST_DIR, 'skills.html'), 'utf8');
+  assert.match(skillsHtml, /href="\.\/index\.html"/);
+  assert.match(skillsHtml, /href="\.\/landing\.html"/);
+  assert.doesNotMatch(skillsHtml, /href="\.\/studio/);
   assert.match(landingHtml, /property="og:image"/);
   assert.doesNotMatch(landingHtml, /fonts\.googleapis\.com|fonts\.gstatic\.com/);
   assert.equal((landingHtml.match(/<h1\b/g) || []).length, 1);
@@ -234,6 +246,16 @@ test('find_skills وsystem_live_view يعطيان تقريرًا حيًا متم
   assert.ok(skills.matched >= 3);
   assert.ok(skills.skills.every((skill) => typeof skill.invocation === 'string'));
   assert.equal(skills.liveStatus.storage, 'memory');
+
+  for (const arabicQuery of ['تقويم', 'تشفير', 'بريد', 'ملفات', 'إرسال']) {
+    const res = await CeliaStatic.handleRpc({
+      jsonrpc: '2.0',
+      id: 99,
+      method: 'tools/call',
+      params: { name: 'find_skills', arguments: { query: arabicQuery, category: 'all' } }
+    });
+    assert.ok(res.result.structuredContent.matched >= 1, `static find_skills should match "${arabicQuery}"`);
+  }
 
   const live = await CeliaStatic.handleRpc({
     jsonrpc: '2.0',

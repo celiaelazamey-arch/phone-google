@@ -88,15 +88,11 @@ function injectShimScript(html) {
 
 function rewriteStaticHostLinks(html) {
   return html
-    .replace(/href="\.\/live"/g, 'href="./live.html"')
-    .replace(/href="\.\/live\/"/g, 'href="./live.html"')
-    .replace(/href="\.\/skills"/g, 'href="./skills.html"')
-    .replace(/href="\.\/skills\/"/g, 'href="./skills.html"')
-    .replace(/href="\.\/landing"/g, 'href="./landing.html"')
-    .replace(/href="\.\/landing\/"/g, 'href="./landing.html"')
-    .replace(/href="\.\/index"/g, 'href="./index.html"')
-    .replace(/href="\.\/studio"/g, 'href="./index.html"')
-    .replace(/href="\.\/studio\/"/g, 'href="./index.html"');
+    .replace(/href="\.\/live\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./live.html${suffix}"`)
+    .replace(/href="\.\/skills\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./skills.html${suffix}"`)
+    .replace(/href="\.\/landing\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./landing.html${suffix}"`)
+    .replace(/href="\.\/index\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./index.html${suffix}"`)
+    .replace(/href="\.\/studio\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./index.html${suffix}"`);
 }
 
 export async function build() {
