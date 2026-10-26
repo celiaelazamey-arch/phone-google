@@ -92,6 +92,8 @@ function rewriteStaticHostLinks(html) {
     .replace(/href="\.\/live\/"/g, 'href="./live.html"')
     .replace(/href="\.\/skills"/g, 'href="./skills.html"')
     .replace(/href="\.\/skills\/"/g, 'href="./skills.html"')
+    .replace(/href="\.\/landing"/g, 'href="./landing.html"')
+    .replace(/href="\.\/landing\/"/g, 'href="./landing.html"')
     .replace(/href="\.\/index"/g, 'href="./index.html"');
 }
 

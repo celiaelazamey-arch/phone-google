@@ -61,6 +61,16 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, conf
   router.get('/skills.html', (_req, res) => {
     res.sendFile(path.join(PUBLIC_DIR, 'skills.html'));
   });
+  // صفحة الهبوط التسويقية الفاخرة (landing) — أصول خارجية فقط لتوافق CSP.
+  router.get('/landing', (_req, res) => {
+    res.sendFile(path.join(PUBLIC_DIR, 'landing.html'));
+  });
+  router.get('/landing.html', (_req, res) => {
+    res.sendFile(path.join(PUBLIC_DIR, 'landing.html'));
+  });
+  router.get('/index.html', (_req, res) => {
+    res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
+  });
 
   router.get('/styles.css', (_req, res) => {
     res.type('text/css').sendFile(path.join(PUBLIC_DIR, 'styles.css'));
@@ -77,6 +87,14 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, conf
 
   router.get('/skills.js', (_req, res) => {
     res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'skills.js'));
+  });
+
+  router.get('/landing.css', (_req, res) => {
+    res.type('text/css').sendFile(path.join(PUBLIC_DIR, 'landing.css'));
+  });
+
+  router.get('/landing.js', (_req, res) => {
+    res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'landing.js'));
   });
 
   // Live JSON endpoints — no auth, shows system live on ground
