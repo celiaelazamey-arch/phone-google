@@ -128,13 +128,13 @@
                   <p>تنفيذ دورة <code>initialize → tools/list → celia_status</code> واختبار تشفير رموز Google OAuth بـ AES-256-GCM وكشف التلاعب بالتواقيع.</p>
                 </button>
 
-                <button type="button" class="mission-card" data-mission="policy-guard">
+                <button type="button" class="mission-card" data-mission="live-app-artifact">
                   <div class="mission-top">
-                    <span class="mission-icon violet">🧠</span>
-                    <span class="mission-tag">حارس السياسة · 6 قواعد</span>
+                    <span class="mission-icon violet">✨</span>
+                    <span class="mission-tag">تطبيق حي تفاعلي · Claude Artifact</span>
                   </div>
-                  <h3>اختبار ذكاء خدمة العملاء ومنع الهلوسة</h3>
-                  <p>معالجة استفسار حساس حول الأسعار والشكاوى والمدفوعات وإثبات التزام سيليا بعدم اختلاق البيانات والتحويل اللطيف لموظف بشري.</p>
+                  <h3>بناء تطبيق تفاعلي حي داخل حاسوب سيليا</h3>
+                  <p>يبني ويعرض تطبيق ويب تفاعليًا متكاملًا (لوحة إدارة عملاء واتساب + حاسبة توفير الأتمتة الفورية) يعمل حيًا داخل شاشة المخرجات.</p>
                 </button>
 
                 <button type="button" class="mission-card" data-mission="free-stack-blueprint">
@@ -165,11 +165,12 @@
                   <label class="model-select-pill" for="studio-provider">
                     <span class="spark">✦</span>
                     <select id="studio-provider" aria-label="اختيار المحرك المجاني">
-                      <option value="auto">تلقائي ذكي (مجاني 100%)</option>
+                      <option value="auto">تلقائي ذكي سحابي (مجاني 100% بدون مفتاح)</option>
+                      <option value="pollinations-free">سحابي مجاني فوري (GPT / Qwen بدون مفتاح)</option>
                       <option value="gemini-browser">Gemini 2.5 Flash (مجاني — AI Studio)</option>
                       <option value="ollama-local">Ollama محلي (qwen2.5:7b مجاني)</option>
                       <option value="groq-free">Groq مجاني فائق السرعة (Llama 3.3)</option>
-                      <option value="celia-builtin">محرك سيليا المدمج (فوري بدون مفتاح)</option>
+                      <option value="celia-builtin">حارس سيليا المدمج (أوفلاين فوري)</option>
                     </select>
                   </label>
                   <button type="button" class="quick-chip" data-quick="افحص حالة خادم MCP وجميع المزودات المتصلة الآن">فحص المنظومة</button>
@@ -284,14 +285,14 @@
             </div>
 
             <div class="models-grid">
-              <!-- Free Option 1: Built-in -->
+              <!-- Free Option 1: Keyless Cloud + Built-in -->
               <div class="surface-card model-card featured">
                 <div class="model-card-head">
-                  <span class="badge-pill ok">نشط افتراضيًا · 0$ للأبد</span>
-                  <span class="model-cost">بدون مفتاح</span>
+                  <span class="badge-pill ok">نشط افتراضيًا · 0$ بلا مفتاح</span>
+                  <span class="model-cost">سحابي + مدمج</span>
                 </div>
-                <h3>🛡️ وكيل سيليا المدمج (Celia Guard 2026)</h3>
-                <p>مخطّط مهام متعدد الخطوات ومحرّك ردود متوافق مع القواعد الست يعمل مباشرةً داخل الخادم دون الحاجة لأي مفتاح خارجي أو بطاقة بنكية.</p>
+                <h3>🌐 الذكاء السحابي المجاني الفوري + وكيل سيليا</h3>
+                <p>يجمع بين التوليد السحابي المجاني بدون مفتاح (GPT / Qwen لتوليد التطبيقات التفاعلية والمستندات الحية بأسلوب Claude Artifacts) وحارس سيليا المحلي السريع دون أي اشتراك أو بطاقة بنكية.</p>
               </div>
 
               <!-- Free Option 2: Google Gemini Free Tier -->
@@ -358,6 +359,8 @@
             </div>
           </div>
           <div class="drawer-actions">
+            <button type="button" class="mini-btn" id="btn-expand-computer" title="تكبير / تصغير شاشة المخرجات">⛶ تكبير</button>
+            <button type="button" class="mini-btn" id="btn-download-artifact" title="تنزيل المخرج كملف">⬇ تنزيل</button>
             <button type="button" class="mini-btn" id="btn-copy-artifact" title="نسخ المخرج">نسخ</button>
             <button type="button" class="mini-btn" id="btn-close-computer" title="إغلاق اللوحة">✕</button>
           </div>

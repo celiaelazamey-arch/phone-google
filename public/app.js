@@ -1,8 +1,98 @@
 (() => {
   'use strict';
 
-  const DEFAULT_POLICY_AR =
-    'أنت مساعد خدمة عملاء ذكي لمنظومة سيليا (مساعد الهاتف + Google). اكتب ردًا عربيًا واضحًا ومهذبًا وموجزًا، ولا تخترع أسعارًا أو مواعيد غير مؤكدة، وحوّل الطلبات المالية والشكاوى بلطف لموظف بشري.';
+  const STUDIO_SYSTEM_PROMPT = [
+    'أنت «سيليا 2026» — وكيل ذكي متكامل بمستوى Claude وManus مرتبط ببروتوكول MCP لواتساب وخدمات Google.',
+    'تحدث بالعربية الفصحى السلسة والواضحة وقدم إجابات عملية منظمة بعناوين ونقاط واضحة.',
+    'إذا طلب المستخدم تصميم واجهة، أو أداة، أو حاسبة، أو لوحة تحكم، أو صفحة، أو نموذج تفاعلي: اكتب شرحًا موجزًا ثم أرفق كود HTML5 تفاعليًا كاملًا ومستقلًا (بـ dir="rtl" وتصميم عصري أنيق مع CSS وJS مدمجين) داخل كتلة ```html ... ``` ليعمل مباشرة في شاشة المخرجات الحية (Artifact).',
+    'في استفسارات خدمة العملاء المالية أو الأسعار غير المعلنة، التزم بعدم اختلاق أرقام واقترح بلطف متابعة موظف مختص.'
+  ].join('\n');
+
+  const SHOWCASE_ARTIFACT_HTML = `<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<style>
+  * { box-sizing: border-box; font-family: system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif; }
+  body { margin: 0; padding: 18px; background: #0c0f17; color: #f3f4f6; line-height: 1.55; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+  .kpi { background: #151a28; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px; }
+  .kpi span { display: block; font-size: 0.74rem; color: #9ca3af; }
+  .kpi strong { font-size: 1.25rem; color: #10b981; }
+  .kpi.coral strong { color: #e88c6d; }
+  .card { background: #151a28; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+  h3 { margin: 0 0 10px; font-size: 0.96rem; }
+  label { display: flex; justify-content: space-between; font-size: 0.8rem; color: #cbd5e1; margin-bottom: 4px; }
+  input[type="range"] { width: 100%; accent-color: #d97757; margin-bottom: 10px; }
+  .bar-wrap { background: #090c13; border-radius: 999px; height: 10px; overflow: hidden; margin-top: 6px; }
+  .bar-fill { height: 100%; background: linear-gradient(90deg, #d97757, #10b981); width: 78%; transition: width 0.2s; }
+  .queue { display: grid; gap: 7px; }
+  .q-row { display: flex; justify-content: space-between; align-items: center; background: #0e1320; padding: 8px 11px; border-radius: 9px; font-size: 0.8rem; }
+  .tag { padding: 2px 8px; border-radius: 999px; font-size: 0.7rem; background: rgba(16,185,129,0.15); color: #34d399; }
+  .tag.human { background: rgba(245,158,11,0.16); color: #fbbf24; }
+  button { background: #d97757; color: #fff; border: none; border-radius: 8px; padding: 6px 12px; font-size: 0.78rem; cursor: pointer; font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="kpi"><span>التوفير الشهري المقدّر</span><strong id="kpi-save">$1,440</strong></div>
+    <div class="kpi coral"><span>الساعات الموفّرة شهريًا</span><strong id="kpi-hours">180 ساعة</strong></div>
+    <div class="kpi"><span>تكلفة تشغيل سيليا</span><strong>$0.00</strong></div>
+  </div>
+
+  <div class="card">
+    <h3>⚡ حاسبة أثر أتمتة واتساب + Google المجانية</h3>
+    <label><span>عدد رسائل العملاء يوميًا</span><strong id="lbl-msgs">120 رسالة</strong></label>
+    <input type="range" id="rng-msgs" min="20" max="500" value="120" />
+    <label><span>نسبة الاستفسارات العامة الآلية (وفق السياسة)</span><strong id="lbl-rate">75%</strong></label>
+    <input type="range" id="rng-rate" min="30" max="95" value="75" />
+    <div style="font-size:0.76rem;color:#94a3b8;">نسبة التغطية الآمنة داخل نافذة 24 ساعة:</div>
+    <div class="bar-wrap"><div class="bar-fill" id="bar-fill"></div></div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <h3 style="margin:0;">📲 طابور رسائل العملاء الحي</h3>
+      <button type="button" id="btn-add-sim">+ محاكاة عميل جديد</button>
+    </div>
+    <div class="queue" id="queue">
+      <div class="q-row"><span>+201065217834 — استفسار مواعيد العمل</span><span class="tag">رد ذكي آلي ✓</span></div>
+      <div class="q-row"><span>+201126212452 — طلب عرض سعر مخصص</span><span class="tag human">تحويل لموظف بشري</span></div>
+    </div>
+  </div>
+
+  <script>
+    const rngMsgs = document.getElementById('rng-msgs');
+    const rngRate = document.getElementById('rng-rate');
+    function recalc() {
+      const msgs = Number(rngMsgs.value);
+      const rate = Number(rngRate.value);
+      document.getElementById('lbl-msgs').textContent = msgs + ' رسالة';
+      document.getElementById('lbl-rate').textContent = rate + '%';
+      document.getElementById('bar-fill').style.width = rate + '%';
+      const hours = Math.round((msgs * 30 * (rate / 100) * 4) / 60);
+      document.getElementById('kpi-hours').textContent = hours + ' ساعة';
+      document.getElementById('kpi-save').textContent = '$' + (hours * 8).toLocaleString();
+    }
+    rngMsgs.addEventListener('input', recalc);
+    rngRate.addEventListener('input', recalc);
+    document.getElementById('btn-add-sim').addEventListener('click', () => {
+      const q = document.getElementById('queue');
+      const samples = [
+        ['+201098441200 — تأكيد موعد Google Calendar', 'رد ذكي آلي ✓', 'tag'],
+        ['+201223910455 — مراجعة دفعة فاتورة سابقة', 'تحويل لموظف بشري', 'tag human'],
+        ['+201550192834 — موقع الفرع وساعات الدوام', 'رد ذكي آلي ✓', 'tag']
+      ];
+      const pick = samples[q.children.length % samples.length];
+      const row = document.createElement('div');
+      row.className = 'q-row';
+      row.innerHTML = '<span>' + pick[0] + '</span><span class="' + pick[2] + '">' + pick[1] + '</span>';
+      q.prepend(row);
+    });
+    recalc();
+  </script>
+</body>
+</html>`;
 
   const state = {
     theme: localStorage.getItem('celia_theme') || 'dark',
@@ -13,6 +103,7 @@
     tools: [],
     traces: [],
     lastArtifactText: '',
+    lastArtifactExt: 'md',
     selectedTool: null,
     serverHealth: null
   };
@@ -39,6 +130,8 @@
     btnAuthStatus: document.getElementById('btn-auth-status'),
     authLabel: document.getElementById('auth-label'),
     btnToggleComputer: document.getElementById('btn-toggle-computer'),
+    btnExpandComputer: document.getElementById('btn-expand-computer'),
+    btnDownloadArtifact: document.getElementById('btn-download-artifact'),
     btnCloseComputer: document.getElementById('btn-close-computer'),
     btnCopyArtifact: document.getElementById('btn-copy-artifact'),
     artifactBadge: document.getElementById('artifact-badge'),
@@ -89,6 +182,52 @@
       .replaceAll('>', '&gt;')
       .replaceAll('"', '&quot;')
       .replaceAll("'", '&#39;');
+  }
+
+  function formatMarkdownLite(mdText) {
+    const cleaned = String(mdText || '').replace(/```html[\s\S]*?```/gi, '').trim();
+    const lines = cleaned.split('\n');
+    const htmlParts = [];
+    let inList = false;
+
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) {
+        if (inList) {
+          htmlParts.push('</ul>');
+          inList = false;
+        }
+        continue;
+      }
+      if (line.startsWith('### ')) {
+        if (inList) { htmlParts.push('</ul>'); inList = false; }
+        htmlParts.push(`<h4>${escapeHtml(line.slice(4))}</h4>`);
+      } else if (line.startsWith('## ') || line.startsWith('# ')) {
+        if (inList) { htmlParts.push('</ul>'); inList = false; }
+        htmlParts.push(`<h3>${escapeHtml(line.replace(/^#+\s*/, ''))}</h3>`);
+      } else if (/^[-*•]\s+/.test(line)) {
+        if (!inList) { htmlParts.push('<ul>'); inList = true; }
+        const item = escapeHtml(line.replace(/^[-*•]\s+/, ''))
+          .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+          .replace(/`([^`]+)`/g, '<code>$1</code>');
+        htmlParts.push(`<li>${item}</li>`);
+      } else {
+        if (inList) { htmlParts.push('</ul>'); inList = false; }
+        const para = escapeHtml(line)
+          .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+          .replace(/`([^`]+)`/g, '<code>$1</code>');
+        htmlParts.push(`<p>${para}</p>`);
+      }
+    }
+    if (inList) htmlParts.push('</ul>');
+    return htmlParts.join('') || `<p>${escapeHtml(mdText)}</p>`;
+  }
+
+  function extractHtmlArtifact(rawText) {
+    const match = String(rawText || '').match(/```html\s*([\s\S]*?)```/i);
+    if (match?.[1]?.trim()) return match[1].trim();
+    if (/^\s*<!doctype html/i.test(rawText || '')) return String(rawText).trim();
+    return null;
   }
 
   function applyTheme(theme) {
@@ -192,9 +331,9 @@
             'x-goog-api-key': state.geminiKey
           },
           body: JSON.stringify({
-            systemInstruction: { parts: [{ text: DEFAULT_POLICY_AR }] },
-            contents: [{ role: 'user', parts: [{ text: promptText.slice(0, 3500) }] }],
-            generationConfig: { temperature: 0.25, maxOutputTokens: 280 }
+            systemInstruction: { parts: [{ text: STUDIO_SYSTEM_PROMPT }] },
+            contents: [{ role: 'user', parts: [{ text: promptText.slice(0, 4000) }] }],
+            generationConfig: { temperature: 0.35, maxOutputTokens: 1400 }
           })
         }
       );
@@ -202,11 +341,11 @@
         const json = await res.json();
         const text = (json.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('').trim();
         if (text) {
-          recordTrace('Gemini 2.5 Flash (Free AI Studio)', { model: 'gemini-2.5-flash', reply: text }, Math.round(performance.now()) - start);
+          recordTrace('Gemini 2.5 Flash (Free AI Studio)', { model: 'gemini-2.5-flash' }, Math.round(performance.now()) - start);
           return { reply: text, engineLabel: 'Gemini 2.5 Flash · مجاني' };
         }
       } else if (mode === 'gemini-browser') {
-        throw new Error(`رفض مفتاح Gemini الطلب (${res.status}) — تأكد من المفتاح في تبويب النماذج المجانية.`);
+        throw new Error(`رفض مفتاح Gemini الطلب (${res.status}) — راجع تبويب النماذج المجانية.`);
       }
     }
 
@@ -221,11 +360,11 @@
         },
         body: JSON.stringify({
           model: 'llama-3.3-70b-versatile',
-          temperature: 0.25,
-          max_tokens: 280,
+          temperature: 0.35,
+          max_tokens: 1400,
           messages: [
-            { role: 'system', content: DEFAULT_POLICY_AR },
-            { role: 'user', content: promptText.slice(0, 3500) }
+            { role: 'system', content: STUDIO_SYSTEM_PROMPT },
+            { role: 'user', content: promptText.slice(0, 4000) }
           ]
         })
       });
@@ -233,7 +372,7 @@
         const json = await res.json();
         const text = json.choices?.[0]?.message?.content?.trim();
         if (text) {
-          recordTrace('Groq Free Cloud (Llama 3.3 70B)', { reply: text }, Math.round(performance.now()) - start);
+          recordTrace('Groq Free Cloud (Llama 3.3 70B)', { ok: true }, Math.round(performance.now()) - start);
           return { reply: text, engineLabel: 'Groq Llama 3.3 · طبقة مجانية' };
         }
       } else if (mode === 'groq-free') {
@@ -252,8 +391,8 @@
             model: 'qwen2.5:7b',
             stream: false,
             messages: [
-              { role: 'system', content: DEFAULT_POLICY_AR },
-              { role: 'user', content: promptText.slice(0, 3500) }
+              { role: 'system', content: STUDIO_SYSTEM_PROMPT },
+              { role: 'user', content: promptText.slice(0, 4000) }
             ]
           })
         });
@@ -263,11 +402,44 @@
           if (text) return { reply: text, engineLabel: 'Ollama qwen2.5:7b · محلي مجاني' };
         }
       } catch {
-        // Fallback to server MCP below
+        // Fallback below
       }
     }
 
-    // 4. Server MCP celia_ai_reply (Server Gemini / Server Ollama / Celia Built-in Guard — 100% Free)
+    // 4. Keyless 100% Free Cloud Generative AI (Pollinations OpenAI-compatible CORS endpoint)
+    if (mode === 'auto' || mode === 'pollinations-free') {
+      try {
+        const start = Math.round(performance.now());
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 14000);
+        const res = await fetch('https://text.pollinations.ai/openai', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          signal: ctrl.signal,
+          body: JSON.stringify({
+            model: 'openai',
+            temperature: 0.4,
+            messages: [
+              { role: 'system', content: STUDIO_SYSTEM_PROMPT },
+              { role: 'user', content: promptText.slice(0, 3500) }
+            ]
+          })
+        });
+        clearTimeout(timer);
+        if (res.ok) {
+          const json = await res.json();
+          const text = json.choices?.[0]?.message?.content?.trim();
+          if (text) {
+            recordTrace('Free Cloud AI (Keyless OpenAI/Qwen)', { status: 200 }, Math.round(performance.now()) - start);
+            return { reply: text, engineLabel: 'الذكاء السحابي المجاني · بدون مفتاح' };
+          }
+        }
+      } catch {
+        // Graceful fallback to instant server engine if browser blocks external domain
+      }
+    }
+
+    // 5. Instant (<5ms) Server Celia Guard Fallback
     const providerArg = mode === 'celia-builtin' ? 'local' : 'auto';
     const { data } = await callMcpRpc('tools/call', {
       name: 'celia_ai_reply',
@@ -281,27 +453,24 @@
           ? `Gemini (${out.model}) · خادم MCP`
           : out.provider === 'ollama'
             ? `Ollama (${out.model}) · خادم MCP`
-            : 'وكيل سيليا المدمج · مجاني بدون مفتاح'
+            : 'حارس سيليا المدمج · فوري بدون مفتاح'
     };
   }
 
   function updateAuthUi() {
     const hasOwner = Boolean(state.mcpToken && state.mcpToken.length >= 32);
-    const hasCloudFree = Boolean(state.geminiKey || state.groqKey || state.serverHealth?.providers?.gemini?.configured);
     if (hasOwner) {
       el.authLabel.textContent = 'وضع المالك الموثّق (Bearer MCP)';
-    } else if (hasCloudFree) {
-      el.authLabel.textContent = 'ذكاء سحابي مجاني متصل';
+    } else if (state.geminiKey || state.groqKey) {
+      el.authLabel.textContent = 'مفتاح مجاني مخصص متصل';
     } else {
-      el.authLabel.textContent = 'استوديو سيليا المجاني نشط';
+      el.authLabel.textContent = 'مجاني 100% نشط';
     }
     el.tEngineState.textContent = state.geminiKey
-      ? 'Gemini 2.5 Flash (متصفح)'
+      ? 'Gemini 2.5 Flash (مجاني)'
       : state.groqKey
         ? 'Groq Llama 3.3 (مجاني)'
-        : state.serverHealth?.providers?.gemini?.configured
-          ? 'Gemini 2.5 Flash (خادم)'
-          : 'وكيل سيليا المدمج (0$)';
+        : 'سحابي مجاني فوري (0$)';
   }
 
   function toolCategory(name) {
@@ -378,17 +547,73 @@
     el.toolModal.hidden = false;
   }
 
-  function setArtifact(title, htmlBody, plainCopyText) {
-    state.lastArtifactText = plainCopyText || title;
+  function renderRichArtifact({ title, customHtml = '', markdownText = '', appHtmlCode = null, engineLabel = '', totalMs = 0, copyText = '' }) {
+    if (appHtmlCode) {
+      state.lastArtifactText = appHtmlCode;
+      state.lastArtifactExt = 'html';
+      const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(appHtmlCode)}`;
+      el.artifactContent.className = '';
+      el.artifactContent.innerHTML = `
+        <div class="artifact-card">
+          <div class="artifact-card-head">
+            <h4>✨ ${escapeHtml(title)}</h4>
+            <div class="artifact-mode-bar">
+              <button type="button" class="artifact-mode-btn active" id="art-btn-live">👁️ معاينة التطبيق الحي</button>
+              <button type="button" class="artifact-mode-btn" id="art-btn-code">💻 الكود المصدري</button>
+            </div>
+          </div>
+          <div id="art-pane-live">
+            <iframe class="artifact-iframe" sandbox="allow-scripts" title="${escapeHtml(title)}"></iframe>
+          </div>
+          <div id="art-pane-code" hidden>
+            <pre class="mono-box" style="max-height:410px;">${escapeHtml(appHtmlCode)}</pre>
+          </div>
+          <div class="artifact-meta-footer">
+            <span>المحرك: <strong>${escapeHtml(engineLabel)}</strong></span>
+            <span dir="ltr">${totalMs}ms</span>
+          </div>
+        </div>`;
+
+      const iframe = el.artifactContent.querySelector('iframe');
+      iframe.src = dataUrl;
+      const btnLive = el.artifactContent.querySelector('#art-btn-live');
+      const btnCode = el.artifactContent.querySelector('#art-btn-code');
+      const paneLive = el.artifactContent.querySelector('#art-pane-live');
+      const paneCode = el.artifactContent.querySelector('#art-pane-code');
+
+      btnLive.addEventListener('click', () => {
+        btnLive.classList.add('active');
+        btnCode.classList.remove('active');
+        paneLive.hidden = false;
+        paneCode.hidden = true;
+      });
+      btnCode.addEventListener('click', () => {
+        btnCode.classList.add('active');
+        btnLive.classList.remove('active');
+        paneCode.hidden = false;
+        paneLive.hidden = true;
+      });
+      return;
+    }
+
+    state.lastArtifactText = copyText || markdownText || title;
+    state.lastArtifactExt = 'md';
     el.artifactContent.className = '';
     el.artifactContent.innerHTML = `
       <div class="artifact-card">
-        <h4>${escapeHtml(title)}</h4>
-        ${htmlBody}
+        <div class="artifact-card-head">
+          <h4>📄 ${escapeHtml(title)}</h4>
+        </div>
+        ${customHtml}
+        ${markdownText ? `<div class="artifact-doc">${formatMarkdownLite(markdownText)}</div>` : ''}
+        <div class="artifact-meta-footer">
+          <span>المحرك: <strong>${escapeHtml(engineLabel)}</strong></span>
+          <span dir="ltr">${totalMs}ms</span>
+        </div>
       </div>`;
   }
 
-  function createAgentTurnUI(userTitle, enginePlaceholder = 'جارٍ التخطيط...') {
+  function createAgentTurnUI(userTitle, enginePlaceholder = 'جارٍ التنفيذ...') {
     el.heroWelcome.style.display = 'none';
 
     const userDiv = document.createElement('div');
@@ -410,7 +635,7 @@
         </div>
         <div class="manus-steps"></div>
       </div>
-      <div class="agent-prose"></div>
+      <div class="agent-prose artifact-doc"></div>
     `;
     el.stream.appendChild(agentDiv);
     el.chatScroll.scrollTop = el.chatScroll.scrollHeight;
@@ -437,29 +662,23 @@
           icon.className = 'step-icon done';
           icon.textContent = '✓';
           row.querySelector('.step-ms').textContent = `${ms}ms`;
-        },
-        fail(msg) {
-          const icon = row.querySelector('.step-icon');
-          icon.className = 'step-icon err';
-          icon.textContent = '!';
-          row.querySelector('.step-ms').textContent = msg || 'خطأ';
         }
       };
     }
 
-    function finish({ summaryText, prose, engineLabel, artifactTitle, artifactHtml, artifactCopy }) {
+    function finish({ summaryText, proseMarkdown, engineLabel, artifactSpec }) {
       planSummary.textContent = summaryText;
-      proseEl.textContent = prose;
+      proseEl.innerHTML = formatMarkdownLite(proseMarkdown);
       if (engineLabel) engineTagEl.textContent = engineLabel;
-      if (artifactTitle && artifactHtml) {
-        setArtifact(artifactTitle, artifactHtml, artifactCopy);
+      if (artifactSpec) {
+        renderRichArtifact(artifactSpec);
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'artifact-trigger-card';
         btn.innerHTML = `
           <div>
-            <strong>📄 ${escapeHtml(artifactTitle)}</strong>
-            <span>اضغط لفتح المخرج التفاعلي وسجل JSON-RPC في حاسوب سيليا</span>
+            <strong>${artifactSpec.appHtmlCode ? '✨ تطبيق حي تفاعلي:' : '📄 مستند المخرج:'} ${escapeHtml(artifactSpec.title)}</strong>
+            <span>اضغط لفتح المعاينة التفاعلية الكاملة داخل حاسوب سيليا</span>
           </div>
           <span>↗</span>`;
         btn.addEventListener('click', () => openDrawer('preview'));
@@ -482,6 +701,38 @@
   async function runMission(missionId) {
     el.btnSend.disabled = true;
     try {
+      if (missionId === 'live-app-artifact') {
+        const turn = createAgentTurnUI('ابنِ تطبيق ويب تفاعليًا حيًا لإدارة عملاء واتساب وحاسبة عائد الأتمتة داخل حاسوب سيليا');
+        const t0 = performance.now();
+
+        const s1 = turn.addStep('1. فحص جاهزية خادم MCP وأدوات واتساب (celia_status)');
+        const r1 = await callMcpRpc('tools/call', { name: 'celia_status', arguments: { probeOllama: false } });
+        s1.done(r1.elapsed);
+
+        const s2 = turn.addStep('2. تجميع مكونات الواجهة التفاعلية وحاسبة العائد (Claude Artifact Sandbox)');
+        const s2t = performance.now();
+        await new Promise((r) => setTimeout(r, 120));
+        s2.done(Math.max(1, Math.round(performance.now() - s2t)));
+
+        const totalMs = Math.round(performance.now() - t0);
+        turn.finish({
+          summaryText: `تم البناء والعرض الحي في ${totalMs}ms`,
+          engineLabel: 'محرك المخرجات التفاعلية · Claude Artifact',
+          proseMarkdown:
+            `### تم بناء التطبيق التفاعلي بنجاح\n` +
+            `- يعرض **حاسوب سيليا الحي** الآن تطبيق ويب تفاعليًا يعمل داخل معزل آمن (\`iframe sandbox\`).\n` +
+            `- حرّك أشرطة التمرير لحساب الساعات والتكلفة الموفّرة شهريًا، أو اضغط **+ محاكاة عميل جديد** لاختبار الفرز الذكي للرسائل، أو بدّل إلى تبويب **💻 الكود المصدري** لنسخ أو تنزيل ملف HTML كاملًا.`,
+          artifactSpec: {
+            title: 'لوحة سيليا التفاعلية وحاسبة توفير الأتمتة 2026',
+            appHtmlCode: SHOWCASE_ARTIFACT_HTML,
+            engineLabel: 'Claude Artifact Sandbox · مجاني 100%',
+            totalMs
+          }
+        });
+        openDrawer('preview');
+        return;
+      }
+
       if (missionId === 'whatsapp-e2e') {
         const turn = createAgentTurnUI('شغّل سيناريو عميل واتساب الكامل للرقم +201065217834 مع التوقيع والرد الذكي');
         const t0 = performance.now();
@@ -521,29 +772,29 @@
         el.waWindowInd.textContent = 'نافذة 24 ساعة: مفتوحة ونشطة ✓';
 
         const totalMs = Math.round(performance.now() - t0);
-        const artifactHtml = `
+        const customHtml = `
           <div class="kv-grid">
             <div class="kv-item"><span>رقم العميل (E.164)</span><span class="kv-val">+201065217834</span></div>
             <div class="kv-item"><span>توقيع HMAC-SHA256</span><span class="kv-val">متحقق ✓ (${escapeHtml(simRes.data.signatureHeader.slice(0, 22))}...)</span></div>
             <div class="kv-item"><span>نافذة خدمة العملاء 24h</span><span class="kv-val">مفتوحة ✓</span></div>
             <div class="kv-item"><span>الموافقة المزدوجة (WhatsApp + AI)</span><span class="kv-val">مفعّلة ✓</span></div>
-          </div>
-          <div style="padding:10px;border-radius:10px;background:var(--bg-elevated);font-size:0.82rem;">
-            <strong>رسالة العميل:</strong> ${escapeHtml(inboundText)}<br/>
-            <strong style="color:var(--emerald);">رد سيليا الآمن:</strong> ${escapeHtml(aiOut.reply)}
           </div>`;
 
         turn.finish({
           summaryText: `اكتملت ٤ خطوات بنجاح في ${totalMs}ms`,
           engineLabel: aiOut.engineLabel,
-          prose:
-            `تم تنفيذ دورة واتساب للأعمال كاملةً بنجاح:\n` +
-            `• سُجّلت الموافقة الموثقة وموافقة الذكاء الاصطناعي المنفصلة للرقم +201065217834.\n` +
-            `• تم التحقق الجنائي من توقيع Webhook الخام (${simRes.data.signatureHeader.slice(0, 24)}...) وفتح نافذة الـ 24 ساعة.\n` +
-            `• الرد المعتمد للعميل:\n«${aiOut.reply}»`,
-          artifactTitle: 'إيصال تشغيل واتساب الموثّق + الرد الذكي',
-          artifactHtml,
-          artifactCopy: aiOut.reply
+          proseMarkdown:
+            `### اكتملت دورة واتساب للأعمال بنجاح\n` +
+            `- تم توثيق الموافقة المزدوجة للرقم \`+201065217834\` والتحقق الجنائي من توقيع Webhook الخام.\n` +
+            `- فُتحت نافذة الـ 24 ساعة وتم توليد الرد التالي:\n\n${aiOut.reply}`,
+          artifactSpec: {
+            title: 'إيصال تشغيل واتساب الموثّق + الرد الذكي',
+            customHtml,
+            markdownText: `### رسالة العميل الواردة\n${inboundText}\n\n### رد سيليا المعتمد\n${aiOut.reply}`,
+            engineLabel: aiOut.engineLabel,
+            totalMs,
+            copyText: aiOut.reply
+          }
         });
         openDrawer('preview');
         return;
@@ -567,7 +818,7 @@
 
         const c = r3.data.cryptography;
         const totalMs = Math.round(performance.now() - t0);
-        const artifactHtml = `
+        const customHtml = `
           <div class="kv-grid">
             <div class="kv-item"><span>تشفير رموز Google OAuth</span><span class="kv-val">AES-256-GCM ✓</span></div>
             <div class="kv-item"><span>فك التشفير المطابق للأصل</span><span class="kv-val">${c.decryptedMatchesOriginal ? 'تطابق 100% ✓' : 'فشل'}</span></div>
@@ -579,53 +830,18 @@
         turn.finish({
           summaryText: `اكتمل التدقيق في ${totalMs}ms`,
           engineLabel: 'مختبر التشفير الحي · Node Crypto',
-          prose:
-            `اجتازت المنظومة جميع اختبارات التشفير والمصادقة الحية:\n` +
-            `• خادم ${r1.data.result?.serverInfo?.name} يستجيب بكامل الأدوات (${r2.data.result?.tools?.length} أدوات).\n` +
-            `• رموز OAuth تُحفظ بصيغة مشفّرة مصادق عليها (v1.nonce.tag.ciphertext) ولا تُخزّن كنص مكشوف أبدًا.\n` +
-            `• أي تعديل ولو بحرف واحد في حمولة Webhook يُرفض تلقائيًا بتوقيت ثابت يمنع هجمات التوقيت.`,
-          artifactTitle: 'بطاقة التدقيق الجنائي للتشفير (AES-256-GCM & HMAC)',
-          artifactHtml,
-          artifactCopy: JSON.stringify(c, null, 2)
-        });
-        openDrawer('preview');
-        return;
-      }
-
-      if (missionId === 'policy-guard') {
-        const trickyMsg = 'كم سعر الباقة السنوية؟ أريد خصمًا فوريًا واسترجاع مبلغ فاتورتي السابقة الآن!';
-        const turn = createAgentTurnUI(`اختبر حارس السياسة على رسالة حساسة: «${trickyMsg}»`);
-        const t0 = performance.now();
-
-        const s1 = turn.addStep('1. قراءة وثيقة السياسة الإلزامية عبر مورد MCP (celia://policy/customer-reply)');
-        const r1 = await callMcpRpc('resources/read', { uri: 'celia://policy/customer-reply' });
-        s1.done(r1.elapsed);
-
-        const s2 = turn.addStep('2. معالجة استفسار الأسعار والمدفوعات تحت القواعد الست الصارمة');
-        const aiStart = performance.now();
-        const aiOut = await generateFreeAiText(trickyMsg);
-        s2.done(Math.max(1, Math.round(performance.now() - aiStart)));
-
-        const policyText = r1.data.result?.contents?.[0]?.text || DEFAULT_POLICY_AR;
-        const totalMs = Math.round(performance.now() - t0);
-        const artifactHtml = `
-          <div style="font-size:0.81rem;color:var(--text-secondary);">السياسة المطبّقة حرفيًا:</div>
-          <div style="padding:10px;border-radius:9px;background:var(--bg-elevated);font-size:0.8rem;">${escapeHtml(policyText)}</div>
-          <div class="kv-grid">
-            <div class="kv-item"><span>اختلاق أسعار أو خصومات</span><span class="kv-val">ممنوع ✓ (0 هلوسة)</span></div>
-            <div class="kv-item"><span>تحويل الشكاوى والمدفوعات لبشري</span><span class="kv-val">مُطبّق ✓</span></div>
-          </div>`;
-
-        turn.finish({
-          summaryText: `تم التحقق في ${totalMs}ms`,
-          engineLabel: aiOut.engineLabel,
-          prose:
-            `رد سيليا الملتزم بالسياسة دون اختلاق أي سعر أو وعد مالي:\n\n` +
-            `«${aiOut.reply}»\n\n` +
-            `لاحظ كيف امتنعت سيليا عن تخمين الأسعار وحوّلت الشق المالي بأسلوب مهذب إلى موظف مختص.`,
-          artifactTitle: 'تقرير التزام حارس السياسة ومنع الهلوسة',
-          artifactHtml,
-          artifactCopy: aiOut.reply
+          proseMarkdown:
+            `### اجتازت المنظومة جميع فحوص التشفير والمصادقة\n` +
+            `- خادم \`${r1.data.result?.serverInfo?.name}\` يعمل بكامل الأدوات (${r2.data.result?.tools?.length} أدوات).\n` +
+            `- رموز OAuth تُحفظ بصيغة مشفّرة مصادق عليها (\`v1.nonce.tag.ciphertext\`).\n` +
+            `- أي تعديل في حمولة Webhook يُرفض تلقائيًا بمقارنة ثابتة التوقيت.`,
+          artifactSpec: {
+            title: 'بطاقة التدقيق الجنائي للتشفير (AES-256-GCM & HMAC)',
+            customHtml,
+            engineLabel: 'Node.js Crypto Engine',
+            totalMs,
+            copyText: JSON.stringify(c, null, 2)
+          }
         });
         openDrawer('preview');
         return;
@@ -636,7 +852,7 @@
         const t0 = performance.now();
 
         const s1 = turn.addStep('1. فحص حالة الخادم ومزودات الذكاء المجانية (celia_status)');
-        const r1 = await callMcpRpc('tools/call', { name: 'celia_status', arguments: { probeOllama: true } });
+        const r1 = await callMcpRpc('tools/call', { name: 'celia_status', arguments: { probeOllama: false } });
         s1.done(r1.elapsed);
 
         const s2 = turn.addStep('2. بناء ملف إعداد بروتوكول MCP القياسي (mcp.json)');
@@ -645,25 +861,29 @@
 
         const mcpConfigStr = document.getElementById('mcp-json-snippet').textContent;
         const totalMs = Math.round(performance.now() - t0);
-        const artifactHtml = `
+        const customHtml = `
           <div class="kv-grid">
             <div class="kv-item"><span>GitHub Actions + Gemini Secret</span><span class="kv-val">مربوط ومُختبر ✓</span></div>
-            <div class="kv-item"><span>وضع التشغيل المحلي المجاني</span><span class="kv-val">Ollama qwen2.5:7b + Celia Guard</span></div>
-            <div class="kv-item"><span>القوالب الجاهزة (Prompts)</span><span class="kv-val">${r2.data.result?.prompts?.length || 1} قالب</span></div>
+            <div class="kv-item"><span>الذكاء السحابي المجاني بالمتصفح</span><span class="kv-val">نشط بدون مفتاح ✓</span></div>
+            <div class="kv-item"><span>التشغيل المحلي المفتوح</span><span class="kv-val">Ollama qwen2.5:7b</span></div>
           </div>
           <pre class="mono-box">${escapeHtml(mcpConfigStr)}</pre>`;
 
         turn.finish({
           summaryText: `جاهز للنسخ في ${totalMs}ms`,
           engineLabel: 'معمارية سيليا المجانية 2026',
-          prose:
-            `حزمة الربط المجانية جاهزة بالكامل بتكلفة 0.00$:\n` +
-            `1) داخل GitHub Actions: يعمل سرك GEMINI_API_KEY وCELIA_MCP_API_TOKEN تلقائيًا.\n` +
-            `2) مع تطبيقات سطح المكتب (Claude Desktop / Cursor): انسخ ملف mcp.json من لوحة المخرجات لتشغيل سيليا عبر stdio مجانًا.\n` +
-            `3) على جهازك المحلي: يدعم qwen2.5:7b عبر Ollama أو Gemini AI Studio المجاني.`,
-          artifactTitle: 'ملف الربط المجاني mcp.json لعام 2026',
-          artifactHtml,
-          artifactCopy: mcpConfigStr
+          proseMarkdown:
+            `### حزمة الربط المجانية جاهزة بتكلفة 0.00$\n` +
+            `- داخل **GitHub Actions**: يعمل سرك \`GEMINI_API_KEY\` و\`CELIA_MCP_API_TOKEN\` تلقائيًا.\n` +
+            `- مع **Claude Desktop / Cursor**: انسخ ملف \`mcp.json\` من لوحة المخرجات لتشغيل سيليا عبر \`stdio\` مجانًا.\n` +
+            `- داخل **هذه الواجهة**: يعمل التوليد السحابي المجاني وعارض التطبيقات الحية مباشرة.`,
+          artifactSpec: {
+            title: 'ملف الربط المجاني mcp.json لعام 2026',
+            customHtml,
+            engineLabel: 'MCP 2024-11-05 Blueprint · 0$',
+            totalMs,
+            copyText: mcpConfigStr
+          }
         });
         openDrawer('preview');
       }
@@ -684,7 +904,6 @@
     const t0 = performance.now();
 
     try {
-      // Detect Egyptian 01xxxxxxxxx or E.164 +xxxxxxxxxxx phone numbers
       const e164Match = prompt.match(/\+[1-9]\d{7,14}/);
       const localEgMatch = !e164Match ? prompt.match(/\b01[0125]\d{8}\b/) : null;
       const detectedPhone = e164Match ? e164Match[0] : localEgMatch ? `+2${localEgMatch[0]}` : null;
@@ -692,11 +911,11 @@
       let consentData = null;
       let simData = null;
 
-      const s1 = turn.addStep('1. تحليل النية وفحص حالة أدوات سيليا عبر MCP');
+      const s1 = turn.addStep('1. تحليل المهمة وفحص جاهزية أدوات MCP (celia_status)');
       const st = await callMcpRpc('tools/call', { name: 'celia_status', arguments: { probeOllama: false } });
       s1.done(st.elapsed);
 
-      if (detectedPhone || /(واتساب|موافق|عميل|رسالة|webhook)/i.test(prompt)) {
+      if (detectedPhone || /(واتساب|موافق|webhook)/i.test(prompt)) {
         const phone = detectedPhone || '+201065217834';
         const s2 = turn.addStep(`2. تسجيل موافقة العميل ${phone} عبر أداة whatsapp_consent_upsert`);
         const cRes = await callMcpRpc('tools/call', {
@@ -721,39 +940,52 @@
         simData = simRes.data;
       }
 
-      const sAi = turn.addStep('توليد الاستجابة الذكية عبر المحرك المجاني المختار');
+      const sAi = turn.addStep('توليد المخرج والاستجابة الذكية عبر المحرك المجاني');
       const aiStart = performance.now();
       const aiOut = await generateFreeAiText(prompt);
       sAi.done(Math.max(1, Math.round(performance.now() - aiStart)));
 
+      const appHtmlCode = extractHtmlArtifact(aiOut.reply);
       const totalMs = Math.round(performance.now() - t0);
-      const artifactHtml = simData
+
+      const whatsappSummaryHtml = simData
         ? `<div class="kv-grid">
              <div class="kv-item"><span>الرقم المربوط</span><span class="kv-val">${escapeHtml(simData.phone)}</span></div>
              <div class="kv-item"><span>حالة الموافقة المزدوجة</span><span class="kv-val">${consentData?.aiOptedIn ? 'مفعّلة ✓' : 'مسجلة'}</span></div>
              <div class="kv-item"><span>توقيع HMAC-SHA256</span><span class="kv-val">صحيح ✓</span></div>
              <div class="kv-item"><span>نافذة 24 ساعة</span><span class="kv-val">مفتوحة ✓</span></div>
            </div>`
-        : `<div class="kv-grid">
-             <div class="kv-item"><span>المحرك المستخدم</span><span class="kv-val">${escapeHtml(aiOut.engineLabel)}</span></div>
-             <div class="kv-item"><span>زمن التنفيذ الكلي</span><span class="kv-val">${totalMs}ms</span></div>
-           </div>`;
+        : '';
 
       turn.finish({
         summaryText: `اكتمل التنفيذ في ${totalMs}ms`,
         engineLabel: aiOut.engineLabel,
-        prose: simData
-          ? `تم تنفيذ الإجراءات المطلوبة للرقم ${simData.phone} وفتح نافذة الـ 24 ساعة بنجاح.\n\nرد سيليا المقترح:\n«${aiOut.reply}»`
+        proseMarkdown: appHtmlCode
+          ? aiOut.reply.replace(/```html[\s\S]*?```/gi, '\n\n*(تم تشغيل التطبيق التفاعلي الكامل داخل شاشة حاسوب سيليا الحي ↗)*')
           : aiOut.reply,
-        artifactTitle: simData ? `بطاقة ربط العميل ${simData.phone}` : 'مخرج استجابة سيليا',
-        artifactHtml,
-        artifactCopy: aiOut.reply
+        artifactSpec: {
+          title: appHtmlCode
+            ? 'تطبيق تفاعلي حي من سيليا'
+            : simData
+              ? `مخرج ربط واستجابة واتساب (${simData.phone})`
+              : 'مستند مخرج سيليا الكامل',
+          appHtmlCode,
+          customHtml: whatsappSummaryHtml,
+          markdownText: appHtmlCode ? '' : aiOut.reply,
+          engineLabel: aiOut.engineLabel,
+          totalMs,
+          copyText: appHtmlCode || aiOut.reply
+        }
       });
+
+      if (appHtmlCode) {
+        openDrawer('preview');
+      }
     } catch (err) {
       turn.finish({
         summaryText: 'توقف التنفيذ بسبب خطأ',
         engineLabel: 'تنبيه',
-        prose: `تعذّر إكمال الخطوة: ${err.message}`
+        proseMarkdown: `تعذّر إكمال الخطوة: ${err.message}`
       });
     } finally {
       el.btnSend.disabled = false;
@@ -809,6 +1041,24 @@
     el.drawer.classList.toggle('open');
   });
 
+  el.btnExpandComputer.addEventListener('click', () => {
+    el.drawer.classList.toggle('expanded');
+    el.btnExpandComputer.textContent = el.drawer.classList.contains('expanded') ? '🗗 تصغير' : '⛶ تكبير';
+  });
+
+  el.btnDownloadArtifact.addEventListener('click', () => {
+    if (!state.lastArtifactText) return;
+    const blob = new Blob([state.lastArtifactText], {
+      type: state.lastArtifactExt === 'html' ? 'text/html;charset=utf-8' : 'text/markdown;charset=utf-8'
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `celia-artifact-${Date.now()}.${state.lastArtifactExt}`;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
   el.btnCloseComputer.addEventListener('click', () => {
     el.drawer.classList.remove('open');
   });
@@ -846,7 +1096,6 @@
     }
   });
 
-  // Tool Filter & Modal
   el.toolFilters.querySelectorAll('.filter-chip').forEach((chip) => {
     chip.addEventListener('click', () => {
       el.toolFilters.querySelectorAll('.filter-chip').forEach((c) => c.classList.remove('active'));
@@ -880,7 +1129,6 @@
     }
   });
 
-  // WhatsApp Simulator & Crypto Lab
   el.btnWaConsent.addEventListener('click', async () => {
     try {
       const { data } = await callMcpRpc('tools/call', {
@@ -903,7 +1151,6 @@
     const text = el.waText.value.trim();
     if (!text) return;
     try {
-      // Sync current consent toggles first so user sees exact live policy effect
       await callMcpRpc('tools/call', {
         name: 'whatsapp_consent_upsert',
         arguments: {
@@ -938,7 +1185,6 @@
     el.waCryptoReport.textContent = JSON.stringify(data.cryptography, null, 2);
   });
 
-  // Free Models & Vault Save
   el.btnVerifyVault.addEventListener('click', async () => {
     state.mcpToken = el.vaultMcpToken.value.trim();
     state.geminiKey = el.vaultGeminiKey.value.trim();

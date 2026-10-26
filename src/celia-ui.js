@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { DEFAULT_POLICY } from './gemini.js';
 import { createMemoryPool } from './memory-pool.js';
+import { checkOllamaHealth } from './ollama.js';
 import { decryptJson, encryptJson, hashOAuthState, isValidE164, isWithinCustomerWindow, verifyWhatsAppSignature } from './security.js';
 
 const PUBLIC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../public');
@@ -23,7 +24,7 @@ export function generateLocalPolicyReply({ customerMessage, businessContext = ''
   if (contextSnippet) {
     return `مرحبًا بك! يسعدنا خدمتك وفق سياق نشاطنا المعتمد: ${contextSnippet}. أخبرنا كيف يمكننا مساعدتك أو تحويلك لموظف مختص عند الحاجة.`;
   }
-  return 'أهلًا وسهلًا بك! أنا مساعد خدمة العملاء الذكي لسيليا؛ يسعدني الإجابة عن استفساراتك العامة أو تحويل طلبك لموظف بشري مختص للتفاصيل الإجرائية.';
+  return 'أهلًا وسهلًا بك! تم تنفيذ الفحص عبر وكيل سيليا؛ يسعدني الإجابة عن استفساراتك العامة، أو بناء مخرج تفاعلي متكامل، أو تحويل التفاصيل الإجرائية لموظف مختص.';
 }
 
 export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, config }) {
@@ -69,21 +70,15 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, conf
 
     if (body.method === 'tools/call' && body.params?.name === 'celia_ai_reply') {
       const requestedProvider = String(body.params?.arguments?.provider || 'auto').toLowerCase();
-      if (requestedProvider === 'local' || (requestedProvider === 'auto' && !config.gemini.apiKey)) {
-        const response = await sandboxHandler.handleRpcMessage(body);
-        if (!response?.result?.isError) {
-          return res.json({ ...response, sandbox: true });
-        }
-        const customerMessage = String(body.params?.arguments?.customerMessage || '').trim();
-        if (!customerMessage) {
-          return res.json({ ...response, sandbox: true });
-        }
-        const businessContext = String(body.params?.arguments?.businessContext || config.gemini.businessContext || '');
+      const customerMessage = String(body.params?.arguments?.customerMessage || '').trim();
+      const businessContext = String(body.params?.arguments?.businessContext || config.gemini.businessContext || '');
+
+      if (requestedProvider === 'local') {
         const reply = generateLocalPolicyReply({ customerMessage, businessContext });
         const output = {
           reply,
           provider: 'celia-local-policy-engine',
-          model: 'celia-guard-ar-2026 (مجاني مدمج بدون مفتاح)',
+          model: 'celia-guard-ar-2026 (فوري بدون مفتاح)',
           policyEnforced: true
         };
         return res.json({
@@ -96,6 +91,33 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, conf
             isError: false
           }
         });
+      }
+
+      if (requestedProvider === 'auto' && !config.gemini.apiKey) {
+        const ollama = await checkOllamaHealth({
+          baseUrl: config.ollama.baseUrl,
+          model: config.ollama.model,
+          allowRemote: config.ollama.allowRemote
+        });
+        if (!ollama.reachable) {
+          const reply = generateLocalPolicyReply({ customerMessage, businessContext });
+          const output = {
+            reply,
+            provider: 'celia-local-policy-engine',
+            model: 'celia-guard-ar-2026 (فوري بدون مفتاح)',
+            policyEnforced: true
+          };
+          return res.json({
+            jsonrpc: '2.0',
+            id: body.id ?? null,
+            sandbox: true,
+            result: {
+              content: [{ type: 'text', text: JSON.stringify(output, null, 2) }],
+              structuredContent: output,
+              isError: false
+            }
+          });
+        }
       }
     }
 

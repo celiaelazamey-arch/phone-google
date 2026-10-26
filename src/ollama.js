@@ -1,6 +1,7 @@
 import { DEFAULT_POLICY, generateWhatsAppReply } from './gemini.js';
 
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
+let ollamaHealthCache = { key: '', expiresAt: 0, value: null };
 
 export function normalizeOllamaBaseUrl(rawUrl = 'http://127.0.0.1:11434', allowRemote = false) {
   let parsed;
@@ -22,8 +23,12 @@ export async function checkOllamaHealth({
   baseUrl = 'http://127.0.0.1:11434',
   model = 'qwen2.5:7b',
   allowRemote = false,
-  timeoutMs = 1500
+  timeoutMs = 350
 } = {}) {
+  const cacheKey = `${baseUrl}|${model}|${allowRemote}`;
+  if (ollamaHealthCache.key === cacheKey && Date.now() < ollamaHealthCache.expiresAt && ollamaHealthCache.value) {
+    return ollamaHealthCache.value;
+  }
   try {
     const origin = normalizeOllamaBaseUrl(baseUrl, allowRemote);
     const response = await fetch(`${origin}/api/tags`, {
@@ -31,7 +36,9 @@ export async function checkOllamaHealth({
       signal: AbortSignal.timeout(timeoutMs)
     });
     if (!response.ok) {
-      return { reachable: false, model, modelAvailable: false, reason: `http_${response.status}` };
+      const val = { reachable: false, model, modelAvailable: false, reason: `http_${response.status}` };
+      ollamaHealthCache = { key: cacheKey, expiresAt: Date.now() + 15_000, value: val };
+      return val;
     }
     const payload = await response.json().catch(() => ({}));
     const models = Array.isArray(payload.models)
@@ -42,9 +49,13 @@ export async function checkOllamaHealth({
       const lower = name.toLowerCase();
       return lower === target || lower === `${target}:latest`;
     });
-    return { reachable: true, model, modelAvailable, installedModels: models.slice(0, 20) };
+    const val = { reachable: true, model, modelAvailable, installedModels: models.slice(0, 20) };
+    ollamaHealthCache = { key: cacheKey, expiresAt: Date.now() + 15_000, value: val };
+    return val;
   } catch (error) {
-    return { reachable: false, model, modelAvailable: false, reason: error.message || 'unreachable' };
+    const val = { reachable: false, model, modelAvailable: false, reason: error.message || 'unreachable' };
+    ollamaHealthCache = { key: cacheKey, expiresAt: Date.now() + 15_000, value: val };
+    return val;
   }
 }
 

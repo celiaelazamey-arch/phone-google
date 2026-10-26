@@ -667,8 +667,10 @@ export function createCeliaMcpApp({ pool, config }) {
           'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
           'font-src': ["'self'", 'https://fonts.gstatic.com', 'data:'],
           'img-src': ["'self'", 'data:'],
+          'frame-src': ["'self'", 'data:', 'blob:'],
           'connect-src': [
             "'self'",
+            'https://text.pollinations.ai',
             'https://generativelanguage.googleapis.com',
             'https://api.groq.com',
             'http://127.0.0.1:11434',
