@@ -63,7 +63,11 @@ const SECRET_ENV_NAMES = Object.freeze({
 
 function pickSecret(env, names) {
   for (const name of names) {
-    const raw = typeof env[name] === 'string' ? env[name].trim() : '';
+    let raw = typeof env[name] === 'string' ? env[name].trim() : '';
+    // قد تُنسخ المفاتيح من واجهات مختلفة محاطة بعلامات تنصيص؛ نزيل الزوج المطابق فقط.
+    if (raw.length >= 2 && ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'")))) {
+      raw = raw.slice(1, -1).trim();
+    }
     if (raw && !/^replace-with-/i.test(raw)) return { value: raw, source: name };
   }
   return { value: '', source: null };
@@ -246,15 +250,37 @@ export async function runSecretAudit({ env = process.env, fetchImpl = null, time
     finish(results.deepseek, result);
   }
 
+  // بعض الحسابات تستخدم مفتاحًا شخصيًا (xi-api-key / X-Figma-Token) وبعضها رمز OAuth
+  // (Authorization: Bearer). عند 401/403 نعيد المحاولة بالصيغة الأخرى قبل إعلان رفض المفتاح.
+  async function dualAuth({ url, value, primaryHeader }) {
+    let result = await probe({ ...common, url, headers: { [primaryHeader]: value } });
+    let headers = { [primaryHeader]: value };
+    let scheme = primaryHeader;
+    if (result.status === 401 || result.status === 403) {
+      const bearer = await probe({ ...common, url, headers: { authorization: `Bearer ${value}` } });
+      if (bearer.status >= 200 && bearer.status < 300) {
+        result = bearer;
+        headers = { authorization: `Bearer ${value}` };
+        scheme = 'authorization';
+      }
+    }
+    return { result, headers, scheme };
+  }
+
   // 5) ELEVENLABS — الاشتراك (لا يستهلك أحرفًا) + حساب النسبة المتبقية.
   let voiceQuota = null;
+  let elevenHeaders = null;
   if (secrets.elevenLabs.value) {
-    const result = await probe({
-      ...common,
+    const { result, headers, scheme } = await dualAuth({
       url: ELEVENLABS_SUBSCRIPTION_URL,
-      headers: { 'xi-api-key': secrets.elevenLabs.value }
+      value: secrets.elevenLabs.value,
+      primaryHeader: 'xi-api-key'
     });
+    elevenHeaders = headers;
     finish(results.elevenLabs, result);
+    if (['ok', 'limited'].includes(results.elevenLabs.state)) {
+      results.elevenLabs.authScheme = scheme === 'authorization' ? 'bearer' : 'xi-api-key';
+    }
     voiceQuota = parseVoiceQuota(result.payload);
     if (voiceQuota) results.elevenLabs.remainingCharacters = voiceQuota.remaining;
   }
@@ -266,22 +292,45 @@ export async function runSecretAudit({ env = process.env, fetchImpl = null, time
     results.voiceId.state = 'unverified';
     results.voiceId.note = 'needs_elevenlabs_key';
   } else {
-    const result = await probe({
+    const headers = elevenHeaders || { 'xi-api-key': secrets.elevenLabs.value };
+    const voiceId = secrets.voiceId.value;
+    const direct = await probe({
       ...common,
-      url: `${ELEVENLABS_VOICES_URL}/${encodeURIComponent(secrets.voiceId.value)}`,
-      headers: { 'xi-api-key': secrets.elevenLabs.value }
+      url: `${ELEVENLABS_VOICES_URL}/${encodeURIComponent(voiceId)}`,
+      headers
     });
-    finish(results.voiceId, result);
+    if (direct.status === 400 || direct.status === 404) {
+      // قد يكون المعرّف بصيغة غير مباشرة؛ نتحقق من قائمة الأصوات بدل إعلان رفض المفتاح.
+      const list = await probe({ ...common, url: ELEVENLABS_VOICES_URL, headers });
+      if (list.status >= 200 && list.status < 300) {
+        const voices = Array.isArray(list.payload?.voices) ? list.payload.voices : [];
+        if (voices.some((voice) => String(voice?.voice_id || '') === voiceId)) {
+          finish(results.voiceId, { status: 200, payload: list.payload, failureReason: null });
+          results.voiceId.note = 'matched_in_voice_list';
+        } else {
+          results.voiceId.state = 'unverified';
+          results.voiceId.note = 'voice_id_not_found';
+          results.voiceId.httpStatus = 404;
+        }
+      } else {
+        finish(results.voiceId, direct);
+      }
+    } else {
+      finish(results.voiceId, direct);
+    }
   }
 
   // 7) FIGMA_ACCESS_TOKEN — /me مجاني بالكامل (لا نطبع هوية الحساب).
   if (secrets.figma.value) {
-    const result = await probe({
-      ...common,
+    const { result, scheme } = await dualAuth({
       url: FIGMA_URL,
-      headers: { 'X-Figma-Token': secrets.figma.value }
+      value: secrets.figma.value,
+      primaryHeader: 'X-Figma-Token'
     });
     finish(results.figma, result);
+    if (results.figma.state === 'ok') {
+      results.figma.authScheme = scheme === 'authorization' ? 'bearer' : 'x-figma-token';
+    }
   }
 
   const configured = PROVIDER_ORDER.filter((id) => results[id].configured).length;

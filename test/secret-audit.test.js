@@ -219,6 +219,59 @@ test('MCP token length is enforced and an optional live 401 guard is recorded', 
   assert.equal(guarded.providers.mcpToken.bearerGuard, 'enforced');
 });
 
+test('dual-auth Bearer fallback, quote stripping, and the voice-list fallback recover false rejections', async () => {
+  const env = {
+    ELEVENLABS_API_KEY: '"quoted-eleven-key-123456"',
+    CELIA_VOICE_ID: 'voice-xyz-987',
+    FIGMA_ACCESS_TOKEN: 'oauth-figma-123456'
+  };
+  const calls = [];
+  const report = await runSecretAudit({
+    env,
+    fetchImpl: async (url, options) => {
+      const target = String(url);
+      calls.push({ url: target, options });
+      if (target.includes('/v1/user/subscription')) {
+        if (options.headers['xi-api-key']) return response({}, { status: 401 });
+        return response({ character_count: 100, character_limit: 1000, tier: 'free' });
+      }
+      if (target.includes('/v1/voices/')) return response({}, { status: 400 });
+      if (target.includes('/v1/voices')) return response({ voices: [{ voice_id: 'voice-xyz-987' }] });
+      if (target.includes('api.figma.com')) {
+        if (options.headers['X-Figma-Token']) return response({}, { status: 401 });
+        return response({ id: 'me' });
+      }
+      return response({});
+    }
+  });
+
+  assert.equal(collectSecrets(env).elevenLabs.value, 'quoted-eleven-key-123456');
+  assert.equal(report.providers.elevenLabs.state, 'ok');
+  assert.equal(report.providers.elevenLabs.authScheme, 'bearer');
+  assert.equal(report.providers.figma.state, 'ok');
+  assert.equal(report.providers.figma.authScheme, 'bearer');
+  assert.equal(report.providers.voiceId.state, 'ok');
+  assert.equal(report.providers.voiceId.note, 'matched_in_voice_list');
+  assert.equal(report.voiceQuota.remainingPct, 90);
+  assert.equal(calls.some((c) => c.options.headers['xi-api-key'] === 'quoted-eleven-key-123456'), true);
+  const dump = JSON.stringify(report) + renderSummary(report, Object.values(env));
+  for (const secret of Object.values(env)) assert.equal(dump.includes(secret), false);
+});
+
+test('when both auth schemes are rejected the audit still reports invalid (no false positives)', async () => {
+  const env = { ELEVENLABS_API_KEY: 'bad-eleven-key-123456', FIGMA_ACCESS_TOKEN: 'bad-figma-123456' };
+  const report = await runSecretAudit({
+    env,
+    fetchImpl: async () => response({ error: { message: 'nope' } }, { status: 401 })
+  });
+  assert.equal(report.providers.elevenLabs.state, 'invalid');
+  assert.equal(report.providers.figma.state, 'invalid');
+  assert.equal(report.voiceQuota, null);
+  const md = renderSummary(report, Object.values(env));
+  assert.equal(md.includes('bad-eleven-key-123456'), false);
+  assert.equal(md.includes('bad-figma-123456'), false);
+});
+
 test('parseVoiceQuota rejects malformed payloads and redactText masks injected secrets', () => {
   assert.equal(parseVoiceQuota(null), null);
   assert.equal(parseVoiceQuota({ character_count: 'x', character_limit: 10 }), null);
