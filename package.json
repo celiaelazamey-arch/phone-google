@@ -4,7 +4,9 @@
   "private": false,
   "description": "Secure starter API for Google OAuth and WhatsApp Cloud API assistant integrations",
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
@@ -13,7 +15,9 @@
     "celia:mcp:stdio": "node src/celia-mcp.js --stdio",
     "celia:mcp:verify": "node src/celia-mcp.js --self-test",
     "test": "node --test",
-    "check": "for file in src/*.js test/*.js public/*.js; do node --check \"$file\" || exit 1; done"
+    "check": "for file in src/*.js test/*.js public/*.js scripts/*.mjs; do node --check \"$file\" || exit 1; done",
+    "build:pages": "node scripts/build-pages.mjs",
+    "preview:pages": "node scripts/build-pages.mjs && node -e \"console.log('افتح dist/index.html عبر أي خادم ثابت')\""
   },
   "dependencies": {
     "dotenv": "^16.4.7",

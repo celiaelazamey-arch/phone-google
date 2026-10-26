@@ -1,6 +1,10 @@
 # مساعد الهاتف + Google
 
-نقطة بداية لخادم API يربط Google OAuth مع WhatsApp Cloud API ويخزن حالة التكامل ورسائل WhatsApp في MySQL. المستودع **هيكل قابل للتشغيل محليًا** وليس خدمة منشورة أو مربوطة بحساب Google/WhatsApp بعد.
+نقطة بداية لخادم API يربط Google OAuth مع WhatsApp Cloud API ويخزن حالة التكامل ورسائل WhatsApp في MySQL.
+
+**النسخة الحية المجانية:** https://celiaelazamey-arch.github.io/phone-google/ — واجهة سيليا كاملة على GitHub Pages، وكل أدوات MCP الاثنتي عشرة تعمل داخل المتصفح مجانًا (بتشفير AES-256-GCM حقيقي عبر Web Crypto، وبيانات Google/WhatsApp موسومة كعرض توضيحي). خطة النشر المجاني الكاملة في [`docs/خطة-النشر-المجاني.md`](docs/خطة-النشر-المجاني.md).
+
+> الخادم الكامل (`src/server.js`) يحتاج Node.js + MySQL وأسرار Google/WhatsApp/Gemini. النسخة الثابتة على Pages لا تحتوي أي سر ولا تتصل بأي خدمة خارجية.
 
 ## ما يتضمنه المشروع
 
@@ -82,3 +86,22 @@ npm run celia:mcp
 ## حدود النشر والإكمال
 
 هذا المستودع لا يحتوي أسرارًا ولا يملك نطاق HTTPS، قاعدة بيانات إنتاجية، Google OAuth client، مفتاح Gemini فعليًا، حساب Meta/WhatsApp Business، رقمًا موثقًا، أو قائمة موافقات العملاء. لذلك لا يمكن تفعيل تسجيل الدخول أو استقبال/إرسال رسائل حقيقية أو الرد عبر Gemini أو نشر الخدمة قبل توفير هذه الموارد. لا تشارك أسرار OAuth أو Gemini أو WhatsApp في المحادثات أو ملفات Git؛ ضعها في مخزن أسرار بيئة الاستضافة.
+
+## النشر المجاني على GitHub Pages (نسخة الواجهة + أدوات MCP داخل المتصفح)
+
+```bash
+npm run build:pages      # يولّد dist/ من public/ + طبقة المحاكاة
+# o افتح dist/index.html عبر أي خادم ثابت أو ارفع dist/ كما هي
+```
+
+- سكربت البناء `scripts/build-pages.mjs` يستخرج `MCP_TOOLS` و`SERVER_INFO` من `src/celia-mcp.js` ويحقنهما في `dist/celia-static-shim.js`، ثم يحقن الوسم في كل صفحة ويضيف `.nojekyll` و`404.html`.
+- الطبقة الثابتة تخدم `GET /health` و`POST /ui/workspace/rpc` و`POST /mcp` و`POST /ui/workspace/crypto-lab` داخل المتصفح: `initialize`, `ping`, `tools/list`, `tools/call` (١٢ أداة), `resources/*`, `prompts/*`.
+- النشر تلقائي عبر `.github/workflows/pages.yml` عند كل دفع إلى `main` (بيئة `github-pages`, `build_type: workflow`). لا يحتاج أي سر ولا بطاقة دفع.
+- الاختبارات: `node --test test/static-shim.test.js` (تبني `dist/` وتتحقق من كل أداة ونقاط REST ومسار التشفير والموافقات).
+
+### قيود النسخة الثابتة (معلنة في الواجهة)
+
+- التخزين في ذاكرة التبويب فقط (`storage: memory`) ويُصفَّر عند التحديث.
+- Google/WhatsApp تُرجع بيانات `demo: true`؛ لا OAuth حقيقي ولا إرسال رسائل، ولا استقبال Webhook (Pages لا تقبل POST خارجيًا).
+- الردود يولّدها محرك السياسة العربي المدمج `celia-local-policy-engine` بلا مفتاح؛ وللردود السحابية الصق مفتاحك في تبويب «النماذج المجانية» (يبقى في `sessionStorage` بمتصفحك).
+- للترقية إلى خدمة كاملة: Render/Koyeb/Cloudflare + MySQL مُدار، ثم إضافة الأسرار في منصة الاستضافة وربط Webhook واتساب.
