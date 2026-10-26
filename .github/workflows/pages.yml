@@ -1,0 +1,68 @@
+name: Deploy (GitHub Pages)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build static site (dist)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Syntax check
+        run: npm run check
+
+      - name: Static shim tests
+        run: node --test test/static-shim.test.js
+
+      - name: Build static site
+        run: node scripts/build-pages.mjs
+
+      - name: Ensure no secrets leaked into dist
+        run: |
+          if grep -rEI "(MYSQL_PASSWORD|WHATSAPP_APP_SECRET|GOOGLE_CLIENT_SECRET|APP_API_TOKEN)=.+|AIza[0-9A-Za-z_-]{20,}" dist; then
+            echo "::error::Secret-like value found in dist"
+            exit 1
+          fi
+          echo "No secret-like values found in dist."
+
+      - name: Configure Pages (تفعيل المصدر تلقائيًا عند أول نشر)
+        uses: actions/configure-pages@v6
+        with:
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v5
