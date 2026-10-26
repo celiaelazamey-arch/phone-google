@@ -105,6 +105,39 @@ npm run celia:mcp
 
 كما يُستخدم الموجّه تلقائيًا في أداة `celia_ai_reply` عند ضبط `CELIA_AI_PROVIDER=router`، أو تلقائيًا في وضع `auto` عند وجود مفتاح AgentRouter أو DeepSeek. **استوديو الأدوات العام `/` يعمل كمحاكاة محلية فقط** ولا يستهلك أي مفتاح من مفاتيح الموجّه؛ التوجيه الحقيقي متاح حصرًا عبر `POST /mcp` المحمي بالرمز.
 
+## لوحة فحص الأسرار السبعة (`npm run audit:secrets`)
+
+سير العمل `.github/workflows/celia-mcp.yml` يتحقق تلقائيًا من **الأسرار السبعة** ويكتب جدولًا في تبويب **Summary** لكل تشغيل:
+
+| السر | الفحص (بدون استهلاك حصة) |
+|---|---|
+| `CELIA_MCP_API_TOKEN` | طول ≥32 حرفًا + اختبار `401` محلي لبوابة Bearer |
+| `GEMINI_API_KEY` | `GET /v1beta/models` |
+| `AGENETROUTERAPI_KEY` / `AGENTROUTER_API_KEY` | `GET /v1/models` |
+| `DEEPSEEK_API_KEY` | `GET /v1/models` ثم `/models` عند 404 |
+| `ELEVENLABS_API_KEY` | `GET /v1/user/subscription` + **النسبة المتبقية من الأحرف المجانية** |
+| `CELIA_VOICE_ID` | `GET /v1/voices/{id}` |
+| `FIGMA_ACCESS_TOKEN` | `GET /v1/me` |
+
+```bash
+# محليًا (يقرأ الأسرار من البيئة فقط؛ لا يحتاج .env)
+npm run audit:secrets
+# وضع صارم: كود خروج 1 إذا لم تُتحقق كل الأسرار
+AUDIT_STRICT=true npm run audit:secrets
+# في GitHub Actions يُكتب التقرير تلقائيًا إلى GITHUB_STEP_SUMMARY
+```
+
+قواعد الأمان: المفاتيح في **ترويسات** فقط (لا روابط استعلام)، ولا تُطبع استجابة أي مزوّد ولا رسالة خطأ شبكية، والتقرير يحتوي أرقامًا وحالات معرّفة مسبقًا مع تمويه إضافي (`[REDACTED]`). الفحوص كلها **قراءة مجانية**: لا توليد نصوص ولا تحويل صوتي. من `workflow_dispatch` يمكن تفعيل `strict_secret_audit=true` لجعل المهمة تفشل عند غياب أي مفتاح.
+
+> ملاحظة: قدرة تكامل الـ sandbox على **سرد** أسماء الأسرار محدودة بصلاحيات GitHub (`gh secret list` يعيد 403)، لذلك اللوحة لا تفترض وجودها؛ تعرض بدقة `⚪ غير مضبوط` أو `✅ متصل` أو `❌ مرفوض` لكل مزوّد حسب ما يصل فعلًا إلى بيئة التشغيل.
+
+## النشر المجاني (Render Free / Koyeb Free)
+
+- **`render.yaml`** — Blueprint جاهز على الخطة `free` باستخدام `Dockerfile.mcp` (خادم MCP فقط، منفذ 10000، فحص صحة `/health`). من لوحة Render: *Blueprints → New Blueprint Instance*، ثم أدخل قيم الحقول `sync: false` يدويًا.
+- **Koyeb Free** — أنشئ Web Service من نفس المستودع مع `Dockerfile.mcp`، واضبط `CELIA_MCP_PORT=8080` و`CELIA_MCP_HOST=0.0.0.0` وبقية الأسرار السبعة في Environment Variables.
+- **نشر يدوي من Actions** — اختر `Run workflow` ثم `deploy_target = render` أو `koyeb`. يتطلب إضافة الأسرار: `RENDER_DEPLOY_HOOK_URL` أو `KOYEB_API_TOKEN` + `KOYEB_SERVICE_ID`. المهمة **لا تعمل تلقائيًا** ولا تُنفّذ عند غيابها.
+- حدود الخطة المجانية واقعية: **cold start** بعد الخمول، وتخزين **ذاكرة مؤقتة** (`memory`) بدل MySQL لأن الاستضافة لا توفر قاعدة بيانات مجانية دائمة. لا تُستخدم هذه النسخة لرسائل واتساب إنتاجية قبل توفير HTTPS ودومين وقاعدة بيانات وموافقات العملاء.
+
 ## حدود النشر والإكمال
 
 هذا المستودع لا يحتوي أسرارًا ولا يملك نطاق HTTPS، قاعدة بيانات إنتاجية، Google OAuth client، مفتاح Gemini فعليًا، حساب Meta/WhatsApp Business، رقمًا موثقًا، أو قائمة موافقات العملاء. لذلك لا يمكن تفعيل تسجيل الدخول أو استقبال/إرسال رسائل حقيقية أو الرد عبر Gemini أو نشر الخدمة قبل توفير هذه الموارد. لا تشارك أسرار OAuth أو Gemini أو WhatsApp في المحادثات أو ملفات Git؛ ضعها في مخزن أسرار بيئة الاستضافة.

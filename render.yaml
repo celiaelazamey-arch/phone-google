@@ -1,0 +1,40 @@
+# Render Blueprint — خطة Free (0$) لخادم Celia MCP.
+# أنشئ الخدمة من: Render Dashboard → Blueprints → New Blueprint Instance → اختر هذا المستودع.
+# ثم أدخل قيم الأسرار يدويًا في الحقول التي تحمل sync: false (لا تُرفع إلى Git).
+services:
+  - type: web
+    name: celia-mcp
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./Dockerfile.mcp
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CELIA_MCP_HOST
+        value: 0.0.0.0
+      - key: CELIA_MCP_PORT
+        value: "10000"
+      - key: CELIA_AI_PROVIDER
+        value: auto
+      - key: PORT
+        value: "10000"
+      - key: CELIA_MCP_API_TOKEN
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: AGENETROUTERAPI_KEY
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: CELIA_VOICE_ID
+        sync: false
+      - key: FIGMA_ACCESS_TOKEN
+        sync: false
+      - key: TOKEN_ENCRYPTION_KEY
+        sync: false

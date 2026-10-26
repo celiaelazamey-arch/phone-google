@@ -1,0 +1,14 @@
+# صورة مخصّصة لخادم Celia MCP على الاستضافات المجانية (Render Free / Koyeb Free).
+# الصورة الرئيسية Dockerfile تشغّل src/server.js، أما هذه فتشغّل src/celia-mcp.js.
+FROM node:22-alpine
+ENV NODE_ENV=production
+ENV CELIA_MCP_HOST=0.0.0.0
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev
+COPY src ./src
+COPY public ./public
+USER node
+# تضبط المنصة المنفذ عبر CELIA_MCP_PORT (Render: 10000، Koyeb: 8080).
+EXPOSE 10000
+CMD ["node", "src/celia-mcp.js"]

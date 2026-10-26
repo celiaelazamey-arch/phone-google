@@ -12,6 +12,7 @@
     "celia:mcp": "node src/celia-mcp.js",
     "celia:mcp:stdio": "node src/celia-mcp.js --stdio",
     "celia:mcp:verify": "node src/celia-mcp.js --self-test",
+    "audit:secrets": "node src/secret-audit.js",
     "test": "node --test",
     "check": "for file in src/*.js test/*.js public/*.js; do node --check \"$file\" || exit 1; done"
   },

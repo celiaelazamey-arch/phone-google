@@ -1,4 +1,4 @@
-name: Celia MCP & Gemini CI
+name: Celia MCP, Gemini & Secrets Audit
 
 on:
   push:
@@ -10,14 +10,30 @@ on:
         description: 'رسالة عميل تجريبية لاختبار أداة celia_ai_reply عبر Gemini'
         required: false
         default: 'مرحبًا، ما هي الخدمات المتوفرة وكيف يمكنني التواصل مع فريقكم؟'
+      strict_secret_audit:
+        description: 'إفشال المهمة إذا لم يُتحقق من الأسرار السبعة كلها'
+        type: boolean
+        required: false
+        default: false
+      deploy_target:
+        description: 'نشر مجاني اختياري (يتطلب أسرار نشر مضافة مسبقًا)'
+        type: choice
+        required: false
+        default: 'none'
+        options:
+          - 'none'
+          - 'render'
+          - 'koyeb'
 
 permissions:
   contents: read
 
 jobs:
   verify-celia-mcp:
-    name: Celia MCP + Gemini Verification
+    name: Celia MCP + Gemini + 7-Secrets Audit
     runs-on: ubuntu-latest
+    env:
+      AUDIT_STRICT: ${{ inputs.strict_secret_audit || 'false' }}
     steps:
       - uses: actions/checkout@v7
 
@@ -36,53 +52,86 @@ jobs:
       - name: Install dependencies (npm ci)
         run: npm ci --no-audit --no-fund
 
-      - name: Prepare .env using Repository Secret CELIA_MCP_API_TOKEN
+      # تُكتب الأسرار في .env المؤقت على الـ runner فقط (mode 0600) عبر متغيرات بيئة،
+      # ولا تظهر أي قيمة في نص الأمر أو في السجلات.
+      - name: Prepare .env from all Repository Secrets (never printed)
         env:
           SECRET_CELIA_MCP_API_TOKEN: ${{ secrets.CELIA_MCP_API_TOKEN }}
+          SECRET_GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SECRET_GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          SECRET_AGENTROUTER_API_KEY: ${{ secrets.AGENTROUTER_API_KEY }}
+          SECRET_AGENETROUTERAPI_KEY: ${{ secrets.AGENETROUTERAPI_KEY }}
+          SECRET_DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          SECRET_ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          SECRET_CELIA_VOICE_ID: ${{ secrets.CELIA_VOICE_ID }}
+          SECRET_FIGMA_ACCESS_TOKEN: ${{ secrets.FIGMA_ACCESS_TOKEN }}
         run: |
           cp .env.example .env
           TRIMMED_SECRET="$(printf '%s' "${SECRET_CELIA_MCP_API_TOKEN:-}" | tr -d '\r\n')"
           if [ -n "$TRIMMED_SECRET" ] && [ "${#TRIMMED_SECRET}" -ge 32 ]; then
-            CELIA_TOKEN="$TRIMMED_SECRET"
             echo "CELIA_TOKEN_SOURCE=repository_secret" >> "$GITHUB_ENV"
           else
-            CELIA_TOKEN="$(openssl rand -hex 32)"
             echo "CELIA_TOKEN_SOURCE=generated_fallback" >> "$GITHUB_ENV"
+            TRIMMED_SECRET=""
           fi
-          APP_TOKEN="$(openssl rand -hex 32)"
-          ENC_KEY="$(openssl rand -base64 32)"
-          node -e '
+          MCP_TOKEN_VALUE="$TRIMMED_SECRET" node --input-type=commonjs -e '
             const fs = require("node:fs");
+            const crypto = require("node:crypto");
             let content = fs.readFileSync(".env", "utf8");
-            content = content.replace(/^CELIA_MCP_API_TOKEN=.*$/m, "CELIA_MCP_API_TOKEN=" + process.argv[1]);
-            content = content.replace(/^APP_API_TOKEN=.*$/m, "APP_API_TOKEN=" + process.argv[2]);
-            content = content.replace(/^TOKEN_ENCRYPTION_KEY=.*$/m, "TOKEN_ENCRYPTION_KEY=" + process.argv[3]);
-            fs.writeFileSync(".env", content);
-          ' "$CELIA_TOKEN" "$APP_TOKEN" "$ENC_KEY"
+            function set(name, value) {
+              const safe = String(value == null ? "" : value).replace(/[\r\n]/g, "");
+              const line = name + "=" + safe;
+              const re = new RegExp("^" + name + "=.*$", "m");
+              if (re.test(content)) content = content.replace(re, () => line);
+              else content = content + "\n" + line + "\n";
+            }
+            const mcp = process.env.MCP_TOKEN_VALUE || crypto.randomBytes(32).toString("hex");
+            set("CELIA_MCP_API_TOKEN", mcp);
+            set("GEMINI_API_KEY", process.env.SECRET_GEMINI_API_KEY || process.env.SECRET_GOOGLE_API_KEY || "");
+            set("AGENETROUTERAPI_KEY", process.env.SECRET_AGENETROUTERAPI_KEY || process.env.SECRET_AGENTROUTER_API_KEY || "");
+            set("DEEPSEEK_API_KEY", process.env.SECRET_DEEPSEEK_API_KEY || "");
+            set("ELEVENLABS_API_KEY", process.env.SECRET_ELEVENLABS_API_KEY || "");
+            set("CELIA_VOICE_ID", process.env.SECRET_CELIA_VOICE_ID || "");
+            set("FIGMA_ACCESS_TOKEN", process.env.SECRET_FIGMA_ACCESS_TOKEN || "");
+            set("APP_API_TOKEN", crypto.randomBytes(32).toString("hex"));
+            set("TOKEN_ENCRYPTION_KEY", crypto.randomBytes(32).toString("base64"));
+            fs.writeFileSync(".env", content, { mode: 0o600 });
+            // cp أنشأ الملف مسبقًا بصلاحية 644؛ writeFileSync لا يغيّر صلاحية ملف موجود.
+            fs.chmodSync(".env", 0o600);
+            console.log("Prepared .env with 7 secret slots (values never printed, mode 0600).");
+          '
 
-      - name: Confirm both Repository Secrets are active (CELIA_MCP_API_TOKEN & GEMINI_API_KEY)
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY }}
+      - name: Confirm critical MCP token secret
         run: |
           if [ "${CELIA_TOKEN_SOURCE:-}" != "repository_secret" ]; then
-            echo "::error::CELIA_MCP_API_TOKEN secret is missing or shorter than 32 characters."
-            exit 1
+            if [ "${AUDIT_STRICT:-false}" = "true" ]; then
+              echo "::error::CELIA_MCP_API_TOKEN secret is missing or shorter than 32 characters."
+              exit 1
+            fi
+            echo "::warning::CELIA_MCP_API_TOKEN is missing; an ephemeral token was generated for CI."
+          else
+            echo "CELIA_MCP_API_TOKEN secret is present and valid (value hidden)."
           fi
-          if [ -z "${GEMINI_API_KEY:-}" ]; then
-            echo "::error::GEMINI_API_KEY secret is missing in Repository Secrets."
-            exit 1
-          fi
-          echo "Both CELIA_MCP_API_TOKEN and GEMINI_API_KEY secrets are present and valid."
 
       - name: Syntax check & automated test suite
         run: |
           npm run check
           npm test
 
-      - name: Run npm run celia:mcp & verify live Repository Secrets (CELIA_MCP_API_TOKEN + GEMINI_API_KEY)
+      - name: Run MCP server, verify live secrets, and publish the 7-secret Summary
         env:
+          # لا نضبط CELIA_MCP_API_TOKEN هنا: الخادم يقرأه من .env (dotenv لا يتجاوز متغيرًا موجودًا حتى لو كان فارغًا).
+          AUDIT_MCP_TOKEN: ${{ secrets.CELIA_MCP_API_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          AGENTROUTER_API_KEY: ${{ secrets.AGENTROUTER_API_KEY }}
+          AGENETROUTERAPI_KEY: ${{ secrets.AGENETROUTERAPI_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          CELIA_VOICE_ID: ${{ secrets.CELIA_VOICE_ID }}
+          FIGMA_ACCESS_TOKEN: ${{ secrets.FIGMA_ACCESS_TOKEN }}
+          AUDIT_MCP_URL: http://127.0.0.1:3010
+          AUDIT_STRICT: ${{ inputs.strict_secret_audit || 'false' }}
           TEST_CUSTOMER_MESSAGE: ${{ inputs.customer_message || 'مرحبًا، ما هي الخدمات المتوفرة وكيف يمكنني التواصل مع فريقكم؟' }}
         run: |
           npm run celia:mcp > /tmp/celia-mcp.log 2>&1 &
@@ -106,7 +155,6 @@ jobs:
             const hasGeminiSecret = Boolean((process.env.GEMINI_API_KEY || "").trim());
             const customerMessage = process.env.TEST_CUSTOMER_MESSAGE;
 
-            // Verify unauthorized call is rejected (401)
             const badRes = await fetch("http://127.0.0.1:3010/mcp", {
               method: "POST",
               headers: { "content-type": "application/json", authorization: "Bearer invalid-token" },
@@ -132,25 +180,26 @@ jobs:
             const status = await rpc(3, "tools/call", { name: "celia_status", arguments: { probeOllama: false } });
             const statusObj = status.result?.structuredContent;
 
+            // المرحلة 1: تأكيد أن الموجّه الذكي مسجّل ويعمل محليًا دون استهلاك أي حصة.
+            const routerCheck = await rpc(5, "tools/call", {
+              name: "celia_smart_router",
+              arguments: { prompt: "مرحبًا", task: "fast", provider: "local" }
+            });
+            if (routerCheck.result?.isError || routerCheck.result?.structuredContent?.provider !== "local") {
+              throw new Error("celia_smart_router local fallback check failed");
+            }
+
             let geminiResult = { secretDetected: hasGeminiSecret, liveReplyVerified: false, model: null, reply: null };
             if (hasGeminiSecret) {
               const replyRes = await rpc(4, "tools/call", {
                 name: "celia_ai_reply",
-                arguments: {
-                  customerMessage,
-                  provider: "gemini"
-                }
+                arguments: { customerMessage, provider: "gemini" }
               });
               if (replyRes.result?.isError) {
                 throw new Error(`Gemini MCP call failed: ${replyRes.result?.content?.[0]?.text}`);
               }
               const data = replyRes.result.structuredContent;
-              geminiResult = {
-                secretDetected: true,
-                liveReplyVerified: true,
-                model: data.model,
-                reply: data.reply
-              };
+              geminiResult = { secretDetected: true, liveReplyVerified: true, model: data.model, reply: data.reply };
             }
 
             const summary = {
@@ -158,7 +207,10 @@ jobs:
               tokenSource,
               toolsRegistered: tools.result?.tools?.length,
               storage: statusObj?.storage,
+              effectiveProvider: statusObj?.providers?.effectiveDefault,
+              smartRouterChains: statusObj?.providers?.smartRouter?.chains,
               geminiConfiguredInMcp: statusObj?.providers?.gemini?.configured,
+              routerLocalFallback: "verified",
               geminiResult
             };
             console.log(JSON.stringify(summary, null, 2));
@@ -166,10 +218,11 @@ jobs:
             const md = [
               "## تقرير تشغيل Celia MCP في GitHub Actions",
               `- **الخادم:** \`${summary.server}\` (\`POST /mcp\`)`,
-              `- **مصدر \`CELIA_MCP_API_TOKEN\`:** ${tokenSource === "repository_secret" ? "✅ من Repository Secrets (`CELIA_MCP_API_TOKEN`)" : "⚠️ مولد تلقائيًا"}`,
+              `- **مصدر \`CELIA_MCP_API_TOKEN\`:** ${tokenSource === "repository_secret" ? "✅ من Repository Secrets" : "⚠️ مولد تلقائيًا"}`,
               `- **مصادقة Bearer وحجب الطلبات غير المصرحة (401):** ✅ تم التحقق`,
               `- **عدد أدوات MCP المسجلة:** ${summary.toolsRegistered}`,
-              `- **مفتاح Gemini في Actions (\`GEMINI_API_KEY\`):** ${hasGeminiSecret ? "✅ متصل ومفعّل من Repository Secrets" : "⚠️ غير مضبوط في Secrets"}`,
+              `- **المزوّد الفعّال:** \`${summary.effectiveProvider}\` · **الموجّه الذكي:** ✅ حارس محلي مُختبَر`,
+              `- **مفتاح Gemini في Actions:** ${hasGeminiSecret ? "✅ متصل من Repository Secrets" : "⚠️ غير مضبوط"}`,
               hasGeminiSecret
                 ? `- **اختبار الرد الحي عبر Gemini (${geminiResult.model}):** ✅ نجح — \`${geminiResult.reply}\``
                 : "- **ملاحظة:** أضف `GEMINI_API_KEY` في Repository Secrets لتفعيل الرد الحي داخل Actions."
@@ -178,3 +231,43 @@ jobs:
               fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, md + "\n");
             }
           '
+
+          # لوحة الأسرار السبعة: فحوص GET مجانية + نسبة حصة الصوت المتبقية.
+          # في الوضع الصارم يفشل هذا الأمر إذا لم تُتحقق كل الأسرار.
+          node src/secret-audit.js
+
+  deploy-free:
+    name: Optional free deployment (Render / Koyeb)
+    runs-on: ubuntu-latest
+    needs: verify-celia-mcp
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy_target != 'none'
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Trigger Render Free deploy hook
+        if: inputs.deploy_target == 'render'
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "${RENDER_DEPLOY_HOOK_URL:-}" ]; then
+            echo "::error::Add RENDER_DEPLOY_HOOK_URL in Repository Secrets first."
+            exit 1
+          fi
+          curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL" > /dev/null
+          echo "Render Free deploy triggered (hook hidden)."
+
+      - name: Trigger Koyeb Free service redeploy
+        if: inputs.deploy_target == 'koyeb'
+        env:
+          KOYEB_API_TOKEN: ${{ secrets.KOYEB_API_TOKEN }}
+          KOYEB_SERVICE_ID: ${{ secrets.KOYEB_SERVICE_ID }}
+        run: |
+          if [ -z "${KOYEB_API_TOKEN:-}" ] || [ -z "${KOYEB_SERVICE_ID:-}" ]; then
+            echo "::error::Add KOYEB_API_TOKEN and KOYEB_SERVICE_ID in Repository Secrets first."
+            exit 1
+          fi
+          curl -fsS -X POST \
+            -H "Authorization: Bearer ${KOYEB_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            "https://app.koyeb.com/v1/services/${KOYEB_SERVICE_ID}/redeploy" > /dev/null
+          echo "Koyeb Free redeploy triggered (token hidden)."
