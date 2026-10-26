@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { build, DIST_DIR } from '../scripts/build-pages.mjs';
@@ -81,6 +81,31 @@ test('صفحة الهبوط مكتملة وكل أصولها المحلية تد
   assert.equal(socialImage.readUInt32BE(16), 1200);
   assert.equal(socialImage.readUInt32BE(20), 630);
   await readFile(path.join(DIST_DIR, 'favicon.svg'), 'utf8');
+});
+
+test('روابط التشخيص وكل الروابط المحلية في النسخة الثابتة تشير إلى ملفات موجودة', async () => {
+  const liveHtml = await readFile(path.join(DIST_DIR, 'live.html'), 'utf8');
+  assert.match(liveHtml, /href="\.\/health\.json"/);
+  assert.match(liveHtml, /href="\.\/api\/live\.json"/);
+  assert.match(liveHtml, /href="\.\/mcp\.json"/);
+  assert.doesNotMatch(liveHtml, /href="\.\/(?:health|api\/live|mcp)"/);
+
+  const mcp = JSON.parse(await readFile(path.join(DIST_DIR, 'mcp.json'), 'utf8'));
+  assert.equal(mcp.toolsCount, EXPECTED_TOOLS.length);
+  assert.equal(mcp.service, 'celia-phone-google-mcp');
+  const apiLive = JSON.parse(await readFile(path.join(DIST_DIR, 'api', 'live.json'), 'utf8'));
+  assert.equal(apiLive.live, true);
+  assert.equal(apiLive.tools, EXPECTED_TOOLS.length);
+  assert.equal(apiLive.summary.toolsCount, EXPECTED_TOOLS.length);
+
+  for (const page of ['index.html', 'live.html', 'skills.html', 'landing.html', '404.html']) {
+    const html = await readFile(path.join(DIST_DIR, page), 'utf8');
+    const localLinks = [...html.matchAll(/href="(\.\/[^"#?]+)(?:[?#][^"]*)?"/g)];
+    assert.ok(localLinks.length > 0, `${page} should contain local links`);
+    for (const match of localLinks) {
+      await access(path.join(DIST_DIR, match[1]));
+    }
+  }
 });
 
 test('مصافحة MCP وقائمة الأدوات وقائمة الموارد', async () => {

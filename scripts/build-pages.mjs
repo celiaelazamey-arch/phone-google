@@ -61,7 +61,9 @@ export async function loadMcpTools() {
   const serverInfoMatch = /const SERVER_INFO = Object\.freeze\(\{([\s\S]*?)\}\);/.exec(source);
   if (!serverInfoMatch) throw new Error('لم يتم العثور على SERVER_INFO');
   const serverInfo = new Function(`return ({${serverInfoMatch[1]}});`)();
-  return { tools, serverInfo };
+  const protocolMatch = /const MCP_PROTOCOL_VERSION = '([^']+)'/.exec(source);
+  if (!protocolMatch) throw new Error('لم يتم العثور على MCP_PROTOCOL_VERSION');
+  return { tools, serverInfo, protocolVersion: protocolMatch[1] };
 }
 
 async function gitCommitSha() {
@@ -92,11 +94,15 @@ function rewriteStaticHostLinks(html) {
     .replace(/href="\.\/skills\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./skills.html${suffix}"`)
     .replace(/href="\.\/landing\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./landing.html${suffix}"`)
     .replace(/href="\.\/index\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./index.html${suffix}"`)
-    .replace(/href="\.\/studio\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./index.html${suffix}"`);
+    .replace(/href="\.\/studio\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./index.html${suffix}"`)
+    // روابط التشخيص المباشرة: Pages يخدم ملفات فقط، لذا تشير إلى لقطات JSON ثابتة.
+    .replace(/href="\.\/health"/g, 'href="./health.json"')
+    .replace(/href="\.\/api\/live"/g, 'href="./api/live.json"')
+    .replace(/href="\.\/mcp"/g, 'href="./mcp.json"');
 }
 
 export async function build() {
-  const { tools, serverInfo } = await loadMcpTools();
+  const { tools, serverInfo, protocolVersion } = await loadMcpTools();
   const template = await readFile(TEMPLATE_PATH, 'utf8');
   const commit = await gitCommitSha();
   const buildMeta = {
@@ -159,6 +165,50 @@ export async function build() {
         builtAt: buildMeta.builtAt,
         commit,
         note: 'ملف ثابت للفحص السريع. الطبقة الحية داخل المتصفح تخدم /health و /ui/workspace/rpc.'
+      },
+      null,
+      2
+    )}\n`,
+    'utf8'
+  );
+
+  // لقطات JSON ثابتة لروابط التشخيص في live.html (لا تُخدم نقاط POST على Pages).
+  await writeFile(
+    path.join(DIST_DIR, 'mcp.json'),
+    `${JSON.stringify(
+      {
+        service: serverInfo.name,
+        version: serverInfo.version,
+        protocolVersion,
+        transport: 'static-browser-shim',
+        toolsCount: tools.length,
+        note: 'لقطة ثابتة لهوية خادم MCP؛ التنفيذ الفعلي للأدوات يتم داخل المتصفح عبر celia-static-shim.js.'
+      },
+      null,
+      2
+    )}\n`,
+    'utf8'
+  );
+  await mkdir(path.join(DIST_DIR, 'api'), { recursive: true });
+  await writeFile(
+    path.join(DIST_DIR, 'api', 'live.json'),
+    `${JSON.stringify(
+      {
+        live: true,
+        mode: 'static-preview',
+        message: 'النظام الحي داخل المتصفح — Find Skills و System Live View يعملان عبر الطبقة الثابتة',
+        tools: tools.length,
+        summary: {
+          service: serverInfo.name,
+          version: serverInfo.version,
+          protocolVersion,
+          toolsCount: tools.length,
+          storage: 'memory',
+          providers: {}
+        },
+        timestamp: buildMeta.builtAt,
+        uptime: 0,
+        note: 'لقطة وقت البناء؛ القيم اللحظية الحقيقية تُعرض داخل لوحة النظام الحي عبر الطبقة الثابتة.'
       },
       null,
       2
