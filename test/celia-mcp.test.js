@@ -119,7 +119,8 @@ test('Celia MCP HTTP server enforces Bearer token, supports MCP methods, and nev
     assert.equal(notif.status, 202);
 
     const tools = await rpc(2, 'tools/list');
-    assert.equal(tools.result.tools.length, 10);
+    assert.equal(tools.result.tools.length, 11);
+    assert.ok(tools.result.tools.some((tool) => tool.name === 'celia_smart_router'));
 
     const consent = await rpc(3, 'tools/call', {
       name: 'whatsapp_consent_upsert',

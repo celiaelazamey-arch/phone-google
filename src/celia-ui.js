@@ -36,6 +36,15 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, conf
     ...config,
     encryptionKey: '',
     google: Object.freeze({ clientId: '', clientSecret: '', redirectUri: config.google.redirectUri }),
+    // الاستوديو العام غير محمٍ بمفتاح: نُفرغ مفاتيح المزودات ذات الرصيد/الحصة
+    // (AgentRouter وDeepSeek) حتى لا يتمكن أي زائر من استهلاكها.
+    aiRouter: config.aiRouter
+      ? Object.freeze({
+          ...config.aiRouter,
+          agentRouter: Object.freeze({ ...config.aiRouter.agentRouter, apiKey: '' }),
+          deepseek: Object.freeze({ ...config.aiRouter.deepseek, apiKey: '' })
+        })
+      : undefined,
     whatsapp: Object.freeze({
       ...config.whatsapp,
       accessToken: '',
@@ -64,6 +73,39 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, conf
         jsonrpc: '2.0',
         id: null,
         error: { code: -32600, message: 'Invalid JSON-RPC 2.0 payload' }
+      });
+    }
+
+    // الموجّه الذكي في الاستوديو العام يعمل كمحاكاة محلية فقط (صفر مفاتيح، صفر تكلفة).
+    if (body.method === 'tools/call' && body.params?.name === 'celia_smart_router') {
+      const callArgs = body.params?.arguments || {};
+      const prompt = String(callArgs.prompt ?? callArgs.customerMessage ?? '').trim().slice(0, 4000);
+      if (!prompt) {
+        return res.json({
+          jsonrpc: '2.0',
+          id: body.id ?? null,
+          sandbox: true,
+          error: { code: -32602, message: 'prompt (or customerMessage) is required' }
+        });
+      }
+      const businessContext = String(callArgs.businessContext ?? config.gemini.businessContext ?? '');
+      const output = {
+        reply: generateLocalPolicyReply({ customerMessage: prompt, businessContext }),
+        provider: 'celia-local-policy-engine',
+        model: 'celia-sandbox-router (محاكاة محلية بدون مفاتيح)',
+        task: typeof callArgs.task === 'string' ? callArgs.task : 'auto',
+        sandboxOnly: true,
+        note: 'محاكاة داخل الاستوديو العام؛ للتوجيه الحقيقي استخدم POST /mcp مع CELIA_MCP_API_TOKEN.'
+      };
+      return res.json({
+        jsonrpc: '2.0',
+        id: body.id ?? null,
+        sandbox: true,
+        result: {
+          content: [{ type: 'text', text: JSON.stringify(output, null, 2) }],
+          structuredContent: output,
+          isError: false
+        }
       });
     }
 

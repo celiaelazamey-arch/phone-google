@@ -316,6 +316,8 @@
         return { probeOllama: true };
       case 'celia_ai_reply':
         return { customerMessage: 'مرحبًا، ما هي مواعيد العمل لديكم وكيف أحجز استشارة؟', provider: 'auto' };
+      case 'celia_smart_router':
+        return { prompt: 'لخّص لي خطة عمل لتطبيق حجوزات عربي بسيط', task: 'deep', provider: 'auto' };
       case 'whatsapp_consent_upsert':
         return { phone: '+201065217834', optedIn: true, aiOptedIn: true, source: 'نموذج موافقة استوديو سيليا 2026' };
       case 'whatsapp_contacts_list':
@@ -557,7 +559,7 @@
         const r1 = await callMcpRpc('initialize', { protocolVersion: '2024-11-05' });
         s1.done(r1.elapsed);
 
-        const s2 = turn.addStep('2. فحص سجل الأدوات العشر (tools/list)');
+        const s2 = turn.addStep('2. فحص سجل أدوات MCP (tools/list)');
         const r2 = await callMcpRpc('tools/list');
         s2.done(r2.elapsed);
 

@@ -79,6 +79,32 @@ npm install
 npm run celia:mcp
 ```
 
+## الموجّه الذكي الموحّد (`src/ai-router.js`)
+
+المرحلة 1 من منظومة سيليا 2026: سلسلة إسناد تلقائية تحمي الحصص المجانية وتضمن عدم توقف الردود، وكلها تعمل من متغيرات البيئة دون أي تكلفة إضافية على GitHub Actions (المستودع عام):
+
+| نوع المهمة | سلسلة المزودات بالترتيب |
+|---|---|
+| ردود سريعة (`fast`) | `GEMINI_API_KEY` → `AGENETROUTERAPI_KEY` (أو `AGENTROUTER_API_KEY`) → Ollama المحلي → حارس سيليا المحلي (بدون شبكة) |
+| تفكير/كود (`deep`) | `DEEPSEEK_API_KEY` → AgentRouter → Gemini → Ollama |
+
+خصائص الحماية:
+
+- **المهلة الزمنية:** `AI_ROUTER_FAST_TIMEOUT_MS` (افتراضي 12 ثانية) و`AI_ROUTER_DEEP_TIMEOUT_MS` (45 ثانية) عبر `AbortSignal.timeout`.
+- **اقتصاد الحصص:** أي رد `429/503/401/402` يضع المزوّد في تهدئة `AI_ROUTER_COOLDOWN_MS` (افتراضي 60 ثانية، مع احترام ترويسة `Retry-After`)، فيُستبعد تلقائيًا من الطلبات التالية.
+- **النماذج المجانية:** افتراضيًا `gemini-2.5-flash` (مع بديلَي `gemini-flash-latest` و`gemini-flash-lite-latest` عند 404)، و`glm-4.5-air` على AgentRouter، و`deepseek-chat` لمهام الكود (يمكن ضبط `DEEPSEEK_MODEL=deepseek-reasoner`).
+- **منع كشف الأسرار:** المفاتيح تُرسل في ترويسات فقط، ولا تظهر في URL أو نص الاستجابة أو رسائل الخطأ؛ كما يُستبدل أي مفتاح يعيده النموذج بـ `[REDACTED]`. دالة `status()` تُعيد أسماء المزودات ونماذجها فقط.
+
+الوصول عبر MCP (يتطلب `CELIA_MCP_API_TOKEN`):
+
+```json
+{"jsonrpc":"2.0","id":1,"method":"tools/call",
+ "params":{"name":"celia_smart_router",
+           "arguments":{"prompt":"اكتب خطة لتطبيق حجوزات","task":"deep"}}}
+```
+
+كما يُستخدم الموجّه تلقائيًا في أداة `celia_ai_reply` عند ضبط `CELIA_AI_PROVIDER=router`، أو تلقائيًا في وضع `auto` عند وجود مفتاح AgentRouter أو DeepSeek. **استوديو الأدوات العام `/` يعمل كمحاكاة محلية فقط** ولا يستهلك أي مفتاح من مفاتيح الموجّه؛ التوجيه الحقيقي متاح حصرًا عبر `POST /mcp` المحمي بالرمز.
+
 ## حدود النشر والإكمال
 
 هذا المستودع لا يحتوي أسرارًا ولا يملك نطاق HTTPS، قاعدة بيانات إنتاجية، Google OAuth client، مفتاح Gemini فعليًا، حساب Meta/WhatsApp Business، رقمًا موثقًا، أو قائمة موافقات العملاء. لذلك لا يمكن تفعيل تسجيل الدخول أو استقبال/إرسال رسائل حقيقية أو الرد عبر Gemini أو نشر الخدمة قبل توفير هذه الموارد. لا تشارك أسرار OAuth أو Gemini أو WhatsApp في المحادثات أو ملفات Git؛ ضعها في مخزن أسرار بيئة الاستضافة.

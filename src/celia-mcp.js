@@ -6,6 +6,7 @@ import express from 'express';
 import { google } from 'googleapis';
 import helmet from 'helmet';
 import mysql from 'mysql2/promise';
+import { createAiRouter, loadAiRouterConfig } from './ai-router.js';
 import { DEFAULT_POLICY } from './gemini.js';
 import { createCeliaUiRouter } from './celia-ui.js';
 import { createMemoryPool } from './memory-pool.js';
@@ -75,6 +76,9 @@ export function loadCeliaMcpConfig(env = process.env, { requireToken = true } = 
       model: (env.GEMINI_MODEL || 'gemini-2.5-flash').trim() || 'gemini-2.5-flash',
       businessContext: env.GEMINI_BUSINESS_CONTEXT || ''
     }),
+    // المرحلة 1: إعدادات الموجّه الموحّد (Gemini / AgentRouter / DeepSeek / Ollama / الحارس المحلي).
+    // تُقرأ من نفس env ولا تُنسخ إلى أي استجابة أو صفحة HTML.
+    aiRouter: loadAiRouterConfig(env),
     ollama: Object.freeze({
       baseUrl: (env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434').trim(),
       model: (env.OLLAMA_MODEL || 'qwen2.5:7b').trim() || 'qwen2.5:7b',
@@ -157,14 +161,31 @@ export const MCP_TOOLS = Object.freeze([
   },
   {
     name: 'celia_ai_reply',
-    description: 'توليد رد خدمة عملاء مهذب وآمن عبر Gemini (عند توفر GEMINI_API_KEY كما في GitHub Actions) أو عبر Ollama المحلي (qwen2.5:7b).',
+    description: 'توليد رد خدمة عملاء مهذب وآمن عبر Gemini (عند توفر GEMINI_API_KEY كما في GitHub Actions)، أو عبر الموجّه الذكي (router)، أو عبر Ollama المحلي (qwen2.5:7b).',
     inputSchema: {
       type: 'object',
       required: ['customerMessage'],
       properties: {
         customerMessage: { type: 'string', description: 'رسالة العميل المراد الرد عليها.' },
-        provider: { type: 'string', enum: ['auto', 'gemini', 'ollama'], description: 'اختيار المزود: auto (يفضّل Gemini ثم Ollama) أو gemini أو ollama.' },
+        provider: { type: 'string', enum: ['auto', 'gemini', 'ollama', 'router'], description: 'auto (يفضّل Gemini ثم Ollama، أو الموجّه الذكي عند توفر مفاتيح إضافية)، gemini، ollama، أو router لفرض الموجّه الذكي.' },
         businessContext: { type: 'string', description: 'سياق نشاط معتمد اختياري يُمرر للنموذج.' }
+      },
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'celia_smart_router',
+    description: 'الموجّه الذكي الموحّد (Smart Zero-Cost Router): يختار تلقائيًا أنسب نموذج مجاني حسب نوع المهمة — ردود سريعة (Gemini ← AgentRouter ← Ollama ← حارس محلي) أو تفكير وكود (DeepSeek ← AgentRouter ← Gemini)، مع مهلة زمنية وتهدئة تلقائية عند 429 دون كشف أي مفتاح.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string', description: 'الطلب أو الرسالة المراد معالجتها.' },
+        customerMessage: { type: 'string', description: 'بديل لـ prompt لتوليد رد خدمة عملاء.' },
+        task: { type: 'string', enum: ['auto', 'fast', 'deep'], description: 'نوع المهمة: auto للتصنيف التلقائي، fast للردود القصيرة، deep للتفكير والكود.' },
+        provider: { type: 'string', enum: ['auto', 'gemini', 'agentrouter', 'deepseek', 'ollama', 'local'], description: 'فرض مزوّد بعينه بدل السلسلة التلقائية (افتراضي auto).' },
+        businessContext: { type: 'string', description: 'سياق نشاط معتمد اختياري.' },
+        system: { type: 'string', description: 'تعليمات نظام مخصصة اختيارية (تُقتطع إلى 8000 حرف).' },
+        maxOutputChars: { type: 'number', description: 'حد أقصى لطول الرد: 200–12000 حرف.' }
       },
       additionalProperties: false
     }
@@ -270,7 +291,12 @@ export const MCP_TOOLS = Object.freeze([
   }
 ]);
 
-export async function buildStatusSummary(pool, config, { probeOllama = false } = {}) {
+/** ينشئ موجّهًا من إعدادات الخادم فقط (لا يقرأ process.env مباشرة عند غياب الإعدادات). */
+function routerFor(config) {
+  return createAiRouter({ config: config?.aiRouter || loadAiRouterConfig({}) });
+}
+
+export async function buildStatusSummary(pool, config, { probeOllama = false, router = null } = {}) {
   const ollamaHealth = probeOllama
     ? await checkOllamaHealth({
         baseUrl: config.ollama.baseUrl,
@@ -280,14 +306,22 @@ export async function buildStatusSummary(pool, config, { probeOllama = false } =
     : { reachable: null, model: config.ollama.model, modelAvailable: null };
 
   const geminiConfigured = Boolean(config.gemini.apiKey);
-  const activeDefaultProvider =
-    config.celia.aiProvider === 'gemini'
+  const routerStatus = (router || routerFor(config)).status();
+  const hasExtendedKeys = Boolean(
+    config.aiRouter?.agentRouter?.apiKey || config.aiRouter?.deepseek?.apiKey
+  );
+  const routerForced = config.celia.aiProvider === 'router' || config.celia.aiProvider === 'smart';
+  const activeDefaultProvider = routerForced
+    ? 'smart-router'
+    : config.celia.aiProvider === 'gemini'
       ? 'gemini'
       : config.celia.aiProvider === 'ollama'
         ? 'ollama'
-        : geminiConfigured
-          ? 'gemini'
-          : 'ollama';
+        : hasExtendedKeys
+          ? 'smart-router'
+          : geminiConfigured
+            ? 'gemini'
+            : 'ollama';
 
   return {
     status: 'ok',
@@ -307,6 +341,8 @@ export async function buildStatusSummary(pool, config, { probeOllama = false } =
         model: config.ollama.model,
         ...ollamaHealth
       },
+      // حالة الموجّه الذكي: أسماء المزودات ونماذجها فقط، بدون أي مفتاح أو قيمة سرية.
+      smartRouter: routerStatus,
       google: {
         oauthConfigured: Boolean(config.google.clientId && config.google.clientSecret),
         encryptionReady: Boolean(config.encryptionKey)
@@ -320,21 +356,45 @@ export async function buildStatusSummary(pool, config, { probeOllama = false } =
   };
 }
 
-export function createCeliaMcpHandler({ pool, config }) {
+export function createCeliaMcpHandler({ pool, config, router = null }) {
+  const smartRouter = router || routerFor(config);
+
   async function callTool(name, args = {}) {
     switch (name) {
       case 'celia_status': {
         const probeOllama = args?.probeOllama !== false;
-        return buildStatusSummary(pool, config, { probeOllama });
+        return buildStatusSummary(pool, config, { probeOllama, router: smartRouter });
       }
       case 'celia_ai_reply': {
         const customerMessage = String(args?.customerMessage || '').trim();
         if (!customerMessage) throw new Error('customerMessage is required');
+        const requested = String(args?.provider || config.celia.aiProvider || 'auto').toLowerCase();
+        const hasExtendedKeys = Boolean(config.aiRouter?.agentRouter?.apiKey || config.aiRouter?.deepseek?.apiKey);
+        const useSmartRouter = requested === 'router' || requested === 'smart' || (requested === 'auto' && hasExtendedKeys);
+        if (useSmartRouter) {
+          return smartRouter.generate({
+            customerMessage,
+            task: 'fast',
+            businessContext: typeof args?.businessContext === 'string' ? args.businessContext : undefined
+          });
+        }
         return generateCeliaReply({
           config,
           customerMessage,
-          provider: args?.provider || config.celia.aiProvider,
+          provider: requested,
           businessContext: typeof args?.businessContext === 'string' ? args.businessContext : undefined
+        });
+      }
+      case 'celia_smart_router': {
+        const prompt = String(args?.prompt ?? args?.customerMessage ?? '').trim();
+        if (!prompt) throw new Error('prompt (or customerMessage) is required');
+        return smartRouter.generate({
+          prompt,
+          task: typeof args?.task === 'string' ? args.task : 'auto',
+          provider: typeof args?.provider === 'string' ? args.provider : 'auto',
+          system: typeof args?.system === 'string' ? args.system : undefined,
+          businessContext: typeof args?.businessContext === 'string' ? args.businessContext : undefined,
+          maxOutputChars: args?.maxOutputChars
         });
       }
       case 'google_gmail_search': {
@@ -653,7 +713,8 @@ function requireMcpToken(config) {
 
 export function createCeliaMcpApp({ pool, config }) {
   const app = express();
-  const { handleRpcMessage } = createCeliaMcpHandler({ pool, config });
+  const router = routerFor(config);
+  const { handleRpcMessage } = createCeliaMcpHandler({ pool, config, router });
 
   app.disable('x-powered-by');
   app.use(
@@ -682,7 +743,7 @@ export function createCeliaMcpApp({ pool, config }) {
   );
 
   app.get('/health', async (_req, res) => {
-    const summary = await buildStatusSummary(pool, config, { probeOllama: true });
+    const summary = await buildStatusSummary(pool, config, { probeOllama: true, router });
     res.json(summary);
   });
 
