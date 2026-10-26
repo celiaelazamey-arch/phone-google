@@ -673,6 +673,59 @@ textarea {
   color: var(--text-secondary);
 }
 
+/* زر «استماع بصوت سيليا» أسفل كل رد في المحادثة */
+.voice-speak-btn {
+  margin-top: 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.voice-speak-btn:hover:not(:disabled) {
+  background: var(--accent-soft);
+  transform: translateY(-1px);
+}
+
+.voice-speak-btn:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* زر النطق داخل فقاعة واتساب الصادرة */
+.wa-bubble.outbound {
+  position: relative;
+}
+
+.wa-voice-btn {
+  margin-top: 5px;
+  background: rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: inherit;
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 0.75rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.wa-voice-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.wa-voice-btn:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
 /* Claude Floating Omni-Composer */
 .composer-wrap {
   padding: 10px 18px 14px;

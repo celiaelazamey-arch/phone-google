@@ -7,6 +7,8 @@ import { google } from 'googleapis';
 import helmet from 'helmet';
 import mysql from 'mysql2/promise';
 import { createAiRouter, loadAiRouterConfig } from './ai-router.js';
+import { createVoiceEngine, loadVoiceConfig } from './elevenlabs.js';
+import { buildLiveArtifact, inspectDesign, loadFigmaConfig } from './figma.js';
 import { DEFAULT_POLICY } from './gemini.js';
 import { createCeliaUiRouter } from './celia-ui.js';
 import { createMemoryPool } from './memory-pool.js';
@@ -79,6 +81,10 @@ export function loadCeliaMcpConfig(env = process.env, { requireToken = true } = 
     // المرحلة 1: إعدادات الموجّه الموحّد (Gemini / AgentRouter / DeepSeek / Ollama / الحارس المحلي).
     // تُقرأ من نفس env ولا تُنسخ إلى أي استجابة أو صفحة HTML.
     aiRouter: loadAiRouterConfig(env),
+    // المرحلة 2: إعدادات محرك الصوت (المفتاح ومعرّف الصوت لا يخرجان من الإعدادات أبدًا).
+    voice: loadVoiceConfig(env),
+    // المرحلة 3: إعدادات جسر Figma (التوكن لا يخرج من الإعدادات أبدًا).
+    figma: loadFigmaConfig(env),
     ollama: Object.freeze({
       baseUrl: (env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434').trim(),
       model: (env.OLLAMA_MODEL || 'qwen2.5:7b').trim() || 'qwen2.5:7b',
@@ -191,6 +197,56 @@ export const MCP_TOOLS = Object.freeze([
     }
   },
   {
+    name: 'celia_voice_speak',
+    description: 'يحوّل نص رد سيليا إلى مقطع MP3 بصوت CELIA_VOICE_ID عبر eleven_flash_v2_5، مع كاش SHA-256 (الجملة المكررة تُعاد بصفر حرف) وسقف يومي صارم. النصوص الطويلة أو نفاد الحصة تُحوّل تلقائيًا إلى نطق المتصفح المجاني ar-EG دون أي تكلفة.',
+    inputSchema: {
+      type: 'object',
+      required: ['text'],
+      properties: {
+        text: { type: 'string', description: 'النص العربي المراد نطقه (حتى VOICE_MAX_CHARS_PER_MESSAGE حرفًا).' },
+        maxChars: { type: 'number', description: 'حد اختياري لعدد الحروف لهذا الطلب فقط.' }
+      },
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'celia_voice_quota',
+    description: 'يعرض عدّاد الأحرف المجانية المتبقية في ElevenLabs لهذا الشهر + السقف اليومي المحلي + إحصاءات الكاش، عبر استدعاء قراءة فقط لا يستهلك أي حرف صوتي.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'figma_inspect_design',
+    description: 'يقرأ ملف أو إطار Figma عبر رابطه (أو fileKey) ويعيد ملخصًا مُصفّى وآمنًا: شجرة العقد، الألوان بصيغة HEX، الخطوط، المكوّنات، والأبعاد — دون أي بيانات حساسة من الاستجابة الخام. استدعاء قراءة مجاني لا يعدّل التصميم.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'رابط Figma كامل، قد يحتوي على node-id.' },
+        fileKey: { type: 'string', description: 'مفتاح الملف مباشرة بديلًا عن الرابط.' },
+        nodeId: { type: 'string', description: 'معرّف إطار اختياري بصيغة 12:34 أو 12-34.' },
+        depth: { type: 'number', description: 'عمق الشجرة 1–8.' }
+      },
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'figma_to_live_artifact',
+    description: 'يحوّل تصميم Figma إلى واجهة HTML/CSS عربية حية ومستقلة: ألوان التصميم، خطوطه، وبطاقات تفاعلية عبر <details> — بلا سكربتات ولا موارد خارجية ولا توكن، وكل النصوص معقّمة ضد XSS.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'رابط Figma كامل.' },
+        fileKey: { type: 'string', description: 'مفتاح الملف مباشرة بديلًا عن الرابط.' },
+        nodeId: { type: 'string', description: 'معرّف إطار اختياري.' },
+        title: { type: 'string', description: 'عنوان مخصص للواجهة المولّدة.' }
+      },
+      additionalProperties: false
+    }
+  },
+  {
     name: 'google_gmail_search',
     description: 'بحث للقراءة فقط في رسائل Gmail (بيانات وصفية ومقتطفات بدون مرفقات).',
     inputSchema: {
@@ -296,7 +352,30 @@ function routerFor(config) {
   return createAiRouter({ config: config?.aiRouter || loadAiRouterConfig({}) });
 }
 
-export async function buildStatusSummary(pool, config, { probeOllama = false, router = null } = {}) {
+/** محرك الصوت يُنشأ من إعدادات الخادم فقط، مع إفراغ المفتاح عند غياب الإعدادات. */
+function voiceFor(config) {
+  return createVoiceEngine({ config: config?.voice || loadVoiceConfig({}) });
+}
+
+/** جسر Figma للقراءة الآمنة + توليد الواجهة الحية، قابل للحقن في الاختبارات. */
+function figmaFor(config, fetchImpl = null) {
+  const cfg = config?.figma || loadFigmaConfig({});
+  const inspect = (args = {}) =>
+    inspectDesign({
+      config: cfg,
+      url: args.url,
+      fileKey: args.fileKey,
+      nodeId: args.nodeId,
+      depth: args.depth,
+      fetchImpl
+    });
+  return Object.freeze({
+    inspect,
+    artifact: async (args = {}) => buildLiveArtifact(await inspect(args), { title: args.title })
+  });
+}
+
+export async function buildStatusSummary(pool, config, { probeOllama = false, router = null, voiceEngine = null } = {}) {
   const ollamaHealth = probeOllama
     ? await checkOllamaHealth({
         baseUrl: config.ollama.baseUrl,
@@ -343,6 +422,15 @@ export async function buildStatusSummary(pool, config, { probeOllama = false, ro
       },
       // حالة الموجّه الذكي: أسماء المزودات ونماذجها فقط، بدون أي مفتاح أو قيمة سرية.
       smartRouter: routerStatus,
+      // حالة الصوت: عدّادات وأسماء نماذج فقط، بلا مفتاح ElevenLabs ولا معرّف الصوت.
+      voice: (voiceEngine || voiceFor(config)).status(),
+      // حالة جسر Figma: هل التوكن مضبوط فقط — بلا قيمة التوكن.
+      figma: {
+        configured: Boolean(config.figma?.accessToken),
+        baseUrl: config.figma?.baseUrl || 'https://api.figma.com/v1/',
+        maxNodes: config.figma?.maxNodes || 40,
+        maxDepth: config.figma?.maxDepth || 4
+      },
       google: {
         oauthConfigured: Boolean(config.google.clientId && config.google.clientSecret),
         encryptionReady: Boolean(config.encryptionKey)
@@ -356,14 +444,16 @@ export async function buildStatusSummary(pool, config, { probeOllama = false, ro
   };
 }
 
-export function createCeliaMcpHandler({ pool, config, router = null }) {
+export function createCeliaMcpHandler({ pool, config, router = null, voiceEngine = null, figmaBridge = null }) {
   const smartRouter = router || routerFor(config);
+  const voice = voiceEngine || voiceFor(config);
+  const figma = figmaBridge || figmaFor(config);
 
   async function callTool(name, args = {}) {
     switch (name) {
       case 'celia_status': {
         const probeOllama = args?.probeOllama !== false;
-        return buildStatusSummary(pool, config, { probeOllama, router: smartRouter });
+        return buildStatusSummary(pool, config, { probeOllama, router: smartRouter, voiceEngine: voice });
       }
       case 'celia_ai_reply': {
         const customerMessage = String(args?.customerMessage || '').trim();
@@ -396,6 +486,23 @@ export function createCeliaMcpHandler({ pool, config, router = null }) {
           businessContext: typeof args?.businessContext === 'string' ? args.businessContext : undefined,
           maxOutputChars: args?.maxOutputChars
         });
+      }
+      case 'celia_voice_speak': {
+        const text = String(args?.text ?? '').trim();
+        if (!text) throw new Error('text is required');
+        return voice.speak({
+          text,
+          maxChars: typeof args?.maxChars === 'number' ? args.maxChars : undefined
+        });
+      }
+      case 'celia_voice_quota': {
+        return voice.quota();
+      }
+      case 'figma_inspect_design': {
+        return figma.inspect(args);
+      }
+      case 'figma_to_live_artifact': {
+        return figma.artifact(args);
       }
       case 'google_gmail_search': {
         const q = String(args?.q || '').trim().slice(0, 500);
@@ -711,10 +818,12 @@ function requireMcpToken(config) {
   };
 }
 
-export function createCeliaMcpApp({ pool, config }) {
+export function createCeliaMcpApp({ pool, config, figmaFetchImpl = null }) {
   const app = express();
   const router = routerFor(config);
-  const { handleRpcMessage } = createCeliaMcpHandler({ pool, config, router });
+  const voiceEngine = voiceFor(config);
+  const figmaBridge = figmaFor(config, figmaFetchImpl);
+  const { handleRpcMessage } = createCeliaMcpHandler({ pool, config, router, voiceEngine, figmaBridge });
 
   app.disable('x-powered-by');
   app.use(
@@ -728,6 +837,7 @@ export function createCeliaMcpApp({ pool, config }) {
           'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
           'font-src': ["'self'", 'https://fonts.gstatic.com', 'data:'],
           'img-src': ["'self'", 'data:'],
+          'media-src': ["'self'", 'data:', 'blob:'],
           'connect-src': [
             "'self'",
             'https://generativelanguage.googleapis.com',
@@ -743,7 +853,7 @@ export function createCeliaMcpApp({ pool, config }) {
   );
 
   app.get('/health', async (_req, res) => {
-    const summary = await buildStatusSummary(pool, config, { probeOllama: true, router });
+    const summary = await buildStatusSummary(pool, config, { probeOllama: true, router, voiceEngine });
     res.json(summary);
   });
 
@@ -751,7 +861,9 @@ export function createCeliaMcpApp({ pool, config }) {
     createCeliaUiRouter({
       createMcpHandler: createCeliaMcpHandler,
       buildStatusSummary,
-      config
+      config,
+      voiceEngine,
+      figmaBridge
     })
   );
 

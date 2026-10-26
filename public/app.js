@@ -318,6 +318,14 @@
         return { customerMessage: 'مرحبًا، ما هي مواعيد العمل لديكم وكيف أحجز استشارة؟', provider: 'auto' };
       case 'celia_smart_router':
         return { prompt: 'لخّص لي خطة عمل لتطبيق حجوزات عربي بسيط', task: 'deep', provider: 'auto' };
+      case 'celia_voice_speak':
+        return { text: 'أهلًا بك، يسعدني مساعدتك اليوم.' };
+      case 'celia_voice_quota':
+        return {};
+      case 'figma_inspect_design':
+        return { url: 'https://www.figma.com/file/AbCdEfGhIjKlMnOpQrStUv/CeliaDesign?node-id=1-2', depth: 3 };
+      case 'figma_to_live_artifact':
+        return { url: 'https://www.figma.com/file/AbCdEfGhIjKlMnOpQrStUv/CeliaDesign', title: 'واجهة سيليا الحية' };
       case 'whatsapp_consent_upsert':
         return { phone: '+201065217834', optedIn: true, aiOptedIn: true, source: 'نموذج موافقة استوديو سيليا 2026' };
       case 'whatsapp_contacts_list':
@@ -388,6 +396,36 @@
         <h4>${escapeHtml(title)}</h4>
         ${htmlBody}
       </div>`;
+  }
+
+  /**
+   * يشغّل رد سيليا صوتيًا: MP3 من ElevenLabs عند توفره، أو نطق المتصفح المجاني ar-EG
+   * للنصوص الطويلة/نفاد الحصة/محاكاة الاستوديو العام. لا تُرسل أي مفاتيح من المتصفح.
+   */
+  async function playCeliaVoice(text) {
+    const cleanText = String(text || '').trim();
+    if (!cleanText) return { provider: 'none', mode: 'none' };
+    const { data } = await callMcpRpc('tools/call', {
+      name: 'celia_voice_speak',
+      arguments: { text: cleanText.slice(0, 1000) }
+    });
+    const out = data?.result?.structuredContent || {};
+    if (out.audioBase64) {
+      const audio = new Audio(`data:${out.mimeType || 'audio/mpeg'};base64,${out.audioBase64}`);
+      await audio.play();
+      return { provider: out.provider, mode: out.cached ? 'cache' : 'elevenlabs' };
+    }
+    if (out.provider === 'web-speech-ar-EG') {
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(out.text || cleanText);
+        utterance.lang = 'ar-EG';
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
+        return { provider: out.provider, mode: 'browser', reason: out.reason };
+      }
+      return { provider: out.provider, mode: 'unavailable', reason: 'browser_speech_not_supported' };
+    }
+    return { provider: out.provider || 'unknown', mode: 'none', reason: out.reason };
   }
 
   function createAgentTurnUI(userTitle, enginePlaceholder = 'جارٍ التخطيط...') {
@@ -467,6 +505,30 @@
         btn.addEventListener('click', () => openDrawer('preview'));
         agentDiv.appendChild(btn);
       }
+      if (prose) {
+        const voiceBtn = document.createElement('button');
+        voiceBtn.type = 'button';
+        voiceBtn.className = 'voice-speak-btn';
+        voiceBtn.textContent = '🔊 استماع بصوت سيليا';
+        voiceBtn.title = 'نطق الرد بصوت سيليا (أو نطق المتصفح المجاني عند الحاجة)';
+        voiceBtn.addEventListener('click', async () => {
+          voiceBtn.disabled = true;
+          const original = voiceBtn.textContent;
+          voiceBtn.textContent = '⏳ جارٍ تجهيز الصوت...';
+          try {
+            const info = await playCeliaVoice(prose);
+            voiceBtn.textContent =
+              info.mode === 'browser' ? '🔊 نطق المتصفح المجاني ar-EG' : original;
+            voiceBtn.title = `المزوّد: ${info.provider} · الوضع: ${info.mode}${info.reason ? ` · ${info.reason}` : ''}`;
+          } catch (err) {
+            voiceBtn.textContent = '⚠️ تعذّر تشغيل الصوت';
+            voiceBtn.title = String(err?.message || err);
+          } finally {
+            voiceBtn.disabled = false;
+          }
+        });
+        agentDiv.appendChild(voiceBtn);
+      }
       el.chatScroll.scrollTop = el.chatScroll.scrollHeight;
     }
 
@@ -477,6 +539,24 @@
     const div = document.createElement('div');
     div.className = `wa-bubble ${direction}`;
     div.innerHTML = `${escapeHtml(text)}<span class="wa-meta">${escapeHtml(meta)}</span>`;
+    if (direction === 'outbound' && text) {
+      const waVoiceBtn = document.createElement('button');
+      waVoiceBtn.type = 'button';
+      waVoiceBtn.className = 'wa-voice-btn';
+      waVoiceBtn.textContent = '🔊';
+      waVoiceBtn.title = 'استمع بصوت سيليا';
+      waVoiceBtn.addEventListener('click', async () => {
+        waVoiceBtn.disabled = true;
+        try {
+          await playCeliaVoice(text);
+        } catch (err) {
+          waVoiceBtn.title = String(err?.message || err);
+        } finally {
+          waVoiceBtn.disabled = false;
+        }
+      });
+      div.appendChild(waVoiceBtn);
+    }
     el.waFeed.appendChild(div);
     el.waFeed.scrollTop = el.waFeed.scrollHeight;
   }
@@ -628,6 +708,48 @@
           artifactTitle: 'تقرير التزام حارس السياسة ومنع الهلوسة',
           artifactHtml,
           artifactCopy: aiOut.reply
+        });
+        openDrawer('preview');
+        return;
+      }
+
+      if (missionId === 'figma-live-ui') {
+        const turn = createAgentTurnUI('حوّل تصميم Figma إلى واجهة HTML/CSS حية داخل حاسوب سيليا');
+        const t0 = performance.now();
+        const figmaUrl = 'https://www.figma.com/file/AbCdEfGhIjKlMnOpQrStUv/CeliaDesign';
+
+        const s1 = turn.addStep('1. قراءة التصميم وتحليل الألوان والخطوط والمكوّنات (figma_inspect_design)');
+        const r1 = await callMcpRpc('tools/call', {
+          name: 'figma_inspect_design',
+          arguments: { url: figmaUrl, depth: 3 }
+        });
+        s1.done(r1.elapsed);
+        const design = r1.data.result?.structuredContent || {};
+
+        const s2 = turn.addStep('2. توليد الواجهة الحية الآمنة (figma_to_live_artifact)');
+        const r2 = await callMcpRpc('tools/call', {
+          name: 'figma_to_live_artifact',
+          arguments: { url: figmaUrl, title: 'واجهة سيليا الحية' }
+        });
+        s2.done(r2.elapsed);
+        if (r2.data.result?.isError) {
+          throw new Error('تعذّر قراءة تصميم Figma — تحقق من صلاحية توكن Figma في أسرار المستودع.');
+        }
+        const artifact = r2.data.result?.structuredContent || {};
+        const totalMs = Math.round(performance.now() - t0);
+
+        turn.finish({
+          summaryText: `واجهة جاهزة في ${totalMs}ms`,
+          engineLabel: artifact.sandboxOnly ? 'محاكاة Figma المحلية' : 'جسر Figma → واجهة حية',
+          prose:
+            `تم تحويل التصميم إلى واجهة عربية حية بلا أي تكلفة إضافية:\n\n` +
+            `• العقد المُحلَّلة: ${design.nodeCount || artifact.nodeCount || 0}\n` +
+            `• الألوان المستخرجة: ${(artifact.colors || []).length}\n` +
+            `• الخطوط: ${(artifact.fonts || []).join(' · ') || 'افتراضي عربي'}\n` +
+            `• الواجهة بلا سكربتات ولا موارد خارجية، وكل النصوص معقّمة ضد XSS.`,
+          artifactTitle: artifact.title || 'واجهة سيليا الحية',
+          artifactHtml: artifact.html || '<div class="cf-empty">لم يتم إرجاع واجهة.</div>',
+          artifactCopy: artifact.css || ''
         });
         openDrawer('preview');
         return;

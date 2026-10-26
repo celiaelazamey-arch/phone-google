@@ -2,11 +2,46 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
+import { buildLiveArtifact, sanitizeFigmaTree } from './figma.js';
 import { DEFAULT_POLICY } from './gemini.js';
 import { createMemoryPool } from './memory-pool.js';
 import { decryptJson, encryptJson, hashOAuthState, isValidE164, isWithinCustomerWindow, verifyWhatsAppSignature } from './security.js';
 
 const PUBLIC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../public');
+
+/** تصميم تجريبي ثابت للاستوديو العام: صفر استدعاءات Figma، صفر توكن. */
+function buildSandboxFigmaDemo() {
+  const document = {
+    id: '0:0',
+    name: 'شاشة سيليا الرئيسية',
+    type: 'CANVAS',
+    absoluteBoundingBox: { width: 1440, height: 900 },
+    fills: [{ type: 'SOLID', color: { r: 0.97, g: 0.98, b: 1 } }],
+    children: [
+      {
+        id: '1:1',
+        name: 'شريط التنقل',
+        type: 'FRAME',
+        fills: [{ type: 'SOLID', color: { r: 0.388, g: 0.4, b: 0.945 } }],
+        style: { fontFamily: 'Cairo' }
+      },
+      { id: '1:2', name: 'بطاقة العميل', type: 'COMPONENT', style: { fontFamily: 'Tajawal' } },
+      { id: '1:3', name: 'زر الحجز', type: 'INSTANCE', fills: [{ type: 'SOLID', color: { r: 0.055, g: 0.647, b: 0.914 } }] }
+    ]
+  };
+  return {
+    provider: 'figma',
+    fileKey: 'SANDBOX_DEMO_ONLY',
+    nodeId: null,
+    referenceSource: 'sandbox',
+    name: 'واجهة سيليا التجريبية',
+    lastModified: '',
+    httpStatus: 0,
+    depth: 2,
+    sandboxOnly: true,
+    ...sanitizeFigmaTree(document)
+  };
+}
 
 export function generateLocalPolicyReply({ customerMessage, businessContext = '' }) {
   const msg = String(customerMessage || '').trim();
@@ -26,7 +61,7 @@ export function generateLocalPolicyReply({ customerMessage, businessContext = ''
   return 'أهلًا وسهلًا بك! أنا مساعد خدمة العملاء الذكي لسيليا؛ يسعدني الإجابة عن استفساراتك العامة أو تحويل طلبك لموظف بشري مختص للتفاصيل الإجرائية.';
 }
 
-export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, config }) {
+export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, config, voiceEngine = null, figmaBridge = null }) {
   const router = express.Router();
   const sandboxPool = createMemoryPool();
   const ephemeralLabKey = crypto.randomBytes(32).toString('base64');
@@ -45,6 +80,10 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, conf
           deepseek: Object.freeze({ ...config.aiRouter.deepseek, apiKey: '' })
         })
       : undefined,
+    // مفتاح ElevenLabs ذو حصة مدفوعة: يُفرَّغ في الاستوديو العام تمامًا.
+    voice: config.voice ? Object.freeze({ ...config.voice, apiKey: '' }) : undefined,
+    // توكن Figma: يُفرَّغ في الاستوديو العام؛ أدواته تعمل بمحاكاة محلية بلا شبكة.
+    figma: config.figma ? Object.freeze({ ...config.figma, accessToken: '' }) : undefined,
     whatsapp: Object.freeze({
       ...config.whatsapp,
       accessToken: '',
@@ -97,6 +136,65 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, conf
         sandboxOnly: true,
         note: 'محاكاة داخل الاستوديو العام؛ للتوجيه الحقيقي استخدم POST /mcp مع CELIA_MCP_API_TOKEN.'
       };
+      return res.json({
+        jsonrpc: '2.0',
+        id: body.id ?? null,
+        sandbox: true,
+        result: {
+          content: [{ type: 'text', text: JSON.stringify(output, null, 2) }],
+          structuredContent: output,
+          isError: false
+        }
+      });
+    }
+
+    // أدوات الصوت في الاستوديو العام: محاكاة محلية فقط (لا ElevenLabs، لا حصة، لا صوت حقيقي).
+    if (body.method === 'tools/call' && (body.params?.name === 'celia_voice_speak' || body.params?.name === 'celia_voice_quota')) {
+      const toolName = body.params.name;
+      const callArgs = body.params?.arguments || {};
+      const output =
+        toolName === 'celia_voice_quota'
+          ? {
+              available: false,
+              provider: 'elevenlabs',
+              reason: 'sandbox_simulation',
+              sandboxOnly: true,
+              note: 'الحصة الحقيقية تُقرأ عبر POST /mcp المحمي بالرمز فقط.',
+              dailyBudget: { used: 0, limit: 0, remaining: 0 },
+              cache: { entries: 0, hits: 0, misses: 0 }
+            }
+          : {
+              provider: 'web-speech-ar-EG',
+              model: 'browser-speech-synthesis',
+              locale: 'ar-EG',
+              cached: false,
+              charsConsumed: 0,
+              audioBase64: null,
+              text: String(callArgs.text ?? '').trim().slice(0, 1000),
+              fallback: true,
+              sandboxOnly: true,
+              reason: 'sandbox_simulation',
+              note: 'للصوت الحقيقي استخدم POST /mcp مع CELIA_MCP_API_TOKEN.'
+            };
+      return res.json({
+        jsonrpc: '2.0',
+        id: body.id ?? null,
+        sandbox: true,
+        result: {
+          content: [{ type: 'text', text: JSON.stringify(output, null, 2) }],
+          structuredContent: output,
+          isError: false
+        }
+      });
+    }
+
+    // أدوات Figma في الاستوديو العام: تصميم تجريبي محلي فقط (لا توكن، لا شبكة).
+    if (body.method === 'tools/call' && (body.params?.name === 'figma_inspect_design' || body.params?.name === 'figma_to_live_artifact')) {
+      const demo = buildSandboxFigmaDemo();
+      const output =
+        body.params.name === 'figma_to_live_artifact'
+          ? { ...buildLiveArtifact(demo, { title: String(body.params?.arguments?.title || demo.name) }), sandboxOnly: true }
+          : demo;
       return res.json({
         jsonrpc: '2.0',
         id: body.id ?? null,

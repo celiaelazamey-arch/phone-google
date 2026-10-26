@@ -72,7 +72,7 @@ test('MCP exposes 11 tools including celia_smart_router, and /health reports the
   const { server, baseUrl } = await startApp(fullEnv());
   try {
     const tools = await rpc(baseUrl, 1, 'tools/list');
-    assert.equal(tools.result.tools.length, 11);
+    assert.equal(tools.result.tools.length, 15);
     const routerTool = tools.result.tools.find((tool) => tool.name === 'celia_smart_router');
     assert.ok(routerTool);
     assert.deepEqual(routerTool.inputSchema.properties.task.enum, ['auto', 'fast', 'deep']);
