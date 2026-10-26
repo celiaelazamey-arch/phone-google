@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="ar" dir="rtl" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>النظام الحي — سيليا 2026 | Live on Ground</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+  <style>
+    .live-hero{background:linear-gradient(135deg, rgba(217,119,87,.12), rgba(16,185,129,.08));border:1px solid var(--border-subtle);border-radius:16px;padding:22px 20px;margin:16px 0}
+    .live-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:16px 0}
+    .stat-card{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:14px;padding:14px}
+    .stat-card h4{margin:0 0 6px;font-size:.95rem}
+    .stat-card .val{font-weight:700;font-size:1.15rem}
+    .stat-card .sub{color:var(--text-muted);font-size:.82rem;margin-top:4px}
+    .pulse{display:inline-block;width:9px;height:9px;background:var(--emerald);border-radius:999px;box-shadow:0 0 0 6px rgba(16,185,129,.15);animation:pulse 1.6s infinite}
+    @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(16,185,129,.35)}70%{box-shadow:0 0 0 8px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
+    .find-bar{display:flex;gap:8px;margin:14px 0;flex-wrap:wrap}
+    .find-bar input{flex:1;min-width:180px;padding:10px 12px;border-radius:10px;border:1px solid var(--border-subtle);background:var(--bg-surface);color:var(--text-primary)}
+    .find-bar select,.find-bar button{padding:10px 12px;border-radius:10px;border:1px solid var(--border-subtle);background:var(--bg-surface);color:var(--text-primary);cursor:pointer}
+    .find-bar button.primary{background:var(--accent);color:#fff;border-color:transparent}
+    .skill-card{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px}
+    .skill-card .meta{font-size:.8rem;color:var(--text-muted)}
+    .skill-tag{display:inline-block;background:var(--accent-soft);color:var(--accent);padding:2px 8px;border-radius:999px;font-size:.72rem;margin-inline-end:6px}
+    .log-box{background:var(--bg-code);color:#cbd5e1;border-radius:10px;padding:12px;max-height:360px;overflow:auto;font-size:.82rem;white-space:pre-wrap;direction:ltr;text-align:left}
+    .topbar .nav-pills a{color:inherit;text-decoration:none}
+  </style>
+</head>
+<body>
+  <div class="app-shell" id="app-shell">
+    <header class="topbar">
+      <div class="brand-cluster">
+        <div class="brand-orb"><span class="orb-core"></span></div>
+        <div class="brand-text">
+          <div class="brand-title-row"><span class="brand-name">سيليا</span><span class="brand-year">2026 · LIVE</span></div>
+          <span class="brand-sub">النظام الحي على أرض الواقع — Find Skills مفعّل</span>
+        </div>
+      </div>
+      <nav class="nav-pills">
+        <a class="nav-pill" href="./"><span>✦</span><span>الواجهة الرئيسية</span></a>
+        <a class="nav-pill active" href="./live"><span>●</span><span>النظام الحي</span></a>
+        <a class="nav-pill" href="./skills"><span>⚡</span><span>Find Skills</span></a>
+        <span class="pill-count" id="live-count">12 مهارة</span>
+      </nav>
+      <div class="topbar-actions">
+        <span class="status-chip"><span class="pulse"></span><span style="margin-inline-start:8px">مباشر الآن</span></span>
+        <button class="icon-btn" id="btn-refresh" title="تحديث لحظي">↻</button>
+        <a class="icon-btn" href="./health" target="_blank" title="فحص /health" style="text-decoration:none">♡</a>
+      </div>
+    </header>
+
+    <div class="workspace-body" style="overflow:auto">
+      <main class="stage-main" style="max-width:1100px;margin:0 auto;width:100%;padding:18px">
+        <div class="live-hero">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <span class="pulse"></span>
+            <h1 style="margin:0;font-size:1.35rem">نظامك حي على أرض الواقع الآن</h1>
+            <span class="hero-pill"><span id="live-time">—</span> · <span id="live-uptime">—</span></span>
+          </div>
+          <p style="margin:8px 0 0;color:var(--text-secondary)">هذه الصفحة تُحدَّث من الخادم الحي مباشرةً عبر <code>/health</code> و <code>system_live_view</code> و <code>find_skills</code> — كل رقم تراه مقاس لحظيًا من عملية Node الحالية.</p>
+          <div class="find-bar">
+            <input id="q" placeholder="ابحث بمهارة: gmail، drive، whatsapp، تقويم، ذكاء، تشفير..." />
+            <select id="cat">
+              <option value="all">كل الفئات</option>
+              <option value="google">Google</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="ai">الذكاء الاصطناعي</option>
+              <option value="security">الأمان والتشفير</option>
+              <option value="system">النظام</option>
+            </select>
+            <button class="primary" id="btn-find">Find Skills 🔍</button>
+            <button id="btn-live">System Live View ▶</button>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <span class="hero-pill subtle">MCP 2024-11-05</span>
+            <span class="hero-pill subtle">AES-256-GCM + HMAC-SHA256</span>
+            <span class="hero-pill subtle" id="pill-storage">التخزين: —</span>
+            <span class="hero-pill subtle" id="pill-provider">المحرك: —</span>
+          </div>
+        </div>
+
+        <div class="live-grid" id="stats-grid"></div>
+
+        <div class="telemetry-strip" style="margin:10px 0">
+          <div class="telemetry-item"><span class="t-label">البروتوكول</span><span class="t-val ok">MCP JSON-RPC 2.0</span></div>
+          <div class="telemetry-item"><span class="t-label">النقل</span><span class="t-val accent">Streamable HTTP + Sandbox RPC</span></div>
+          <div class="telemetry-item"><span class="t-label">الأدوات</span><span class="t-val ok" id="t-tools">12</span></div>
+          <div class="telemetry-item"><span class="t-label">التكلفة</span><span class="t-val ok">0.00$ مجانًا</span></div>
+        </div>
+
+        <h3 style="margin:18px 0 8px">نتائج Find Skills — مهارات النظام الحي</h3>
+        <div id="skills-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px"></div>
+
+        <h3 style="margin:18px 0 8px">السجل الحي (Live Trace)</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <div style="font-weight:600;margin-bottom:6px">system_live_view (JSON)</div>
+            <pre id="live-json" class="log-box">جارٍ التحميل...</pre>
+          </div>
+          <div>
+            <div style="font-weight:600;margin-bottom:6px">find_skills (JSON)</div>
+            <pre id="skills-json" class="log-box">اضغط Find Skills للبحث...</pre>
+          </div>
+        </div>
+
+        <div style="margin:18px 0;padding:14px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:12px">
+          <h4 style="margin:0 0 8px">كيف تراه حيًا على أرض الواقع؟</h4>
+          <ol style="margin:0;padding-inline-start:18px;color:var(--text-secondary)">
+            <li>كل بطاقة أعلاه تُجلب من الخادم بطلب <code>fetch('/health')</code> مباشر — حدّث الصفحة وسترى الطابع الزمني يتغير.</li>
+            <li>اكتب <code>whatsapp</code> في شريط البحث واضغط Find Skills لمشاهدة مهارات واتساب تُفلتر لحظيًا عبر أداة <code>find_skills</code>.</li>
+            <li>جرّب <code>POST /ui/workspace/rpc</code> أو <code>POST /mcp</code> برمز المالك لتنفيذ أي مهارة وتوثيق النتيجة في السجل.</li>
+            <li>محاكاة رسالة واتساب حية: <code>POST /ui/workspace/crypto-lab</code> مع <code>{action:"simulate_inbound_whatsapp", phone:"+201065...", text:"مرحبا"}</code></li>
+          </ol>
+          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+            <a href="./" class="icon-btn" style="text-decoration:none">← العودة للاستوديو</a>
+            <a href="./health" target="_blank" class="icon-btn" style="text-decoration:none">/health</a>
+            <a href="./mcp" class="icon-btn" style="text-decoration:none">/mcp</a>
+            <button class="icon-btn" id="btn-copy-live">نسخ تقرير Live JSON</button>
+          </div>
+        </div>
+
+        <div style="margin:14px 0;color:var(--text-muted);font-size:.82rem">الخادم يعمل على <code id="host-info">—</code> · الطابع اللحظي <span id="now-tick">—</span></div>
+      </main>
+    </div>
+  </div>
+<script>
+const els = {
+  stats: document.getElementById('stats-grid'),
+  skillsGrid: document.getElementById('skills-grid'),
+  liveJson: document.getElementById('live-json'),
+  skillsJson: document.getElementById('skills-json'),
+  q: document.getElementById('q'),
+  cat: document.getElementById('cat'),
+  pillStorage: document.getElementById('pill-storage'),
+  pillProvider: document.getElementById('pill-provider'),
+  tTools: document.getElementById('t-tools'),
+  liveCount: document.getElementById('live-count'),
+  liveTime: document.getElementById('live-time'),
+  liveUptime: document.getElementById('live-uptime'),
+  hostInfo: document.getElementById('host-info'),
+  nowTick: document.getElementById('now-tick')
+};
+els.hostInfo.textContent = location.host + ' — ' + location.pathname;
+setInterval(()=> els.nowTick.textContent = new Date().toLocaleString('ar-EG'), 1000);
+
+async function fetchHealth(){
+  const r = await fetch('./health'); const j = await r.json();
+  return j;
+}
+async function rpcFindSkills(query, category){
+  const body = {jsonrpc:'2.0',id:Date.now(),method:'tools/call',params:{name:'find_skills',arguments:{query, category, liveCheck:true}}};
+  const r = await fetch('./ui/workspace/rpc',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+  const j = await r.json(); return j;
+}
+async function rpcLiveView(){
+  const body = {jsonrpc:'2.0',id:Date.now(),method:'tools/call',params:{name:'system_live_view',arguments:{includeTelemetry:true, probeOllama:true}}};
+  const r = await fetch('./ui/workspace/rpc',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+  const j = await r.json(); return j;
+}
+function renderStats(health, live){
+  const p = health.providers || {};
+  els.pillStorage.textContent = 'التخزين: ' + (health.storage==='memory'?'ذاكرة حية (Memory)':'MySQL');
+  els.pillProvider.textContent = 'المحرك: ' + (p.effectiveDefault||'—') + (p.gemini?.configured?' · Gemini جاهز':' · محلي مجاني');
+  els.tTools.textContent = health.toolsCount || '12';
+  els.liveCount.textContent = (health.toolsCount||12)+' مهارة';
+  const cards = [
+    {t:'حالة الخادم',v:health.status==='ok'?'نشط ✓':'—',s: health.service+' @ '+health.version},
+    {t:'التخزين',v:health.storage==='memory'?'Memory (حي)':'MySQL', s: p.google?.encryptionReady ? 'تشفير AES-256-GCM جاهز':'تشفير مؤقت sandbox'},
+    {t:'Gemini',v: p.gemini?.configured ? 'مُهيأ':'غير مُهيأ (محلي)', s: p.gemini?.model || '—'},
+    {t:'Ollama',v: (p.ollama?.reachable ? 'متصل ✓' : 'غير متصل (اختياري)'), s: (p.ollama?.model||'qwen2.5:7b') + ' @ ' + (p.ollama?.baseUrl||'')},
+    {t:'Google OAuth',v: p.google?.oauthConfigured ? 'مُهيأ':'تجريبي', s: p.google?.encryptionReady?'مفتاح 32 بايت جاهز':'—'},
+    {t:'WhatsApp',v: (p.whatsapp?.webhookConfigured?'Webhook ✓':'بدون') + ' · ' + (p.whatsapp?.cloudApiConfigured?'Cloud API':'sandbox'), s: p.whatsapp?.autoReplyEnabled?'رد تلقائي مفعّل':'رد تلقائي متوقف (آمن)'}
+  ];
+  els.stats.innerHTML = cards.map(c=> `<div class="stat-card"><h4>${c.t}</h4><div class="val">${c.v}</div><div class="sub">${c.s}</div></div>`).join('');
+  if(live){
+    els.liveTime.textContent = new Date(live.telemetry?.timestamp || live.timestamp || Date.now()).toLocaleString('ar-EG');
+    els.liveUptime.textContent = live.telemetry?.uptime || '—';
+    els.liveJson.textContent = JSON.stringify(live, null, 2);
+  }
+}
+function renderSkills(data){
+  const out = data?.result?.structuredContent || data;
+  els.skillsJson.textContent = JSON.stringify(out, null, 2);
+  const skills = out.skills || [];
+  els.skillsGrid.innerHTML = skills.map(s=> `
+    <div class="skill-card">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+        <strong>${s.name}</strong>
+        <span class="skill-tag">${(s.tags||[]).join(' · ') || 'system'}</span>
+      </div>
+      <div class="meta">${s.description}</div>
+      <div style="font-size:.78rem;color:var(--text-muted)">استدعاء: <code style="direction:ltr;display:inline-block">${s.invocation}</code></div>
+      <details><summary style="cursor:pointer;font-size:.8rem">مخطط الإدخال (inputSchema)</summary><pre style="white-space:pre-wrap;font-size:.75rem;background:var(--bg-code);padding:8px;border-radius:8px;direction:ltr;text-align:left">${JSON.stringify(s.inputSchema, null, 2)}</pre></details>
+    </div>
+  `).join('') || '<div style="color:var(--text-muted)">لا توجد نتائج — جرّب كلمة أخرى أو اختر \"كل الفئات\".</div>';
+}
+
+async function refreshAll(){
+  try{
+    const health = await fetchHealth();
+    const liveR = await rpcLiveView();
+    const live = liveR.result?.structuredContent || liveR;
+    renderStats(health, live);
+    // auto-run find_skills with current filter
+    const q = els.q.value.trim();
+    const cat = els.cat.value;
+    const f = await rpcFindSkills(q, cat);
+    renderSkills(f);
+  }catch(e){
+    els.liveJson.textContent = 'خطأ: ' + e.message;
+  }
+}
+document.getElementById('btn-find').onclick = async ()=>{
+  const q = els.q.value.trim(); const cat = els.cat.value;
+  els.skillsJson.textContent = 'جارٍ البحث...';
+  try{ const f = await rpcFindSkills(q, cat); renderSkills(f);}catch(e){ els.skillsJson.textContent = e.message;}
+};
+document.getElementById('btn-live').onclick = async ()=>{
+  els.liveJson.textContent='جارٍ جلب system_live_view...';
+  try{ const l = await rpcLiveView(); renderStats(await fetchHealth(), l.result?.structuredContent||l); }catch(e){els.liveJson.textContent=e.message}
+};
+document.getElementById('btn-refresh').onclick = refreshAll;
+document.getElementById('btn-copy-live').onclick = ()=> navigator.clipboard.writeText(els.liveJson.textContent).then(()=> alert('تم نسخ تقرير Live JSON ✓'));
+
+els.q.addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('btn-find').click(); });
+
+// initial load
+refreshAll();
+setInterval(async ()=>{ try{ const h=await fetchHealth(); els.liveTime.textContent=new Date().toLocaleTimeString('ar-EG'); els.liveCount.textContent=(h.toolsCount||12)+' مهارة'; }catch{}}, 4000);
+</script>
+</body>
+</html>

@@ -256,6 +256,31 @@ export const MCP_TOOLS = Object.freeze([
     }
   },
   {
+    name: 'find_skills',
+    description: 'مهارة البحث الحي عن قدرات النظام (Find Skills) — تبحث في جميع أدوات Celia MCP بالعربية أو الإنجليزية وتُرجع المهارات المطابقة مع حالتها الحية وكيفية استدعائها.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'كلمة البحث: مثل gmail، drive، whatsapp، calendar، ai، تشفير، موافقة، إرسال، أو اتركه فارغًا لعرض كل المهارات.' },
+        category: { type: 'string', enum: ['all', 'google', 'whatsapp', 'ai', 'security', 'system'], description: 'تصفية حسب الفئة.' },
+        liveCheck: { type: 'boolean', description: 'إجراء فحص حي لحالة كل مهارة (افتراضي true).' }
+      },
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'system_live_view',
+    description: 'عرض النظام حيّ على أرض الواقع — تقرير لحظي يضم حالة الخادم، التخزين، مزودي الذكاء الاصطناعي، جاهزية Google/WhatsApp، عدد الأدوات، وروابط المعاينة والفحص المباشر.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        includeTelemetry: { type: 'boolean', description: 'تضمين القياسات الحية (افتراضي true)' },
+        probeOllama: { type: 'boolean', description: 'فحص Ollama المحلي' }
+      },
+      additionalProperties: false
+    }
+  },
+  {
     name: 'whatsapp_send_text',
     description: 'إرسال رسالة WhatsApp فردية لعميل وافق مسبقًا وداخل نافذة خدمة العملاء (24 ساعة).',
     inputSchema: {
@@ -478,6 +503,84 @@ export function createCeliaMcpHandler({ pool, config }) {
         }
         return { status: 'accepted', phone, providerMessageId };
       }
+      case 'find_skills': {
+        const query = String(args?.query || '').trim().toLowerCase();
+        const category = String(args?.category || 'all').toLowerCase();
+        const liveCheck = args?.liveCheck !== false;
+        const categoryMap = {
+          google: ['gmail', 'drive', 'calendar', 'contacts', 'google'],
+          whatsapp: ['whatsapp', 'واتساب'],
+          ai: ['ai', 'reply', 'celia_ai', 'ذكاء', 'رد'],
+          security: ['consent', 'crypto', 'تشفير', 'موافقة'],
+          system: ['status', 'celia_status', 'find_skills', 'system_live', 'live_view', 'نظام']
+        };
+        const allToolsDetailed = MCP_TOOLS.map((t) => ({
+          name: t.name,
+          description: t.description,
+          inputSchema: t.inputSchema,
+          tags: Object.entries(categoryMap).filter(([, keys]) => keys.some((k) => t.name.toLowerCase().includes(k) || t.description.toLowerCase().includes(k))).map(([cat]) => cat),
+          invocation: `tools/call → ${t.name}`,
+          example: `{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"${t.name}\",\"arguments\":{}}}`
+        }));
+        let filtered = allToolsDetailed;
+        if (category !== 'all' && categoryMap[category]) {
+          filtered = filtered.filter((t) => t.tags.includes(category) || (category === 'system' && ['find_skills','system_live_view','celia_status'].includes(t.name)));
+        }
+        if (query) {
+          const q = query.toLowerCase();
+          filtered = filtered.filter((t) => t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q) || t.tags.join(' ').includes(q));
+        }
+        let liveStatus = null;
+        if (liveCheck) {
+          liveStatus = await buildStatusSummary(pool, config, { probeOllama: Boolean(args?.probeOllama) }).catch(() => null);
+        }
+        return {
+          query: args?.query || '',
+          category,
+          totalSkills: MCP_TOOLS.length,
+          matched: filtered.length,
+          liveStatus,
+          skills: filtered,
+          hint: 'استخدم system_live_view لرؤية النظام حيّ على أرض الواقع، أو celia_status للفحص السريع.'
+        };
+      }
+      case 'system_live_view': {
+        const includeTelemetry = args?.includeTelemetry !== false;
+        const probeOllama = args?.probeOllama !== false;
+        const status = await buildStatusSummary(pool, config, { probeOllama });
+        const now = new Date();
+        const uptimeSec = Math.floor(process.uptime());
+        const demoPhone = config.ownerPhone || '+201065217834';
+        const baseUrl = config.google?.redirectUri?.replace(/\/auth\/google\/callback.*/, '') || `http://localhost:${config.port || 3010}`;
+        const telemetry = includeTelemetry ? {
+          timestamp: now.toISOString(),
+          uptime: `${Math.floor(uptimeSec / 3600)}h ${Math.floor((uptimeSec % 3600) / 60)}m ${uptimeSec % 60}s`,
+          nodeVersion: process.version,
+          memoryUsage: process.memoryUsage(),
+          storage: status.storage,
+          ownerPhoneDemo: demoPhone,
+          liveEndpoints: {
+            ui: '/',
+            health: '/health',
+            mcp: '/mcp',
+            sandboxRpc: '/ui/workspace/rpc',
+            cryptoLab: '/ui/workspace/crypto-lab'
+          }
+        } : null;
+        return {
+          live: true,
+          message: 'نظامك حي على أرض الواقع — Celia MCP يعمل الآن ويستقبل الطلبات لحظيًا',
+          status,
+          telemetry,
+          nextSteps: [
+            'جرّب find_skills مع query=\"whatsapp\" لاستكشاف مهارات واتساب',
+            'استدعِ whatsapp_consent_upsert لتسجيل موافقة +201065217834',
+            'استخدم simulate_inbound_whatsapp عبر /ui/workspace/crypto-lab لمحاكاة رسالة حية',
+            'استدعِ celia_ai_reply لاختبار الرد الذكي مع حارس السياسة'
+          ],
+          previewNote: 'هذا الرد مولّد لحظيًا من الخادم الحي — كل قيمة فيه مقاسة في زمن الطلب.'
+        };
+      }
       default: {
         const error = new Error(`Unknown MCP tool: ${name}`);
         error.code = -32602;
@@ -684,6 +787,18 @@ export function createCeliaMcpApp({ pool, config }) {
   app.get('/health', async (_req, res) => {
     const summary = await buildStatusSummary(pool, config, { probeOllama: true });
     res.json(summary);
+  });
+  app.get('/live', async (_req, res) => {
+    const summary = await buildStatusSummary(pool, config, { probeOllama: true });
+    res.json({ live: true, message: 'نظامك حي على أرض الواقع — Celia MCP يعمل الآن', summary, timestamp: new Date().toISOString(), uptime: process.uptime(), tools: MCP_TOOLS.length });
+  });
+  app.get('/api/skills/find', async (req, res) => {
+    const q = String(req.query.q || req.query.query || '').trim();
+    const category = String(req.query.category || 'all').trim();
+    try {
+      const out = await createCeliaMcpHandler({ pool, config }).callTool('find_skills', { query: q, category, liveCheck: true });
+      res.json(out);
+    } catch (e) { res.status(400).json({ error: e.message }); }
   });
 
   app.use(
