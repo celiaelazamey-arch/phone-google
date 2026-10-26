@@ -54,6 +54,7 @@ export function loadCeliaMcpConfig(env = process.env, { requireToken = true } = 
     ownerEmail: (env.APP_OWNER_EMAIL || '').trim(),
     ownerPhone: (env.APP_OWNER_PHONE_E164 || '').trim() || null,
     encryptionKey: hasValidEncryptionKey ? rawEncryptionKey : '',
+    envDisableMysql: env.CELIA_MCP_DISABLE_MYSQL === 'true',
     celia: Object.freeze({
       apiToken: mcpToken,
       aiProvider: ((env.CELIA_AI_PROVIDER || 'auto').trim() || 'auto').toLowerCase()
@@ -92,7 +93,14 @@ export function loadCeliaMcpConfig(env = process.env, { requireToken = true } = 
 }
 
 export async function connectPoolWithFallback(config) {
-  if (config.envDisableMysql) return createMemoryPool();
+  if (config.envDisableMysql) {
+    const memoryPool = createMemoryPool();
+    await memoryPool.execute(
+      'INSERT INTO app_users (id, email, phone_e164) VALUES (?, ?, ?)',
+      [config.userId, config.ownerEmail || null, config.ownerPhone]
+    );
+    return memoryPool;
+  }
   try {
     const pool = mysql.createPool({
       ...config.mysql,

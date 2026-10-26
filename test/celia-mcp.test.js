@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { createCeliaMcpApp, loadCeliaMcpConfig } from '../src/celia-mcp.js';
+import { connectPoolWithFallback, createCeliaMcpApp, loadCeliaMcpConfig } from '../src/celia-mcp.js';
 import { createMemoryPool } from '../src/memory-pool.js';
 import { normalizeOllamaBaseUrl } from '../src/ollama.js';
 
@@ -22,6 +22,24 @@ test('loadCeliaMcpConfig enforces 32+ char non-placeholder CELIA_MCP_API_TOKEN',
   assert.equal(cfg.celia.apiToken, validHexToken);
   assert.equal(cfg.ollama.model, 'qwen2.5:7b');
   assert.equal(cfg.gemini.apiKey, 'gemini-secret-test-key');
+});
+
+test('CELIA_MCP_DISABLE_MYSQL selects the in-memory store and still seeds the owner row', async () => {
+  const config = loadCeliaMcpConfig({
+    CELIA_MCP_API_TOKEN: validHexToken,
+    CELIA_MCP_DISABLE_MYSQL: 'true',
+    MYSQL_HOST: '203.0.113.10'
+  });
+  assert.equal(config.envDisableMysql, true);
+
+  const pool = await connectPoolWithFallback(config);
+  assert.equal(pool.isMemory, true);
+  const [rows] = await pool.execute('SELECT 1');
+  assert.deepEqual(rows, [{ 1: 1 }]);
+  await pool.end();
+
+  const mysqlConfig = loadCeliaMcpConfig({ CELIA_MCP_API_TOKEN: validHexToken });
+  assert.equal(mysqlConfig.envDisableMysql, false);
 });
 
 test('normalizeOllamaBaseUrl blocks remote SSRF hosts unless explicitly allowed', () => {
