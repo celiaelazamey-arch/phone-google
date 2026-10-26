@@ -52,6 +52,35 @@ test('Celia MCP HTTP server enforces Bearer token, supports MCP methods, and nev
     const pageHtml = await pageRes.text();
     assert.equal(pageHtml.includes(validHexToken), false);
     assert.equal(pageHtml.includes('super-secret-gemini-key-do-not-expose'), false);
+    assert.match(pageHtml, /سيليا/);
+
+    const cssRes = await fetch(`${baseUrl}/styles.css`);
+    assert.equal(cssRes.status, 200);
+    const jsRes = await fetch(`${baseUrl}/app.js`);
+    assert.equal(jsRes.status, 200);
+
+    const sandboxRpc = await fetch(`${baseUrl}/ui/workspace/rpc`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 77,
+        method: 'tools/call',
+        params: { name: 'celia_ai_reply', arguments: { customerMessage: 'كم الأسعار؟', provider: 'local' } }
+      })
+    }).then((r) => r.json());
+    assert.equal(sandboxRpc.sandbox, true);
+    assert.equal(sandboxRpc.result.isError, false);
+    assert.match(sandboxRpc.result.structuredContent.reply, /خدمة العملاء/);
+
+    const cryptoLab = await fetch(`${baseUrl}/ui/workspace/crypto-lab`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'simulate_inbound_whatsapp', phone: '+201065217834', text: 'مرحبًا' })
+    }).then((r) => r.json());
+    assert.equal(cryptoLab.ok, true);
+    assert.equal(cryptoLab.hmacVerified, true);
+    assert.equal(cryptoLab.customerWindow24hOpen, true);
 
     const healthRes = await fetch(`${baseUrl}/health`);
     assert.equal(healthRes.status, 200);

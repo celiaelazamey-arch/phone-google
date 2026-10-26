@@ -4,6 +4,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY src ./src
+COPY public ./public
 COPY sql ./sql
 EXPOSE 3000
 USER node

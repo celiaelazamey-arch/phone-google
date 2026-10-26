@@ -7,6 +7,7 @@ import { google } from 'googleapis';
 import helmet from 'helmet';
 import mysql from 'mysql2/promise';
 import { DEFAULT_POLICY } from './gemini.js';
+import { createCeliaUiRouter } from './celia-ui.js';
 import { createMemoryPool } from './memory-pool.js';
 import { checkOllamaHealth, generateCeliaReply } from './ollama.js';
 import { decryptJson, encryptJson, isValidE164, isWithinCustomerWindow, safeEqual } from './security.js';
@@ -650,145 +651,6 @@ function requireMcpToken(config) {
   };
 }
 
-const CONSOLE_JS = `(() => {
-  const tokenInput = document.getElementById('mcp-token');
-  const msgInput = document.getElementById('customer-msg');
-  const providerSelect = document.getElementById('ai-provider');
-  const outputEl = document.getElementById('rpc-output');
-  const badgesEl = document.getElementById('status-badges');
-
-  const saved = sessionStorage.getItem('celia_mcp_token');
-  if (saved) tokenInput.value = saved;
-  tokenInput.addEventListener('input', () => sessionStorage.setItem('celia_mcp_token', tokenInput.value.trim()));
-
-  function renderBadges(data) {
-    const p = data.providers || {};
-    const items = [
-      { label: 'الخادم: نشط', ok: data.status === 'ok' },
-      { label: 'التخزين: ' + (data.storage === 'mysql' ? 'MySQL' : 'ذاكرة محلية'), ok: true },
-      { label: 'Gemini (' + (p.gemini?.model || '-') + '): ' + (p.gemini?.configured ? 'متصل بالمفتاح' : 'غير مضبوط محليًا (متاح في Actions)'), ok: Boolean(p.gemini?.configured) },
-      { label: 'Ollama (' + (p.ollama?.model || '-') + '): ' + (p.ollama?.reachable ? 'متصل' : 'غير شغال محليًا'), ok: Boolean(p.ollama?.reachable) }
-    ];
-    badgesEl.innerHTML = items.map((item) =>
-      '<span class="badge ' + (item.ok ? 'ok' : 'warn') + '">' + item.label + '</span>'
-    ).join('');
-  }
-
-  async function refreshHealth() {
-    try {
-      const res = await fetch('./health');
-      const data = await res.json();
-      renderBadges(data);
-    } catch (err) {
-      outputEl.textContent = 'تعذر قراءة /health: ' + err.message;
-    }
-  }
-
-  async function sendRpc(method, params) {
-    const token = tokenInput.value.trim();
-    if (!token) {
-      outputEl.textContent = 'أدخل قيمة CELIA_MCP_API_TOKEN من ملف .env أولًا لاختبار نقطة /mcp المحمية.';
-      return;
-    }
-    outputEl.textContent = 'جارٍ الإرسال...';
-    try {
-      const res = await fetch('./mcp', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'authorization': 'Bearer ' + token
-        },
-        body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params })
-      });
-      const data = await res.json();
-      outputEl.textContent = JSON.stringify(data, null, 2);
-    } catch (err) {
-      outputEl.textContent = 'خطأ اتصال: ' + err.message;
-    }
-  }
-
-  document.getElementById('btn-init').addEventListener('click', () =>
-    sendRpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'celia-web-console', version: '0.1.0' } })
-  );
-  document.getElementById('btn-tools').addEventListener('click', () => sendRpc('tools/list', {}));
-  document.getElementById('btn-status').addEventListener('click', () =>
-    sendRpc('tools/call', { name: 'celia_status', arguments: { probeOllama: true } })
-  );
-  document.getElementById('btn-reply').addEventListener('click', () =>
-    sendRpc('tools/call', {
-      name: 'celia_ai_reply',
-      arguments: { customerMessage: msgInput.value.trim(), provider: providerSelect.value }
-    })
-  );
-
-  refreshHealth();
-})();`;
-
-const CONSOLE_HTML = `<!doctype html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>خادم Celia MCP — مساعد الهاتف + Google</title>
-  <style>
-    :root { color-scheme: dark; --bg: #0b1020; --card: #131b33; --border: #263359; --text: #eef2ff; --muted: #9aa7cc; --ok: #10b981; --warn: #f59e0b; --accent: #3b82f6; }
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; padding: 24px; }
-    .wrap { max-width: 920px; margin: 0 auto; display: grid; gap: 16px; }
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
-    h1 { margin: 0 0 6px; font-size: 1.45rem; }
-    p { margin: 0; color: var(--muted); font-size: 0.95rem; }
-    .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
-    .badge { padding: 5px 11px; border-radius: 999px; font-size: 0.84rem; border: 1px solid var(--border); }
-    .badge.ok { background: rgba(16, 185, 129, 0.14); border-color: rgba(16, 185, 129, 0.45); color: #6ee7b7; }
-    .badge.warn { background: rgba(245, 158, 11, 0.14); border-color: rgba(245, 158, 11, 0.45); color: #fcd34d; }
-    label { display: block; font-size: 0.9rem; margin-bottom: 6px; color: var(--muted); }
-    input, select, textarea { width: 100%; background: #090e1c; color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 0.95rem; margin-bottom: 12px; }
-    .actions { display: flex; flex-wrap: wrap; gap: 8px; }
-    button { background: var(--accent); color: #fff; border: none; border-radius: 10px; padding: 9px 15px; font-size: 0.92rem; cursor: pointer; font-weight: 600; }
-    button.secondary { background: #1e2949; border: 1px solid var(--border); }
-    pre { margin: 0; background: #070b16; border: 1px solid var(--border); border-radius: 10px; padding: 14px; overflow-x: auto; direction: ltr; text-align: left; font-size: 0.86rem; min-height: 150px; color: #dbeafe; }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <section class="card">
-      <h1>خادم Celia MCP — مساعد الهاتف + Google</h1>
-      <p>نقطة JSON-RPC 2.0 محمية بـ <code>CELIA_MCP_API_TOKEN</code> على المسار <code>POST /mcp</code> مع دعم Gemini (في GitHub Actions أو <code>.env</code>) وOllama (<code>qwen2.5:7b</code>).</p>
-      <div id="status-badges" class="badges"></div>
-    </section>
-
-    <section class="card">
-      <label for="mcp-token">رمز المصادقة (<code>CELIA_MCP_API_TOKEN</code> — يُحفظ في جلستك فقط)</label>
-      <input id="mcp-token" type="password" placeholder="الصق رمز CELIA_MCP_API_TOKEN لاختبار أوامر MCP" autocomplete="off" />
-
-      <label for="ai-provider">مزود الذكاء الاصطناعي</label>
-      <select id="ai-provider">
-        <option value="auto">تلقائي (Gemini أولًا ثم Ollama qwen2.5:7b)</option>
-        <option value="gemini">Gemini مباشرة (GEMINI_API_KEY)</option>
-        <option value="ollama">Ollama محلي (qwen2.5:7b)</option>
-      </select>
-
-      <label for="customer-msg">رسالة عميل تجريبية لأداة <code>celia_ai_reply</code></label>
-      <textarea id="customer-msg" rows="2">مرحبًا، أريد الاستفسار عن الخدمات المتاحة لديكم وكيفية المتابعة.</textarea>
-
-      <div class="actions">
-        <button id="btn-init" type="button">1) MCP Initialize</button>
-        <button id="btn-tools" class="secondary" type="button">2) عرض الأدوات (tools/list)</button>
-        <button id="btn-status" class="secondary" type="button">3) فحص الحالة (celia_status)</button>
-        <button id="btn-reply" type="button">4) توليد رد ذكي (celia_ai_reply)</button>
-      </div>
-    </section>
-
-    <section class="card">
-      <label>استجابة JSON-RPC 2.0 الحقيقية</label>
-      <pre id="rpc-output">{ "ready": true, "endpoint": "POST /mcp" }</pre>
-    </section>
-  </div>
-  <script src="./mcp-ui.js"></script>
-</body>
-</html>`;
-
 export function createCeliaMcpApp({ pool, config }) {
   const app = express();
   const { handleRpcMessage } = createCeliaMcpHandler({ pool, config });
@@ -802,9 +664,18 @@ export function createCeliaMcpApp({ pool, config }) {
         directives: {
           'default-src': ["'self'"],
           'script-src': ["'self'"],
-          'style-src': ["'self'", "'unsafe-inline'"],
-          'connect-src': ["'self'"],
-          'frame-ancestors': ['*']
+          'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+          'font-src': ["'self'", 'https://fonts.gstatic.com', 'data:'],
+          'img-src': ["'self'", 'data:'],
+          'connect-src': [
+            "'self'",
+            'https://generativelanguage.googleapis.com',
+            'https://api.groq.com',
+            'http://127.0.0.1:11434',
+            'http://localhost:11434'
+          ],
+          'frame-ancestors': ['*'],
+          'upgrade-insecure-requests': null
         }
       }
     })
@@ -815,13 +686,13 @@ export function createCeliaMcpApp({ pool, config }) {
     res.json(summary);
   });
 
-  app.get('/', (_req, res) => {
-    res.type('html').send(CONSOLE_HTML);
-  });
-
-  app.get('/mcp-ui.js', (_req, res) => {
-    res.type('application/javascript').send(CONSOLE_JS);
-  });
+  app.use(
+    createCeliaUiRouter({
+      createMcpHandler: createCeliaMcpHandler,
+      buildStatusSummary,
+      config
+    })
+  );
 
   app.get('/mcp', requireMcpToken(config), (_req, res) => {
     res.json({

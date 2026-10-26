@@ -13,7 +13,7 @@
     "celia:mcp:stdio": "node src/celia-mcp.js --stdio",
     "celia:mcp:verify": "node src/celia-mcp.js --self-test",
     "test": "node --test",
-    "check": "for file in src/*.js test/*.js; do node --check \"$file\" || exit 1; done"
+    "check": "for file in src/*.js test/*.js public/*.js; do node --check \"$file\" || exit 1; done"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
