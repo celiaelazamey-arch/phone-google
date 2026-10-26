@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="ar" dir="rtl" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>سيليا 2026 — مساحة الوكيل الذكي ومساعد الهاتف + Google (MCP)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app-shell" id="app-shell">
+    <!-- Top Glass Command Bar -->
+    <header class="topbar">
+      <div class="brand-cluster">
+        <div class="brand-orb" aria-hidden="true">
+          <span class="orb-core"></span>
+        </div>
+        <div class="brand-text">
+          <div class="brand-title-row">
+            <span class="brand-name">سيليا</span>
+            <span class="brand-year">2026</span>
+          </div>
+          <span class="brand-sub">مساعد الهاتف + Google · بروتوكول MCP</span>
+        </div>
+      </div>
+
+      <nav class="nav-pills" aria-label="أقسام المنصة">
+        <button type="button" class="nav-pill active" data-view="studio">
+          <span class="nav-icon">✦</span>
+          <span>مساحة الوكيل</span>
+        </button>
+        <button type="button" class="nav-pill" data-view="tools">
+          <span class="nav-icon">⚡</span>
+          <span>أدوات MCP</span>
+          <span class="pill-count" id="nav-tools-count">10</span>
+        </button>
+        <button type="button" class="nav-pill" data-view="whatsapp">
+          <span class="nav-icon">📲</span>
+          <span>واتساب والأمان</span>
+        </button>
+        <button type="button" class="nav-pill" data-view="models">
+          <span class="nav-icon">🆓</span>
+          <span>النماذج المجانية</span>
+        </button>
+      </nav>
+
+      <div class="topbar-actions">
+        <button type="button" class="status-chip" id="btn-auth-status" title="إعدادات النماذج المجانية ورمز المالك">
+          <span class="status-dot ok" id="auth-dot"></span>
+          <span id="auth-label">مجاني نشط</span>
+        </button>
+        <button type="button" class="icon-btn computer-toggle-btn" id="btn-toggle-computer" title="فتح حاسوب سيليا والمخرجات التفاعلية">
+          <span>🖥️</span>
+          <span class="hide-sm">حاسوب سيليا</span>
+          <span class="step-counter" id="artifact-badge">جاهز</span>
+        </button>
+        <button type="button" class="icon-btn" id="btn-new-chat" title="بدء مهمة جديدة">
+          <span>＋</span>
+        </button>
+        <button type="button" class="icon-btn" id="btn-theme-toggle" title="تبديل المظهر الفاتح / الداكن">
+          <span id="theme-icon">☀️</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace Split Stage -->
+    <div class="workspace-body">
+      <!-- Primary Content Stage -->
+      <main class="stage-main">
+        <!-- VIEW 1: Agent Studio (Claude Conversational UX + Manus Live Execution) -->
+        <section class="view-panel active" id="view-studio">
+          <div class="chat-scroll" id="chat-scroll">
+            <!-- Hero Welcome State -->
+            <div class="hero-welcome" id="hero-welcome">
+              <div class="hero-badge-row">
+                <span class="hero-pill">
+                  <span class="pulse-dot"></span>
+                  <span>وكيل 2026 مجاني 100% · بدون اشتراكات مدفوعة</span>
+                </span>
+                <span class="hero-pill subtle" id="hero-actions-pill">✓ Gemini متصل في GitHub Actions</span>
+              </div>
+
+              <h1 class="hero-heading">أهلًا بك في سيليا، وكيلك الذكي للهاتف وGoogle</h1>
+              <p class="hero-lead">
+                واجهة عمل بمستوى Manus وClaude تجمع المحادثة العربية الهادئة، شاشة التنفيذ الحي خطوةً بخطوة، وتكامل WhatsApp وGoogle عبر بروتوكول <code>MCP JSON-RPC 2.0</code> بالاعتماد الكامل على الطبقات المجانية.
+              </p>
+
+              <!-- System Live Telemetry Strip -->
+              <div class="telemetry-strip" id="telemetry-strip">
+                <div class="telemetry-item">
+                  <span class="t-label">بروتوكول MCP</span>
+                  <span class="t-val ok" id="t-mcp-state">نشط · 2024-11-05</span>
+                </div>
+                <div class="telemetry-item">
+                  <span class="t-label">المحرّك النشط</span>
+                  <span class="t-val accent" id="t-engine-state">تلقائي مجاني</span>
+                </div>
+                <div class="telemetry-item">
+                  <span class="t-label">حماية التشفير</span>
+                  <span class="t-val ok">AES-256-GCM + HMAC</span>
+                </div>
+                <div class="telemetry-item">
+                  <span class="t-label">التكلفة التشغيلية</span>
+                  <span class="t-val ok">0.00$ مجانًا</span>
+                </div>
+              </div>
+
+              <!-- 4 Agentic Mission Cards -->
+              <div class="missions-label">اختر مهمة جاهزة لتشغيل حاسوب سيليا الحي فورًا، أو اكتب مهمتك بالأسفل:</div>
+              <div class="missions-grid">
+                <button type="button" class="mission-card" data-mission="whatsapp-e2e">
+                  <div class="mission-top">
+                    <span class="mission-icon emerald">📲</span>
+                    <span class="mission-tag">4 خطوات حية · واتساب + AI</span>
+                  </div>
+                  <h3>سيناريو عميل واتساب الكامل</h3>
+                  <p>تسجيل موافقة مزدوجة للرقم <code>+201065217834</code>، محاكاة رسالة Webhook موقّعة بـ HMAC-SHA256، فتح نافذة الـ 24 ساعة، وتوليد رد ذكي آمن.</p>
+                </button>
+
+                <button type="button" class="mission-card" data-mission="security-audit">
+                  <div class="mission-top">
+                    <span class="mission-icon coral">🛡️</span>
+                    <span class="mission-tag">تدقيق تشفير حي · MCP</span>
+                  </div>
+                  <h3>مصافحة MCP وتدقيق التشفير الجنائي</h3>
+                  <p>تنفيذ دورة <code>initialize → tools/list → celia_status</code> واختبار تشفير رموز Google OAuth بـ AES-256-GCM وكشف التلاعب بالتواقيع.</p>
+                </button>
+
+                <button type="button" class="mission-card" data-mission="policy-guard">
+                  <div class="mission-top">
+                    <span class="mission-icon violet">🧠</span>
+                    <span class="mission-tag">حارس السياسة · 6 قواعد</span>
+                  </div>
+                  <h3>اختبار ذكاء خدمة العملاء ومنع الهلوسة</h3>
+                  <p>معالجة استفسار حساس حول الأسعار والشكاوى والمدفوعات وإثبات التزام سيليا بعدم اختلاق البيانات والتحويل اللطيف لموظف بشري.</p>
+                </button>
+
+                <button type="button" class="mission-card" data-mission="free-stack-blueprint">
+                  <div class="mission-top">
+                    <span class="mission-icon amber">⚡</span>
+                    <span class="mission-tag">مخرج جاهز للنسخ · 0$</span>
+                  </div>
+                  <h3>توليد حزمة الربط المجاني 2026 (Claude &amp; Cursor)</h3>
+                  <p>بناء ملف إعداد <code>mcp.json</code> وأوامر التشغيل لربط خادم سيليا مع Gemini المجاني وOllama المحلي (<code>qwen2.5:7b</code>) وGitHub Actions.</p>
+                </button>
+              </div>
+            </div>
+
+            <!-- Dynamic Conversation Stream -->
+            <div class="conversation-stream" id="conversation-stream"></div>
+          </div>
+
+          <!-- Claude-Style Floating Omni-Composer -->
+          <div class="composer-wrap">
+            <form class="composer-box" id="composer-form">
+              <textarea
+                id="composer-input"
+                rows="2"
+                placeholder="اطلب من سيليا تنفيذ مهمة... (مثال: سجّل موافقة العميل +201065217834 وحاكِ رسالة استفسار عن المواعيد)"
+              ></textarea>
+              <div class="composer-bar">
+                <div class="composer-tools">
+                  <label class="model-select-pill" for="studio-provider">
+                    <span class="spark">✦</span>
+                    <select id="studio-provider" aria-label="اختيار المحرك المجاني">
+                      <option value="auto">تلقائي ذكي (مجاني 100%)</option>
+                      <option value="gemini-browser">Gemini 2.5 Flash (مجاني — AI Studio)</option>
+                      <option value="ollama-local">Ollama محلي (qwen2.5:7b مجاني)</option>
+                      <option value="groq-free">Groq مجاني فائق السرعة (Llama 3.3)</option>
+                      <option value="celia-builtin">محرك سيليا المدمج (فوري بدون مفتاح)</option>
+                    </select>
+                  </label>
+                  <button type="button" class="quick-chip" data-quick="افحص حالة خادم MCP وجميع المزودات المتصلة الآن">فحص المنظومة</button>
+                  <button type="button" class="quick-chip hide-sm" data-quick="سجّل موافقة العميل +201126212452 مع تفعيل موافقة الذكاء الاصطناعي وحاكِ رسالة ترحيب">ربط رقم واتساب</button>
+                </div>
+                <button type="submit" class="send-btn" id="btn-send">
+                  <span>تنفيذ</span>
+                  <span class="send-arrow">↵</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <!-- VIEW 2: Interactive 10 MCP Tools Studio -->
+        <section class="view-panel" id="view-tools">
+          <div class="panel-container">
+            <div class="section-header">
+              <div>
+                <h2>استوديو أدوات بروتوكول MCP العشر</h2>
+                <p>جميع الأدوات الفعلية المسجّلة على <code>POST /mcp</code> مع نماذج إدخال جاهزة وتشغيل JSON-RPC 2.0 فوري.</p>
+              </div>
+              <div class="filter-bar" id="tool-filters">
+                <button type="button" class="filter-chip active" data-cat="all">الكل (10)</button>
+                <button type="button" class="filter-chip" data-cat="ai">الذكاء والحالة (2)</button>
+                <button type="button" class="filter-chip" data-cat="whatsapp">واتساب للأعمال (3)</button>
+                <button type="button" class="filter-chip" data-cat="google">خدمات Google (5)</button>
+              </div>
+            </div>
+
+            <div class="tools-grid" id="tools-grid"></div>
+          </div>
+        </section>
+
+        <!-- VIEW 3: Live WhatsApp Phone Simulator & Crypto Lab -->
+        <section class="view-panel" id="view-whatsapp">
+          <div class="panel-container">
+            <div class="section-header">
+              <div>
+                <h2>محاكي واتساب للأعمال ومختبر التشفير الحي</h2>
+                <p>جرّب دورة حياة رسالة العميل الحقيقية: الموافقة المزدوجة، توقيع <code>X-Hub-Signature-256</code>، نافذة الـ 24 ساعة، والرد الذكي الآمن.</p>
+              </div>
+            </div>
+
+            <div class="wa-lab-grid">
+              <!-- Realistic Phone Frame -->
+              <div class="phone-mockup">
+                <div class="phone-notch"></div>
+                <div class="phone-wa-header">
+                  <div class="wa-avatar">س</div>
+                  <div class="wa-contact-info">
+                    <strong>مساعد سيليا للأعمال ✓</strong>
+                    <span id="wa-window-indicator">نافذة 24 ساعة: بانتظار رسالة العميل</span>
+                  </div>
+                </div>
+                <div class="phone-wa-messages" id="wa-chat-feed">
+                  <div class="wa-sys-notice">🔒 الرسائل محمية بتحقق HMAC-SHA256 وسياسة الموافقة المزدوجة.</div>
+                </div>
+                <div class="phone-wa-footer">
+                  <input type="text" id="wa-sim-text" value="مرحبًا، ما هي مواعيد العمل وكيف يمكنني حجز موعد؟" placeholder="اكتب رسالة واردة من العميل..." />
+                  <button type="button" id="btn-wa-send-sim" title="إرسال كـ Webhook موقّع">➤</button>
+                </div>
+              </div>
+
+              <!-- Controls & Cryptography Audit Card -->
+              <div class="wa-controls-stack">
+                <div class="surface-card">
+                  <h3>1. إعدادات موافقة العميل (Dual Opt-In Policy)</h3>
+                  <div class="form-row">
+                    <label for="wa-sim-phone">رقم هاتف العميل (صيغة E.164)</label>
+                    <input type="text" id="wa-sim-phone" value="+201065217834" dir="ltr" />
+                  </div>
+                  <div class="toggles-row">
+                    <label class="check-card">
+                      <input type="checkbox" id="wa-opt-in" checked />
+                      <div>
+                        <strong>موافقة واتساب الأساسية (optedIn)</strong>
+                        <span>تسمح بالمراسلة الفردية داخل نافذة 24 ساعة</span>
+                      </div>
+                    </label>
+                    <label class="check-card">
+                      <input type="checkbox" id="wa-ai-opt-in" checked />
+                      <div>
+                        <strong>موافقة الذكاء الاصطناعي المنفصلة (aiOptedIn)</strong>
+                        <span>تسمح بمعالجة الرسالة عبر محرك الرد الذكي</span>
+                      </div>
+                    </label>
+                  </div>
+                  <div class="btn-row">
+                    <button type="button" class="primary-btn" id="btn-wa-save-consent">حفظ الموافقة عبر أداة MCP</button>
+                    <button type="button" class="ghost-btn" id="btn-wa-run-crypto">فحص تشفير AES-256-GCM</button>
+                  </div>
+                </div>
+
+                <div class="surface-card">
+                  <h3>2. التقرير الجنائي للتوقيع والنافذة</h3>
+                  <pre class="mono-box" id="wa-crypto-report">{ "ready": true, "hint": "اضغط زر الإرسال في شاشة الهاتف لمحاكاة Webhook حقيقي موقّع بـ HMAC-SHA256" }</pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW 4: 100% Free 2026 AI Models & Owner Token Vault -->
+        <section class="view-panel" id="view-models">
+          <div class="panel-container">
+            <div class="section-header">
+              <div>
+                <h2>مركز النماذج المجانية لعام 2026 وخزنة المصادقة</h2>
+                <p>صُممت سيليا لتعمل مجانًا بالكامل: اختر بين المحرك المدمج الفوري، أو Gemini المجاني، أو Ollama المحلي على جهازك، أو Groq المجاني.</p>
+              </div>
+            </div>
+
+            <div class="models-grid">
+              <!-- Free Option 1: Built-in -->
+              <div class="surface-card model-card featured">
+                <div class="model-card-head">
+                  <span class="badge-pill ok">نشط افتراضيًا · 0$ للأبد</span>
+                  <span class="model-cost">بدون مفتاح</span>
+                </div>
+                <h3>🛡️ وكيل سيليا المدمج (Celia Guard 2026)</h3>
+                <p>مخطّط مهام متعدد الخطوات ومحرّك ردود متوافق مع القواعد الست يعمل مباشرةً داخل الخادم دون الحاجة لأي مفتاح خارجي أو بطاقة بنكية.</p>
+              </div>
+
+              <!-- Free Option 2: Google Gemini Free Tier -->
+              <div class="surface-card model-card">
+                <div class="model-card-head">
+                  <span class="badge-pill accent">متصل في GitHub Actions ✓</span>
+                  <span class="model-cost">مجاني — AI Studio</span>
+                </div>
+                <h3>✨ Google Gemini 2.5 Flash</h3>
+                <p>متصل بالفعل في مستودعك عبر <code>secrets.GEMINI_API_KEY</code>! ويمكنك اختياريًا وضع مفتاح Google AI Studio المجاني أدناه لتشغيله مباشرة من متصفحك هنا أيضًا:</p>
+                <input type="password" id="vault-gemini-key" placeholder="اختياري: الصق مفتاح Gemini المجاني (AIza...) لجلسة المتصفح" autocomplete="off" dir="ltr" />
+              </div>
+
+              <!-- Free Option 3: Local Ollama -->
+              <div class="surface-card model-card">
+                <div class="model-card-head">
+                  <span class="badge-pill warn" id="ollama-live-badge">محلي مفتوح المصدر</span>
+                  <span class="model-cost">مجاني 100% بلا حدود</span>
+                </div>
+                <h3>🦙 Ollama المحلي (<code>qwen2.5:7b</code>)</h3>
+                <p>يعمل على جهازك الشخصي مجانًا وبخصوصية تامة. للربط المباشر مع المتصفح على Windows شغّل في PowerShell:</p>
+                <code class="inline-cmd" dir="ltr">$env:OLLAMA_ORIGINS="*"; ollama run qwen2.5:7b</code>
+                <input type="text" id="vault-ollama-url" value="http://127.0.0.1:11434" dir="ltr" aria-label="عنوان Ollama" />
+              </div>
+
+              <!-- Free Option 4: Groq Free Cloud -->
+              <div class="surface-card model-card">
+                <div class="model-card-head">
+                  <span class="badge-pill subtle">سرعة ~300 كلمة/ث</span>
+                  <span class="model-cost">طبقة مجانية</span>
+                </div>
+                <h3>🚀 Groq Cloud المجاني (Llama 3.3 70B)</h3>
+                <p>طبقة سحابية مجانية فائقة السرعة من <code>console.groq.com</code> تعمل مباشرة من متصفحك عند إدخال مفتاح مجاني:</p>
+                <input type="password" id="vault-groq-key" placeholder="اختياري: مفتاح Groq المجاني (gsk_...)" autocomplete="off" dir="ltr" />
+              </div>
+            </div>
+
+            <!-- Owner MCP Token Card -->
+            <div class="surface-card owner-vault-card">
+              <div class="owner-vault-head">
+                <div>
+                  <h3>🔐 وضع المالك الموثّق (<code>CELIA_MCP_API_TOKEN</code>)</h3>
+                  <p>واجهة سيليا تعمل فورًا في وضع الاستوديو الآمن بدون رمز. وعند لصق رمز <code>CELIA_MCP_API_TOKEN</code> هنا، تتحول جميع الطلبات مباشرةً إلى نقطة <code>POST /mcp</code> المحمية بصلاحية المالك الكاملة (يُحفظ في ذاكرة التبويب المؤقتة فقط).</p>
+                </div>
+              </div>
+              <div class="vault-input-row">
+                <input type="password" id="vault-mcp-token" placeholder="اختياري: الصق قيمة CELIA_MCP_API_TOKEN للترقية لوضع المالك المباشر" autocomplete="off" dir="ltr" />
+                <button type="button" class="primary-btn" id="btn-verify-vault">حفظ وفحص الاتصال الحي</button>
+              </div>
+              <div class="vault-feedback" id="vault-feedback"></div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <!-- Manus Live Computer & Claude Artifact Split Drawer -->
+      <aside class="computer-drawer" id="computer-drawer" aria-label="حاسوب سيليا والمخرجات">
+        <div class="drawer-header">
+          <div class="drawer-title">
+            <span class="live-dot" id="computer-live-dot"></span>
+            <div>
+              <strong>حاسوب سيليا الحي</strong>
+              <span id="computer-subtitle">شاشة التنفيذ والمخرجات (Artifacts)</span>
+            </div>
+          </div>
+          <div class="drawer-actions">
+            <button type="button" class="mini-btn" id="btn-copy-artifact" title="نسخ المخرج">نسخ</button>
+            <button type="button" class="mini-btn" id="btn-close-computer" title="إغلاق اللوحة">✕</button>
+          </div>
+        </div>
+
+        <div class="drawer-tabs">
+          <button type="button" class="drawer-tab active" data-dtab="preview">المخرج التفاعلي</button>
+          <button type="button" class="drawer-tab" data-dtab="trace">سجل JSON-RPC الحي</button>
+          <button type="button" class="drawer-tab" data-dtab="config">ملف ربط MCP</button>
+        </div>
+
+        <div class="drawer-body">
+          <!-- Tab 1: Rich Visual Artifact -->
+          <div class="dtab-pane active" id="dtab-preview">
+            <div class="artifact-empty" id="artifact-content">
+              <div class="empty-orb">✦</div>
+              <h4>شاشة مخرجات سيليا جاهزة</h4>
+              <p>اختر أي مهمة من البطاقات الأربع أو أرسل أمرًا في المحادثة لترى خطوات حاسوب سيليا الحية والمخرج التفاعلي هنا.</p>
+            </div>
+          </div>
+
+          <!-- Tab 2: Live Manus Terminal / JSON-RPC Stream -->
+          <div class="dtab-pane" id="dtab-trace">
+            <div class="trace-list" id="trace-list">
+              <div class="trace-placeholder">لم تُنفّذ طلبات JSON-RPC في هذه الجلسة بعد.</div>
+            </div>
+          </div>
+
+          <!-- Tab 3: Ready-to-copy MCP Config & Snippets -->
+          <div class="dtab-pane" id="dtab-config">
+            <div class="config-block">
+              <div class="config-label">إعداد Claude Desktop / Cursor / Windsurf (<code>mcp.json</code> — مجاني عبر stdio)</div>
+              <pre class="mono-box" id="mcp-json-snippet" dir="ltr">{
+  "mcpServers": {
+    "celia-phone-google": {
+      "command": "npm",
+      "args": ["run", "celia:mcp:stdio"],
+      "env": {
+        "CELIA_AI_PROVIDER": "auto",
+        "OLLAMA_MODEL": "qwen2.5:7b"
+      }
+    }
+  }
+}</pre>
+              <div class="config-label">اختبار نقطة HTTP المحمية عبر cURL</div>
+              <pre class="mono-box" dir="ltr">curl -X POST http://localhost:3010/mcp \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $CELIA_MCP_API_TOKEN" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'</pre>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- Tool Runner Modal -->
+    <div class="modal-backdrop" id="tool-modal" hidden>
+      <div class="modal-card">
+        <div class="modal-head">
+          <div>
+            <span class="modal-tag">تنفيذ أداة MCP حية</span>
+            <h3 id="modal-tool-name">celia_status</h3>
+          </div>
+          <button type="button" class="mini-btn" id="btn-close-modal">✕</button>
+        </div>
+        <p class="modal-desc" id="modal-tool-desc"></p>
+        <div class="form-row">
+          <label for="modal-tool-args">المعاملات (JSON Arguments)</label>
+          <textarea id="modal-tool-args" class="mono-textarea" rows="5" dir="ltr"></textarea>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="primary-btn" id="btn-exec-tool">تشغيل الأداة الآن ⚡</button>
+        </div>
+        <div class="form-row">
+          <label>الاستجابة الفعلية من الخادم</label>
+          <pre class="mono-box" id="modal-tool-result" dir="ltr">{ "waiting": true }</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
