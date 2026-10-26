@@ -114,7 +114,8 @@ npm run build:pages      # يولّد dist/ من public/ + طبقة المحاك
 # o افتح dist/index.html عبر أي خادم ثابت أو ارفع dist/ كما هي
 ```
 
-- سكربت البناء `scripts/build-pages.mjs` يستخرج `MCP_TOOLS` و`SERVER_INFO` من `src/celia-mcp.js` ويحقنهما في `dist/celia-static-shim.js`، ثم يحقن الوسم في كل صفحة ويضيف `.nojekyll` و`404.html`.
+- سكربت البناء `scripts/build-pages.mjs` يستخرج `MCP_TOOLS` و`SERVER_INFO` و`MCP_PROTOCOL_VERSION` من `src/celia-mcp.js` ويحقنها في `dist/celia-static-shim.js`، ثم يحقن الوسم في كل صفحة ويضيف `.nojekyll` و`404.html`.
+- روابط التشخيص في `live.html` تُحوَّل في النسخة الثابتة إلى لقطات JSON حقيقية (`health.json`, `api/live.json`, `mcp.json`) حتى لا تُفضي إلى `404` على Pages؛ والطبقة الثابتة تبقى مصدر القيم اللحظية داخل المتصفح.
 - الطبقة الثابتة تخدم `GET /health` و`POST /ui/workspace/rpc` و`POST /mcp` و`POST /ui/workspace/crypto-lab` داخل المتصفح: `initialize`, `ping`, `tools/list`, `tools/call` (١٢ أداة), `resources/*`, `prompts/*`.
 - النشر تلقائي عبر `.github/workflows/pages.yml` عند كل دفع إلى `main` (بيئة `github-pages`, `build_type: workflow`). لا يحتاج أي سر ولا بطاقة دفع.
 - الاختبارات: `node --test test/static-shim.test.js` (تبني `dist/` وتتحقق من كل أداة ونقاط REST ومسار التشفير والموافقات).
