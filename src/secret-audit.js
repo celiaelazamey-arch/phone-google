@@ -352,6 +352,25 @@ export function renderSummary(report, secretValues = []) {
   return redactText(lines.join('\n'), secretValues);
 }
 
+/** يبني أمر ::notice:: آمنًا (تنظيف الحمولة فقط دون المساس ببادئة الأمر). */
+export function buildAuditNotice(report, secretValues = []) {
+  const compact = PROVIDER_ORDER.map((id) => {
+    const item = report.providers[id];
+    return `${id}:${item.state}${item.httpStatus ? `(http${item.httpStatus})` : ''}`;
+  }).join(',');
+  const quota = report.voiceQuota ? String(report.voiceQuota.remainingPct) : 'n/a';
+  const payload = redactText(
+    `verified=${report.verified}/${report.total} configured=${report.configured}/${report.total} voiceQuotaRemainingPct=${quota} ${compact}`,
+    secretValues
+  )
+    // تهريب صيغة أوامر الـ workflow: علامة % أولًا ثم الأسطر، وأخيرًا نمنع أي :: داخل الحمولة.
+    .replace(/%/g, '%25')
+    .replace(/\r/g, '%0D')
+    .replace(/\n/g, '%0A')
+    .replace(/::/g, ':');
+  return `::notice title=Celia 7-Secret Audit::${payload}`;
+}
+
 export function auditExitCode(report, strict = false) {
   if (!strict) return 0;
   return PROVIDER_ORDER.every((id) => ['ok', 'limited'].includes(report.providers[id].state)) ? 0 : 1;
@@ -391,5 +410,8 @@ if (isMain) {
   console.log(safeJson);
   const markdown = renderSummary(report, secrets);
   if (env.GITHUB_STEP_SUMMARY) fs.appendFileSync(env.GITHUB_STEP_SUMMARY, `${markdown}\n`);
+
+  // قناة ملاحظة قابلة للقراءة عبر GitHub Checks API (مفيدة حين يتعذّر تنزيل سجلات التشغيل).
+  console.log(buildAuditNotice(report, secrets));
   process.exitCode = auditExitCode(report, strict);
 }

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   auditExitCode,
+  buildAuditNotice,
   collectSecrets,
   parseVoiceQuota,
   redactText,
@@ -98,6 +99,17 @@ test('all seven secrets are verified with safe GET probes; the voice quota perce
   assert.match(markdown, /حصة الصوت المجانية/);
   assert.equal(auditExitCode(report, true), 0);
   assert.equal(auditExitCode(report, false), 0);
+
+  // أمر ::notice:: يجب أن يبقى سليمًا بعد التنظيف، وألا يحمل أي سر.
+  const notice = buildAuditNotice(report, Object.values(SECRETS));
+  assert.match(notice, /^::notice title=Celia 7-Secret Audit::/);
+  assert.match(notice, /verified=7\/7 configured=7\/7 voiceQuotaRemainingPct=75/);
+  assert.match(notice, /gemini:ok\(http200\)/);
+  const noticePayload = notice.slice(notice.indexOf('Audit::') + 'Audit::'.length);
+  assert.equal(noticePayload.includes('::'), false);
+  for (const secret of Object.values(SECRETS)) assert.equal(notice.includes(secret), false);
+  assert.equal(notice.includes('\n'), false);
+  assert.equal(notice.includes('\r'), false);
 });
 
 test('missing secrets are reported without any network call; strict mode decides the exit code', async () => {
