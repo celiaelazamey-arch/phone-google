@@ -49,12 +49,48 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, conf
     res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
   });
 
+  router.get('/live', (_req, res) => {
+    res.sendFile(path.join(PUBLIC_DIR, 'live.html'));
+  });
+  router.get('/skills', (_req, res) => {
+    res.sendFile(path.join(PUBLIC_DIR, 'skills.html'));
+  });
+  router.get('/live.html', (_req, res) => {
+    res.sendFile(path.join(PUBLIC_DIR, 'live.html'));
+  });
+  router.get('/skills.html', (_req, res) => {
+    res.sendFile(path.join(PUBLIC_DIR, 'skills.html'));
+  });
+
   router.get('/styles.css', (_req, res) => {
     res.type('text/css').sendFile(path.join(PUBLIC_DIR, 'styles.css'));
   });
 
   router.get('/app.js', (_req, res) => {
     res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'app.js'));
+  });
+
+  // Live JSON endpoints — no auth, shows system live on ground
+  router.get('/healthz', async (_req, res) => {
+    const summary = await buildStatusSummary(sandboxPool, config, { probeOllama: false });
+    res.json({ ...summary, live: true, timestamp: new Date().toISOString() });
+  });
+  router.get('/api/live', async (_req, res) => {
+    const summary = await buildStatusSummary(sandboxPool, config, { probeOllama: true });
+    res.json({ live: true, message: 'نظامك حي على أرض الواقع — Find Skills و System Live View يعملان الآن', summary, timestamp: new Date().toISOString() });
+  });
+  router.get('/api/skills', async (req, res) => {
+    const query = String(req.query.q || req.query.query || '').trim();
+    const category = String(req.query.category || 'all').trim();
+    const handler = createMcpHandler({ pool: sandboxPool, config: sandboxConfig });
+    const rpcRes = await handler.handleRpcMessage({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: { name: 'find_skills', arguments: { query, category, liveCheck: true } }
+    });
+    const out = rpcRes?.result?.structuredContent || rpcRes?.result || rpcRes;
+    res.json(out);
   });
 
   router.post('/ui/workspace/rpc', express.json({ limit: '128kb' }), async (req, res) => {
