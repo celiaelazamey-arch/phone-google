@@ -1,0 +1,137 @@
+name: Celia MCP & Gemini CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-celia-mcp:
+    name: Celia MCP + Gemini Verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Verify no .env file is tracked in Git
+        run: |
+          if git ls-files | grep -Ev '(^|/)\.env\.example$' | grep -Eq '(^|/)\.env($|\.)'; then
+            echo "::error::A .env file is tracked in Git. Remove it immediately."
+            exit 1
+          fi
+
+      - name: Install dependencies (npm ci)
+        run: npm ci --no-audit --no-fund
+
+      - name: Prepare .env with CELIA_MCP_API_TOKEN (openssl rand -hex 32)
+        run: |
+          cp .env.example .env
+          CELIA_TOKEN="$(openssl rand -hex 32)"
+          APP_TOKEN="$(openssl rand -hex 32)"
+          ENC_KEY="$(openssl rand -base64 32)"
+          node -e '
+            const fs = require("node:fs");
+            let content = fs.readFileSync(".env", "utf8");
+            content = content.replace(/^CELIA_MCP_API_TOKEN=.*$/m, "CELIA_MCP_API_TOKEN=" + process.argv[1]);
+            content = content.replace(/^APP_API_TOKEN=.*$/m, "APP_API_TOKEN=" + process.argv[2]);
+            content = content.replace(/^TOKEN_ENCRYPTION_KEY=.*$/m, "TOKEN_ENCRYPTION_KEY=" + process.argv[3]);
+            fs.writeFileSync(".env", content);
+          ' "$CELIA_TOKEN" "$APP_TOKEN" "$ENC_KEY"
+
+      - name: Syntax check & automated test suite
+        run: |
+          npm run check
+          npm test
+
+      - name: Run npm run celia:mcp & verify live MCP + Gemini integration
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY }}
+        run: |
+          npm run celia:mcp > /tmp/celia-mcp.log 2>&1 &
+          MCP_PID=$!
+          trap 'kill "$MCP_PID" 2>/dev/null || true' EXIT
+
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3010/health > /tmp/health.json 2>/dev/null; then
+              break
+            fi
+            sleep 0.5
+          done
+
+          node --input-type=module -e '
+            import fs from "node:fs";
+            import dotenv from "dotenv";
+
+            const parsed = dotenv.parse(fs.readFileSync(".env", "utf8"));
+            const token = parsed.CELIA_MCP_API_TOKEN;
+            const hasGeminiSecret = Boolean((process.env.GEMINI_API_KEY || "").trim());
+
+            async function rpc(id, method, params = {}) {
+              const res = await fetch("http://127.0.0.1:3010/mcp", {
+                method: "POST",
+                headers: {
+                  "content-type": "application/json",
+                  authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({ jsonrpc: "2.0", id, method, params })
+              });
+              if (!res.ok) throw new Error(`HTTP ${res.status} on ${method}`);
+              return res.json();
+            }
+
+            const init = await rpc(1, "initialize", { protocolVersion: "2024-11-05" });
+            const tools = await rpc(2, "tools/list");
+            const status = await rpc(3, "tools/call", { name: "celia_status", arguments: { probeOllama: false } });
+            const statusObj = status.result?.structuredContent;
+
+            let geminiResult = { secretDetected: hasGeminiSecret, liveReplyVerified: false, model: null, reply: null };
+            if (hasGeminiSecret) {
+              const replyRes = await rpc(4, "tools/call", {
+                name: "celia_ai_reply",
+                arguments: {
+                  customerMessage: "مرحبًا، ما هي الخدمات المتوفرة وكيف يمكنني التواصل مع فريقكم؟",
+                  provider: "gemini"
+                }
+              });
+              if (replyRes.result?.isError) {
+                throw new Error(`Gemini MCP call failed: ${replyRes.result?.content?.[0]?.text}`);
+              }
+              const data = replyRes.result.structuredContent;
+              geminiResult = {
+                secretDetected: true,
+                liveReplyVerified: true,
+                model: data.model,
+                reply: data.reply
+              };
+            }
+
+            const summary = {
+              server: init.result?.serverInfo?.name,
+              toolsRegistered: tools.result?.tools?.length,
+              storage: statusObj?.storage,
+              geminiConfiguredInMcp: statusObj?.providers?.gemini?.configured,
+              geminiResult
+            };
+            console.log(JSON.stringify(summary, null, 2));
+
+            const md = [
+              "## تقرير تشغيل Celia MCP في GitHub Actions",
+              `- **الخادم:** \`${summary.server}\` (يعمل على \`POST /mcp\`)`,
+              `- **عدد أدوات MCP المسجلة:** ${summary.toolsRegistered}`,
+              `- **مفتاح Gemini في Actions (\`GEMINI_API_KEY\`):** ${hasGeminiSecret ? "✅ متصل ومفعّل" : "⚠️ غير مضبوط في Secrets"}`,
+              hasGeminiSecret
+                ? `- **اختبار الرد الحي عبر Gemini (${geminiResult.model}):** ✅ نجح — \`${geminiResult.reply}\``
+                : "- **ملاحظة:** أضف `GEMINI_API_KEY` في Repository Secrets لتفعيل الرد الحي داخل Actions."
+            ].join("\n");
+            if (process.env.GITHUB_STEP_SUMMARY) {
+              fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, md + "\n");
+            }
+          '

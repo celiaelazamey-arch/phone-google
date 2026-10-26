@@ -64,6 +64,21 @@ npm start
 
 حاليًا رمز API واحد لمالك واحد (single-owner deployment). لا توجد إدارة مستخدمين/صلاحيات متعددة، لوحة تحكم، WhatsApp broadcast، جدولة تذكيرات، معالجة طلبات بيع أو ربط فعلي بـMySQL موجود لدى المستخدم.
 
+## خادم Celia MCP (`npm run celia:mcp`)
+
+يوفر المشروع خادم **Model Context Protocol (JSON-RPC 2.0)** محميًا برمز `CELIA_MCP_API_TOKEN` على المسار `POST /mcp` (مع وضع `stdio` اختياري عبر `npm run celia:mcp:stdio` ولوحة فحص تفاعلية عربية على `/`). يدعم الخادم تلقائيًا:
+- **Gemini (`GEMINI_API_KEY`)** كمزود أساسي فور توفّر المفتاح (بما في ذلك داخل **GitHub Actions Secrets** عبر `.github/workflows/celia-mcp.yml` دون الحاجة إلى تنزيل نماذج محلية).
+- **Ollama المحلي (`qwen2.5:7b`)** كبديل محلي عند تشغيله على جهازك الشخصي.
+
+```bash
+cp .env.example .env
+# أنشئ CELIA_MCP_API_TOKEN باستخدام openssl rand -hex 32، وضعه في .env
+# اختياري على جهازك المحلي فقط إن لم تستخدم GEMINI_API_KEY:
+ollama pull qwen2.5:7b
+npm install
+npm run celia:mcp
+```
+
 ## حدود النشر والإكمال
 
 هذا المستودع لا يحتوي أسرارًا ولا يملك نطاق HTTPS، قاعدة بيانات إنتاجية، Google OAuth client، مفتاح Gemini فعليًا، حساب Meta/WhatsApp Business، رقمًا موثقًا، أو قائمة موافقات العملاء. لذلك لا يمكن تفعيل تسجيل الدخول أو استقبال/إرسال رسائل حقيقية أو الرد عبر Gemini أو نشر الخدمة قبل توفير هذه الموارد. لا تشارك أسرار OAuth أو Gemini أو WhatsApp في المحادثات أو ملفات Git؛ ضعها في مخزن أسرار بيئة الاستضافة.
