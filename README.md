@@ -2,7 +2,17 @@
 
 نقطة بداية لخادم API يربط Google OAuth مع WhatsApp Cloud API ويخزن حالة التكامل ورسائل WhatsApp في MySQL.
 
-**النسخة الحية المجانية:** https://celiaelazamey-arch.github.io/phone-google/ — واجهة سيليا كاملة على GitHub Pages، وكل أدوات MCP الاثنتي عشرة تعمل داخل المتصفح مجانًا (بتشفير AES-256-GCM حقيقي عبر Web Crypto، وبيانات Google/WhatsApp موسومة كعرض توضيحي). خطة النشر المجاني الكاملة في [`docs/خطة-النشر-المجاني.md`](docs/خطة-النشر-المجاني.md).
+**تشغيل حيّ كامل (مجاني، بلا مفاتيح):**
+
+```bash
+CELIA_MCP_DISABLE_MYSQL=true CELIA_MCP_API_TOKEN=$(openssl rand -hex 32) \
+CELIA_MCP_HOST=0.0.0.0 CELIA_MCP_PORT=3010 node src/celia-mcp.js
+# ثم افتح http://localhost:3010
+```
+
+هذا الأمر يشغّل الواجهة العربية + خادم MCP (١٢ أداة) + مختبر التشفير على ذاكرة مؤقتة، وهو نفس ما يعمل في المعاينة الحيّة.
+
+**نشر دائم مجاني:** نسخة ثابتة جاهزة لـ GitHub Pages (`npm run build:pages` + سير عمل جاهز؛ التفعيل الأول يحتاج نقرة واحدة من المالك: Settings → Pages → Source: GitHub Actions)، وبديل خادم كامل عبر `render.yaml` + `Dockerfile.mcp` على طبقة Render المجانية. التفاصيل وسبب الحاجة للنقرة في [`docs/خطة-النشر-المجاني.md`](docs/خطة-النشر-المجاني.md).
 
 > الخادم الكامل (`src/server.js`) يحتاج Node.js + MySQL وأسرار Google/WhatsApp/Gemini. النسخة الثابتة على Pages لا تحتوي أي سر ولا تتصل بأي خدمة خارجية.
 

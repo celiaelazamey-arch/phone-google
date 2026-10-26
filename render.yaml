@@ -1,0 +1,24 @@
+# نشر كامل مجاني (طبقة Render Free) لخادم Celia MCP + الواجهة العربية.
+# الاستخدام: Render Dashboard → New → Blueprint → اختر هذا المستودع.
+# التخزين في الذاكرة (لا يحتاج MySQL). أضف GEMINI_API_KEY اختياريًا لتفعيل الردود السحابية.
+services:
+  - type: web
+    name: celia-phone-google
+    runtime: docker
+    dockerfilePath: ./Dockerfile.mcp
+    plan: free
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: CELIA_MCP_API_TOKEN
+        generateValue: true
+      - key: CELIA_MCP_DISABLE_MYSQL
+        value: 'true'
+      - key: CELIA_AI_PROVIDER
+        value: auto
+      - key: CELIA_MCP_HOST
+        value: 0.0.0.0
+      - key: CELIA_MCP_PORT
+        value: '3010'
+      - key: NODE_ENV
+        value: production
