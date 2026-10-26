@@ -45,7 +45,11 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, conf
 
   const sandboxHandler = createMcpHandler({ pool: sandboxPool, config: sandboxConfig });
 
+  const landingAtRoot = process.env.CELIA_LANDING_ROOT === 'true';
   router.get('/', (_req, res) => {
+    res.sendFile(path.join(PUBLIC_DIR, landingAtRoot ? 'landing.html' : 'index.html'));
+  });
+  router.get('/studio', (_req, res) => {
     res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
   });
 
@@ -89,12 +93,29 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, conf
     res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'skills.js'));
   });
 
+  router.get('/fonts.css', (_req, res) => {
+    res.type('text/css').sendFile(path.join(PUBLIC_DIR, 'fonts.css'));
+  });
+
   router.get('/landing.css', (_req, res) => {
     res.type('text/css').sendFile(path.join(PUBLIC_DIR, 'landing.css'));
   });
 
   router.get('/landing.js', (_req, res) => {
     res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'landing.js'));
+  });
+
+  // أصول صفحة الهبوط المحلية: لا خطوط أو صور أو تتبّع من أطراف خارجية.
+  router.use('/fonts', express.static(path.join(PUBLIC_DIR, 'fonts'), {
+    dotfiles: 'deny',
+    index: false,
+    maxAge: '7d'
+  }));
+  router.get('/favicon.svg', (_req, res) => {
+    res.type('image/svg+xml').sendFile(path.join(PUBLIC_DIR, 'favicon.svg'));
+  });
+  router.get('/og-celia.png', (_req, res) => {
+    res.type('image/png').sendFile(path.join(PUBLIC_DIR, 'og-celia.png'));
   });
 
   // Live JSON endpoints — no auth, shows system live on ground

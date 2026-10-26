@@ -6,7 +6,7 @@
  * نصًّا (بدون تشغيل اعتماديات Node) ويُحقنان في طبقة محاكاة داخل المتصفح،
  * فلا تتباعد نسختان من تعريفات الأدوات.
  */
-import { mkdir, readFile, readdir, rm, writeFile, copyFile, stat } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rm, writeFile, copyFile, cp, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -94,7 +94,9 @@ function rewriteStaticHostLinks(html) {
     .replace(/href="\.\/skills\/"/g, 'href="./skills.html"')
     .replace(/href="\.\/landing"/g, 'href="./landing.html"')
     .replace(/href="\.\/landing\/"/g, 'href="./landing.html"')
-    .replace(/href="\.\/index"/g, 'href="./index.html"');
+    .replace(/href="\.\/index"/g, 'href="./index.html"')
+    .replace(/href="\.\/studio"/g, 'href="./index.html"')
+    .replace(/href="\.\/studio\/"/g, 'href="./index.html"');
 }
 
 export async function build() {
@@ -122,9 +124,14 @@ export async function build() {
   const entries = await readdir(PUBLIC_DIR, { withFileTypes: true });
   const pages = [];
   for (const entry of entries) {
-    if (!entry.isFile()) continue;
     const sourcePath = path.join(PUBLIC_DIR, entry.name);
     const targetPath = path.join(DIST_DIR, entry.name);
+    if (entry.isDirectory()) {
+      // أصول محلية مثل الخطوط والصور؛ انسخها كما هي إلى النسخة الثابتة.
+      await cp(sourcePath, targetPath, { recursive: true });
+      continue;
+    }
+    if (!entry.isFile()) continue;
     if (entry.name.endsWith('.html')) {
       const html = rewriteStaticHostLinks(injectShimScript(await readFile(sourcePath, 'utf8')));
       await writeFile(targetPath, html, 'utf8');

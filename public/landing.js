@@ -35,11 +35,13 @@
   /* ---------- Mobile nav ---------- */
   var navToggle = document.getElementById('nav-toggle');
   var navMenu = document.getElementById('nav-menu');
-  function closeNav() {
+  function closeNav(restoreFocus) {
     if (!navMenu || !navToggle) return;
+    var wasOpen = navMenu.classList.contains('open');
     navMenu.classList.remove('open');
     navToggle.setAttribute('aria-expanded', 'false');
     navToggle.setAttribute('aria-label', 'فتح قائمة التنقل');
+    if (restoreFocus && wasOpen) navToggle.focus();
   }
   if (navToggle && navMenu) {
     navToggle.addEventListener('click', function () {
@@ -47,10 +49,12 @@
       navToggle.setAttribute('aria-expanded', String(open));
       navToggle.setAttribute('aria-label', open ? 'إغلاق قائمة التنقل' : 'فتح قائمة التنقل');
     });
-    navMenu.querySelectorAll('a').forEach(function (link) { link.addEventListener('click', closeNav); });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeNav(); });
+    navMenu.querySelectorAll('a').forEach(function (link) {
+      link.addEventListener('click', function () { closeNav(false); });
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeNav(true); });
     document.addEventListener('click', function (e) {
-      if (navMenu.classList.contains('open') && !navbar.contains(e.target)) closeNav();
+      if (navMenu.classList.contains('open') && !navbar.contains(e.target)) closeNav(false);
     });
   }
 
@@ -62,9 +66,15 @@
     var sectionObserver = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
         if (!entry.isIntersecting) return;
-        navLinks.forEach(function (l) { l.classList.remove('active-link'); });
+        navLinks.forEach(function (l) {
+          l.classList.remove('active-link');
+          l.removeAttribute('aria-current');
+        });
         var link = byHash['#' + entry.target.id];
-        if (link) link.classList.add('active-link');
+        if (link) {
+          link.classList.add('active-link');
+          link.setAttribute('aria-current', 'location');
+        }
       });
     }, { rootMargin: '-35% 0px -55% 0px' });
     ['features', 'showcase', 'tools', 'pricing', 'faq'].forEach(function (id) {
@@ -159,7 +169,7 @@
   var chatLog = document.getElementById('chat-log');
   var typingBubble = document.getElementById('typing-bubble');
   var chatSteps = [
-    { dir: 'out', text: 'تم التنسيق مساءً ✓ سأرسل التذكير قبل الموعد، ولأي تفاصيل عن الطلب سيتابعك موظف مختص مباشرة.' },
+    { dir: 'out', text: 'تم التنسيق مساءً. سأرسل التذكير قبل الموعد، ولأي تفاصيل عن الطلب سيتابعك موظف مختص مباشرة.' },
     { dir: 'in', text: 'ممتاز، هل يمكنك إرسال ملف العقد على البريد؟' },
     { dir: 'out', text: 'وجدت الملف في Drive — بياناته جاهزة الآن في مساحة العمل، وفريقنا سيشاركه معك بأمان من القناة الرسمية.' }
   ];
@@ -287,8 +297,14 @@
       var successEl = document.getElementById('form-success');
       var nameOk = name && name.value.trim().length >= 2;
       var emailOk = email && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.value.trim());
-      if (name) name.classList.toggle('invalid', !nameOk);
-      if (email) email.classList.toggle('invalid', !emailOk);
+      if (name) {
+        name.classList.toggle('invalid', !nameOk);
+        name.setAttribute('aria-invalid', String(!nameOk));
+      }
+      if (email) {
+        email.classList.toggle('invalid', !emailOk);
+        email.setAttribute('aria-invalid', String(!emailOk));
+      }
       if (!nameOk || !emailOk) {
         if (successEl) successEl.hidden = true;
         if (errorEl) {
@@ -304,9 +320,9 @@
       } catch (err) { /* storage may be unavailable; the demo still succeeds */ }
       if (successEl) {
         successEl.hidden = false;
-        successEl.textContent = '✓ أهلًا ' + name.value.trim() + '! تم الحفظ محليًا في متصفحك (تجريبيًا، دون أي إرسال خارجي). خطوتك التالية: افتح التجربة الحية الآن.';
+        successEl.textContent = 'أهلًا ' + name.value.trim() + '! تم الحفظ محليًا في متصفحك (تجريبيًا، دون أي إرسال خارجي). خطوتك التالية: افتح التجربة الحية الآن.';
       }
-      leadForm.querySelector('button[type="submit"]').textContent = 'تم الحجز ✓ — افتح التجربة الحية من الأسفل';
+      leadForm.querySelector('button[type="submit"]').textContent = 'تم الحفظ محليًا — التجربة الحية من الأسفل';
     });
   }
 

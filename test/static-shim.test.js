@@ -39,6 +39,38 @@ test('البناء يولّد صفحات ثابتة ومحاكي أدوات من
   await readFile(path.join(DIST_DIR, '404.html'));
 });
 
+test('صفحة الهبوط مكتملة وكل أصولها المحلية تدخل نسخة النشر', async () => {
+  const landingHtml = await readFile(path.join(DIST_DIR, 'landing.html'), 'utf8');
+  assert.match(landingHtml, /<html lang="ar" dir="rtl">/);
+  assert.match(landingHtml, /id="features"/);
+  assert.match(landingHtml, /id="showcase"/);
+  assert.match(landingHtml, /id="pricing"/);
+  assert.match(landingHtml, /id="faq"/);
+  assert.match(landingHtml, /id="cta"/);
+  assert.match(landingHtml, /href="\.\/fonts\.css"/);
+  assert.match(landingHtml, /href="\.\/index\.html"/);
+  assert.doesNotMatch(landingHtml, /href="\.\/studio"/);
+  assert.match(landingHtml, /property="og:image"/);
+  assert.doesNotMatch(landingHtml, /fonts\.googleapis\.com|fonts\.gstatic\.com/);
+  assert.equal((landingHtml.match(/<h1\b/g) || []).length, 1);
+  assert.ok((landingHtml.match(/<section\b/g) || []).length >= 10);
+
+  const localResources = landingHtml.matchAll(/<(?:link|script)\b[^>]*(?:href|src)="(\.\/[^"]+)"/g);
+  for (const match of localResources) {
+    await readFile(path.join(DIST_DIR, match[1]));
+  }
+
+  const fontsCss = await readFile(path.join(DIST_DIR, 'fonts.css'), 'utf8');
+  for (const match of fontsCss.matchAll(/url\("(\.\/fonts\/[^"]+)"\)/g)) {
+    await readFile(path.join(DIST_DIR, match[1]));
+  }
+  const socialImage = await readFile(path.join(DIST_DIR, 'og-celia.png'));
+  assert.equal(socialImage.subarray(1, 4).toString(), 'PNG');
+  assert.equal(socialImage.readUInt32BE(16), 1200);
+  assert.equal(socialImage.readUInt32BE(20), 630);
+  await readFile(path.join(DIST_DIR, 'favicon.svg'), 'utf8');
+});
+
 test('مصافحة MCP وقائمة الأدوات وقائمة الموارد', async () => {
   const init = await CeliaStatic.handleRpc({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05' } });
   assert.equal(init.result.protocolVersion, '2024-11-05');
