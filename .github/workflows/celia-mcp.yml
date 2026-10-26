@@ -5,6 +5,11 @@ on:
     branches: ['**']
   pull_request:
   workflow_dispatch:
+    inputs:
+      customer_message:
+        description: 'رسالة عميل تجريبية لاختبار أداة celia_ai_reply عبر Gemini'
+        required: false
+        default: 'مرحبًا، ما هي الخدمات المتوفرة وكيف يمكنني التواصل مع فريقكم؟'
 
 permissions:
   contents: read
@@ -31,10 +36,19 @@ jobs:
       - name: Install dependencies (npm ci)
         run: npm ci --no-audit --no-fund
 
-      - name: Prepare .env with CELIA_MCP_API_TOKEN (openssl rand -hex 32)
+      - name: Prepare .env using Repository Secret CELIA_MCP_API_TOKEN
+        env:
+          SECRET_CELIA_MCP_API_TOKEN: ${{ secrets.CELIA_MCP_API_TOKEN }}
         run: |
           cp .env.example .env
-          CELIA_TOKEN="$(openssl rand -hex 32)"
+          TRIMMED_SECRET="$(printf '%s' "${SECRET_CELIA_MCP_API_TOKEN:-}" | tr -d '\r\n')"
+          if [ -n "$TRIMMED_SECRET" ] && [ "${#TRIMMED_SECRET}" -ge 32 ]; then
+            CELIA_TOKEN="$TRIMMED_SECRET"
+            echo "CELIA_TOKEN_SOURCE=repository_secret" >> "$GITHUB_ENV"
+          else
+            CELIA_TOKEN="$(openssl rand -hex 32)"
+            echo "CELIA_TOKEN_SOURCE=generated_fallback" >> "$GITHUB_ENV"
+          fi
           APP_TOKEN="$(openssl rand -hex 32)"
           ENC_KEY="$(openssl rand -base64 32)"
           node -e '
@@ -46,14 +60,30 @@ jobs:
             fs.writeFileSync(".env", content);
           ' "$CELIA_TOKEN" "$APP_TOKEN" "$ENC_KEY"
 
+      - name: Confirm both Repository Secrets are active (CELIA_MCP_API_TOKEN & GEMINI_API_KEY)
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY }}
+        run: |
+          if [ "${CELIA_TOKEN_SOURCE:-}" != "repository_secret" ]; then
+            echo "::error::CELIA_MCP_API_TOKEN secret is missing or shorter than 32 characters."
+            exit 1
+          fi
+          if [ -z "${GEMINI_API_KEY:-}" ]; then
+            echo "::error::GEMINI_API_KEY secret is missing in Repository Secrets."
+            exit 1
+          fi
+          echo "Both CELIA_MCP_API_TOKEN and GEMINI_API_KEY secrets are present and valid."
+
       - name: Syntax check & automated test suite
         run: |
           npm run check
           npm test
 
-      - name: Run npm run celia:mcp & verify live MCP + Gemini integration
+      - name: Run npm run celia:mcp & verify live Repository Secrets (CELIA_MCP_API_TOKEN + GEMINI_API_KEY)
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY }}
+          TEST_CUSTOMER_MESSAGE: ${{ inputs.customer_message || 'مرحبًا، ما هي الخدمات المتوفرة وكيف يمكنني التواصل مع فريقكم؟' }}
         run: |
           npm run celia:mcp > /tmp/celia-mcp.log 2>&1 &
           MCP_PID=$!
@@ -72,7 +102,17 @@ jobs:
 
             const parsed = dotenv.parse(fs.readFileSync(".env", "utf8"));
             const token = parsed.CELIA_MCP_API_TOKEN;
+            const tokenSource = process.env.CELIA_TOKEN_SOURCE || "unknown";
             const hasGeminiSecret = Boolean((process.env.GEMINI_API_KEY || "").trim());
+            const customerMessage = process.env.TEST_CUSTOMER_MESSAGE;
+
+            // Verify unauthorized call is rejected (401)
+            const badRes = await fetch("http://127.0.0.1:3010/mcp", {
+              method: "POST",
+              headers: { "content-type": "application/json", authorization: "Bearer invalid-token" },
+              body: JSON.stringify({ jsonrpc: "2.0", id: 0, method: "ping" })
+            });
+            if (badRes.status !== 401) throw new Error(`Expected 401 for invalid token, got ${badRes.status}`);
 
             async function rpc(id, method, params = {}) {
               const res = await fetch("http://127.0.0.1:3010/mcp", {
@@ -97,7 +137,7 @@ jobs:
               const replyRes = await rpc(4, "tools/call", {
                 name: "celia_ai_reply",
                 arguments: {
-                  customerMessage: "مرحبًا، ما هي الخدمات المتوفرة وكيف يمكنني التواصل مع فريقكم؟",
+                  customerMessage,
                   provider: "gemini"
                 }
               });
@@ -115,6 +155,7 @@ jobs:
 
             const summary = {
               server: init.result?.serverInfo?.name,
+              tokenSource,
               toolsRegistered: tools.result?.tools?.length,
               storage: statusObj?.storage,
               geminiConfiguredInMcp: statusObj?.providers?.gemini?.configured,
@@ -124,9 +165,11 @@ jobs:
 
             const md = [
               "## تقرير تشغيل Celia MCP في GitHub Actions",
-              `- **الخادم:** \`${summary.server}\` (يعمل على \`POST /mcp\`)`,
+              `- **الخادم:** \`${summary.server}\` (\`POST /mcp\`)`,
+              `- **مصدر \`CELIA_MCP_API_TOKEN\`:** ${tokenSource === "repository_secret" ? "✅ من Repository Secrets (`CELIA_MCP_API_TOKEN`)" : "⚠️ مولد تلقائيًا"}`,
+              `- **مصادقة Bearer وحجب الطلبات غير المصرحة (401):** ✅ تم التحقق`,
               `- **عدد أدوات MCP المسجلة:** ${summary.toolsRegistered}`,
-              `- **مفتاح Gemini في Actions (\`GEMINI_API_KEY\`):** ${hasGeminiSecret ? "✅ متصل ومفعّل" : "⚠️ غير مضبوط في Secrets"}`,
+              `- **مفتاح Gemini في Actions (\`GEMINI_API_KEY\`):** ${hasGeminiSecret ? "✅ متصل ومفعّل من Repository Secrets" : "⚠️ غير مضبوط في Secrets"}`,
               hasGeminiSecret
                 ? `- **اختبار الرد الحي عبر Gemini (${geminiResult.model}):** ✅ نجح — \`${geminiResult.reply}\``
                 : "- **ملاحظة:** أضف `GEMINI_API_KEY` في Repository Secrets لتفعيل الرد الحي داخل Actions."

@@ -100,12 +100,19 @@ export async function generateCeliaReply({ config, customerMessage, provider = '
       });
       return { reply, provider: 'gemini', model: primaryModel };
     } catch (geminiError) {
-      if (/\(404\)/.test(geminiError.message) && primaryModel !== 'gemini-flash-latest') {
-        const reply = await generateWhatsAppReply({
-          config: { gemini: { apiKey: config.gemini.apiKey, model: 'gemini-flash-latest', businessContext: context } },
-          customerMessage
-        });
-        return { reply, provider: 'gemini', model: 'gemini-flash-latest' };
+      if (/\((404|429|503)\)/.test(geminiError.message)) {
+        for (const fallbackModel of ['gemini-flash-latest', 'gemini-flash-lite-latest']) {
+          if (fallbackModel === primaryModel) continue;
+          try {
+            const reply = await generateWhatsAppReply({
+              config: { gemini: { apiKey: config.gemini.apiKey, model: fallbackModel, businessContext: context } },
+              customerMessage
+            });
+            return { reply, provider: 'gemini', model: fallbackModel };
+          } catch {
+            // Try next fallback model
+          }
+        }
       }
       if (requested === 'gemini') throw geminiError;
       const ollamaStatus = await checkOllamaHealth({
