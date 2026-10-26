@@ -239,3 +239,51 @@ test('celia_ai_reply routes to Gemini when GEMINI_API_KEY is present and Ollama 
     ]);
   }
 });
+
+test('UI routes serve HTML on /live, /skills, /studio, /landing and JSON on /api/live (including CELIA_LANDING_ROOT=true)', async () => {
+  const pool = createMemoryPool();
+  const config = loadCeliaMcpConfig({
+    CELIA_MCP_API_TOKEN: validHexToken,
+    CELIA_LANDING_ROOT: 'true'
+  });
+  const server = createCeliaMcpApp({ pool, config }).listen(0, '127.0.0.1');
+  const baseUrl = await new Promise((resolve) =>
+    server.once('listening', () => resolve(`http://127.0.0.1:${server.address().port}`))
+  );
+
+  try {
+    const rootRes = await fetch(`${baseUrl}/`);
+    assert.equal(rootRes.status, 200);
+    assert.match(rootRes.headers.get('content-type') || '', /text\/html/);
+    const rootHtml = await rootRes.text();
+    assert.match(rootHtml, /id="features"/);
+
+    const studioRes = await fetch(`${baseUrl}/studio`);
+    assert.equal(studioRes.status, 200);
+    assert.match(studioRes.headers.get('content-type') || '', /text\/html/);
+    const studioHtml = await studioRes.text();
+    assert.match(studioHtml, /id="view-tools"/);
+    assert.match(studioHtml, /استوديو أدوات بروتوكول MCP الاثنتي عشرة/);
+
+    for (const htmlRoute of ['/live', '/live.html', '/skills', '/skills.html', '/landing', '/landing.html']) {
+      const res = await fetch(`${baseUrl}${htmlRoute}`);
+      assert.equal(res.status, 200, `${htmlRoute} should return 200`);
+      assert.match(res.headers.get('content-type') || '', /text\/html/, `${htmlRoute} should serve HTML, not JSON`);
+    }
+
+    const apiLiveRes = await fetch(`${baseUrl}/api/live`);
+    assert.equal(apiLiveRes.status, 200);
+    assert.match(apiLiveRes.headers.get('content-type') || '', /application\/json/);
+    const apiLive = await apiLiveRes.json();
+    assert.equal(apiLive.live, true);
+    assert.equal(apiLive.tools, 12);
+    assert.equal(typeof apiLive.uptime, 'number');
+
+    for (const arabicQuery of ['تقويم', 'تشفير', 'بريد', 'ملفات', 'إرسال']) {
+      const skillsRes = await fetch(`${baseUrl}/api/skills?q=${encodeURIComponent(arabicQuery)}`).then((r) => r.json());
+      assert.ok(skillsRes.matched >= 1, `find_skills should match Arabic query "${arabicQuery}"`);
+    }
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

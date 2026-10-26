@@ -7,6 +7,14 @@ async function callFind(query, category){
   const j=await r.json();
   return j;
 }
+function escapeHtml(value){
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
 function render(j){
   const out=j.result?.structuredContent||j; elRaw.textContent=JSON.stringify(out,null,2);
   document.getElementById('count').textContent=(out.matched||0)+' / '+(out.totalSkills||0);
@@ -15,12 +23,12 @@ function render(j){
   document.getElementById('s-tools').textContent='الأدوات: '+(out.liveStatus?.toolsCount||out.totalSkills||'—');
   elGrid.innerHTML=(out.skills||[]).map(s=>`
     <div class="skill-card">
-      <h4>${s.name}</h4>
-      <div class="meta">${s.description}</div>
-      <div style="margin:6px 0"><span class="chip" style="font-size:.7rem">${(s.tags||[]).join(' · ')||'عام'}</span></div>
-      <div class="code">${s.invocation}</div>
-      <details style="margin-top:6px"><summary style="cursor:pointer;font-size:.82rem">inputSchema</summary><pre class="code" style="margin-top:6px">${JSON.stringify(s.inputSchema,null,2)}</pre></details>
-      <div style="margin-top:8px;display:flex;gap:6px"><button class="chip" data-copy-skill="${s.name}">نسخ اسم المهارة</button><button class="chip" data-try-skill="${s.name}">تجربة عبر الاستوديو →</button></div>
+      <h4>${escapeHtml(s.name)}</h4>
+      <div class="meta">${escapeHtml(s.description)}</div>
+      <div style="margin:6px 0"><span class="chip" style="font-size:.7rem">${escapeHtml((s.tags||[]).join(' · ')||'عام')}</span></div>
+      <div class="code">${escapeHtml(s.invocation)}</div>
+      <details style="margin-top:6px"><summary style="cursor:pointer;font-size:.82rem">inputSchema</summary><pre class="code" style="margin-top:6px">${escapeHtml(JSON.stringify(s.inputSchema,null,2))}</pre></details>
+      <div style="margin-top:8px;display:flex;gap:6px"><button class="chip" data-copy-skill="${escapeHtml(s.name)}">نسخ اسم المهارة</button><button class="chip" data-try-skill="${escapeHtml(s.name)}">تجربة عبر الاستوديو →</button></div>
     </div>
   `).join('') || '<div class="meta">لا نتائج — جرّب كلمة أخرى.</div>';
 }
@@ -38,7 +46,10 @@ elGrid.addEventListener('click', (event)=>{
   const copyBtn = event.target.closest('[data-copy-skill]');
   if (copyBtn) { navigator.clipboard.writeText(copyBtn.dataset.copySkill).then(()=> alert('تم نسخ: '+copyBtn.dataset.copySkill)); return; }
   const tryBtn = event.target.closest('[data-try-skill]');
-  if (tryBtn) location.href='./#tool='+encodeURIComponent(tryBtn.dataset.trySkill);
+  if (tryBtn) {
+    const studioBase = window.CeliaStatic ? './index.html' : './studio';
+    location.href = `${studioBase}#tool=${encodeURIComponent(tryBtn.dataset.trySkill)}`;
+  }
 });
 // init
 doFind();

@@ -316,6 +316,10 @@
         return { probeOllama: true };
       case 'celia_ai_reply':
         return { customerMessage: 'مرحبًا، ما هي مواعيد العمل لديكم وكيف أحجز استشارة؟', provider: 'auto' };
+      case 'find_skills':
+        return { query: 'whatsapp', category: 'all', liveCheck: true };
+      case 'system_live_view':
+        return { includeTelemetry: true, probeOllama: true };
       case 'whatsapp_consent_upsert':
         return { phone: '+201065217834', optedIn: true, aiOptedIn: true, source: 'نموذج موافقة استوديو سيليا 2026' };
       case 'whatsapp_contacts_list':
@@ -342,8 +346,14 @@
     }
   }
 
+  function setToolFilterChip(filter = 'all') {
+    el.toolFilters.querySelectorAll('.filter-chip').forEach((c) => {
+      c.classList.toggle('active', c.dataset.cat === filter);
+    });
+  }
+
   function renderToolsGrid(filter = 'all') {
-    const labels = { ai: 'ذكاء وحالة', whatsapp: 'واتساب للأعمال', google: 'خدمات Google' };
+    const labels = { ai: 'ذكاء ونظام', whatsapp: 'واتساب للأعمال', google: 'خدمات Google' };
     const filtered = state.tools.filter((t) => filter === 'all' || toolCategory(t.name) === filter);
     el.toolsGrid.innerHTML = filtered
       .map((tool) => {
@@ -557,7 +567,7 @@
         const r1 = await callMcpRpc('initialize', { protocolVersion: '2024-11-05' });
         s1.done(r1.elapsed);
 
-        const s2 = turn.addStep('2. فحص سجل الأدوات العشر (tools/list)');
+        const s2 = turn.addStep('2. فحص سجل أدوات MCP الاثنتي عشرة (tools/list)');
         const r2 = await callMcpRpc('tools/list');
         s2.done(r2.elapsed);
 
@@ -760,6 +770,31 @@
     }
   }
 
+  function handleHashRoute() {
+    const rawHash = (location.hash || '').replace(/^#/, '').trim();
+    if (!rawHash) return;
+    const params = new URLSearchParams(rawHash);
+    const requestedTool = params.get('tool');
+    if (requestedTool && state.tools.some((t) => t.name === requestedTool)) {
+      switchView('tools');
+      setToolFilterChip('all');
+      renderToolsGrid('all');
+      openToolModal(requestedTool);
+      return;
+    }
+    const requestedView = params.get('view');
+    if (requestedView && Object.prototype.hasOwnProperty.call(el.views, requestedView)) {
+      switchView(requestedView);
+      el.toolModal.hidden = true;
+      if (requestedView === 'tools') {
+        const cat = params.get('cat') || 'all';
+        const validCat = ['all', 'ai', 'whatsapp', 'google'].includes(cat) ? cat : 'all';
+        setToolFilterChip(validCat);
+        renderToolsGrid(validCat);
+      }
+    }
+  }
+
   async function bootstrap() {
     applyTheme(state.theme);
 
@@ -785,8 +820,11 @@
       el.tMcpState.textContent = `تنبيه: ${err.message}`;
     }
 
+    handleHashRoute();
     updateAuthUi();
   }
+
+  window.addEventListener('hashchange', handleHashRoute);
 
   // Event Listeners
   el.navPills.forEach((btn) => {

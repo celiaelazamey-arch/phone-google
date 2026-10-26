@@ -464,11 +464,22 @@
         const category = String(args?.category || 'all').toLowerCase();
         const liveCheck = args?.liveCheck !== false;
         const categoryMap = {
-          google: ['gmail', 'drive', 'calendar', 'contacts', 'google'],
-          whatsapp: ['whatsapp', 'واتساب'],
+          google: ['gmail', 'drive', 'calendar', 'contacts', 'google', 'بريد', 'ملفات', 'تقويم', 'مواعيد', 'جهات'],
+          whatsapp: ['whatsapp', 'واتساب', 'إرسال'],
           ai: ['ai', 'reply', 'celia_ai', 'ذكاء', 'رد'],
-          security: ['consent', 'crypto', 'تشفير', 'موافقة'],
-          system: ['status', 'celia_status', 'find_skills', 'system_live', 'live_view', 'نظام']
+          security: ['consent', 'crypto', 'celia_status', 'تشفير', 'موافقة', 'أمان'],
+          system: ['status', 'celia_status', 'find_skills', 'system_live', 'live_view', 'نظام', 'حالة']
+        };
+        const synonymExpansions = {
+          تقويم: ['calendar', 'مواعيد', 'موعد'],
+          بريد: ['gmail', 'رسائل'],
+          ملفات: ['drive', 'ملف'],
+          جهات: ['contacts', 'اتصال'],
+          تشفير: ['security', 'consent', 'celia_status', 'system_live_view'],
+          أمان: ['security', 'consent', 'celia_status'],
+          إرسال: ['send', 'whatsapp_send_text'],
+          ذكاء: ['ai', 'celia_ai_reply'],
+          حالة: ['status', 'celia_status', 'system_live_view']
         };
         const allToolsDetailed = MCP_TOOLS.map((tool) => ({
           name: tool.name,
@@ -489,12 +500,11 @@
           );
         }
         if (query) {
-          filtered = filtered.filter(
-            (tool) =>
-              tool.name.toLowerCase().includes(query) ||
-              String(tool.description).toLowerCase().includes(query) ||
-              tool.tags.join(' ').includes(query)
-          );
+          const terms = [query, ...(synonymExpansions[query] || [])];
+          filtered = filtered.filter((tool) => {
+            const haystack = `${tool.name.toLowerCase()} ${String(tool.description).toLowerCase()} ${tool.tags.join(' ')}`;
+            return terms.some((term) => haystack.includes(term));
+          });
         }
         return {
           query: args?.query || '',
