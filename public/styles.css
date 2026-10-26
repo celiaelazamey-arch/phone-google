@@ -202,6 +202,10 @@ textarea {
   background: var(--bg-hover);
 }
 
+a.nav-pill {
+  text-decoration: none;
+}
+
 .nav-pill.active {
   background: var(--bg-surface-2);
   color: var(--text-primary);
