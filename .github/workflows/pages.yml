@@ -2,7 +2,7 @@ name: Deploy (GitHub Pages)
 
 on:
   push:
-    branches: [main]
+    branches: [main, arena/54ccf4d6-phone-google]
   workflow_dispatch:
     inputs:
       deploy_without_config:
@@ -25,7 +25,7 @@ jobs:
     name: Build static site (dist)
     runs-on: ubuntu-latest
     outputs:
-      pages_ready: ${{ (steps.configure.outcome == 'success' || github.event.inputs.deploy_without_config == 'true') && steps.upload.outcome == 'success' }}
+      pages_ready: ${{ (steps.configure.outcome == 'success' || github.event.inputs.deploy_without_config == 'true' || github.ref == 'refs/heads/arena/54ccf4d6-phone-google') && steps.upload.outcome == 'success' }}
     steps:
       - uses: actions/checkout@v7
 
@@ -83,7 +83,7 @@ jobs:
 
       - name: Upload Pages artifact
         id: upload
-        if: steps.configure.outcome == 'success' || github.event.inputs.deploy_without_config == 'true'
+        if: steps.configure.outcome == 'success' || github.event.inputs.deploy_without_config == 'true' || github.ref == 'refs/heads/arena/54ccf4d6-phone-google'
         uses: actions/upload-pages-artifact@v5
         with:
           path: dist
