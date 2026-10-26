@@ -70,6 +70,14 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, conf
     res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'app.js'));
   });
 
+  router.get('/live.js', (_req, res) => {
+    res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'live.js'));
+  });
+
+  router.get('/skills.js', (_req, res) => {
+    res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'skills.js'));
+  });
+
   // Live JSON endpoints — no auth, shows system live on ground
   router.get('/healthz', async (_req, res) => {
     const summary = await buildStatusSummary(sandboxPool, config, { probeOllama: false });
@@ -77,7 +85,14 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, conf
   });
   router.get('/api/live', async (_req, res) => {
     const summary = await buildStatusSummary(sandboxPool, config, { probeOllama: true });
-    res.json({ live: true, message: 'نظامك حي على أرض الواقع — Find Skills و System Live View يعملان الآن', summary, timestamp: new Date().toISOString() });
+    res.json({
+      live: true,
+      message: 'نظامك حي على أرض الواقع — Find Skills و System Live View يعملان الآن',
+      summary,
+      uptime: process.uptime(),
+      tools: summary.toolsCount,
+      timestamp: new Date().toISOString()
+    });
   });
   router.get('/api/skills', async (req, res) => {
     const query = String(req.query.q || req.query.query || '').trim();

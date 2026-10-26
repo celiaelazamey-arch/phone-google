@@ -239,3 +239,78 @@ test('celia_ai_reply routes to Gemini when GEMINI_API_KEY is present and Ollama 
     ]);
   }
 });
+
+test('Live & Skills pages serve CSP-clean HTML (external JS only) and JSON APIs + MCP skills work end-to-end', async () => {
+  const pool = createMemoryPool();
+  const config = loadCeliaMcpConfig({
+    CELIA_MCP_API_TOKEN: validHexToken,
+    OLLAMA_BASE_URL: 'http://127.0.0.1:59999'
+  });
+  const server = createCeliaMcpApp({ pool, config }).listen(0, '127.0.0.1');
+  const baseUrl = await new Promise((resolve) =>
+    server.once('listening', () => resolve(`http://127.0.0.1:${server.address().port}`))
+  );
+
+  try {
+    for (const htmlRoute of ['/', '/live', '/live.html', '/skills', '/skills.html']) {
+      const res = await fetch(`${baseUrl}${htmlRoute}`);
+      assert.equal(res.status, 200, `Expected 200 on ${htmlRoute}`);
+      assert.match(res.headers.get('content-type') || '', /^text\/html/, `Expected text/html on ${htmlRoute}`);
+      const html = await res.text();
+      // Every <script> tag must have a src="..." attribute (no inline script bodies blocked by script-src 'self')
+      const scriptTags = html.match(/<script\b[^>]*>/gi) || [];
+      assert.ok(scriptTags.length >= 1, `Expected external script tag in ${htmlRoute}`);
+      for (const tag of scriptTags) {
+        assert.match(tag, /\bsrc=["']\.\/(app|live|skills)\.js["']/i, `Inline script tag forbidden by CSP in ${htmlRoute}: ${tag}`);
+      }
+      // No inline event handlers (onclick=, onchange=, etc.) blocked by script-src-attr 'none'
+      assert.equal(/\son[a-z]+\s*=/i.test(html), false, `Inline event handler forbidden by CSP in ${htmlRoute}`);
+    }
+
+    for (const jsRoute of ['/app.js', '/live.js', '/skills.js']) {
+      const jsRes = await fetch(`${baseUrl}${jsRoute}`);
+      assert.equal(jsRes.status, 200, `Expected 200 on ${jsRoute}`);
+      assert.match(jsRes.headers.get('content-type') || '', /javascript/);
+    }
+
+    const apiLive = await fetch(`${baseUrl}/api/live`).then((r) => r.json());
+    assert.equal(apiLive.live, true);
+    assert.equal(apiLive.tools, 12);
+    assert.equal(apiLive.summary.toolsCount, 12);
+
+    const apiSkills = await fetch(`${baseUrl}/api/skills?q=whatsapp`).then((r) => r.json());
+    assert.equal(apiSkills.totalSkills, 12);
+    assert.ok(apiSkills.matched >= 3);
+    assert.ok(apiSkills.skills.some((s) => s.name === 'whatsapp_send_text'));
+
+    const exactSkill = await fetch(`${baseUrl}/api/skills?q=whatsapp_send_text`).then((r) => r.json());
+    assert.equal(exactSkill.matched, 1);
+
+    const rpc = async (id, name, args) =>
+      fetch(`${baseUrl}/mcp`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${validHexToken}` },
+        body: JSON.stringify({ jsonrpc: '2.0', id, method: 'tools/call', params: { name, arguments: args } })
+      }).then((r) => r.json());
+
+    const findArabic = await rpc(21, 'find_skills', { query: 'تشفير', category: 'all', liveCheck: true });
+    assert.equal(findArabic.result.isError, false);
+    assert.equal(findArabic.result.structuredContent.totalSkills, 12);
+    assert.ok(findArabic.result.structuredContent.matched >= 1);
+    assert.equal(findArabic.result.structuredContent.liveStatus.toolsCount, 12);
+
+    const findCalendarAr = await rpc(23, 'find_skills', { query: 'تقويم', category: 'google', liveCheck: false });
+    assert.equal(findCalendarAr.result.isError, false);
+    assert.equal(findCalendarAr.result.structuredContent.matched, 2);
+
+    const liveView = await rpc(22, 'system_live_view', { includeTelemetry: true, probeOllama: false });
+    assert.equal(liveView.result.isError, false);
+    assert.equal(liveView.result.structuredContent.live, true);
+    assert.equal(liveView.result.structuredContent.telemetry.liveEndpoints.livePage, '/live');
+    assert.equal(liveView.result.structuredContent.telemetry.liveEndpoints.skillsPage, '/skills');
+    assert.equal(liveView.result.structuredContent.telemetry.liveEndpoints.liveApi, '/api/live');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+

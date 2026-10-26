@@ -66,9 +66,15 @@ npm start
 
 ## خادم Celia MCP (`npm run celia:mcp`)
 
-يوفر المشروع خادم **Model Context Protocol (JSON-RPC 2.0)** محميًا برمز `CELIA_MCP_API_TOKEN` على المسار `POST /mcp` (مع وضع `stdio` اختياري عبر `npm run celia:mcp:stdio` ولوحة فحص تفاعلية عربية على `/`). يدعم الخادم تلقائيًا:
+يوفر المشروع خادم **Model Context Protocol (JSON-RPC 2.0)** محميًا برمز `CELIA_MCP_API_TOKEN` على المسار `POST /mcp` (مع وضع `stdio` اختياري عبر `npm run celia:mcp:stdio`) ويضم **12 أداة/مهارة مسجلة** تشمل خدمات Google، وواتساب، والرد الذكي (`celia_ai_reply`)، ومهارتي البحث والاكتشاف الحي (`find_skills` و`system_live_view`). كما يقدّم ثلاث واجهات ويب عربية متوافقة مع سياسة CSP الصارمة:
+- `/` — استوديو الوكيل الذكي ومحاكي واتساب ومختبر التشفير.
+- `/live` — لوحة النظام الحي اللحظية (مع واجهة JSON على `/api/live`).
+- `/skills` — مستكشف المهارات التفاعلي Find Skills (مع واجهة JSON على `/api/skills`).
+
+يدعم الخادم تلقائيًا:
 - **Gemini (`GEMINI_API_KEY`)** كمزود أساسي فور توفّر المفتاح (بما في ذلك داخل **GitHub Actions Secrets** عبر `.github/workflows/celia-mcp.yml` دون الحاجة إلى تنزيل نماذج محلية).
-- **Ollama المحلي (`qwen2.5:7b`)** كبديل محلي عند تشغيله على جهازك الشخصي.
+- **Ollama المحلي (`qwen2.5:7b`)** كبديل محلي مع حماية SSRF، إضافةً إلى محرك السياسات المحلي المجاني داخل وضع الاستوديو.
+- **مخزن الذاكرة المدمج (`memory-pool.js`)** تلقائيًا عند غياب MySQL أو صراحةً عند ضبط `CELIA_MCP_DISABLE_MYSQL=true`.
 
 ```bash
 cp .env.example .env

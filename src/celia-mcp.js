@@ -327,6 +327,7 @@ export async function buildStatusSummary(pool, config, { probeOllama = false } =
     service: SERVER_INFO.name,
     version: SERVER_INFO.version,
     protocolVersion: MCP_PROTOCOL_VERSION,
+    toolsCount: MCP_TOOLS.length,
     storage: pool.isMemory ? 'memory' : 'mysql',
     providers: {
       configuredMode: config.celia.aiProvider,
@@ -519,24 +520,48 @@ export function createCeliaMcpHandler({ pool, config }) {
           google: ['gmail', 'drive', 'calendar', 'contacts', 'google'],
           whatsapp: ['whatsapp', 'واتساب'],
           ai: ['ai', 'reply', 'celia_ai', 'ذكاء', 'رد'],
-          security: ['consent', 'crypto', 'تشفير', 'موافقة'],
+          security: ['consent', 'crypto', 'تشفير', 'موافقة', 'أمان'],
           system: ['status', 'celia_status', 'find_skills', 'system_live', 'live_view', 'نظام']
         };
-        const allToolsDetailed = MCP_TOOLS.map((t) => ({
-          name: t.name,
-          description: t.description,
-          inputSchema: t.inputSchema,
-          tags: Object.entries(categoryMap).filter(([, keys]) => keys.some((k) => t.name.toLowerCase().includes(k) || t.description.toLowerCase().includes(k))).map(([cat]) => cat),
-          invocation: `tools/call → ${t.name}`,
-          example: `{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"${t.name}\",\"arguments\":{}}}`
-        }));
+        const toolKeywords = {
+          celia_status: ['system', 'security', 'status', 'health', 'crypto', 'حالة', 'نظام', 'فحص', 'تشفير', 'أمان'],
+          celia_ai_reply: ['ai', 'reply', 'gemini', 'ollama', 'ذكاء', 'رد', 'توليد'],
+          google_gmail_search: ['google', 'gmail', 'email', 'mail', 'بريد', 'رسائل', 'إيميل'],
+          google_drive_search: ['google', 'drive', 'files', 'ملفات', 'درايف', 'مستندات'],
+          google_calendar_events_list: ['google', 'calendar', 'events', 'تقويم', 'مواعيد', 'جدول'],
+          google_calendar_events_create: ['google', 'calendar', 'events', 'create', 'تقويم', 'موعد', 'مواعيد', 'حجز', 'إنشاء'],
+          google_contacts_search: ['google', 'contacts', 'people', 'جهات', 'اتصال', 'أرقام'],
+          whatsapp_consent_upsert: ['whatsapp', 'security', 'consent', 'crypto', 'واتساب', 'موافقة', 'أمان', 'تشفير', 'خصوصية'],
+          whatsapp_contacts_list: ['whatsapp', 'contacts', 'consent', 'security', 'واتساب', 'جهات', 'موافقة', 'نافذة'],
+          whatsapp_send_text: ['whatsapp', 'send', 'message', 'واتساب', 'إرسال', 'رسالة'],
+          find_skills: ['system', 'skills', 'search', 'find', 'نظام', 'مهارات', 'بحث', 'اكتشاف'],
+          system_live_view: ['system', 'live', 'telemetry', 'status', 'نظام', 'حي', 'مباشر', 'قياسات']
+        };
+        const allToolsDetailed = MCP_TOOLS.map((t) => {
+          const extra = (toolKeywords[t.name] || []).join(' ').toLowerCase();
+          const haystack = `${t.name} ${t.description} ${extra}`.toLowerCase();
+          const tags = Object.entries(categoryMap)
+            .filter(([, keys]) => keys.some((k) => haystack.includes(k)))
+            .map(([cat]) => cat);
+          return {
+            name: t.name,
+            description: t.description,
+            inputSchema: t.inputSchema,
+            tags,
+            invocation: `tools/call → ${t.name}`,
+            example: `{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"${t.name}\",\"arguments\":{}}}`
+          };
+        });
         let filtered = allToolsDetailed;
         if (category !== 'all' && categoryMap[category]) {
           filtered = filtered.filter((t) => t.tags.includes(category) || (category === 'system' && ['find_skills','system_live_view','celia_status'].includes(t.name)));
         }
         if (query) {
           const q = query.toLowerCase();
-          filtered = filtered.filter((t) => t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q) || t.tags.join(' ').includes(q));
+          filtered = filtered.filter((t) => {
+            const extra = (toolKeywords[t.name] || []).join(' ').toLowerCase();
+            return t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q) || t.tags.join(' ').includes(q) || extra.includes(q);
+          });
         }
         let liveStatus = null;
         if (liveCheck) {
@@ -569,7 +594,11 @@ export function createCeliaMcpHandler({ pool, config }) {
           ownerPhoneDemo: demoPhone,
           liveEndpoints: {
             ui: '/',
+            livePage: '/live',
+            skillsPage: '/skills',
             health: '/health',
+            liveApi: '/api/live',
+            skillsApi: '/api/skills',
             mcp: '/mcp',
             sandboxRpc: '/ui/workspace/rpc',
             cryptoLab: '/ui/workspace/crypto-lab'
@@ -795,10 +824,6 @@ export function createCeliaMcpApp({ pool, config }) {
   app.get('/health', async (_req, res) => {
     const summary = await buildStatusSummary(pool, config, { probeOllama: true });
     res.json(summary);
-  });
-  app.get('/live', async (_req, res) => {
-    const summary = await buildStatusSummary(pool, config, { probeOllama: true });
-    res.json({ live: true, message: 'نظامك حي على أرض الواقع — Celia MCP يعمل الآن', summary, timestamp: new Date().toISOString(), uptime: process.uptime(), tools: MCP_TOOLS.length });
   });
   app.get('/api/skills/find', async (req, res) => {
     const q = String(req.query.q || req.query.query || '').trim();

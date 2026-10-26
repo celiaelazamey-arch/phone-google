@@ -316,6 +316,10 @@
         return { probeOllama: true };
       case 'celia_ai_reply':
         return { customerMessage: 'مرحبًا، ما هي مواعيد العمل لديكم وكيف أحجز استشارة؟', provider: 'auto' };
+      case 'find_skills':
+        return { query: 'whatsapp', category: 'all', liveCheck: true };
+      case 'system_live_view':
+        return { includeTelemetry: true, probeOllama: true };
       case 'whatsapp_consent_upsert':
         return { phone: '+201065217834', optedIn: true, aiOptedIn: true, source: 'نموذج موافقة استوديو سيليا 2026' };
       case 'whatsapp_contacts_list':
@@ -343,7 +347,7 @@
   }
 
   function renderToolsGrid(filter = 'all') {
-    const labels = { ai: 'ذكاء وحالة', whatsapp: 'واتساب للأعمال', google: 'خدمات Google' };
+    const labels = { ai: 'ذكاء ونظام', whatsapp: 'واتساب للأعمال', google: 'خدمات Google' };
     const filtered = state.tools.filter((t) => filter === 'all' || toolCategory(t.name) === filter);
     el.toolsGrid.innerHTML = filtered
       .map((tool) => {
@@ -557,7 +561,7 @@
         const r1 = await callMcpRpc('initialize', { protocolVersion: '2024-11-05' });
         s1.done(r1.elapsed);
 
-        const s2 = turn.addStep('2. فحص سجل الأدوات العشر (tools/list)');
+        const s2 = turn.addStep('2. فحص سجل أدوات MCP الاثنتي عشرة (tools/list)');
         const r2 = await callMcpRpc('tools/list');
         s2.done(r2.elapsed);
 
@@ -760,6 +764,16 @@
     }
   }
 
+  function handleHashToolRoute() {
+    const match = /^#tool=([^&]+)$/.exec(location.hash || '');
+    if (!match) return;
+    const requestedTool = decodeURIComponent(match[1]);
+    if (state.tools.some((t) => t.name === requestedTool)) {
+      switchView('tools');
+      openToolModal(requestedTool);
+    }
+  }
+
   async function bootstrap() {
     applyTheme(state.theme);
 
@@ -781,12 +795,15 @@
       state.tools = listRes.data.result?.tools || [];
       el.navToolsCount.textContent = String(state.tools.length);
       renderToolsGrid('all');
+      handleHashToolRoute();
     } catch (err) {
       el.tMcpState.textContent = `تنبيه: ${err.message}`;
     }
 
     updateAuthUi();
   }
+
+  window.addEventListener('hashchange', handleHashToolRoute);
 
   // Event Listeners
   el.navPills.forEach((btn) => {
