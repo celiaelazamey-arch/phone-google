@@ -1,0 +1,8 @@
+name = "celia-phone-google"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+workers_dev = true
+
+[vars]
+ALLOWED_ORIGIN = "https://celiaelazamey-arch.github.io"
+CELIA_VERSION = "0.2.1"

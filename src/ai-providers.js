@@ -99,6 +99,36 @@ export function loadExtendedIntegrationsConfig(env = process.env) {
     ? normalizeHttpsApiUrl(rawCodataBase, 'https://api.codata.io/v1', 'CODATA_BASE_URL')
     : '';
 
+  const cronjobExact = cleanSecret(env.CELIAOS_CRONJOB_ORG_API_KEY);
+  const cronjobAlias = cleanSecret(env.CRONJOB_API_KEY);
+  const cronjobApiKey = cronjobExact || cronjobAlias;
+  const cronjobSourceEnv = cronjobExact
+    ? 'CELIAOS_CRONJOB_ORG_API_KEY'
+    : cronjobAlias
+      ? 'CRONJOB_API_KEY'
+      : null;
+
+  const cloudflareAccountId = cleanSecret(env.CLOUDFLARE_ACCOUNT_ID);
+  const cloudflareApiToken = cleanSecret(env.CLOUDFLARE_API_TOKEN);
+
+  const r2AccessKeyId = cleanSecret(env.CLOUDFLARE_R2_ACCESS_KEY_ID);
+  const r2SecretAccessKey = cleanSecret(env.CLOUDFLARE_R2_SECRET_ACCESS_KEY);
+  const rawR2Endpoint = cleanSecret(env.CLOUDFLARE_R2_S3_ENDPOINT);
+  let r2Endpoint = '';
+  let r2EndpointFormatValid = true;
+  if (rawR2Endpoint) {
+    try {
+      const candidate =
+        rawR2Endpoint.startsWith('http://') || rawR2Endpoint.startsWith('https://')
+          ? rawR2Endpoint
+          : `https://${rawR2Endpoint}`;
+      r2Endpoint = normalizeHttpsApiUrl(candidate, candidate, 'CLOUDFLARE_R2_S3_ENDPOINT');
+    } catch {
+      r2Endpoint = '';
+      r2EndpointFormatValid = false;
+    }
+  }
+
   return Object.freeze({
     allowCloudFailover: env.CELIA_AI_ALLOW_CLOUD_FAILOVER === 'true',
     extendedMcpTools: env.CELIA_EXTENDED_MCP_TOOLS === 'true',
@@ -135,6 +165,23 @@ export function loadExtendedIntegrationsConfig(env = process.env) {
       sourceEnv: codataSourceEnv,
       workspaceId: codataWorkspaceId,
       baseUrl: codataBaseUrl
+    }),
+    cronjob: Object.freeze({
+      apiKey: cronjobApiKey,
+      sourceEnv: cronjobSourceEnv,
+      baseUrl: normalizeHttpsApiUrl(env.CRONJOB_BASE_URL, 'https://api.cron-job.org', 'CRONJOB_BASE_URL')
+    }),
+    cloudflare: Object.freeze({
+      accountId: cloudflareAccountId,
+      apiToken: cloudflareApiToken,
+      baseUrl: normalizeHttpsApiUrl(env.CLOUDFLARE_API_BASE_URL, 'https://api.cloudflare.com/client/v4', 'CLOUDFLARE_API_BASE_URL')
+    }),
+    cloudflareR2: Object.freeze({
+      accessKeyId: r2AccessKeyId,
+      secretAccessKey: r2SecretAccessKey,
+      s3Endpoint: r2Endpoint,
+      rawEndpointConfigured: Boolean(rawR2Endpoint),
+      endpointFormatValid: r2EndpointFormatValid
     })
   });
 }

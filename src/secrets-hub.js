@@ -62,6 +62,16 @@ export function buildSecretsReadiness(config = {}, services = null) {
       model: config.aiGateway?.model || 'google/gemini-2.5-flash'
     },
     {
+      secretName: 'CELIAOS_CRONJOB_ORG_API_KEY',
+      aliases: ['CRONJOB_API_KEY'],
+      configured: Boolean(config.cronjob?.apiKey),
+      sourceEnv: config.cronjob?.sourceEnv || null,
+      role: 'scheduler-api',
+      boundary: 'cronjob',
+      enabled: config.features?.cronjob !== false,
+      circuitState: stateOf('cronjob')
+    },
+    {
       secretName: 'CELIA_MCP_API_TOKEN',
       aliases: ['APP_API_TOKEN'],
       configured: ownerTokenConfigured,
@@ -85,6 +95,60 @@ export function buildSecretsReadiness(config = {}, services = null) {
         config.elevenlabs?.voiceId &&
         config.features?.elevenlabs !== false
       )
+    },
+    {
+      secretName: 'CLOUDFLARE_ACCOUNT_ID',
+      aliases: [],
+      configured: Boolean(config.cloudflare?.accountId),
+      sourceEnv: config.cloudflare?.accountId ? 'CLOUDFLARE_ACCOUNT_ID' : null,
+      role: 'edge-account',
+      boundary: 'cloudflare',
+      enabled: config.features?.cloudflare !== false,
+      circuitState: stateOf('cloudflare')
+    },
+    {
+      secretName: 'CLOUDFLARE_API_TOKEN',
+      aliases: [],
+      configured: Boolean(config.cloudflare?.apiToken),
+      sourceEnv: config.cloudflare?.apiToken ? 'CLOUDFLARE_API_TOKEN' : null,
+      role: 'edge-deploy-token',
+      boundary: 'cloudflare',
+      enabled: config.features?.cloudflare !== false,
+      circuitState: stateOf('cloudflare')
+    },
+    {
+      secretName: 'CLOUDFLARE_R2_ACCESS_KEY_ID',
+      aliases: [],
+      configured: Boolean(config.cloudflareR2?.accessKeyId),
+      sourceEnv: config.cloudflareR2?.accessKeyId ? 'CLOUDFLARE_R2_ACCESS_KEY_ID' : null,
+      role: 'object-storage-key',
+      boundary: 'cloudflare_r2',
+      enabled: config.features?.cloudflare_r2 !== false,
+      circuitState: stateOf('cloudflare_r2')
+    },
+    {
+      secretName: 'CLOUDFLARE_R2_S3_ENDPOINT',
+      aliases: [],
+      configured: Boolean(config.cloudflareR2?.s3Endpoint || config.cloudflareR2?.rawEndpointConfigured),
+      formatValid: config.cloudflareR2?.endpointFormatValid !== false,
+      sourceEnv:
+        config.cloudflareR2?.s3Endpoint || config.cloudflareR2?.rawEndpointConfigured
+          ? 'CLOUDFLARE_R2_S3_ENDPOINT'
+          : null,
+      role: 'object-storage-endpoint',
+      boundary: 'cloudflare_r2',
+      enabled: config.features?.cloudflare_r2 !== false,
+      circuitState: stateOf('cloudflare_r2')
+    },
+    {
+      secretName: 'CLOUDFLARE_R2_SECRET_ACCESS_KEY',
+      aliases: [],
+      configured: Boolean(config.cloudflareR2?.secretAccessKey),
+      sourceEnv: config.cloudflareR2?.secretAccessKey ? 'CLOUDFLARE_R2_SECRET_ACCESS_KEY' : null,
+      role: 'object-storage-secret',
+      boundary: 'cloudflare_r2',
+      enabled: config.features?.cloudflare_r2 !== false,
+      circuitState: stateOf('cloudflare_r2')
     },
     {
       secretName: 'DEEPSEEK_API_KEY',
@@ -129,6 +193,36 @@ export function buildSecretsReadiness(config = {}, services = null) {
       enabled: config.features?.gemini !== false,
       circuitState: stateOf('gemini'),
       model: config.gemini?.model || 'gemini-2.5-flash'
+    },
+    {
+      secretName: 'GOOGLE_CLIENT_ID',
+      aliases: [],
+      configured: Boolean(config.google?.clientId),
+      sourceEnv: config.google?.clientId ? 'GOOGLE_CLIENT_ID' : null,
+      role: 'oauth-client-id',
+      boundary: 'google',
+      enabled: config.features?.google !== false,
+      circuitState: stateOf('google.oauth')
+    },
+    {
+      secretName: 'GOOGLE_CLIENT_SECRET',
+      aliases: [],
+      configured: Boolean(config.google?.clientSecret),
+      sourceEnv: config.google?.clientSecret ? 'GOOGLE_CLIENT_SECRET' : null,
+      role: 'oauth-client-secret',
+      boundary: 'google',
+      enabled: config.features?.google !== false,
+      circuitState: stateOf('google.oauth')
+    },
+    {
+      secretName: 'PHONE_NUMBER',
+      aliases: ['APP_OWNER_PHONE_E164'],
+      configured: Boolean(config.ownerPhone),
+      sourceEnv: config.ownerPhoneSourceEnv || (config.ownerPhone ? 'APP_OWNER_PHONE_E164' : null),
+      role: 'owner-phone',
+      boundary: 'whatsapp',
+      enabled: config.features?.whatsapp !== false,
+      circuitState: stateOf('whatsapp')
     },
     {
       secretName: 'YOUR_CODATA_API_KEY',
@@ -319,6 +413,55 @@ export async function getCodataStatus({ config, probe = false, services, timeout
   return services ? services.run('codata', runProbe) : runProbe();
 }
 
+export async function getCronjobStatus({ config, probe = false, services, timeoutMs = 8000 }) {
+  const cronjob = config?.cronjob;
+  const baseReport = {
+    configured: Boolean(cronjob?.apiKey),
+    sourceEnv: cronjob?.sourceEnv || null,
+    baseUrl: cronjob?.baseUrl || 'https://api.cron-job.org',
+    enabled: config?.features?.cronjob !== false,
+    mode: 'governed-scheduler'
+  };
+  if (!probe) return baseReport;
+  if (!cronjob?.apiKey) throw Object.assign(new Error('cronjob_not_configured'), { status: 400 });
+
+  const runProbe = async (signal) => {
+    const endpoint = `${cronjob.baseUrl}/jobs`;
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        accept: 'application/json',
+        authorization: `Bearer ${cronjob.apiKey}`
+      },
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs)
+    });
+    if (!response.ok) throw new UpstreamError('cronjob', response.status);
+    const data = await response.json().catch(() => ({}));
+    return {
+      ...baseReport,
+      reachable: true,
+      jobsCount: Array.isArray(data.jobs) ? data.jobs.length : 0
+    };
+  };
+
+  return services ? services.run('cronjob', runProbe) : runProbe();
+}
+
+export function getCloudflareR2Status({ config }) {
+  const cf = config?.cloudflare;
+  const r2 = config?.cloudflareR2;
+  return {
+    configured: Boolean(r2?.accessKeyId && r2?.secretAccessKey && r2?.s3Endpoint),
+    accessKeyConfigured: Boolean(r2?.accessKeyId),
+    secretKeyConfigured: Boolean(r2?.secretAccessKey),
+    endpointConfigured: Boolean(r2?.s3Endpoint || r2?.rawEndpointConfigured),
+    endpointFormatValid: r2?.endpointFormatValid !== false,
+    cloudflareAccountConfigured: Boolean(cf?.accountId),
+    cloudflareTokenConfigured: Boolean(cf?.apiToken),
+    enabled: config?.features?.cloudflare_r2 !== false
+  };
+}
+
 function sendHubError(res, error) {
   if (error instanceof ServiceUnavailableError) {
     return res.status(503).json({ error: safeError(error), outcomeUnknown: Boolean(error.outcomeUnknown) });
@@ -339,7 +482,7 @@ export function createSecretsHubRouter({
   const router = express.Router();
   const jsonParser = express.json({ limit: '128kb' });
   const ensureJson = (req, res, next) => (req.body !== undefined ? next() : jsonParser(req, res, next));
-  const hubPaths = ['/api/secrets', '/api/ai', '/api/voice', '/api/figma', '/api/codata'];
+  const hubPaths = ['/api/secrets', '/api/ai', '/api/voice', '/api/figma', '/api/codata', '/api/cron', '/api/storage'];
 
   router.use(hubPaths, (req, res, next) => {
     res.set('Cache-Control', 'no-store');
@@ -499,6 +642,32 @@ export function createSecretsHubRouter({
     } catch (error) {
       return sendHubError(res, error);
     }
+  });
+
+  router.get('/api/cron/status', async (req, res) => {
+    try {
+      const report = await getCronjobStatus({
+        config,
+        probe: req.query.probe === 'true',
+        services
+      });
+      return res.json(report);
+    } catch (error) {
+      return sendHubError(res, error);
+    }
+  });
+
+  router.post('/api/cron/probe', ensureJson, async (_req, res) => {
+    try {
+      const report = await getCronjobStatus({ config, probe: true, services });
+      return res.json(report);
+    } catch (error) {
+      return sendHubError(res, error);
+    }
+  });
+
+  router.get('/api/storage/r2/status', (_req, res) => {
+    return res.json(getCloudflareR2Status({ config }));
   });
 
   return router;

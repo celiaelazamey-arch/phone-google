@@ -82,7 +82,12 @@ export function loadCeliaMcpConfig(env = process.env, { requireToken = true } = 
     port,
     userId: (env.APP_USER_ID || 'owner').trim() || 'owner',
     ownerEmail: (env.APP_OWNER_EMAIL || '').trim(),
-    ownerPhone: (env.APP_OWNER_PHONE_E164 || '').trim() || null,
+    ownerPhone: (env.APP_OWNER_PHONE_E164 || env.PHONE_NUMBER || '').trim() || null,
+    ownerPhoneSourceEnv: (env.APP_OWNER_PHONE_E164 || '').trim()
+      ? 'APP_OWNER_PHONE_E164'
+      : (env.PHONE_NUMBER || '').trim()
+        ? 'PHONE_NUMBER'
+        : null,
     encryptionKey: hasValidEncryptionKey ? rawEncryptionKey : '',
     envDisableMysql: env.CELIA_MCP_DISABLE_MYSQL === 'true',
     landingRoot: env.CELIA_LANDING_ROOT === 'true',

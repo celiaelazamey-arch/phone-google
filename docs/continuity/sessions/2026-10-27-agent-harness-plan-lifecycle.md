@@ -51,6 +51,9 @@
 10. **حزمة التدقيق الموقّعة واستئناف وحذف الخيوط وضبط البيئة (`DEC-024`):**
    - إضافة `exportAuditBundle` (`GET /api/agent/runs/:id/audit-bundle`) و`deleteThread` (`DELETE /api/agent/threads/:id`) في `src/agent/store.js` و`src/agent/runtime.js` و`src/agent-routes.js`، وتحديث `public/agent.{html,css,js}` و`src/config.js` و`src/secrets-hub.js` مع اختبارات `AUDIT-01..AUDIT-03` في `test/agent-audit-bundle.test.js` (إجمالي **280/280** في `npm test`).
 
+11. **توظيف جميع أسرار المستودع الـ18 وبوابة Cloudflare Worker والنشر الآلي (`DEC-025`):**
+   - توسيع `buildSecretsReadiness` و`scripts/check-secrets-wiring.mjs` و`.github/workflows/celia-mcp.yml` لربط وفحص **الأسرار الـ18 جميعًا** (`18/18`) مع صفر تسريب، وإضافة `workers/celia-edge/worker.js` و`scripts/deploy-cloudflare-edge.mjs` و`.github/workflows/cloudflare-deploy.yml` وتحديث `.github/workflows/release.yml` و`test/celia-edge-worker.test.js`.
+
 ## 2. نتائج الفحوص الفعلية (محليًا وفي GitHub Actions CI)
 
 - `npm run build:pages`: ناجح (8 صفحات ثابتة في `dist/`).
