@@ -60,7 +60,7 @@
 - يدعم الإصدار الأول المستندات النصية الصغيرة وCSV وJSON وMarkdown فقط. **PDF والصور وOCR غير منفذة**، ولا يوجد استخراج سحابي أو موصل خارجي ضمن هذه القدرة.
 - استخدم معالجًا واحدًا محليًا عند طلب `استخرج الفاتورة:` ثم ألحق محتوى المستند. لا يُقبل التقرير كمعاملة أعمال؛ `action.status=not_committed` دائمًا في هذا الإصدار.
 - الرسم المعماري: [SVG](public/document-data-automation.svg) · [عرض Canvas تفاعلي](public/document-automation.html). الاختبارات الجديدة في `test/agent-document-automation.test.js`.
-- هذا التغيير على فرع `feature/document-data-automation` للمراجعة؛ لا يعني دمجًا أو نشرًا أو نجاح CI. مرجع المتابعة في [الحالة](docs/continuity/STATE.md).
+- اجتاز فرع المراجعة بوابات CI الموثقة في PR #39؛ يظل هذا فرعًا غير مدموج ولا منشورًا. مراجعة التوافق والقرار البشري بالدمج مرحلتان منفصلتان. مرجع المتابعة في [الحالة](docs/continuity/STATE.md).
 
 ## الجديد في 0.2.1 — Free Launch Runtime
 
