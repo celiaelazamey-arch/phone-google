@@ -1,6 +1,6 @@
 # الحالة الحالية — ابدأ من هنا
 
-**آخر مراجعة:** 27 أكتوبر 2026 · **نوع الجلسة الحالية:** بناء «Celia Google Spider v0.1.0» (موصل Google Drive إلى شبكة معرفة محلية عبر MCP) والتحقق من دمج PR #24
+**آخر مراجعة:** 27 أكتوبر 2026 · **نوع الجلسة الحالية:** جلسة توثيقية قصيرة بعد دمج PR #25 — تصحيح روابط «المراجع» في `celia-google-spider/README.md` وتدقيق ادعاء السرّين `GOOGLE_CLIENT_ID/SECRET` (SPDR-003)
 
 ## الطلب والمتطلبات الثابتة
 
@@ -10,8 +10,8 @@
 
 ## الواقع والهوية
 
-- المستودع: `celiaelazamey-arch/phone-google`؛ خط الأساس لهذه الجلسة `017507bec6efd5f93f6b246240d2e76e1da292cb` (دمج PR #24 على `main`). طلبات PR #17 و#21 و#22 و#23 و#24 مدموجة.
-- الفرع المعطى لهذه الجلسة: `arena/64505100-phone-google`. تحقّق دائمًا من الفرع النشط ولا تنشئ أو تنتقل لفرع آخر.
+- المستودع: `celiaelazamey-arch/phone-google`؛ خط الأساس لهذه الجلسة `5f84b3d2a7581bc95dfc1fe1170cfe956d86e19b` (دمج PR #25 على `main`). طلبات PR #17 و#21 و#22 و#23 و#24 و#25 مدموجة.
+- الفرع المعطى لهذه الجلسة: `arena/20079390-phone-google`. تحقّق دائمًا من الفرع النشط ولا تنشئ أو تنتقل لفرع آخر. (الفرع `arena/64505100-phone-google` انتهى بعد الدمج ولا يُعدّل منه شيء.)
 - الكود الحالي `0.2.1` / السابق `0.2.0` / `schema: 1` كما هي دون أي تعديل — حزمة السبّابة طرفية لا تمس Node أو المخطط.
 - المستودع مقتطاع (shallow) بعمق 1؛ اختبار توافق 0.2.0 يحتاج commit قاعدة `2508893bd7e6d447b2e19374933556322cc9cdb7` محليًا (`git fetch --depth=1 origin <sha>`) — جُلب في هذه الجلسة فصار 75/75.
 - لا رابط Render/Aiven دائم منشأ (HOST-003 بانتظار تفويض المالك).
@@ -24,6 +24,16 @@
    - الحدود مكتوبة في README الحزمة: قراءة فقط (`drive.readonly`)، Docs→نص وSheets→CSV للأولى فقط، بلا embeddings، بلا ChatGPT، بلا مزامنة حية قبل اعتماد المالك وملف اعتماده (SPDR-002).
 2. **وظيفة CI اختيارية:** إضافة `spider` في `.github/workflows/celia-mcp.yml` (Python 3.11 بمفتاح SHA مثبت) لتشغيل `unittest` + `pytest` + `compileall` بلا أي بيانات اعتماد.
 3. **الاستمرارية:** تحديث `STATE.md` وسجل جلسة جديد `sessions/2026-10-27-celia-google-spider.md`، صفّا SPDR-001/SPDR-002 في `BACKLOG.md`، DEC-011 في `DECISIONS.md`، ومؤشر الحزمة في `README.md` الجذري.
+
+## آخر تغيير في هذه الجلسة (SPDR-003)
+
+- `celia-google-spider/README.md` قسم «المراجع»: السطر المعنون «Python quickstart» كان يشير إلى
+  `guides/manage-downloads` — صُحّح إلى `quickstart/python`، وأُضيف فهرس REST v3 ودليل التنزيلات
+  كسطرين منفصلين، وبقي رابط الحصص. الروابط الثلاثة على المسار القانوني `/workspace/drive/…`.
+- **تدقيق:** لا workflow يستخدم `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`؛ ذكر `pages.yml` لهما هو فحص
+  تسرّب في `dist` فقط. إضافتهما إلى Repository secrets لا تفعّل مزامنة ولا أي خطوة بذاتها؛ وصولهما للتشغيل
+  عبر `.env` المحلي أو متغيرات Render إلى `src/config.js` و`src/celia-mcp.js`.
+- التفاصيل والفحوص في `sessions/2026-10-27-reference-link-fix.md`.
 
 ## التحقق الحالي
 
@@ -52,9 +62,11 @@
 
 ## الخطوة التالية بالضبط
 
-1. **مراجعة PR #25 ودمجه من قبل المالك** — الوظائف كلها خضراء (run `40486458531`)؛ لا يُدمج من طرف الوكيل وفق قواعد `AGENTS.md`.
-2. **إن رغب المالك في مزامنة حية (SPDR-002):** وضع `credentials.json` محليًا (خارج Git) وتشغيل `python -m celia_spider.auth` ثم المزامنة والتحقق من حدود عدم الحذف، مع تحديث حالة SPDR-002.
-3. **متابعة باقي الخطة** من `BACKLOG.md` (COMP-001/DATA-001/SEC-001/HOST-003…) دون ادعاء إغلاقها بهذا التسليم.
+1. **`npm ci && npm run check && npm run check:secrets && npm run check:continuity && npm test`** في بيئة كاملة
+   (لم تُشغَّل `check:secrets` هنا لغياب `node_modules`).
+2. **إن أراد المالك الخيار 2** (ربط `GOOGLE_CLIENT_ID/SECRET` بخطوة CI): يحدد الاستخدام المقصود — لا ربط بلا غرض معلن.
+3. **إن رغب المالك في مزامنة حية (SPDR-002):** OAuth client من نوع Desktop في Google Cloud، ثم `credentials.json` محليًا (خارج Git)، ثم `python -m celia_spider.auth`، ثم المزامنة والتحقق من حدود عدم الحذف — لا موافقة تفاعلية داخل CI.
+4. **متابعة باقي الخطة** من `BACKLOG.md` (COMP-001/DATA-001/SEC-001/HOST-003…) دون ادعاء إغلاقها بهذا التسليم.
 
 ## التحقق من الحفظ في الجلسة التالية
 
