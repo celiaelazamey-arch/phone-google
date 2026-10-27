@@ -4,6 +4,19 @@ import { generateCeliaReply } from './ollama.js';
 import { createServiceRegistry, safeError, ServiceUnavailableError, UpstreamError } from './resilience.js';
 import { isValidE164, isWithinCustomerWindow, safeEqual, verifyWhatsAppSignature } from './security.js';
 import { createIdempotencyStore, isValidIdempotencyKey } from './idempotency.js';
+import { createGoogleConsentLink } from './google.js';
+
+/**
+ * Owner-only chat command: "اربط جوجل" / "connect google".
+ * Matched narrowly so a customer message can never trigger a connection link, and the caller
+ * still has to prove the sender is APP_OWNER_PHONE_E164 before anything is minted.
+ */
+export function isGoogleConnectCommand(body) {
+  const text = String(body || '').trim();
+  if (!text || text.length > 64) return false;
+  return /^(?:اربط|ربط|وصل|وصّل)\s+(?:لي\s+)?(?:حسابي\s+)?(?:جوجل|قوقل|google)(?:\s+الآن)?$/i.test(text)
+    || /^(?:connect|link)\s+(?:my\s+)?google(?:\s+account)?(?:\s+now)?$/i.test(text);
+}
 
 function extractInboundMessages(payload) {
   const messages = [];
@@ -69,6 +82,21 @@ export function createWhatsAppWebhookRouter({ pool, config, services = createSer
            ON DUPLICATE KEY UPDATE last_inbound_at = UTC_TIMESTAMP()`,
           [message.from]
         );
+        // Owner-only Google connection command: replies with a single-use link instead of an AI answer.
+        if (message.body && config.ownerPhone && message.from === config.ownerPhone && isGoogleConnectCommand(message.body)) {
+          try {
+            const link = await createGoogleConsentLink({ pool, config });
+            const reply = `رابط ربط حساب Google (صالح حتى ${link.expiresAt}، ويعمل مرة واحدة):\n${link.url}`;
+            const providerId = await services.run('whatsapp', (signal) => sendWhatsAppText({ config, phone: message.from, text: reply, signal }), { sideEffect: true });
+            if (providerId) await pool.execute(
+              'INSERT IGNORE INTO whatsapp_messages (provider_message_id, phone_e164, direction, message_type, body, status) VALUES (?, ?, ?, ?, ?, ?)',
+              [providerId, message.from, 'outbound', 'text', reply.slice(0, 4000), 'sent']
+            );
+          } catch (error) {
+            console.error('WhatsApp Google connect link failed:', error.code || 'google_link_failed');
+          }
+          continue;
+        }
         if (config.whatsapp.autoReplyEnabled && message.body) {
           const [rows] = await pool.execute('SELECT opted_in, ai_opted_in, last_inbound_at FROM whatsapp_contacts WHERE phone_e164 = ?', [message.from]);
           const contact = rows[0];

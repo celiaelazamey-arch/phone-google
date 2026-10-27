@@ -4,7 +4,7 @@
 
 ## خطة 2026 والاستمرارية بين الجلسات
 
-[خطة التطوير الشاملة](docs/2026-development-plan.md) · [الحالة الحالية والخطوة التالية](docs/continuity/STATE.md) · [قائمة المهام](docs/continuity/BACKLOG.md) · [سجل القرارات](docs/continuity/DECISIONS.md) · [عقد التوافق](docs/compatibility-contract.md).
+[خطة التطوير الشاملة](docs/2026-development-plan.md) · [الحالة الحالية والخطوة التالية](docs/continuity/STATE.md) · [قائمة المهام](docs/continuity/BACKLOG.md) · [سجل القرارات](docs/continuity/DECISIONS.md) · [عقد التوافق](docs/compatibility-contract.md) · [نحو وكيل متكامل (خطة M1–M4)](docs/agent-runtime-plan.md) · [ربط حساب Google خطوة بخطوة](docs/google-connect.md).
 
 قبل أي جلسة تطوير، اقرأ [AGENTS.md](AGENTS.md) و[بروتوكول الاستمرارية](docs/continuity/README.md). الخطة تفصل بين حفظ سياق التطوير في Git وذاكرة محادثات التطبيق الدائمة **المخططة وغير المنفذة بعد**، وتفرض جرد البيئة والتوافق والنسخ والاستعادة قبل التغيير. بدأ تنفيذ إضافات 0.2.1 الاختيارية؛ لا تعني اعتماد الخطة أو نجاح الاختبارات نشر حسابات الإنتاج أو إكمال كل المهام. التقارير القديمة محفوظة كلقطات تاريخية، لا كمرجع حالة حي.
 
