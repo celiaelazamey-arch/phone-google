@@ -151,7 +151,14 @@ test('boot recovery: an invalid policy value or a disabled runtime never throws 
 
 test('boot recovery: scheduleBootRecovery runs in the background and logs by code only', async () => {
   const lines = [];
-  const logger = { info: (line) => lines.push(line), error: (...parts) => lines.push(parts.join(' ')) };
+  // Each log line resolves a waiter, so the test never depends on a fixed sleep.
+  let notify = () => {};
+  const logged = () => new Promise((resolve) => { notify = resolve; });
+  const push = (line) => {
+    lines.push(line);
+    notify();
+  };
+  const logger = { info: push, error: (...parts) => push(parts.join(' ')) };
   let calls = 0;
   const host = {
     async recoverOnBoot() {
@@ -159,15 +166,20 @@ test('boot recovery: scheduleBootRecovery runs in the background and logs by cod
       return { performed: true, staleOutbox: [{ id: 1 }], runs: { attempted: 2, resumed: [] }, durationMs: 7 };
     }
   };
+  let waiter = logged();
   const timer = scheduleBootRecovery({ agentHost: host, logger, delayMs: 0 });
   assert.ok(timer, 'a timer is returned so embedders can cancel it');
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  // The production timer is unref'd (it must never keep a draining server alive);
+  // the test refs it so the event loop waits for the background recovery.
+  timer.ref();
+  await waiter;
   assert.equal(calls, 1);
   assert.match(lines[0], /1 abandoned outbox row\(s\) settled as unknown, 2 parked run\(s\) resumed in 7ms/);
 
   const failing = { async recoverOnBoot() { throw Object.assign(new Error('secret detail must not leak'), { code: 'boom' }); } };
-  scheduleBootRecovery({ agentHost: failing, logger, delayMs: 0 });
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  waiter = logged();
+  scheduleBootRecovery({ agentHost: failing, logger, delayMs: 0 }).ref();
+  await waiter;
   assert.match(lines[1], /Agent boot recovery failed: boom$/);
   assert.equal(lines[1].includes('secret detail'), false);
   assert.equal(scheduleBootRecovery({ agentHost: null, logger }), null);

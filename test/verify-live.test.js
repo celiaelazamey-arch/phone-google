@@ -119,9 +119,19 @@ test('verify:live — an ideal durable service passes, and the report says what 
   const wrongCommit = await verifyLive({ url: baseUrl, allowHttp: true, expectVersion: '0.2.1', expectCommit: 'b'.repeat(40) });
   assert.equal(wrongCommit.checks.find((check) => check.id === 'version').status, 'fail');
 
-  // A slow first byte is reported as a sleeping service, not hidden.
-  const slow = await verifyLive({ url: baseUrl, allowHttp: true, expectVersion: '0.2.1', maxFirstMs: 0 });
-  assert.equal(slow.checks.find((check) => check.id === 'wake_latency').status, 'fail');
+  // A slow first byte is reported as a sleeping service, not hidden. The clock is
+  // injected so the verdict does not depend on how fast the loopback happens to be.
+  let fakeNow = 0;
+  const slow = await verifyLive({
+    url: baseUrl,
+    allowHttp: true,
+    expectVersion: '0.2.1',
+    maxFirstMs: 10,
+    now: () => (fakeNow += 50)
+  });
+  const wake = slow.checks.find((check) => check.id === 'wake_latency');
+  assert.equal(wake.status, 'fail');
+  assert.equal(wake.detail.firstMs, 50);
 });
 
 test('verify:live — https is required unless explicitly relaxed, and credentials in the URL are refused', async () => {

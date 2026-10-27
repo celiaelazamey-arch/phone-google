@@ -72,7 +72,9 @@
 | `npm audit --omit=dev --audit-level=moderate` | worktree | 0 ثغرات |
 | فحص حي: `celia-mcp.js` بـ`CELIA_AGENT_RUNTIME=sqlite` + `CELIA_AGENT_RESUME_ON_BOOT=true` | محلي 127.0.0.1:3123 | سطر السجل «Agent boot recovery: 0 … resumed in 1ms»، و`/api/agent/status` يعيد `bootRecovery.policy=resume, last.performed=true` |
 | فحص حي: `verify:live --allow-http` على الخادم أعلاه | محلي | **FAIL كما يجب** (5 pass، 2 fail: `ready_durable` ذاكرة، `agent_status` dialect=sqlite)؛ التقرير بلا الرمز (0 تطابق) |
-| `test:mysql` / `test:browser` | — | **لم يُشغَّلا** (لا MySQL ولا Chromium هنا؛ يغطيهما CI للفرع) |
+| CI للفرع (دفعة `632a09b`): run `40556575394` (push) | GitHub Actions | **كل الوظائف خضراء** (Node 22/24، MySQL 8.4، الحاوية، المتصفح، Python) |
+| CI لـPR #37 (نفس الدفعة): run `40556648657` (pull_request) | GitHub Actions | Node 22 **أحمر** والبقية خضراء — نفس الكود نجح في تشغيل الدفع ⇒ اختبار متقلب. السجل غير قابل للقراءة من الساندبوكس. السبب المرجّح وأُصلح: اختبار `wake_latency` بـ`maxFirstMs: 0` ينجح إن استغرق طلب loopback أقل من 0.5ms (يُقرَّب إلى 0) — صار الزمن محقونًا؛ واختبار `scheduleBootRecovery` كان يعتمد على نوم 20ms — صار ينتظر سطر السجل نفسه مع `ref()` للمؤقّت. أُعيد تشغيل الملفين 8 مرات (منها 3 تحت حمل CPU مصطنع): 10/10 دائمًا |
+| `test:mysql` / `test:browser` | — | **لم يُشغَّلا** محليًا (لا MySQL ولا Chromium هنا؛ خضراء في CI للفرع) |
 | `verify:live` على رابط حقيقي | — | **لم يُنفَّذ**: لا خدمة منشورة |
 
 ## الحفظ والتسليم
