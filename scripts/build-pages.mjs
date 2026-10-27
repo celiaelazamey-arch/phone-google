@@ -119,6 +119,11 @@ export async function build() {
     .replaceAll('/*__CELIA_BUILD_META__*/', JSON.stringify(buildMeta, null, 2));
 
   if (shim.includes('__CELIA_')) throw new Error('بقيت علامة قالب غير مستبدلة في الطبقة الثابتة');
+  try {
+    new Function(shim);
+  } catch (error) {
+    throw new Error(`الطبقة الثابتة غير صالحة نحوياً: ${error.message}`);
+  }
 
   await rm(DIST_DIR, { recursive: true, force: true });
   await mkdir(DIST_DIR, { recursive: true });

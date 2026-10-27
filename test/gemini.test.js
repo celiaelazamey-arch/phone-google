@@ -19,6 +19,7 @@ test('Gemini key is sent only in a header and generated candidate text is return
     assert.equal(reply, 'أهلًا، كيف يمكنني مساعدتك؟');
     assert.equal(requestUrl.includes('secret-test-key'), false);
     assert.equal(requestOptions.headers['x-goog-api-key'], 'secret-test-key');
+    assert.ok(requestOptions.signal instanceof AbortSignal);
     const body = JSON.parse(requestOptions.body);
     assert.equal(body.contents[0].parts[0].text, 'مرحبا');
   } finally {
@@ -28,4 +29,25 @@ test('Gemini key is sent only in a header and generated candidate text is return
 
 test('Gemini integration refuses to run without an API key', async () => {
   await assert.rejects(generateWhatsAppReply({ config: { gemini: { apiKey: '', model: 'gemini-test', businessContext: '' } }, customerMessage: 'hello' }), /not configured/);
+});
+
+test('Gemini request is aborted when its timeout expires', async () => {
+  const previousFetch = globalThis.fetch;
+  const keepEventLoopAlive = setTimeout(() => {}, 50);
+  globalThis.fetch = (_url, { signal }) => new Promise((resolve, reject) => {
+    signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+  });
+  try {
+    await assert.rejects(
+      generateWhatsAppReply({
+        config: { gemini: { apiKey: 'secret-test-key', model: 'gemini-test', businessContext: '' } },
+        customerMessage: 'hello',
+        timeoutMs: 5
+      }),
+      { name: 'TimeoutError' }
+    );
+  } finally {
+    globalThis.fetch = previousFetch;
+    clearTimeout(keepEventLoopAlive);
+  }
 });

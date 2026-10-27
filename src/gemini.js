@@ -7,13 +7,16 @@ export const DEFAULT_POLICY = [
   'أعد نص الرد وحده دون Markdown أو شرح إضافي.'
 ].join(' ');
 
-export async function generateWhatsAppReply({ config, customerMessage }) {
+const DEFAULT_GEMINI_TIMEOUT_MS = 20_000;
+
+export async function generateWhatsAppReply({ config, customerMessage, timeoutMs = DEFAULT_GEMINI_TIMEOUT_MS }) {
   const { apiKey, model, businessContext } = config.gemini;
   if (!apiKey) throw new Error('Gemini API is not configured');
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
+    signal: AbortSignal.timeout(timeoutMs),
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: `${DEFAULT_POLICY}${businessContext ? ` سياق النشاط المعتمد: ${businessContext.slice(0, 4000)}` : ''}` }] },
       contents: [{ role: 'user', parts: [{ text: String(customerMessage).slice(0, 4000) }] }],
