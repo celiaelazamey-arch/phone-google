@@ -53,6 +53,36 @@ function outcomeOf(toolRuns, name) {
   }
 }
 
+function documentRequest(goal) {
+  const match = String(goal || '').match(/^(?:استخرج\\s+(?:بيانات\\s+)?الفاتورة|حلل\\s+الفاتورة|document_data_automation|extract\\s+(?:the\\s+)?invoice(?:\\s+data)?)\\s*[:：]\\s*/i);
+  if (!match) return null;
+  const content = String(goal).slice(match[0].length).trim();
+  if (!content) return null;
+  const trimmed = content.replace(/^\\uFEFF/, '').trimStart();
+  const format = trimmed.startsWith('{') ? 'json'
+    : (trimmed.includes('\\n') && trimmed.split(/\\r?\\n/, 1)[0].includes(',')) ? 'csv'
+      : 'txt';
+  return { content, format };
+}
+
+function documentRunSummary(report) {
+  if (!report) return 'لم يُنشأ تقرير مستند موثوق.';
+  const validation = report.validation || {};
+  const labels = {
+    valid: 'مطابق حسابيًا، وينتظر اعتماد صاحب العمل',
+    review_required: 'يحتاج إلى مراجعة بشرية',
+    invalid: 'مرفوض بسبب تناقض أو خطأ'
+  };
+  return [
+    'اكتملت معالجة المستند محليًا دون اتصال خارجي.',
+    'الحالة: ' + (labels[validation.status] || report.report_status || 'غير معروفة') + '.',
+    'بصمة المستند: ' + String(report.document_hash || 'غير متاحة'),
+    'التنبيهات: ' + [...(validation.errors || []), ...(validation.review_items || [])].join(', ').slice(0, 500),
+    'حالة الإجراء: ' + String(report.action?.status || 'not_committed') + '؛ لم يُكتب سجل مشتريات ولم تُعتمد الفاتورة تلقائيًا.',
+    'قراءة CSV/JSON/TXT/Markdown فقط؛ OCR وPDF والكتابة إلى الخدمات الخارجية غير مفعلة في هذا الإصدار.'
+  ].join('\\n');
+}
+
 export function createDemoPlanner({ externalEffectTool = 'google.calendar_create_event', knowledge = false } = {}) {
   return {
     name: 'demo-deterministic',
@@ -60,6 +90,66 @@ export function createDemoPlanner({ externalEffectTool = 'google.calendar_create
     async plan({ messages, toolRuns, approvals = [], outbox = [], run = null }) {
       const goal = lastUserMessage(messages);
       const externalApproval = approvals.find((approval) => approval.toolName === externalEffectTool);
+      const request = documentRequest(goal);
+
+      if (request) {
+        if (!succeeded(toolRuns, 'document.read')) {
+          if (failed(toolRuns, 'document.read')) return this.giveUp(toolRuns, 'document.read');
+          return {
+            action: DECISION.call,
+            tool: 'document.read',
+            args: { content: request.content, format: request.format, sourceId: 'inline-invoice' },
+            reason: 'قراءة مستند فاتورة كبيانات غير موثوقة وبحجم محدود'
+          };
+        }
+        const read = outcomeOf(toolRuns, 'document.read');
+        if (!read?.source?.file_sha256 || typeof read.raw_text !== 'string') {
+          return { action: DECISION.finish, failed: true, summary: 'توقفت أتمتة المستند: مخرج القراءة غير مكتمل، ولم يُعتمد أي سجل.' };
+        }
+
+        if (!succeeded(toolRuns, 'document.extract')) {
+          if (failed(toolRuns, 'document.extract')) return this.giveUp(toolRuns, 'document.extract');
+          return {
+            action: DECISION.call,
+            tool: 'document.extract',
+            args: {
+              documentHash: read.source.file_sha256,
+              documentType: 'invoice',
+              sourceId: read.source.source_id,
+              format: read.source.format,
+              rawText: read.raw_text
+            }
+          };
+        }
+        const extracted = outcomeOf(toolRuns, 'document.extract');
+        if (!extracted?.source?.file_sha256 || !extracted?.fields) {
+          return { action: DECISION.finish, failed: true, summary: 'توقفت أتمتة المستند: مخرج الاستخراج غير صالح؛ لم يُعتمد أي سجل.' };
+        }
+
+        if (!succeeded(toolRuns, 'data.validate')) {
+          if (failed(toolRuns, 'data.validate')) return this.giveUp(toolRuns, 'data.validate');
+          return { action: DECISION.call, tool: 'data.validate', args: { extracted } };
+        }
+        const checked = outcomeOf(toolRuns, 'data.validate');
+        if (!checked?.validation?.status) {
+          return { action: DECISION.finish, failed: true, summary: 'توقفت أتمتة المستند: غابت نتيجة التحقق، ولم يُعتمد أي سجل.' };
+        }
+
+        if (!succeeded(toolRuns, 'data.report')) {
+          if (failed(toolRuns, 'data.report')) return this.giveUp(toolRuns, 'data.report');
+          return {
+            action: DECISION.call,
+            tool: 'data.report',
+            args: {
+              taskId: run?.id || null,
+              documentHash: extracted.source.file_sha256,
+              extracted,
+              validation: checked.validation
+            }
+          };
+        }
+        return { action: DECISION.finish, summary: documentRunSummary(outcomeOf(toolRuns, 'data.report')) };
+      }
 
       if (knowledge && !succeeded(toolRuns, 'kb.search')) {
         if (failed(toolRuns, 'kb.search')) return this.giveUp(toolRuns, 'kb.search');
