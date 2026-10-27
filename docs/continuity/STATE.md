@@ -1,6 +1,6 @@
 # الحالة الحالية — ابدأ من هنا
 
-**آخر مراجعة:** 27 أكتوبر 2026 · **المهمة الحالية:** DOC-AUTO-001 — تنفيذ `document_data_automation` مع توثيق SVG/Canvas على فرع مراجعة مستقل. سجل الجلسة: [2026-10-27-document-data-automation](sessions/2026-10-27-document-data-automation.md) · القرار: DEC-019.
+**آخر مراجعة:** 27 أكتوبر 2026 · **المهمة الحالية:** AUTO-001 — تنفيذ `document_data_automation` مع توثيق SVG/Canvas على فرع مراجعة مستقل. سجل الجلسة: [2026-10-27-document-data-automation](sessions/2026-10-27-document-data-automation.md) · القرار: DEC-019.
 
 ## الطلب الحالي — أتمتة المستندات والبيانات
 
