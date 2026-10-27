@@ -1,0 +1,40 @@
+# Repository working agreement — Celia
+
+These instructions preserve project context between coding sessions. They do not replace the hosting environment's instructions or grant production access.
+
+## Start every session
+
+1. Run `pwd`, `git branch --show-current`, `git status --short`, and `git log -5 --oneline`. Preserve uncommitted user work. Use the branch assigned by the environment; never infer a branch from an old report. In a branch-pinned environment, do not create, switch, rename, or push another branch.
+2. Read `docs/continuity/STATE.md`, then `BACKLOG.md`, `DECISIONS.md`, and `README.md` in that directory. Read the current plan and `docs/compatibility-contract.md` before implementation.
+3. Resolve stale claims against actual files, Git, and live GitHub results. Historical Arabic reports and prior chat/Google Docs are snapshots, not current deployment evidence.
+4. Select a backlog task and its acceptance criteria. Unknown production settings are blockers, not permission to guess. A plan or documentation request is not authorization to deploy or migrate production.
+
+## System invariants
+
+- Keep existing Express/ESM/MySQL architecture, routes, MCP tools, owner authentication, OAuth protections, consent rules, HMAC/dedup, and local/static demo boundaries unless a reviewed task explicitly changes their contract.
+- Durable MySQL must never silently fall back to an empty memory store. The current Render blueprint and Pages are demonstrations, not persistent customer storage.
+- Never replay external mutations after a timeout or session restart. `outcomeUnknown` requires reconciliation or human review, not blind retry.
+- Preserve old clients during protocol upgrades. MCP 2026 changes more than a version string; do not advertise conformance before transport/schema/behavior tests pass.
+- The current deployment CLI manages MCP only. Code rollback is not database restore. Do not weaken schema gates to make a migration pass.
+- Do not delete/reinitialize user databases, remove volumes, rewrite Git history, publish releases, merge PRs, change sharing/security settings, or incur infrastructure/provider costs as a side effect of planning.
+- Never commit `.env`, credentials, database dumps, customer conversations, browser traces containing private data, or raw SDK error content. Record secret names and provisioning steps only.
+- For proposals, label future behavior clearly. Do not add suggested flags to `.env.example` or change release metadata until their implementation exists.
+
+## Verify and hand off
+
+Use relevant checks; distinguish current execution from historical results and skipped/live-provider tests. Baseline commands:
+
+```sh
+npm ci
+npm run check
+npm run release:check
+npm test
+CELIA_MCP_DISABLE_MYSQL=true CELIA_DISABLE_OLLAMA=true npm run celia:mcp:verify
+npm run build:pages
+npm audit --omit=dev --audit-level=moderate
+# Browser/runtime changes also require Chromium setup and npm run test:browser.
+```
+
+Before ending or changing task: update STATE, the affected backlog rows, decisions when changed, and a dated session record using SESSION_TEMPLATE. Record changed files, tests actually run, blockers, unsafe operations not performed, and the exact next task. Commit/save and, when authorized, push only the environment-assigned branch. If remote persistence fails, say so explicitly; do not claim a local commit is pushed.
+
+Keep one authority per fact: STATE for current focus; BACKLOG for task status; DECISIONS for rationale; the development plan for scope; runbooks for implemented commands; GitHub for current PR/CI/deployment status. Do not erase historical records to resolve contradictions.
