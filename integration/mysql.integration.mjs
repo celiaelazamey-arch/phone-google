@@ -257,13 +257,14 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
     assert.equal(before.ledger, 'missing', 'dry run reports the missing ledger and writes nothing');
 
     const applied = await runMigrations({ connection: migrationConnection, directory, apply: true });
-    assert.deepEqual(applied.appliedNow, ['0002_agent-runtime.sql']);
+    assert.deepEqual(applied.appliedNow, ['0002_agent-runtime.sql', '0003_agent-governance.sql']);
 
     const second = await runMigrations({ connection: migrationConnection, directory, apply: true });
     assert.deepEqual(second.pending, [], 'a second apply is a no-op');
     const status = await runMigrations({ connection: migrationConnection, directory, statusOnly: true });
-    assert.equal(status.applied.length, 1);
+    assert.equal(status.applied.length, 2);
     assert.equal(status.applied[0].version, 2);
+    assert.equal(status.applied[1].version, 3);
   } finally {
     await migrationConnection.end();
   }
@@ -274,7 +275,7 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
       cwd: root,
       env: { ...process.env, ...mysqlEnv }
     });
-    assert.equal(JSON.parse(stdout).applied.length, 1);
+    assert.equal(JSON.parse(stdout).applied.length, 2);
   } catch (error) {
     throw new Error(`migrate CLI failed: ${String(error?.stderr || error?.message || '').slice(0, 600)}`);
   }
@@ -328,6 +329,6 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
   // The five core tables are untouched by the additive migration.
   const [tables] = await pool.execute('SELECT TABLE_NAME AS name FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()');
   const names = tables.map((row) => row.name);
-  assert.equal(names.filter((name) => name.startsWith('agent_')).length, 5);
+  assert.equal(names.filter((name) => name.startsWith('agent_')).length, 8);
   assert.ok(['app_users', 'oauth_states', 'google_credentials', 'whatsapp_contacts', 'whatsapp_messages'].every((name) => names.includes(name)));
 });

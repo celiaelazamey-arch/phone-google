@@ -1,4 +1,11 @@
 import crypto from 'node:crypto';
+import {
+  EVIDENCE_VERSION,
+  entryHash,
+  genesisHash,
+  hashOf,
+  verifyChain
+} from './evidence.js';
 
 /**
  * Durable agent store (AGENT-001).
@@ -34,6 +41,12 @@ export const TOOL_RUN_STATUS = Object.freeze({
   succeeded: 'succeeded',
   failed: 'failed',
   unknown: 'unknown'
+});
+
+export const APPROVAL_DECISION = Object.freeze({
+  pending: 'pending',
+  approved: 'approved',
+  rejected: 'rejected'
 });
 
 const nowIso = (clock) => new Date(clock()).toISOString();
@@ -124,6 +137,67 @@ function mapToolRun(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
+}
+
+function mapApproval(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    runId: row.run_id,
+    stepId: row.step_id ?? null,
+    toolName: row.tool_name,
+    risk: row.risk,
+    idempotencyKey: row.idempotency_key,
+    decision: row.decision,
+    decisionKey: row.decision_key ?? null,
+    actor: row.actor ?? null,
+    note: row.note ?? null,
+    requestedAt: row.requested_at,
+    decidedAt: row.decided_at ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function mapEvidence(row) {
+  if (!row) return null;
+  let sourceIds = [];
+  if (row.source_ids) {
+    try {
+      const parsed = JSON.parse(row.source_ids);
+      if (Array.isArray(parsed)) sourceIds = parsed;
+    } catch {
+      sourceIds = [];
+    }
+  }
+  return {
+    id: row.id,
+    runId: row.run_id,
+    stepId: row.step_id ?? null,
+    seq: Number(row.seq),
+    kind: row.kind,
+    inputHash: row.input_hash,
+    outputHash: row.output_hash ?? null,
+    sourceIds,
+    verdict: row.verdict ?? null,
+    version: row.version,
+    prevHash: row.prev_hash,
+    hash: row.hash,
+    createdAt: row.created_at
+  };
+}
+
+function mapGoalContract(row) {
+  if (!row) return null;
+  try {
+    return JSON.parse(row.contract);
+  } catch {
+    return null;
+  }
+}
+
+function codedError(code, message) {
+  return Object.assign(new Error(message || code), { code });
 }
 
 export function createAgentStore({ driver, clock = Date.now, idFactory = crypto.randomUUID } = {}) {
@@ -344,6 +418,144 @@ export function createAgentStore({ driver, clock = Date.now, idFactory = crypto.
         nowIso(clock),
         runId
       ]);
+    },
+    // ── Goal contract (one inspectable data contract per run) ──────────────
+    async saveGoalContract(runId, contract) {
+      const at = nowIso(clock);
+      await driver.run(
+        'INSERT INTO agent_goal_contracts (run_id, contract, created_at) VALUES (?, ?, ?)',
+        [runId, JSON.stringify(contract), at]
+      );
+      return store.getGoalContract(runId);
+    },
+    async getGoalContract(runId) {
+      return mapGoalContract(
+        await driver.get('SELECT * FROM agent_goal_contracts WHERE run_id = ?', [runId])
+      );
+    },
+    // ── Approval gate: durable pending/approved/rejected decisions ─────────
+    async requestApproval({ runId, stepId = null, toolName, risk, idempotencyKey }) {
+      const id = idFactory();
+      const at = nowIso(clock);
+      try {
+        await driver.run(
+          `INSERT INTO agent_approvals
+             (id, run_id, step_id, tool_name, risk, idempotency_key, decision, requested_at, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [id, runId, stepId, text(toolName, 64), text(risk, 24), text(idempotencyKey, 160), APPROVAL_DECISION.pending, at, at, at]
+        );
+        return { created: true, approval: mapApproval(await driver.get('SELECT * FROM agent_approvals WHERE id = ?', [id])) };
+      } catch (error) {
+        if (!driver.isUniqueViolation(error)) throw error;
+        const existing = await driver.get('SELECT * FROM agent_approvals WHERE idempotency_key = ?', [idempotencyKey]);
+        return { created: false, approval: mapApproval(existing) };
+      }
+    },
+    async listApprovals(runId) {
+      const rows = await driver.all(
+        'SELECT * FROM agent_approvals WHERE run_id = ? ORDER BY requested_at ASC, created_at ASC',
+        [runId]
+      );
+      return rows.map(mapApproval);
+    },
+    async getApproval(approvalId) {
+      return mapApproval(await driver.get('SELECT * FROM agent_approvals WHERE id = ?', [approvalId]));
+    },
+    /** Idempotent decision: a retried call carrying the same decision key returns the same row. */
+    async decideApproval({ approvalId, decision, actor, note = null, decisionKey }) {
+      const existing = await driver.get('SELECT * FROM agent_approvals WHERE id = ?', [approvalId]);
+      if (!existing) return { changed: false, approval: null };
+      if (existing.decision !== APPROVAL_DECISION.pending) {
+        if (decisionKey && existing.decision_key === decisionKey) {
+          return { changed: false, approval: mapApproval(existing) };
+        }
+        throw codedError('approval_already_decided', 'approval_already_decided');
+      }
+      const at = nowIso(clock);
+      const result = await driver.run(
+        `UPDATE agent_approvals
+           SET decision = ?, decision_key = ?, actor = ?, note = ?, decided_at = ?, updated_at = ?
+         WHERE id = ? AND decision = ?`,
+        [
+          text(decision, 16),
+          decisionKey ? text(decisionKey, 160) : null,
+          text(actor, 64),
+          note === null ? null : text(note, 500),
+          at,
+          at,
+          approvalId,
+          APPROVAL_DECISION.pending
+        ]
+      );
+      if (result.changes === 0) {
+        // Lost a concurrent decision race: the conditional UPDATE matched nothing.
+        throw codedError('approval_already_decided', 'approval_already_decided');
+      }
+      return { changed: true, approval: mapApproval(await driver.get('SELECT * FROM agent_approvals WHERE id = ?', [approvalId])) };
+    },
+    /** Move a parked run back to the queue after an approval; only waiting_approval is eligible. */
+    async requeueRun(runId) {
+      const at = nowIso(clock);
+      const result = await driver.run(
+        `UPDATE agent_runs
+           SET status = ?, lease_until = NULL, lease_owner = NULL, last_error = NULL, updated_at = ?
+         WHERE id = ? AND status = ?`,
+        [RUN_STATUS.queued, at, runId, RUN_STATUS.waitingApproval]
+      );
+      return result.changes > 0;
+    },
+    // ── Append-only evidence ledger with a SHA-256 hash chain ──────────────
+    async appendEvidence({
+      runId,
+      stepId = null,
+      kind,
+      input = null,
+      output = null,
+      sourceIds = [],
+      verdict = null,
+      version = EVIDENCE_VERSION
+    }) {
+      return driver.transaction(async (tx) => {
+        const row = await tx.get('SELECT COALESCE(MAX(seq), 0) AS maxSeq FROM agent_evidence WHERE run_id = ?', [runId]);
+        const seq = Number(row?.maxSeq || 0) + 1;
+        const id = idFactory();
+        const at = nowIso(clock);
+        const inputHash = hashOf(input);
+        const outputHash = output === null || output === undefined ? null : hashOf(output);
+        const prevRow = await tx.get(
+          'SELECT hash FROM agent_evidence WHERE run_id = ? ORDER BY seq DESC LIMIT 1',
+          [runId]
+        );
+        const prevHash = prevRow?.hash || genesisHash(runId);
+        const ids = (Array.isArray(sourceIds) ? sourceIds : []).map((entry) => String(entry));
+        const hash = entryHash({
+          prevHash,
+          runId,
+          seq,
+          kind: text(kind, 32),
+          inputHash,
+          outputHash,
+          sourceIds: ids,
+          verdict,
+          version: text(version, 24),
+          at
+        });
+        await tx.run(
+          `INSERT INTO agent_evidence
+             (id, run_id, step_id, seq, kind, input_hash, output_hash, source_ids, verdict, version, prev_hash, hash, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [id, runId, stepId, seq, text(kind, 32), inputHash, outputHash, JSON.stringify(ids), verdict, text(version, 24), prevHash, hash, at]
+        );
+        return mapEvidence(await tx.get('SELECT * FROM agent_evidence WHERE id = ?', [id]));
+      });
+    },
+    async listEvidence(runId) {
+      const rows = await driver.all('SELECT * FROM agent_evidence WHERE run_id = ? ORDER BY seq ASC', [runId]);
+      return rows.map(mapEvidence);
+    },
+    async verifyEvidenceChain(runId) {
+      const rows = await driver.all('SELECT * FROM agent_evidence WHERE run_id = ? ORDER BY seq ASC', [runId]);
+      return verifyChain(rows, { runId });
     }
   };
 

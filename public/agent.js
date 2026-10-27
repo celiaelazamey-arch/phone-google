@@ -63,6 +63,7 @@ function renderStatus(status) {
   badge.className = 'badge ok';
   $('fact-store').textContent = status.dialect === 'mysql' ? 'MySQL دائم' : 'SQLite محلي/تجريبي';
   $('fact-planner').textContent = status.planner;
+  $('fact-verifier').textContent = status.verifier || '—';
   $('fact-steps').textContent = status.limits?.maxSteps ?? '—';
   $('fact-cost').textContent = status.limits?.maxCostMicros ?? '—';
   $('mode-note').textContent = status.note || '';
@@ -113,13 +114,127 @@ function emptySteps() {
   $('steps').innerHTML = '<li class="empty">لم تبدأ أي خطوة بعد.</li>';
 }
 
+const DECISION_LABELS = {
+  pending: ['بانتظار قرار المالك', 'decision-pending'],
+  approved: ['موافقة مسجلة', 'decision-approved'],
+  rejected: ['مرفوضة', 'decision-rejected']
+};
+
+const EVIDENCE_LABELS = {
+  goal_contract: 'عقد الهدف',
+  tool_call: 'استدعاء أداة',
+  tool_call_reconciled: 'استدعاء مُصالح',
+  approval: 'قرار موافقة',
+  verification: 'حكم تحقق',
+  delivery: 'تسليم'
+};
+
+function shortHash(hash) {
+  return hash ? String(hash).slice(0, 10) + '…' : '—';
+}
+
+function renderContract(contract) {
+  const root = $('contract');
+  if (!contract) {
+    root.innerHTML = '<p class="empty">لا يظهر العقد إلا بعد بدء تشغيل.</p>';
+    return;
+  }
+  const list = (items) => `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`;
+  root.innerHTML = `
+    <dl>
+      <dt>الهدف</dt><dd>${escapeHtml(contract.objective)}</dd>
+      <dt>معايير النجاح</dt><dd>${list(contract.success_criteria || [])}</dd>
+      <dt>القيود</dt><dd>${list(contract.constraints || [])}</dd>
+      <dt>شروط التوقف</dt><dd>${list(contract.stop_conditions || [])}</dd>
+      <dt>الميزانية</dt><dd>خطوات ≤ ${contract.budget?.maxSteps ?? '—'} · تكلفة ≤ ${contract.budget?.maxCostMicros ?? '—'} مايكرو</dd>
+      <dt>الموعد النهائي</dt><dd>${escapeHtml(contract.deadline || '—')}</dd>
+    </dl>`;
+}
+
+function renderApprovals(approvals = [], runStatus) {
+  const list = $('approvals');
+  if (!approvals.length) {
+    list.innerHTML = '<li class="empty">لا طلبات موافقة بعد.</li>';
+  } else {
+    list.innerHTML = '';
+    for (const approval of approvals) {
+      const [label, cls] = DECISION_LABELS[approval.decision] || [approval.decision, ''];
+      const item = document.createElement('li');
+      item.innerHTML = `
+        <div class="head"><b>${escapeHtml(approval.toolName)}</b><span class="${cls}">${label}</span></div>
+        <div class="meta">الخطر: ${escapeHtml(approval.risk)} · طُلب: ${escapeHtml(approval.requestedAt)}${approval.actor ? ` · القرار لـ: ${escapeHtml(approval.actor)}` : ''}${approval.note ? ` · ملاحظة: ${escapeHtml(approval.note)}` : ''}</div>`;
+      list.append(item);
+    }
+  }
+  const hasPending = approvals.some((approval) => approval.decision === 'pending');
+  const canDecide = runStatus === 'waiting_approval' && hasPending;
+  $('approval-actions').hidden = !canDecide;
+  $('approval-note-field').hidden = !canDecide;
+  $('approve').disabled = !canDecide;
+  $('reject').disabled = !canDecide;
+}
+
+function renderEvidence(evidence = [], chain, verification) {
+  const list = $('evidence');
+  if (!evidence.length) {
+    list.innerHTML = '<li class="empty">لا أدلة مسجلة بعد.</li>';
+  } else {
+    list.innerHTML = '';
+    for (const entry of evidence) {
+      const item = document.createElement('li');
+      const verdict = entry.verdict ? `<span class="pill verdict-${entry.verdict}">${entry.verdict}</span>` : '<span class="hash">—</span>';
+      item.innerHTML = `
+        <div class="head"><b>#${entry.seq} ${EVIDENCE_LABELS[entry.kind] || entry.kind}</b>${verdict}</div>
+        <div class="meta hash">in:${shortHash(entry.inputHash)} · out:${shortHash(entry.outputHash)} · prev:${shortHash(entry.prevHash)}</div>`;
+      list.append(item);
+    }
+  }
+  const chainBadge = $('chain-badge');
+  if (chain?.ok) {
+    chainBadge.textContent = `سلسلة سليمة · ${chain.count} مدخل`;
+    chainBadge.className = 'pill chain-ok';
+  } else if (evidence.length) {
+    chainBadge.textContent = chain?.reason ? `كسر: ${chain.reason}` : 'سلسلة غير سليمة';
+    chainBadge.className = 'pill chain-bad';
+  } else {
+    chainBadge.textContent = '—';
+    chainBadge.className = 'pill idle';
+  }
+  const badge = $('verification-badge');
+  if (verification?.verdict) {
+    badge.textContent = `تحقق: ${verification.verdict}`;
+    badge.className = `pill verdict-${verification.verdict}`;
+  } else {
+    badge.textContent = 'بلا تحقق';
+    badge.className = 'pill idle';
+  }
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+}
+
+function resetGovernancePanels() {
+  renderContract(null);
+  renderApprovals([], null);
+  renderEvidence([], null, null);
+}
+
 function handleEvent(event) {
   if (event.type === 'snapshot') {
     setRunState(event.run?.status);
     setUsage(event.run?.usage);
+    renderContract(event.goalContract || null);
+    renderApprovals(event.approvals || [], event.run?.status);
+    renderEvidence(event.evidence || [], event.evidenceChain || null, event.verification || null);
     $('steps').innerHTML = '';
     (event.steps || []).forEach(renderStep);
     if (!(event.steps || []).length) emptySteps();
+    return;
+  }
+  if (event.type === 'approval.requested' || event.type === 'approval.decided' || event.type === 'verification') {
+    refreshDetail();
     return;
   }
   if (event.type === 'step') {
@@ -141,6 +256,7 @@ function handleEvent(event) {
       delivery.textContent = last ? last.textContent : 'اكتملت المهمة.';
     }
     $('cancel').disabled = true;
+    refreshDetail();
   }
 }
 
@@ -187,6 +303,44 @@ async function streamRun(runId) {
   }
 }
 
+async function refreshDetail() {
+  if (!state.runId) return;
+  try {
+    const detail = await api(`/api/agent/runs/${state.runId}`);
+    setRunState(detail.run?.status);
+    setUsage(detail.run?.usage);
+    renderContract(detail.goalContract || null);
+    renderApprovals(detail.approvals || [], detail.run?.status);
+    renderEvidence(detail.evidence || [], detail.evidenceChain || null, detail.verification || null);
+  } catch (error) {
+    setAuthStatus(`تعذّر تحديث التفاصيل: ${error.message}`, 'bad');
+  }
+}
+
+async function decide(decision) {
+  if (!state.runId) return;
+  const note = $('approval-note').value.trim() || null;
+  const buttons = [$('approve'), $('reject')];
+  buttons.forEach((button) => { button.disabled = true; });
+  try {
+    const result = await api(`/api/agent/runs/${state.runId}/approval`, {
+      method: 'POST',
+      body: JSON.stringify({ decision, note })
+    });
+    setAuthStatus(decision === 'approved' ? 'سُجلت الموافقة واستؤنف التشغيل.' : 'سُجل الرفض وأُوقف التشغيل دون أثر.', 'ok');
+    await refreshDetail();
+    if (result.resumed) {
+      streamRun(state.runId);
+    }
+  } catch (error) {
+    setAuthStatus(`تعذّر تسجيل القرار: ${error.message}${error.payload?.error ? ` (${error.payload.error})` : ''}`, 'bad');
+    await refreshDetail();
+  }
+}
+
+$('approve').addEventListener('click', () => decide('approved'));
+$('reject').addEventListener('click', () => decide('rejected'));
+
 async function ensureThread() {
   if (state.threadId) return state.threadId;
   const threads = await api('/api/agent/threads');
@@ -212,6 +366,7 @@ async function connect() {
     renderStatus(status);
     setAuthStatus(status.enabled ? 'متصل — الوكيل جاهز' : 'متصل، لكن الوكيل متوقف', status.enabled ? 'ok' : 'bad');
     emptySteps();
+    resetGovernancePanels();
   } catch (error) {
     setAuthStatus(error.status === 401 ? 'رمز غير صحيح (401).' : `تعذّر الاتصال: ${error.message}`, 'bad');
   }
@@ -232,6 +387,7 @@ $('new-thread').addEventListener('click', async () => {
     state.runId = null;
     state.lastClientMessageId = null;
     emptySteps();
+    resetGovernancePanels();
     $('delivery').hidden = true;
     setRunState('idle');
     $('cancel').disabled = true;
@@ -257,6 +413,7 @@ $('run').addEventListener('click', async () => {
     state.lastClientMessageId = clientMessageId;
     $('delivery').hidden = true;
     $('steps').innerHTML = '';
+    resetGovernancePanels();
     setRunState(started.status);
     setAuthStatus(started.duplicate ? 'طلب مكرر: أُعيد نفس التشغيل دون تكرار.' : 'بدأ التشغيل.', 'ok');
     await streamRun(started.runId);
@@ -286,6 +443,7 @@ if (STATIC_HOST) {
     'هذه الصفحة مبنية على GitHub Pages بلا خادم؛ حلقة الوكيل تحتاج خدمة Node مع MySQL (أو SQLite محليًا). راجع صفحة النشر لمسار التشغيل.';
   $('run').disabled = true;
   emptySteps();
+  resetGovernancePanels();
 } else if (state.token) {
   $('token').value = state.token;
   connect();

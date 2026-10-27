@@ -44,10 +44,19 @@
       <ul class="facts">
         <li><span>المخزن</span><b id="fact-store">—</b></li>
         <li><span>المخطط</span><b id="fact-planner">—</b></li>
+        <li><span>المُتحقِّق</span><b id="fact-verifier">—</b></li>
         <li><span>سقف الخطوات</span><b id="fact-steps">—</b></li>
         <li><span>سقف التكلفة</span><b id="fact-cost">—</b></li>
       </ul>
       <p class="hint" id="mode-note"></p>
+    </section>
+
+    <section class="card contract-card" aria-labelledby="contract-title">
+      <h2 id="contract-title">عقد الهدف</h2>
+      <p class="hint">بيانات قابلة للفحص الآلي، لا نص بلاغي: الهدف، معايير النجاح، القيود، شروط التوقف، الميزانية والموعد النهائي.</p>
+      <div id="contract" class="contract">
+        <p class="empty">لا يظهر العقد إلا بعد بدء تشغيل.</p>
+      </div>
     </section>
 
     <section class="card thread" aria-labelledby="thread-title">
@@ -82,11 +91,35 @@
       </div>
       <ol id="steps" class="steps" aria-live="polite"></ol>
       <pre id="delivery" class="delivery" hidden></pre>
+
+      <div class="subhead">
+        <h3>بوابة الموافقات</h3>
+        <span id="verification-badge" class="pill idle">بلا تحقق</span>
+      </div>
+      <ul id="approvals" class="approvals">
+        <li class="empty">لا طلبات موافقة بعد.</li>
+      </ul>
+      <label class="field" id="approval-note-field" hidden>
+        <span>ملاحظة المالك مع القرار (اختياري)</span>
+        <input id="approval-note" type="text" maxlength="500" autocomplete="off" placeholder="مثال: وافق فقط إن كان الاجتماع داخليًا">
+      </label>
+      <div class="row actions" id="approval-actions" hidden>
+        <button id="approve" class="primary" type="button">موافقة واستئناف</button>
+        <button id="reject" class="danger" type="button">رفض وإيقاف</button>
+      </div>
+
+      <div class="subhead">
+        <h3>سجل الأدلة المسلسل</h3>
+        <span id="chain-badge" class="pill idle">—</span>
+      </div>
+      <ul id="evidence" class="evidence">
+        <li class="empty">لا أدلة مسجلة بعد.</li>
+      </ul>
     </section>
   </main>
 
   <footer class="foot">
-    <p>M1 تجريبي: الحلقة والتخزين والاستئناف والإلغاء وبوابة المخاطر منفذة ومختبرة؛ المخطط حتمي لا نموذج لغوي، والأثر الخارجي مرفوض بانتظار AGENT-002. لا تدّعِ هذه الصفحة وكيلًا عامًا.</p>
+    <p>الحلقة دائمة ومختبرة: عقد هدف لكل تشغيل، بوابة موافقات مسجلة قابلة للاستئناف (لا تعيد استدعاءً حالته unknown)، سجل أدلة إضافي بسلسلة بصمات SHA-256، ومُتحقِّق مستقل بأحكام PASS/BLOCK/UNKNOWN قبل أي تسليم. المخطط حتمي لا نموذج لغوي، ومنفذ الأثر الخارجي (outbox AGENT-002) والعزل (AGENT-003) غير مبنيين بعد — لا تدّعِ هذه الصفحة وكيلًا عامًا.</p>
   </footer>
 
   <script src="/agent.js" type="module"></script>

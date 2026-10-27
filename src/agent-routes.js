@@ -162,6 +162,45 @@ export function createAgentRouter({ agent, authorize, logger = console }) {
     }
   });
 
+  router.get('/runs/:id/approvals', async (req, res) => {
+    const current = await runtime(res);
+    if (!current) return undefined;
+    try {
+      const detail = await current.detail(req.params.id, current.status().ownerId);
+      return res.json({ approvals: detail.approvals });
+    } catch (error) {
+      return fail(res, error);
+    }
+  });
+
+  // Owner decision on a parked run. Idempotent via Idempotency-Key or body key.
+  // A run with an unresolved (`unknown`/`started`) tool call is refused with 409
+  // reconciliation_required: approval must never replay an uncertain call.
+  router.post('/runs/:id/approval', json, async (req, res) => {
+    const current = await runtime(res);
+    if (!current) return undefined;
+    const decision = String(req.body?.decision || '').trim().toLowerCase();
+    if (!['approved', 'rejected'].includes(decision)) {
+      return res.status(400).json({ error: 'invalid_approval_decision' });
+    }
+    const headerKey = req.get('idempotency-key');
+    const idempotencyKey = headerKey || req.body?.idempotencyKey || null;
+    if (idempotencyKey !== null && !CLIENT_ID.test(String(idempotencyKey))) {
+      return res.status(400).json({ error: 'invalid_client_message_id' });
+    }
+    const note = typeof req.body?.note === 'string' ? req.body.note.slice(0, 500) : null;
+    try {
+      const result = await current.approve(
+        req.params.id,
+        { decision, note, idempotencyKey },
+        current.status().ownerId
+      );
+      return res.json(result);
+    } catch (error) {
+      return fail(res, error);
+    }
+  });
+
   router.use((error, _req, res, _next) => {
     const status = Number.isInteger(error?.status) ? error.status : 400;
     res.status(status).json({ error: status === 400 ? 'invalid_agent_request' : 'agent_request_failed' });

@@ -175,7 +175,9 @@ export function defaultToolDefinitions({ statusProvider, kb } = {}) {
       name: 'celia.thread_context',
       description: 'قراءة عدد رسائل الخيط الحالية وآخر رسالة فيه',
       risk: RISK.read,
+      deterministic: true,
       arguments: {},
+      replayArgs: () => ({}),
       async execute(_args, { context } = {}) {
         const messages = context?.messages || [];
         const last = messages[messages.length - 1];
@@ -190,7 +192,12 @@ export function defaultToolDefinitions({ statusProvider, kb } = {}) {
       name: 'celia.draft_outline',
       description: 'بناء مسودة مخطط حتمية من هدف المستخدم (لا كتابة خارجية)',
       risk: RISK.read,
+      deterministic: true,
       arguments: { goal: 'string' },
+      replayArgs: ({ messages = [] } = {}) => {
+        const last = [...messages].reverse().find((message) => message.role === 'user');
+        return { goal: last ? String(last.content) : '' };
+      },
       async execute(args) {
         if (!args || typeof args.goal !== 'string' || !args.goal.trim()) {
           throw new Error('goal is required');

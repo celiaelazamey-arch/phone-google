@@ -80,7 +80,48 @@ const SQLITE_DDL = [
     updated_at TEXT NOT NULL
   )`,
   'CREATE UNIQUE INDEX IF NOT EXISTS uq_agent_tool_runs_key ON agent_tool_runs (idempotency_key)',
-  'CREATE INDEX IF NOT EXISTS idx_agent_tool_runs_run ON agent_tool_runs (run_id)'
+  'CREATE INDEX IF NOT EXISTS idx_agent_tool_runs_run ON agent_tool_runs (run_id)',
+  `CREATE TABLE IF NOT EXISTS agent_approvals (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+    step_id TEXT NULL,
+    tool_name TEXT NOT NULL,
+    risk TEXT NOT NULL,
+    idempotency_key TEXT NOT NULL,
+    decision TEXT NOT NULL DEFAULT 'pending',
+    decision_key TEXT NULL,
+    actor TEXT NULL,
+    note TEXT NULL,
+    requested_at TEXT NOT NULL,
+    decided_at TEXT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`,
+  'CREATE UNIQUE INDEX IF NOT EXISTS uq_agent_approvals_key ON agent_approvals (idempotency_key)',
+  'CREATE INDEX IF NOT EXISTS idx_agent_approvals_decision_key ON agent_approvals (decision_key)',
+  'CREATE INDEX IF NOT EXISTS idx_agent_approvals_run ON agent_approvals (run_id, requested_at)',
+  `CREATE TABLE IF NOT EXISTS agent_goal_contracts (
+    run_id TEXT PRIMARY KEY REFERENCES agent_runs(id) ON DELETE CASCADE,
+    contract TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS agent_evidence (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+    step_id TEXT NULL,
+    seq INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    input_hash TEXT NOT NULL,
+    output_hash TEXT NULL,
+    source_ids TEXT NULL,
+    verdict TEXT NULL,
+    version TEXT NOT NULL,
+    prev_hash TEXT NOT NULL,
+    hash TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )`,
+  'CREATE UNIQUE INDEX IF NOT EXISTS uq_agent_evidence_seq ON agent_evidence (run_id, seq)',
+  'CREATE INDEX IF NOT EXISTS idx_agent_evidence_run ON agent_evidence (run_id, seq)'
 ];
 
 const MYSQL_AGENT_TABLES = [
@@ -88,7 +129,10 @@ const MYSQL_AGENT_TABLES = [
   'agent_messages',
   'agent_runs',
   'agent_steps',
-  'agent_tool_runs'
+  'agent_tool_runs',
+  'agent_approvals',
+  'agent_goal_contracts',
+  'agent_evidence'
 ];
 
 function uniqueViolation(error) {
