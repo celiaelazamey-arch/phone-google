@@ -20,5 +20,9 @@ services:
         value: 0.0.0.0
       - key: CELIA_MCP_PORT
         value: '3010'
+      - key: PORT
+        value: '3010'
+      - key: CELIA_LANDING_ROOT
+        value: 'true'
       - key: NODE_ENV
         value: production
