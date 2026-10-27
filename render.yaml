@@ -1,28 +1,51 @@
-# نشر كامل مجاني (طبقة Render Free) لخادم Celia MCP + الواجهة العربية.
-# الاستخدام: Render Dashboard → New → Blueprint → اختر هذا المستودع.
-# التخزين في الذاكرة (لا يحتاج MySQL). أضف GEMINI_API_KEY اختياريًا لتفعيل الردود السحابية.
+# Full single-service runtime. Explicit FREE plan; no paid disk, worker or expiring database.
+# Create a NEW dedicated Aiven Free MySQL database first. Secrets go into Render only.
 services:
   - type: web
     name: celia-phone-google
     runtime: docker
     dockerfilePath: ./Dockerfile.mcp
     plan: free
-    healthCheckPath: /health
-    autoDeploy: true
+    healthCheckPath: /readyz
+    autoDeployTrigger: 'off'
     envVars:
-      - key: CELIA_MCP_API_TOKEN
-        generateValue: true
-      - key: CELIA_MCP_DISABLE_MYSQL
-        value: 'true'
-      - key: CELIA_AI_PROVIDER
-        value: auto
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: '3010'
       - key: CELIA_MCP_HOST
         value: 0.0.0.0
       - key: CELIA_MCP_PORT
         value: '3010'
-      - key: PORT
-        value: '3010'
-      - key: CELIA_LANDING_ROOT
+      - key: CELIA_MCP_API_TOKEN
+        generateValue: true
+      - key: TOKEN_ENCRYPTION_KEY
+        generateValue: true
+      - key: CELIA_MCP_DISABLE_MYSQL
+        value: 'false'
+      - key: CELIA_ENABLE_INTEGRATIONS
         value: 'true'
-      - key: NODE_ENV
-        value: production
+      - key: CELIA_DB_INITIALIZE
+        value: empty-only
+      - key: CELIA_DEPLOYMENT_ROOT
+        value: 'true'
+      - key: MYSQL_HOST
+        sync: false
+      - key: MYSQL_PORT
+        sync: false
+      - key: MYSQL_DATABASE
+        sync: false
+      - key: MYSQL_USER
+        sync: false
+      - key: MYSQL_PASSWORD
+        sync: false
+      - key: MYSQL_SSL
+        value: 'true'
+      - key: MYSQL_SSL_CA_BASE64
+        sync: false
+      - key: CELIA_AI_PROVIDER
+        value: auto
+      - key: CELIA_DISABLE_OLLAMA
+        value: 'true'
+      - key: WHATSAPP_AUTO_REPLY_ENABLED
+        value: 'false'

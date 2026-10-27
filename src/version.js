@@ -23,7 +23,7 @@ export const SERVER_INFO = Object.freeze({
 });
 
 export function releaseInfo(env = process.env) {
-  const candidate = env.CELIA_BUILD_SHA || env.GITHUB_SHA || "";
+  const candidate = [env.CELIA_BUILD_SHA, env.RENDER_GIT_COMMIT, env.GITHUB_SHA].find((value) => /^[a-f0-9]{40}$/i.test(value || "")) || "";
   return {
     ...RELEASE,
     commit: /^[a-f0-9]{40}$/i.test(candidate) ? candidate.toLowerCase() : null,

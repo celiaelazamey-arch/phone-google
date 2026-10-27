@@ -35,11 +35,15 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, oper
 
   const landingAtRoot = Boolean(config?.landingRoot || process.env.CELIA_LANDING_ROOT === 'true');
   router.get('/', (_req, res) => {
-    res.sendFile(path.join(PUBLIC_DIR, landingAtRoot ? 'landing.html' : 'index.html'));
+    res.sendFile(path.join(PUBLIC_DIR, config.deploymentRoot ? 'deploy.html' : landingAtRoot ? 'landing.html' : 'index.html'));
   });
   router.get('/studio', (_req, res) => {
     res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
   });
+
+  router.get(['/deploy', '/deploy.html'], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'deploy.html')));
+  router.get('/deploy.css', (_req, res) => res.type('text/css').sendFile(path.join(PUBLIC_DIR, 'deploy.css')));
+  router.get('/deploy.js', (_req, res) => res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'deploy.js')));
 
   router.get(['/system', '/system.html'], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'system.html')));
   router.get('/system.css', (_req, res) => res.type('text/css').sendFile(path.join(PUBLIC_DIR, 'system.css')));

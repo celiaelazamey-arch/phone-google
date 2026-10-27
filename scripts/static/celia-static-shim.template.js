@@ -884,6 +884,7 @@
     'GET /readyz': true,
     'GET /api/system': true,
     'GET /api/releases': true,
+    'GET /api/deployment': true,
     'GET /health': true,
     'GET /healthz': true,
     'GET /api/live': true,
@@ -909,6 +910,15 @@
 
     if (verb === 'GET' && route === '/version') return { status: 200, payload: { ...RELEASE, commit: BUILD.commit } };
     if (verb === 'GET' && (route === '/api/system' || route === '/readyz')) return { status: 200, payload: systemSnapshot() };
+    if (verb === 'GET' && route === '/api/deployment') {
+      return { status: 200, payload: {
+        scope: 'browser', release: { ...RELEASE, commit: BUILD.commit }, sourceRef: BUILD.sourceRef || 'main',
+        coreReady: false, storage: { mode: 'memory', durable: false, available: true, explicitDemo: true },
+        fullApiMounted: false, publicUrl: null, publicUrlVerification: 'not-externally-verified',
+        schemaVerification: 'not-a-database', providers: [], allCapabilitiesVerified: false,
+        generatedAt: new Date().toISOString(), notice: 'Pages is a static demonstration, not a full backend deployment.'
+      } };
+    }
     if (verb === 'GET' && route === '/api/releases') return { status: 200, payload: { current: { ...RELEASE, commit: BUILD.commit }, releases: RELEASE_HISTORY, publication: 'catalog-only', notice: 'سجل مصدر؛ ليس تأكيدًا على نشر كل إصدار.' } };
 
     if (verb === 'GET' && (route === '/health' || route === '/healthz')) {

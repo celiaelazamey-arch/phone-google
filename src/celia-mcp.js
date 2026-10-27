@@ -6,6 +6,10 @@ import express from 'express';
 import { google } from 'googleapis';
 import helmet from 'helmet';
 import { createPool, ensureOwner } from './db.js';
+import { loadMysqlConfig } from './mysql-config.js';
+import { loadHostingConfig, deploymentStatus } from './hosting.js';
+import { bootstrapEmptySchema } from './bootstrap-schema.js';
+import { createIntegratedApiRouter } from './integrated-api.js';
 import { createServiceRegistry, isolatePool, loadFeatures, loadResilienceConfig, safeError } from './resilience.js';
 import { createOperations, mountOperations } from './operations.js';
 import { SERVER_INFO } from './version.js';
@@ -34,7 +38,8 @@ export function loadCeliaMcpConfig(env = process.env, { requireToken = true } = 
     }
   }
 
-  const rawPort = env.CELIA_MCP_PORT ?? '3010';
+  // Keep legacy .env PORT (REST) separate from CELIA_MCP_PORT unless full hosting is opted in.
+  const rawPort = (env.CELIA_ENABLE_INTEGRATIONS === 'true' ? env.PORT ?? env.CELIA_MCP_PORT : env.CELIA_MCP_PORT) ?? '3010';
   const port = Number(rawPort);
   if (!Number.isInteger(port) || port < 0 || port > 65535) {
     throw new Error('CELIA_MCP_PORT must be a valid TCP port');
@@ -48,6 +53,8 @@ export function loadCeliaMcpConfig(env = process.env, { requireToken = true } = 
 
   return Object.freeze({
     nodeEnv: env.NODE_ENV || 'development',
+    hosting: loadHostingConfig(env, mcpToken),
+    deploymentRoot: env.CELIA_DEPLOYMENT_ROOT === 'true',
     features: loadFeatures(env),
     resilience: loadResilienceConfig(env),
     host: (env.CELIA_MCP_HOST || '0.0.0.0').trim() || '0.0.0.0',
@@ -62,13 +69,7 @@ export function loadCeliaMcpConfig(env = process.env, { requireToken = true } = 
       apiToken: mcpToken,
       aiProvider: ((env.CELIA_AI_PROVIDER || 'auto').trim() || 'auto').toLowerCase()
     }),
-    mysql: Object.freeze({
-      host: env.MYSQL_HOST || '127.0.0.1',
-      port: Number(env.MYSQL_PORT || 3306),
-      database: env.MYSQL_DATABASE || 'phone_google',
-      user: env.MYSQL_USER || 'phone_google',
-      password: env.MYSQL_PASSWORD || ''
-    }),
+    mysql: loadMysqlConfig(env),
     google: Object.freeze({
       clientId: (env.GOOGLE_CLIENT_ID || '').trim(),
       clientSecret: (env.GOOGLE_CLIENT_SECRET || '').trim(),
@@ -106,6 +107,10 @@ export async function connectPoolWithFallback(config) {
   }
   // A failed durable store is never silently replaced with an empty in-memory database.
   // The core starts in degraded mode and the same pool can recover on a later request.
+  if (config.hosting?.initializeDatabase === 'empty-only') {
+    const installation = await bootstrapEmptySchema(config);
+    console.log(`Database first-install check: ${installation.action} (schema=${installation.schema}).`);
+  }
   const pool = createPool(config);
   try { await ensureOwner(pool, config); }
   catch { console.error('Storage unavailable at startup; durable operations are suspended until recovery.'); }
@@ -788,6 +793,7 @@ export function createCeliaMcpApp({ pool, config, services = createServiceRegist
   app.locals.operations = operations;
 
   app.disable('x-powered-by');
+  app.set('trust proxy', config.nodeEnv === 'production' ? 1 : false);
   app.use(
     helmet({
       frameguard: false,
@@ -812,6 +818,14 @@ export function createCeliaMcpApp({ pool, config, services = createServiceRegist
   );
 
   mountOperations(app, { operations, authorize: requireMcpToken(config) });
+  app.get('/api/deployment', async (_req, res, next) => {
+    try {
+      res.set('Cache-Control', 'no-store').json(deploymentStatus({ config, snapshot: await operations.snapshot() }));
+    } catch (error) { next(error); }
+  });
+  if (config.hosting?.integrationsEnabled) {
+    app.use(createIntegratedApiRouter({ pool, config: config.hosting.integrationConfig, services }));
+  }
   app.get('/api/skills/find', async (req, res) => {
     const q = String(req.query.q || req.query.query || '').trim();
     const category = String(req.query.category || 'all').trim();
@@ -984,7 +998,7 @@ if (isMain) {
     const app = createCeliaMcpApp({ pool, config });
     const server = app.listen(config.port, config.host, () => {
       console.log(
-        `Celia MCP server listening on http://${config.host}:${config.port} (storage=${pool.isMemory ? 'memory' : 'mysql'}, gemini=${config.gemini.apiKey ? 'configured' : 'not-set'}, ollama=${config.ollama.model})`
+        `Celia MCP server listening on http://${config.host}:${server.address().port} (storage=${pool.isMemory ? 'memory' : 'mysql'}, gemini=${config.gemini.apiKey ? 'configured' : 'not-set'}, ollama=${config.ollama.model})`
       );
     });
     installShutdown({ server, pool, operations: app.locals.operations });

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.2.1 — Free Launch Runtime — 2026-10-27
+
+### Added
+- Opt-in single-port MCP/UI + existing owner-authenticated Google/WhatsApp REST/OAuth/webhook routers; raw-body HMAC ordering preserved.
+- Shared strict MySQL TLS/CA configuration and explicit, locked initialization of an entirely empty dedicated schema only. Existing compatible tables are not modified; schema 1 unchanged.
+- Arabic `/deploy` centre and sanitized read-only `/api/deployment`, with real blockers, stale evidence exports and honest static/browser mode.
+- Free single-service Render Blueprint with dashboard-only MySQL inputs and generated keys; previous demonstration preserved as `render.demo.yaml`.
+- Isolated real MySQL 8.4 CI acceptance for concurrent deduplication, transactions, restart persistence, previous 0.2.0 MCP/schema compatibility and actual synthetic dump/restore.
+- Structural continuity checker and PR handoff gate; hosting runbook and redacted deployment inventory.
+
+### Compatibility and operational limits
+- Existing MCP-only mode remains the default; hosting PORT takes precedence only when full integration mode is explicitly enabled. No dependency or SQL table changes.
+- Production cannot disable TLS certificate verification. Empty-only installation is not a migration or automatic repair.
+- Rollback to 0.2.0 preserves its MCP/schema contract, not the new combined REST surface. No invented previous healthy image.
+- Permanent provider accounts/public deployment, production backup restore and live Google/Meta acceptance are not claimed. Free plans have resource/sleep limits and may require account verification; stop if a card is requested.
+- General durable studio conversation history, outbox and MCP2026 remain separate backlog work.
+
 ## 0.2.0 — Resilient Core — 2026-10-27
 
 ### Added

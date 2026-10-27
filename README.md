@@ -6,7 +6,19 @@
 
 [خطة التطوير الشاملة](docs/2026-development-plan.md) · [الحالة الحالية والخطوة التالية](docs/continuity/STATE.md) · [قائمة المهام](docs/continuity/BACKLOG.md) · [سجل القرارات](docs/continuity/DECISIONS.md) · [عقد التوافق](docs/compatibility-contract.md).
 
-قبل أي جلسة تطوير، اقرأ [AGENTS.md](AGENTS.md) و[بروتوكول الاستمرارية](docs/continuity/README.md). الخطة تفصل بين حفظ سياق التطوير في Git وذاكرة محادثات التطبيق الدائمة **المخططة وغير المنفذة بعد**، وتفرض جرد البيئة والتوافق والنسخ والاستعادة قبل التغيير. هذه الإضافة توثيقية؛ لا تُشغّل ترحيلًا أو نشرًا ولا تغيّر الإصدار. التقارير القديمة محفوظة كلقطات تاريخية، لا كمرجع حالة حي.
+قبل أي جلسة تطوير، اقرأ [AGENTS.md](AGENTS.md) و[بروتوكول الاستمرارية](docs/continuity/README.md). الخطة تفصل بين حفظ سياق التطوير في Git وذاكرة محادثات التطبيق الدائمة **المخططة وغير المنفذة بعد**، وتفرض جرد البيئة والتوافق والنسخ والاستعادة قبل التغيير. بدأ تنفيذ إضافات 0.2.1 الاختيارية؛ لا تعني اعتماد الخطة أو نجاح الاختبارات نشر حسابات الإنتاج أو إكمال كل المهام. التقارير القديمة محفوظة كلقطات تاريخية، لا كمرجع حالة حي.
+
+## الجديد في 0.2.1 — Free Launch Runtime
+
+**[دليل النشر المجاني الفعلي](docs/free-hosting.md)** · افتح `/deploy` لمركز التشغيل والفحص.
+
+- Google OAuth/REST وWhatsApp Webhook/REST وMCP والواجهة على خدمة واحدة عند `CELIA_ENABLE_INTEGRATIONS=true`؛ الافتراضي القديم باقٍ.
+- MySQL دائمة مع TLS/CA موثقة، وتهيئة صريحة لقاعدة جديدة فارغة فقط؛ schema1 الحالية لم تتغير ولا migration تلقائي لقاعدة قائمة.
+- مركز نشر عربي يعرض الجاهزية والعوائق بصدق، وروابط إنشاء **Render Free + Aiven Free MySQL** ونطاق فرعي HTTPS مجاني. لا جمع أسرار في الصفحة أو الدردشة.
+- Blueprint كامل في `render.yaml` بخطة free وتحديث تلقائي معطل؛ التجربة المؤقتة القديمة في `render.demo.yaml`.
+- اختبار MySQL8.4 فعلي في CI، وقراءة الإصدار السابق لنفس قاعدة البيانات، ونسخة مصطنعة تُستعاد إلى قاعدة مستقلة. بوابة handoff وروابط/مهام في CI.
+
+**النشر الدائم لم يُنشأ بعد:** يلزم تسجيل دخول المالك وتفويض حسابات الاستضافة وإعداد أسرار المزوّدين لديهم. لا تساوي المعاينة أو Pages أو CI نشرًا كاملًا؛ وإذا طُلبت بطاقة تحقق نتوقف وفق شرط المستخدم. النسخ والاستعادة الفعلية لبيانات حسابك واتصال Google/Meta غير متحققة بعد. لا يوجد حفظ دائم عام لمحادثات الاستوديو في هذه الحزمة.
 
 ## الجديد في 0.2.0 — Resilient Core
 
@@ -20,7 +32,7 @@
 
 > لا يوجد نظام مضمون بلا أعطال. العزل الحالي منطقي داخل عملية Node؛ انهيار العملية/الجهاز ونسخ البيانات الاحتياطية يحتاجان بنية تشغيل مستقلة. أول نشر مُدار لا يختلق نسخة سابقة؛ `0.1.0` خط أساس مصدر، لا صورة مُدارة جاهزة للرجوع.
 
-**تشغيل حيّ كامل (مجاني، بلا مفاتيح):**
+**معاينة محلية حقيقية (ذاكرة مؤقتة، بلا ربط حسابات أو حفظ إنتاجي):**
 
 ```bash
 CELIA_MCP_DISABLE_MYSQL=true CELIA_MCP_API_TOKEN=$(openssl rand -hex 32) \
@@ -94,7 +106,7 @@ npm start
 
 ## المصادقة وواجهات API
 
-مسارات إدارة Google/WhatsApp تتطلب `Authorization: Bearer $APP_API_TOKEN`. مسارات المراقبة المنقّحة `/api/system` و`/api/releases` عامة؛ `/api/system/diagnostics` يتطلب رمز المالك (رمز MCP على خادم MCP).
+مسارات إدارة Google/WhatsApp تتطلب `Authorization: Bearer $APP_API_TOKEN`. مسارات المراقبة المنقّحة `/api/system` و`/api/releases` و`/api/deployment` عامة؛ `/api/system/diagnostics` يتطلب رمز المالك (رمز MCP على خادم MCP).
 
 - `GET /api/google/gmail/search?q=<Gmail query>`
 - `GET /api/google/drive/search?q=<name>`
@@ -104,7 +116,7 @@ npm start
 - `POST /api/whatsapp/contacts/<phone-without-plus>/consent` مع JSON `{"optedIn":true,"aiOptedIn":true,"source":"نموذج موافقة موثق"}` لتسجيل الموافقتين فقط إذا كانتا قد أُخذتا فعلًا؛ `aiOptedIn` اختياري ويمكن أن يبقى `false`.
 - `POST /api/whatsapp/messages` مع JSON `{"phone":"+14155552671","text":"مرحبًا"}` لإرسال فردي مسموح به.
 
-حاليًا رمز API واحد لمالك واحد (single-owner deployment). لا توجد إدارة مستخدمين/صلاحيات متعددة، لوحة تحكم، WhatsApp broadcast، جدولة تذكيرات، معالجة طلبات بيع أو ربط فعلي بـMySQL موجود لدى المستخدم.
+حاليًا رمز API واحد لمالك واحد (single-owner deployment). توجد لوحة مراقبة واستوديو تجريبي، لكن لا توجد إدارة مستخدمين/صلاحيات متعددة، WhatsApp broadcast، جدولة تذكيرات، معالجة طلبات بيع أو ربط فعلي بـMySQL موجود لدى المستخدم.
 
 ## خادم Celia MCP (`npm run celia:mcp`)
 
@@ -135,7 +147,7 @@ npm run build:pages      # يولّد dist/ من public/ + طبقة المحاك
 - سكربت البناء `scripts/build-pages.mjs` يستخرج `MCP_TOOLS` و`MCP_PROTOCOL_VERSION` من `src/celia-mcp.js` وهوية `SERVER_INFO` من `src/version.js` ويحقنها في `dist/celia-static-shim.js`، ويقرأ هوية الإصدار الموحدة من `releases/current.json`، ثم يحقن الوسم في كل صفحة ويضيف `.nojekyll` و`404.html`.
 - روابط التشخيص في `live.html` تُحوَّل في النسخة الثابتة إلى لقطات JSON حقيقية (`health.json`, `api/live.json`, `mcp.json`) حتى لا تُفضي إلى `404` على Pages؛ والطبقة الثابتة تبقى مصدر القيم اللحظية داخل المتصفح.
 - الطبقة الثابتة تخدم `GET /health` و`POST /ui/workspace/rpc` و`POST /mcp` و`POST /ui/workspace/crypto-lab` داخل المتصفح: `initialize`, `ping`, `tools/list`, `tools/call` (١٢ أداة), `resources/*`, `prompts/*`.
-- النشر تلقائي عبر `.github/workflows/pages.yml` عند كل دفع إلى `main` (بيئة `github-pages`, `build_type: workflow`). لا يحتاج أي سر ولا بطاقة دفع.
+- بعد تفعيل Pages بصلاحية مناسبة، يحاول `.github/workflows/pages.yml` النشر عند الدفع إلى `main` (بيئة `github-pages`, `build_type: workflow`). محاولة التفعيل بصلاحية الجلسة الحالية أعادت 403، فلا يوجد رابط Pages عام متحقق هنا. النسخة الثابتة لا تحتاج أسرار خادم أو بطاقة.
 - الاختبارات: `node --test test/static-shim.test.js` (تبني `dist/` وتتحقق من كل أداة ونقاط REST ومسار التشفير والموافقات).
 
 ### قيود النسخة الثابتة (معلنة في الواجهة)
@@ -143,13 +155,13 @@ npm run build:pages      # يولّد dist/ من public/ + طبقة المحاك
 - التخزين في ذاكرة التبويب فقط (`storage: memory`) ويُصفَّر عند التحديث؛ ليس نسخة احتياطية أو قاعدة إنتاجية.
 - Google/WhatsApp تُرجع بيانات `demo: true`؛ لا OAuth حقيقي ولا إرسال رسائل، ولا استقبال Webhook (Pages لا تقبل POST خارجيًا).
 - الردود يولّدها محرك السياسة العربي المدمج `celia-local-policy-engine` بلا مفتاح؛ وللردود السحابية الصق مفتاحك في تبويب «النماذج المجانية» (يبقى في `sessionStorage` بمتصفحك).
-- للترقية إلى خدمة كاملة: Render/Koyeb/Cloudflare + MySQL مُدار، ثم إضافة الأسرار في منصة الاستضافة وربط Webhook واتساب.
+- للمسار المختار لخدمة كاملة: [Render Free + Aiven Free MySQL](docs/free-hosting.md)، ثم أسرار المزوّدين وموافقاتهم والتحقق الخارجي. لا نفترض شروط مزوّد بديل أو مجانية غير محدودة.
 
 ## أوامر الجودة والتشغيل الحديثة
 
 ```bash
 npm ci
-npm run check && npm run release:check && npm test
+npm run check && npm run release:check && npm run check:continuity && npm test
 npm run test:resilience
 npm audit --omit=dev
 # اختبارات المتصفح (تحتاج تنزيل Chromium أول مرة):

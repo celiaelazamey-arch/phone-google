@@ -354,13 +354,29 @@ test('مركز النظام الثابت يعلن أنه معاينة ولا ي�
   assert.equal(system.status, 200);
   assert.equal(system.payload.scope, 'browser-demo');
   assert.equal(system.payload.storage.durable, false);
-  assert.equal(system.payload.release.version, '0.2.0');
+  assert.equal(system.payload.release.version, '0.2.1');
   assert.deepEqual(system.payload.circuits, []);
   const catalogue = await CeliaStatic.handleRest('GET', '/api/releases');
   assert.equal(catalogue.payload.publication, 'catalog-only');
-  assert.equal(catalogue.payload.releases[1].managedDeployment, false);
+  assert.equal(catalogue.payload.releases.find((release) => release.version === '0.1.0').managedDeployment, false);
   const html = await readFile(path.join(DIST_DIR, 'system.html'), 'utf8');
   assert.match(html, /celia-static-shim\.js/);
   assert.match(html, /href="\.\/system\.html"/);
   assert.match(html, /الرجوع يُبدّل كود التطبيق/);
+});
+
+test('مركز النشر الثابت لا يدعي وجود خادم كامل أو نشر متحقق', async () => {
+  const response = await CeliaStatic.handleRest('GET', '/api/deployment');
+  assert.equal(response.status, 200);
+  assert.equal(response.payload.scope, 'browser');
+  assert.equal(response.payload.storage.durable, false);
+  assert.equal(response.payload.fullApiMounted, false);
+  assert.equal(response.payload.allCapabilitiesVerified, false);
+  assert.equal(response.payload.publicUrl, null);
+  assert.equal(CeliaStatic.isKnownRoute('GET', '/api/deployment'), true);
+  const html = await readFile(path.join(DIST_DIR, 'deploy.html'), 'utf8');
+  assert.match(html, /href="\.\/deploy\.html"/);
+  assert.match(html, /celia-static-shim\.js/);
+  await readFile(path.join(DIST_DIR, 'deploy.js'));
+  await readFile(path.join(DIST_DIR, 'deploy.css'));
 });
