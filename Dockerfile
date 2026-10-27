@@ -1,4 +1,4 @@
-FROM node:24-alpine
+FROM node:26-alpine
 ARG CELIA_BUILD_SHA=unknown
 ENV NODE_ENV=production CELIA_BUILD_SHA=$CELIA_BUILD_SHA
 WORKDIR /app

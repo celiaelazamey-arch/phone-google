@@ -1,4 +1,4 @@
-FROM node:24-alpine
+FROM node:26-alpine
 ARG CELIA_BUILD_SHA=unknown
 ARG CELIA_VERSION=0.2.0
 LABEL org.opencontainers.image.title="Celia Resilient Core" \
