@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Offline Google connection preflight (GOOG-002): `npm run google:doctor` and owner-only `GET /api/google/preflight` report the ten environment conditions behind `503 google_not_configured`, `redirect_uri_mismatch`, a silently disabled owner-identity check and a `localhost`-only consent link, with a concrete fix per failure and exit code 1 on any blocker.
+- Preflight output is sanitized by contract and covered by tests: no client secret, API token or encryption key is ever printed or returned.
+
+### Limits
+- The preflight is offline: it cannot prove the OAuth client exists in Google Cloud, that the owner email is listed under Test users, or that the public domain is live. Live connection still requires an owner OAuth client and public HTTPS (HOST-003).
+
 ## 0.2.1 — Free Launch Runtime — 2026-10-27
 
 ### Added
