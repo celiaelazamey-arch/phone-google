@@ -64,3 +64,7 @@
 - المعاينة أُعيد تشغيلها من commit المدفوع الصحيح على3010؛ API يثبت0.2.1 وSHA8e34efe وdurable=false وallCapabilitiesVerified=false. ليست استضافة عامة دائمة.
 - مراجعة mysql2 أظهرت أن الثقة بالـCA لا تفعّل hostname validation تلقائيًا. شُدد `verifyIdentity=true` صراحة وأضيف اختبار TLS فعلي يثق بشهادة MySQL المُصدرة محليًا ثم يرفض اسم مضيف غير مطابق. هذا تحديث أمان بعد CI الأول؛ نتيجة أحدث commit توثق لاحقًا.
 - لا merge أو GitHub Release أو نشر دائم؛ عائق تفويض Render/Aiven والحسابات الخارجية باقٍ.
+
+### تصحيح عقد خطأ TLS في CI
+
+commit18099a4 اجتاز الوحدة/الحاوية/المتصفح، لكن [SQL40470452998](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40470452998) فشل بعد إضافة الحالة التاسعة. قراءة `mysql2/lib/commands/client_handshake.js` تثبت أن SDK يستبدل `ERR_TLS_CERT_ALTNAME_INVALID` بـ`HANDSHAKE_SSL_ERROR`. عُدلت مطابقة القبول لتتطلب كود TLS ومضمون **عدم تطابق الاسم** معًا، فلا تقبل خطأ شبكة/CA عشوائيًا. لم يُعطل hostname verification أو شهادة CA لتجميل نتيجة CI. تنزيل logs محظور أيضًا عند Azure؛ لا تكرار له دون تغير الشبكة. إعادة CI على التصحيح لازمة قبل التسليم.

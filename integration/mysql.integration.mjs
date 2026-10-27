@@ -94,7 +94,8 @@ test('real MySQL 8.4 acceptance: installation, persistence, signed webhook, lega
     try {
       await assert.rejects(async () => {
         unexpectedConnection = await mysql.createConnection({ ...tlsConfig, ssl: { ...tlsConfig.ssl }, connectTimeout: 5000, stream: () => (socket = connectSocket({ host, port })) });
-      }, (error) => error.code === 'ERR_TLS_CERT_ALTNAME_INVALID');
+      }, // mysql2 deliberately wraps native TLS error codes as HANDSHAKE_SSL_ERROR.
+      (error) => ['ERR_TLS_CERT_ALTNAME_INVALID', 'HANDSHAKE_SSL_ERROR'].includes(error.code) && /Hostname\/IP does not match certificate/.test(error.message));
     } finally {
       if (unexpectedConnection) await unexpectedConnection.end();
       socket?.destroy();
