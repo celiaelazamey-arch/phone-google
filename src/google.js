@@ -5,6 +5,7 @@ import { requireApiToken } from './auth.js';
 import { createServiceRegistry, safeError, ServiceUnavailableError } from './resilience.js';
 import { decryptJson, encryptJson, hashOAuthState, safeEqual } from './security.js';
 import { createIdempotencyStore, isValidIdempotencyKey } from './idempotency.js';
+import { consentTicketDefaults, mintConsentTicket, verifyConsentTicket } from './consent-ticket.js';
 
 const GOOGLE_SCOPES = [
   'openid',
@@ -57,6 +58,25 @@ function handleError(res, error) {
   return res.status(status).json({ error: status === 503 ? 'google_not_configured' : status === 409 ? 'google_not_connected' : 'google_request_failed' });
 }
 
+/**
+ * Mints a single-use Google connection link for the owner and records its state hash so the
+ * callback can consume it exactly once. Shared by the REST route and the WhatsApp owner command.
+ */
+export async function createGoogleConsentLink({ pool, config, now = Date.now() }) {
+  oauthClient(config);
+  const { ticket, expiresAt } = mintConsentTicket({ userId: config.userId, encryptionKey: config.encryptionKey, now });
+  await pool.execute(
+    'INSERT INTO oauth_states (state_hash, user_id, expires_at) VALUES (?, ?, FROM_UNIXTIME(?))',
+    [hashOAuthState(ticket), config.userId, Math.floor(expiresAt.getTime() / 1000)]
+  );
+  const base = String(config.baseUrl || '').replace(/\/+$/, '');
+  return {
+    url: `${base}/auth/google?ticket=${encodeURIComponent(ticket)}`,
+    expiresAt: expiresAt.toISOString(),
+    singleUse: true
+  };
+}
+
 export function createGoogleRouter({ pool, config, services = createServiceRegistry(config), idempotencyStore = createIdempotencyStore() }) {
   const router = express.Router();
   const guarded = (name, action, sideEffect = false) => services.run(name, (signal) =>
@@ -68,29 +88,48 @@ export function createGoogleRouter({ pool, config, services = createServiceRegis
     next();
   });
 
-  router.get('/auth/google', requireApiToken(config), async (req, res, next) => {
+  const ownerOnly = requireApiToken(config);
+  const startAuthorization = (res, state) => {
+    const client = oauthClient(config);
+    res.cookie('google_oauth_state', state, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: config.nodeEnv === 'production',
+      maxAge: consentTicketDefaults.ttlMs,
+      path: '/auth/google/callback'
+    });
+    return res.redirect(client.generateAuthUrl({
+      access_type: 'offline',
+      prompt: 'consent',
+      include_granted_scopes: true,
+      scope: GOOGLE_SCOPES,
+      state
+    }));
+  };
+
+  // Owner-token entry point (unchanged contract): mints a fresh state and redirects to Google.
+  // A single-use signed ticket may be supplied instead, so a chat client can hand the owner a
+  // link without ever seeing APP_API_TOKEN. An invalid or already-used ticket is rejected.
+  router.get('/auth/google', async (req, res, next) => {
     try {
-      const client = oauthClient(config);
-      const state = crypto.randomBytes(32).toString('hex');
-      await pool.execute(
-        'INSERT INTO oauth_states (state_hash, user_id, expires_at) VALUES (?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 10 MINUTE))',
-        [hashOAuthState(state), config.userId]
-      );
-      res.cookie('google_oauth_state', state, {
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: config.nodeEnv === 'production',
-        maxAge: 10 * 60 * 1000,
-        path: '/auth/google/callback'
+      const ticket = typeof req.query.ticket === 'string' ? req.query.ticket : '';
+      if (ticket) {
+        const verified = verifyConsentTicket(ticket, { encryptionKey: config.encryptionKey, userId: config.userId });
+        if (!verified.ok) return res.status(400).send('This connection link is invalid or has expired. Request a new link from the assistant.');
+        const [rows] = await pool.execute(
+          'SELECT user_id FROM oauth_states WHERE state_hash = ? AND used_at IS NULL AND expires_at > UTC_TIMESTAMP()',
+          [hashOAuthState(ticket)]
+        );
+        if (!rows.length) return res.status(400).send('This connection link was already used or has expired. Request a new link from the assistant.');
+        return startAuthorization(res, ticket);
+      }
+      return ownerOnly(req, res, () => {
+        const state = crypto.randomBytes(32).toString('hex');
+        pool.execute(
+          'INSERT INTO oauth_states (state_hash, user_id, expires_at) VALUES (?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 10 MINUTE))',
+          [hashOAuthState(state), config.userId]
+        ).then(() => startAuthorization(res, state)).catch(next);
       });
-      const url = client.generateAuthUrl({
-        access_type: 'offline',
-        prompt: 'consent',
-        include_granted_scopes: true,
-        scope: GOOGLE_SCOPES,
-        state
-      });
-      return res.redirect(url);
     } catch (error) { return next(error); }
   });
 
@@ -139,6 +178,15 @@ export function createGoogleRouter({ pool, config, services = createServiceRegis
   });
 
   router.use('/api', requireApiToken(config));
+
+  // Owner-only: returns a single-use, ten-minute connection link that can be delivered in chat.
+  router.post('/api/google/consent-link', async (_req, res, next) => {
+    try {
+      oauthClient(config);
+      const link = await createGoogleConsentLink({ pool, config });
+      return res.json(link);
+    } catch (error) { return next(error); }
+  });
 
   router.get('/api/google/gmail/search', async (req, res) => {
     try {
