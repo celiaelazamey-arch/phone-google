@@ -486,6 +486,19 @@
 - **الأثر:** تحديث `AGENTS.md` و`src/agent/automation/{schema,extractor,validator,index}.js` و`src/agent/{planner,verifier,store,index}.js`
   وإضافة `test/agent-comprehension-gate.test.js` (`CL-01..CL-10`). **لا ترحيل SQL جديد ولا تغيير في `schema 1` أو الإصدار `0.2.1`.**
 
+## DEC-025 — توظيف جميع أسرار المستودع الـ18 وبوابة Cloudflare Worker والنشر الآلي الموقّع (`18/18 Secrets Wiring & Edge Release`)
+
+- **التاريخ:** 27 أكتوبر 2026 (مساءً) · **الحالة:** منفذ ومتحقق محليًا وفي GitHub Actions CI · **المهمة:** SEC-002، SEC-003، SEC-004، HOST-003
+- **السياق:** أضاف المالك 9 أسرار إضافية إلى GitHub Actions Secrets ليصبح المجموع **18 سرًا** (`AGENETROUTERAPI_KEY`، `AI_GATEWAY_API_KEY`، `CELIAOS_CRONJOB_ORG_API_KEY`، `CELIA_MCP_API_TOKEN`، `CELIA_VOICE_ID`، `CLOUDFLARE_ACCOUNT_ID`، `CLOUDFLARE_API_TOKEN`، `CLOUDFLARE_R2_ACCESS_KEY_ID`، `CLOUDFLARE_R2_S3_ENDPOINT`، `CLOUDFLARE_R2_SECRET_ACCESS_KEY`، `DEEPSEEK_API_KEY`، `ELEVENLABS_API_KEY`، `FIGMA_ACCESS_TOKEN`، `GEMINI_API_KEY`، `GOOGLE_CLIENT_ID`، `GOOGLE_CLIENT_SECRET`، `PHONE_NUMBER`، و`YOUR_CODATA_API_KEY`)، وطلب توظيفها بالكامل للوصول إلى النشر بنسبة 100% عبر GitHub Actions.
+- **القرار:**
+  1. **توظيف الأسرار الـ18 في النواة وبوابة عدم التسريب (`src/ai-providers.js`، `src/celia-mcp.js`، `src/secrets-hub.js`، `scripts/check-secrets-wiring.mjs`):**
+     - توسيع `buildSecretsReadiness` ليتتبع **18 سرًا** (`totalSecretsTracked: 18`) مع تصفيرها جميعًا في صندوق الرمل العام (`src/celia-ui.js` و`scripts/static/celia-static-shim.template.js`).
+     - إضافة نقاط `GET /api/cron/status` و`POST /api/cron/probe` و`GET /api/storage/r2/status` محمية بمصادقة `Bearer CELIA_MCP_API_TOKEN` وقواطع دوائر مستقلة (`cronjob`، `cloudflare`، `cloudflare_r2`).
+  2. **خادم الحافة والنشر الآلي (`workers/celia-edge/worker.js`، `scripts/deploy-cloudflare-edge.mjs`، `.github/workflows/cloudflare-deploy.yml`، `.github/workflows/release.yml`):**
+     - بناء خادم الحافة `workers/celia-edge/worker.js` وسكربت النشر الآلي نحو Cloudflare Workers وإصدار الحزمة الموقّعة `v0.2.1` عبر GitHub Actions عند الدفع إلى `main`.
+- **السبب:** ضمان فحص وتوظيف جميع الأسرار الـ18 فعليًا في CI والنشر الحافي دون أي تسرب للأسرار.
+- **الأثر:** تحديث [src/ai-providers.js](../../src/ai-providers.js)، [src/celia-mcp.js](../../src/celia-mcp.js)، [src/celia-ui.js](../../src/celia-ui.js)، [src/resilience.js](../../src/resilience.js)، [src/secrets-hub.js](../../src/secrets-hub.js)، [scripts/check-secrets-wiring.mjs](../../scripts/check-secrets-wiring.mjs)، [scripts/deploy-cloudflare-edge.mjs](../../scripts/deploy-cloudflare-edge.mjs)، [workers/celia-edge/worker.js](../../workers/celia-edge/worker.js)، و[test/celia-edge-worker.test.js](../../test/celia-edge-worker.test.js).
+
 ## إضافة قرار لاحق
 
 استخدم معرفًا جديدًا، والتاريخ والحالة والسياق والبدائل والقرار والسبب والأثر ومرجع المهمة، واذكر صراحة القرار المستبدل إن وجد. لا تنسخ أسرارًا أو مخطط إنتاج يحوي بيانات شخصية إلى سجل القرار.

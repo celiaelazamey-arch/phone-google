@@ -712,12 +712,21 @@
           const staticSecrets = [
             'AGENETROUTERAPI_KEY',
             'AI_GATEWAY_API_KEY',
+            'CELIAOS_CRONJOB_ORG_API_KEY',
             'CELIA_MCP_API_TOKEN',
             'CELIA_VOICE_ID',
+            'CLOUDFLARE_ACCOUNT_ID',
+            'CLOUDFLARE_API_TOKEN',
+            'CLOUDFLARE_R2_ACCESS_KEY_ID',
+            'CLOUDFLARE_R2_S3_ENDPOINT',
+            'CLOUDFLARE_R2_SECRET_ACCESS_KEY',
             'DEEPSEEK_API_KEY',
             'ELEVENLABS_API_KEY',
             'FIGMA_ACCESS_TOKEN',
             'GEMINI_API_KEY',
+            'GOOGLE_CLIENT_ID',
+            'GOOGLE_CLIENT_SECRET',
+            'PHONE_NUMBER',
             'YOUR_CODATA_API_KEY'
           ].map((secretName) => ({ secretName, configured: false }));
           return {
@@ -731,7 +740,7 @@
                   text: JSON.stringify(
                     {
                       scope: 'static-preview',
-                      totalSecretsTracked: 9,
+                      totalSecretsTracked: 18,
                       configuredCount: 0,
                       secrets: staticSecrets,
                       notice: 'النسخة الثابتة لا تحمل أي أسرار مستودع في المتصفح.'

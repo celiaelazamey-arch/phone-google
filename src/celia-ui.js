@@ -19,6 +19,8 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, oper
 
   const sandboxConfig = Object.freeze({
     ...config,
+    ownerPhone: null,
+    ownerPhoneSourceEnv: null,
     encryptionKey: '',
     extendedMcpTools: false,
     allowCloudFailover: false,
@@ -29,6 +31,16 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, oper
     elevenlabs: Object.freeze({ ...(config.elevenlabs || {}), apiKey: '', voiceId: '', voiceSourceEnv: null }),
     figma: Object.freeze({ ...(config.figma || {}), accessToken: '' }),
     codata: Object.freeze({ ...(config.codata || {}), apiKey: '', sourceEnv: null, baseUrl: '' }),
+    cronjob: Object.freeze({ ...(config.cronjob || {}), apiKey: '', sourceEnv: null }),
+    cloudflare: Object.freeze({ ...(config.cloudflare || {}), accountId: '', apiToken: '' }),
+    cloudflareR2: Object.freeze({
+      ...(config.cloudflareR2 || {}),
+      accessKeyId: '',
+      secretAccessKey: '',
+      s3Endpoint: '',
+      rawEndpointConfigured: false,
+      endpointFormatValid: true
+    }),
     celia: Object.freeze({ ...config.celia, apiToken: '', aiProvider: 'local' }),
     features: Object.freeze({
       ...config.features,
@@ -39,7 +51,10 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, oper
       ollama: false,
       elevenlabs: false,
       figma: false,
-      codata: false
+      codata: false,
+      cronjob: false,
+      cloudflare: false,
+      cloudflare_r2: false
     }),
     google: Object.freeze({ clientId: '', clientSecret: '', redirectUri: config.google.redirectUri }),
     whatsapp: Object.freeze({

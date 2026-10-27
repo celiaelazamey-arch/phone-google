@@ -8,13 +8,24 @@ const SECRET_ENV_NAMES = [
   'AGENETROUTERAPI_KEY',
   'AGENTROUTER_API_KEY',
   'AI_GATEWAY_API_KEY',
+  'CELIAOS_CRONJOB_ORG_API_KEY',
+  'CRONJOB_API_KEY',
   'CELIA_MCP_API_TOKEN',
   'CELIA_VOICE_ID',
   'ELEVENLABS_VOICE_ID',
+  'CLOUDFLARE_ACCOUNT_ID',
+  'CLOUDFLARE_API_TOKEN',
+  'CLOUDFLARE_R2_ACCESS_KEY_ID',
+  'CLOUDFLARE_R2_S3_ENDPOINT',
+  'CLOUDFLARE_R2_SECRET_ACCESS_KEY',
   'DEEPSEEK_API_KEY',
   'ELEVENLABS_API_KEY',
   'FIGMA_ACCESS_TOKEN',
   'GEMINI_API_KEY',
+  'GOOGLE_CLIENT_ID',
+  'GOOGLE_CLIENT_SECRET',
+  'PHONE_NUMBER',
+  'APP_OWNER_PHONE_E164',
   'YOUR_CODATA_API_KEY',
   'CODATA_API_KEY'
 ];
@@ -49,12 +60,14 @@ try {
   }
 
   const authHeaders = { authorization: `Bearer ${runtimeToken}` };
-  const [healthText, liveText, systemText, deployText, secretsRes] = await Promise.all([
+  const [healthText, liveText, systemText, deployText, secretsRes, cronStatusText, r2StatusText] = await Promise.all([
     fetch(`${baseUrl}/health`).then((r) => r.text()),
     fetch(`${baseUrl}/api/live`).then((r) => r.text()),
     fetch(`${baseUrl}/api/system`).then((r) => r.text()),
     fetch(`${baseUrl}/api/deployment`).then((r) => r.text()),
-    fetch(`${baseUrl}/api/secrets/status`, { headers: authHeaders })
+    fetch(`${baseUrl}/api/secrets/status`, { headers: authHeaders }),
+    fetch(`${baseUrl}/api/cron/status`, { headers: authHeaders }).then((r) => r.text()),
+    fetch(`${baseUrl}/api/storage/r2/status`, { headers: authHeaders }).then((r) => r.text())
   ]);
 
   if (secretsRes.status !== 200) {
@@ -62,12 +75,12 @@ try {
   }
   const secretsText = await secretsRes.text();
   const report = JSON.parse(secretsText);
-  if (report.totalSecretsTracked !== 9) {
-    throw new Error(`Expected 9 tracked repository secrets, received ${report.totalSecretsTracked}`);
+  if (report.totalSecretsTracked !== 18) {
+    throw new Error(`Expected 18 tracked repository secrets, received ${report.totalSecretsTracked}`);
   }
 
   // Ensure zero secret values ever leak into public or authenticated status payloads.
-  const combinedOutputs = [healthText, liveText, systemText, deployText, secretsText].join('\n');
+  const combinedOutputs = [healthText, liveText, systemText, deployText, secretsText, cronStatusText, r2StatusText].join('\n');
   const candidateSecretValues = SECRET_ENV_NAMES
     .map((name) => String(process.env[name] || '').trim())
     .filter((val) => val.length >= 4 && !isPlaceholder(val));

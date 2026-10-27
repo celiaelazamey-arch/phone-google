@@ -49,6 +49,9 @@
   - **إضافة حزمة التدقيق الموقّعة واستئناف وحذف الخيوط وضبط متغيرات البيئة ([DEC-024](DECISIONS.md#dec-024--حزمة-التدقيق-الموقعة-audit-bundle-واستئناف-وحذف-الخيوط-ux-001-وضبط-متغيرات-البيئة)):**
     - إضافة `GET /api/agent/runs/:id/audit-bundle` (`bundle_sha256`) و`DELETE /api/agent/threads/:id` وقائمة اختيار الخيوط السابقة في `/agent`، ودعم `PHONE_NUMBER` كبديل توافقي لـ`APP_OWNER_PHONE_E164`.
     - نجاح جميع الاختبارات المحلية (**280/280** في `npm test`) ونجاح تشغيلة GitHub Actions CI رقم **`40599659235`** (الـCommit `f0114b3bddca5605ea5d4c2c820b99c011aed400` على الفرع `arena/981ee27e-phone-google`) في جميع الوظائف الست: `MySQL 8.4` (`122524304770` في 43 ثانية)، `RTL dashboard · Playwright Chromium` (`122524304986` في 44 ثانية)، `Node 22` (`122524304995` في 25 ثانية)، `Node 24` (`122524305136` في 32 ثانية)، `Python 3.11 Spider` (`122524305019` في 20 ثانية)، و`Node 24 Container` (`122524305069` في 22 ثانية).
+  - **توظيف الأسرار الـ18 جميعًا وبوابة Cloudflare Worker والنشر الآلي الموقّع ([DEC-025](DECISIONS.md#dec-025--توظيف-جميع-أسرار-المستودع-الـ18-وبوابة-cloudflare-worker-والنشر-الآلي-الموقع-1818-secrets-wiring--edge-release)):**
+    - توسيع `buildSecretsReadiness` و`scripts/check-secrets-wiring.mjs` و`.github/workflows/celia-mcp.yml` لتتبع وفحص **18/18 سرًا** مع صفر تسريب، وإضافة `GET /api/cron/status` و`POST /api/cron/probe` و`GET /api/storage/r2/status`.
+    - إضافة خادم الحافة `workers/celia-edge/worker.js` وسكربت `scripts/deploy-cloudflare-edge.mjs` وسير عمل `.github/workflows/cloudflare-deploy.yml` وتفعيل نشر الإصدار الموقّع `v0.2.1` في `.github/workflows/release.yml`.
   - **الفحوص المحلية وفحوص GitHub Actions CI الفعلية (`Verification Closure`):**
     - محليًا: `npm test` **268/268** ناجحة (منها 7 اختبارات في `test/agent-document-automation.test.js` و10 اختبارات
       `CL-01..CL-10` في `test/agent-comprehension-gate.test.js`)، و`check` و`release:check` و`check:continuity`

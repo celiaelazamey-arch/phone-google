@@ -21,12 +21,21 @@ const exec = promisify(execFile);
 const TEST_SECRETS = {
   AGENETROUTERAPI_KEY: 'sk-agentrouter-secret-value-991122',
   AI_GATEWAY_API_KEY: 'vck-ai-gateway-secret-value-883344',
+  CELIAOS_CRONJOB_ORG_API_KEY: 'cronjob-org-secret-key-value-771122',
   CELIA_MCP_API_TOKEN: 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90',
   CELIA_VOICE_ID: 'JBFqnCBsd6RMkjVDRZzb',
+  CLOUDFLARE_ACCOUNT_ID: 'cf-account-id-secret-value-661122',
+  CLOUDFLARE_API_TOKEN: 'cf-api-token-secret-value-551122',
+  CLOUDFLARE_R2_ACCESS_KEY_ID: 'cf-r2-access-key-secret-value-441122',
+  CLOUDFLARE_R2_S3_ENDPOINT: 'https://test-account.r2.cloudflarestorage.com',
+  CLOUDFLARE_R2_SECRET_ACCESS_KEY: 'cf-r2-secret-key-value-331122',
   DEEPSEEK_API_KEY: 'sk-deepseek-secret-value-774455',
   ELEVENLABS_API_KEY: 'xi-elevenlabs-secret-value-665544',
   FIGMA_ACCESS_TOKEN: 'figd_secret_token_value_554433',
   GEMINI_API_KEY: 'AIzaSyTestSecretValue44332211',
+  GOOGLE_CLIENT_ID: '1234567890-testclientid.apps.googleusercontent.com',
+  GOOGLE_CLIENT_SECRET: 'GOCSPX-test-google-client-secret-221100',
+  PHONE_NUMBER: '+201099887766',
   YOUR_CODATA_API_KEY: 'codata_secret_key_value_332211'
 };
 
@@ -88,6 +97,15 @@ test('loadCeliaMcpConfig wires all 9 secrets, handles aliases, and validates CEL
   assert.equal(cfg.figma.accessToken, TEST_SECRETS.FIGMA_ACCESS_TOKEN);
   assert.equal(cfg.gemini.apiKey, TEST_SECRETS.GEMINI_API_KEY);
   assert.equal(cfg.codata.apiKey, TEST_SECRETS.YOUR_CODATA_API_KEY);
+  assert.equal(cfg.cronjob.apiKey, TEST_SECRETS.CELIAOS_CRONJOB_ORG_API_KEY);
+  assert.equal(cfg.cloudflare.accountId, TEST_SECRETS.CLOUDFLARE_ACCOUNT_ID);
+  assert.equal(cfg.cloudflare.apiToken, TEST_SECRETS.CLOUDFLARE_API_TOKEN);
+  assert.equal(cfg.cloudflareR2.accessKeyId, TEST_SECRETS.CLOUDFLARE_R2_ACCESS_KEY_ID);
+  assert.equal(cfg.cloudflareR2.secretAccessKey, TEST_SECRETS.CLOUDFLARE_R2_SECRET_ACCESS_KEY);
+  assert.equal(cfg.cloudflareR2.s3Endpoint, TEST_SECRETS.CLOUDFLARE_R2_S3_ENDPOINT);
+  assert.equal(cfg.google.clientId, TEST_SECRETS.GOOGLE_CLIENT_ID);
+  assert.equal(cfg.google.clientSecret, TEST_SECRETS.GOOGLE_CLIENT_SECRET);
+  assert.equal(cfg.ownerPhone, TEST_SECRETS.PHONE_NUMBER);
 
   // loadConfig supports CELIA_MCP_API_TOKEN fallback when APP_API_TOKEN is unset
   const coreCfg = loadConfig({
@@ -129,8 +147,8 @@ test('all 9 secrets report sanitized readiness and never leak values or spend cr
 
     assert.equal(secretsRes.status, 200);
     const secretsJson = await secretsRes.json();
-    assert.equal(secretsJson.totalSecretsTracked, 9);
-    assert.equal(secretsJson.configuredCount, 9);
+    assert.equal(secretsJson.totalSecretsTracked, 18);
+    assert.equal(secretsJson.configuredCount, 18);
 
     // Public sandbox must report 0 secrets configured so visitors cannot probe or spend owner keys
     const sandboxReport = JSON.parse(sandboxRes.result.contents[0].text);

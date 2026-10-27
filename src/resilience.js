@@ -44,6 +44,9 @@ const VALIDATION_ERRORS = new Set([
   "invalid_figma_file_key",
   "codata_not_configured",
   "codata_base_url_not_configured",
+  "cronjob_not_configured",
+  "cloudflare_not_configured",
+  "cloudflare_r2_not_configured",
 ]);
 
 function countsAsFailure(error) {
@@ -245,6 +248,9 @@ export function loadFeatures(env = process.env) {
         "elevenlabs",
         "figma",
         "codata",
+        "cronjob",
+        "cloudflare",
+        "cloudflare_r2",
       ].map((name) => [
         name,
         env[`CELIA_DISABLE_${name.toUpperCase()}`] !== "true",
@@ -268,6 +274,9 @@ export function createServiceRegistry(config = {}) {
     "elevenlabs",
     "figma",
     "codata",
+    "cronjob",
+    "cloudflare",
+    "cloudflare_r2",
     "whatsapp",
     "google.oauth",
     "google.gmail",
