@@ -41,6 +41,17 @@ export function createAgentRouter({ agent, authorize, logger = console }) {
     return res.set('Cache-Control', 'no-store').json(current.harness());
   });
 
+  router.get('/metrics', async (_req, res) => {
+    const current = await runtime(res);
+    if (!current) return undefined;
+    try {
+      const report = await current.metrics(current.status().ownerId);
+      return res.set('Cache-Control', 'no-store').json(report);
+    } catch (error) {
+      return fail(res, error);
+    }
+  });
+
   router.post('/threads', json, async (req, res) => {
     const current = await runtime(res);
     if (!current) return undefined;

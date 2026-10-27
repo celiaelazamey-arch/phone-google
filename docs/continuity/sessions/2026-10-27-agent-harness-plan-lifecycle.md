@@ -44,14 +44,18 @@
    - إضافة موصل `whatsapp.cloud` (`whatsapp.send_text`) بفحص `E.164` و`opted_in` ونافذة 24 ساعة ومنع التكرار عبر `whatsapp_messages`، وموصل `google.drive` (`google.drive_export_report`) ببصمة `appProperties.celiaOutboxKey` وفحص `findByOutboxKey` قبل الإنشاء في `src/agent/connectors.js` و`src/agent/tools.js` و`src/agent/planner.js` و`src/agent/index.js` و`src/google.js`.
    - إضافة اختبارات `WA-01..WA-04` و`DRV-01..DRV-04` في `test/agent-connectors.test.js` وتعزيز `integration/mysql.integration.mjs` (إجمالي `273/273` اختبارًا في `npm test`).
 
+9. **محرك التطبيق والقياس ذو الخطوات الست (`6-Step AI Application & Evaluation Engine` — `DEC-023`):**
+   - إنشاء `src/agent/evaluation.js` و`docs/ai-workflow-6-steps.md` و`test/agent-evaluation.test.js` وتحديث `public/agent.{html,js}` و`src/agent-routes.js` (`GET /api/agent/metrics` وعرض الفصل الثلاثي `executed / verified / unverified` وبوابة الفهم في `/agent`).
+   - تسجيل الأداتين الحتميتين `product.catalog_audit` و`creative.workflow_plan` في `src/agent/tools.js` و`src/knowledge/tool-policy.js`.
+
 ## 2. نتائج الفحوص الفعلية (محليًا وفي GitHub Actions CI)
 
 - `npm run build:pages`: ناجح (8 صفحات ثابتة في `dist/`).
-- `npm run check`: ناجح (`96` ملف JavaScript).
+- `npm run check`: ناجح (`97` ملف JavaScript).
 - `npm run release:check`: ناجح (`0.2.1` / `schema: 1`).
 - `npm run check:continuity`: ناجح.
 - `npm run check:secrets`: ناجح (`wiringVerified: true`، `zeroLeakVerified: true`).
-- `npm test`: **273/273** اختبارًا ناجحًا (منها 13 في `test/agent-connectors.test.js`، و10 في `test/agent-comprehension-gate.test.js`، و7 في `test/agent-document-automation.test.js`).
+- `npm test`: **277/277** اختبارًا ناجحًا (منها 4 في `test/agent-evaluation.test.js`، و13 في `test/agent-connectors.test.js`، و10 في `test/agent-comprehension-gate.test.js`، و7 في `test/agent-document-automation.test.js`).
 - **إغلاق فجوة التحقق في GitHub Actions CI (`Phase 3 — Verification Closure`):**
   - دُفع الفرع `arena/5fccc4e6-phone-google` إلى `origin` بعد موافقة المالك (`موافق على تنفيذ Verification Closure`).
   - كشفت التشغيلة الأولى `40592598360` (`6bf47b3`) أن طول JSON لمخرج `data.report` (`4494` حرفًا) تجاوز حد عمود

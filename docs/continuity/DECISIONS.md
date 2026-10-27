@@ -395,6 +395,25 @@
   حزمة مرجعية ذهبية في `test/fixtures/documents/`، واختبارات `test/agent-document-automation.test.js`. **لا ترحيل SQL جديد
   ولا تغيير في `schema 1` أو الإصدار `0.2.1` أو أدوات MCP الـ12.**
 
+## DEC-023 — محرك التطبيق والقياس ذو الخطوات الست (`6-Step AI Application & Evaluation Engine` + `Product Catalog Audit` + `6-Stage Creative Workflow` + `3-Way Truth Partition`)
+
+- **التاريخ:** 27 أكتوبر 2026 (مساءً) · **الحالة:** منفذ ومختبر محليًا (4 اختبارات في `test/agent-evaluation.test.js`، إجمالي 277/277 في `npm test`) · **المهمة:** AGENT-001، AI-001، AI-002، OPS-001، UX-001
+- **السياق:** تحويل الدليل العملي ذي الخطوات الست (تحديد المهمة قبل اختيار النموذج، اختيار التقنية الأقل تكلفة، حساب تكلفة
+  الرموز وحماية الخطط المجانية، دمج التقنيات في دورة محكومة، الإنتاج المرحلي لكتالوج المنتجات والتصميم الإبداعي، وقياس
+  النتائج مع الفصل الثلاثي `Goal → Plan → Execute → Observe → Verify → Evidence → Improve`) إلى كود برمجي حتمي ومختبر.
+- **القرار:**
+  1. **وحدة [src/agent/evaluation.js](../../src/agent/evaluation.js):**
+     - `recommendTaskStrategy`: تصنيف المهام إلى الفئات الست وتحديد التقنية المناسبة (كود حتمي للحسابات والفواتير، استخراج
+       منظم للمستندات، نموذج سريع للتلخيص، نموذج استدلال للمشكلات المعقدة، سير عمل إبداعي للتصميم، ووكيل بـ`outbox` للأفعال الخارجية).
+     - `estimateTokenCost` و`evaluateProviderSafety`: تطبيق معادلة التكلفة التقديرية ومنع إرسال الأسرار أو بيانات العملاء
+       الخام إلى الخطط المجانية وإلزام المهلة وسلوك نفاد الحصة.
+     - `auditProductCatalog` (الأداة `product.catalog_audit`): فحص حتمي لملفات المنتجات واكتشاف الحقول الناقصة والأسعار
+       غير الصالحة وصياغة مسودة وصف للمراجعة البشرية (`waiting_for_owner_review`، `published_count = 0`).
+     - `buildCreativeWorkflowPlan` (الأداة `creative.workflow_plan`): تقسيم الإنتاج الإبداعي إلى 6 مراحل قابلة للمراجعة.
+     - `buildTruthPartition` و`computeAgentMetrics`: الفصل الثلاثي الصريح (`executed` / `verified` / `unverified`) وحساب
+       المؤشرات الستة للخطوة 6 وعرضها عبر `GET /api/agent/metrics` وفي واجهة `/agent` (`#truth-partition`).
+  2. **الوثيقة المرجعية:** [docs/ai-workflow-6-steps.md](../../docs/ai-workflow-6-steps.md).
+
 ## DEC-022 — استكمال موصلات الأثر الخارجي في `agent_outbox` (`AGENT-002`: WhatsApp Cloud & Google Drive Report Export)
 
 - **التاريخ:** 27 أكتوبر 2026 (مساءً) · **الحالة:** منفذ ومختبر محليًا (13/13 اختبارًا في `test/agent-connectors.test.js`، إجمالي 273/273 في `npm test`) · **المهمة:** AGENT-002، SEC-001، DATA-003

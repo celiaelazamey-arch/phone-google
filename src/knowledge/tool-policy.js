@@ -33,6 +33,8 @@ export const CANONICAL_TOOLS = Object.freeze({
   'google.calendar_create_event': { risk: 'external_effect', requiresApproval: true, surface: 'agent', dataEgress: true },
   'whatsapp.send_text': { risk: 'external_effect', requiresApproval: true, surface: 'agent', dataEgress: true },
   'google.drive_export_report': { risk: 'external_effect', requiresApproval: true, surface: 'agent', dataEgress: true },
+  'product.catalog_audit': { risk: 'read', requiresApproval: false, surface: 'agent' },
+  'creative.workflow_plan': { risk: 'read', requiresApproval: false, surface: 'agent' },
   'sandbox.exec': { risk: 'irreversible', requiresApproval: true, surface: 'agent' },
 
   // Knowledge network tools (M1.1) — read-only by construction.

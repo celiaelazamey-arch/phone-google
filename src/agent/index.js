@@ -47,6 +47,17 @@ import {
   createDriveExportConnector,
   createGoogleDriveTransport
 } from './connectors.js';
+import {
+  CELIA_SEVEN_STAGE_LOOP,
+  TASK_CATEGORIES,
+  recommendTaskStrategy,
+  estimateTokenCost,
+  evaluateProviderSafety,
+  auditProductCatalog,
+  buildCreativeWorkflowPlan,
+  buildTruthPartition,
+  computeAgentMetrics
+} from './evaluation.js';
 
 export {
   PLAN_LIFECYCLE_STATE,
@@ -87,7 +98,16 @@ export {
   createWhatsAppConnector,
   createWhatsAppCloudTransport,
   createDriveExportConnector,
-  createGoogleDriveTransport
+  createGoogleDriveTransport,
+  CELIA_SEVEN_STAGE_LOOP,
+  TASK_CATEGORIES,
+  recommendTaskStrategy,
+  estimateTokenCost,
+  evaluateProviderSafety,
+  auditProductCatalog,
+  buildCreativeWorkflowPlan,
+  buildTruthPartition,
+  computeAgentMetrics
 };
 
 /**

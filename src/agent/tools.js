@@ -19,6 +19,7 @@ export const RISK = Object.freeze({
 });
 
 import { documentAutomationToolDefinitions } from './automation/index.js';
+import { auditProductCatalog, buildCreativeWorkflowPlan } from './evaluation.js';
 
 const EXECUTABLE = new Set([RISK.read, RISK.internalWrite]);
 const FORBIDDEN_SECRET_KEYS = new Set([
@@ -365,6 +366,33 @@ export function defaultToolDefinitions({
       risk: RISK.irreversible,
       requiresApproval: true,
       arguments: { code: 'string' }
+    },
+    {
+      name: 'product.catalog_audit',
+      description: 'تحليل ملف/قائمة المنتجات واكتشاف الحقول الناقصة وصياغة وصف أولي للمراجعة قبل النشر',
+      risk: RISK.read,
+      deterministic: true,
+      arguments: { products: 'object' },
+      async execute(args) {
+        const products = Array.isArray(args?.products) ? args.products : [];
+        return auditProductCatalog({ products });
+      }
+    },
+    {
+      name: 'creative.workflow_plan',
+      description: 'بناء سير عمل إبداعي من 6 مراحل (الملخص، الاتجاهات، المسودة، الفحص، التعديل، التسليم المنظم)',
+      risk: RISK.read,
+      deterministic: true,
+      arguments: {
+        brand: 'string',
+        audience: 'string',
+        message: 'string',
+        style: 'string',
+        dimensions: 'string'
+      },
+      async execute(args) {
+        return buildCreativeWorkflowPlan(args || {});
+      }
     },
     ...knowledgeToolDefinitions({ kb }),
     ...(documentAutomation

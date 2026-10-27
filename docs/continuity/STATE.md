@@ -43,6 +43,9 @@
     - إضافة موصل `whatsapp.cloud` (`whatsapp.send_text`) بفحص `E.164` و`opted_in` ونافذة 24 ساعة ومنع التكرار عبر `whatsapp_messages`، وموصل `google.drive` (`google.drive_export_report`) ببصمة `appProperties.celiaOutboxKey` وفحص `findByOutboxKey` قبل الإنشاء.
     - توسيع `CELIA_AGENT_CONNECTORS` ليقبل `none, calendar, whatsapp, drive` مع بقاء `none` هو الوضع الافتراضي الآمن.
     - نجاح جميع الاختبارات المحلية (**273/273** في `npm test` شاملة `WA-01..WA-04` و`DRV-01..DRV-04` في `test/agent-connectors.test.js`).
+  - **إضافة محرك التطبيق والقياس ذي الخطوات الست (`6-Step AI Application & Evaluation Engine`، [DEC-023](DECISIONS.md#dec-023--محرك-التطبيق-والقياس-ذو-الخطوات-الست-6-step-ai-application--evaluation-engine--product-catalog-audit--6-stage-creative-workflow--3-way-truth-partition)):**
+    - بناء [src/agent/evaluation.js](../../src/agent/evaluation.js) و[docs/ai-workflow-6-steps.md](../ai-workflow-6-steps.md) لتطبيق: توجيه المهام (`recommendTaskStrategy`)، معادلة التكلفة وحارس الخطط المجانية (`estimateTokenCost` و`evaluateProviderSafety`)، فاحص كتالوج المنتجات (`product.catalog_audit`)، سير العمل الإبداعي ذي الـ6 مراحل (`creative.workflow_plan`)، الفصل الثلاثي (`executed / verified / unverified` في `buildTruthPartition` وواجهة `/agent`)، ومؤشرات الأداء الستة (`computeAgentMetrics` ونقطة `GET /api/agent/metrics`).
+    - نجاح جميع الاختبارات المحلية (**277/277** في `npm test`).
   - **الفحوص المحلية وفحوص GitHub Actions CI الفعلية (`Verification Closure`):**
     - محليًا: `npm test` **268/268** ناجحة (منها 7 اختبارات في `test/agent-document-automation.test.js` و10 اختبارات
       `CL-01..CL-10` في `test/agent-comprehension-gate.test.js`)، و`check` و`release:check` و`check:continuity`
