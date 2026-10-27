@@ -23,6 +23,7 @@
   const BUILD = /*__CELIA_BUILD_META__*/;
   const RELEASE = /*__CELIA_RELEASE__*/;
   const RELEASE_HISTORY = /*__CELIA_RELEASE_HISTORY__*/;
+  const REAL_SERVICE = /*__CELIA_REAL_SERVICE__*/;
 
   const MCP_PROTOCOL_VERSION = '2024-11-05';
   const SUPPORTED_VERSIONS = ['2024-11-05', '2025-03-26'];
@@ -905,6 +906,17 @@
   /* REST                                                               */
   /* ------------------------------------------------------------------ */
 
+  /** Sanitized pointer to the optional always-on service; never a claim that it runs. */
+  function realServiceNotice() {
+    return {
+      url: REAL_SERVICE?.url || null,
+      verified: false,
+      verifiedBy: null,
+      expectation: 'خدمة مجانية خارجية بلا بطاقة قد تنام بعد خمول ~15 دقيقة؛ لا يُوصف ذلك بأنه تشغيل متواصل مضمون.',
+      docs: 'deploy/free-always-on/README.md'
+    };
+  }
+
   function systemSnapshot() {
     return {
       status: 'ok', ready: true, scope: 'browser-demo',
@@ -931,6 +943,8 @@
     'GET /healthz': true,
     'GET /api/live': true,
     'GET /api/skills': true,
+    'GET /api/agent/status': true,
+    'GET /api/deployment/hosting': true,
     'POST /mcp': true,
     'POST /ui/workspace/rpc': true,
     'POST /ui/workspace/crypto-lab': true
@@ -995,6 +1009,40 @@
         }
       });
       return { status: 200, payload: response?.result?.structuredContent || response };
+    }
+
+    // The agent runtime needs durable MySQL, so it is honest `off` here: no loop,
+    // no memory fallback. The real service is discoverable instead of simulated.
+    if (verb === 'GET' && route === '/api/agent/status') {
+      return {
+        status: 200,
+        payload: {
+          enabled: false,
+          mode: 'off',
+          reason: 'agent_runtime_disabled',
+          requiredEnv: 'CELIA_AGENT_RUNTIME=mysql',
+          scope: 'browser-demo',
+          realService: realServiceNotice(),
+          notice: 'هذه معاينة ثابتة: حلقة الوكيل تحتاج خادمًا ومخزنًا دائمًا. لا تُحاكى موافقات أو مصالحة هنا.'
+        }
+      };
+    }
+
+    // Discovery only. It says where the always-on service is expected and that it is
+    // NOT verified from this build — never that a deployment exists.
+    if (verb === 'GET' && route === '/api/deployment/hosting') {
+      return {
+        status: 200,
+        payload: {
+          scope: 'browser',
+          staticPreview: { hosting: 'github-pages-or-render-static', compute: false, durableStorage: false },
+          realService: realServiceNotice(),
+          verification: 'not-verified',
+          plan: { file: 'deploy/free-always-on/README.md', profile: 'free-external-trigger', expiresOnTrial: false },
+          notice:
+            'هذه الصفحة لا تنشر شيئًا ولا تتحقق من وجود الخدمة. الرابط يُذكر بعد إدخاله، وحالته «غير متحقق» حتى يتحقق منه المالك بنفسه.'
+        }
+      };
     }
 
     if (verb === 'POST' && (route === '/mcp' || route === '/ui/workspace/rpc')) {

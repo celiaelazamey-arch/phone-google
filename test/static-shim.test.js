@@ -380,3 +380,44 @@ test('مركز النشر الثابت لا يدعي وجود خادم كامل 
   await readFile(path.join(DIST_DIR, 'deploy.js'));
   await readFile(path.join(DIST_DIR, 'deploy.css'));
 });
+
+test('الطبقة الثابتة تعلن غياب حلقة الوكيل بصدق ولا تحاكي موافقة أو مصالحة', async () => {
+  // The static preview intercepts only documented GETs. A fake approval or
+  // reconciliation in the browser would be a lie about a durable decision.
+  assert.equal(CeliaStatic.isKnownRoute('GET', '/api/agent/status'), true);
+  assert.equal(CeliaStatic.isKnownRoute('POST', '/api/agent/threads'), false);
+  assert.equal(CeliaStatic.isKnownRoute('POST', '/api/agent/runs/x/approval'), false);
+  assert.equal(CeliaStatic.isKnownRoute('POST', '/api/agent/runs/x/reconcile'), false);
+
+  const { payload } = await CeliaStatic.handleRest('GET', '/api/agent/status');
+  assert.equal(payload.enabled, false);
+  assert.equal(payload.mode, 'off');
+  assert.equal(payload.reason, 'agent_runtime_disabled');
+  // No memory fallback is ever offered, and no connector is claimed.
+  assert.doesNotMatch(JSON.stringify(payload), /sqlite|memory/);
+  assert.equal(payload.realService.verified, false);
+});
+
+test('نقطة اكتشاف الاستضافة تقول «غير متحقق» وتشير إلى خطة موجودة فعلًا', async () => {
+  const { payload } = await CeliaStatic.handleRest('GET', '/api/deployment/hosting');
+  assert.equal(payload.verification, 'not-verified');
+  assert.equal(payload.staticPreview.compute, false);
+  assert.equal(payload.staticPreview.durableStorage, false);
+  assert.equal(payload.plan.expiresOnTrial, false);
+  assert.equal(payload.realService.verified, false);
+  // A promise of 24/7 is never made for a free tier.
+  assert.doesNotMatch(JSON.stringify(payload), /24\/7/);
+  await readFile(path.join(process.cwd(), payload.plan.file), 'utf8');
+});
+
+test('بناء الصفحات يرفض رابط خدمة غير https بدل حقنه', async () => {
+  const previous = process.env.CELIA_REAL_SERVICE_URL;
+  process.env.CELIA_REAL_SERVICE_URL = 'http://insecure.example';
+  try {
+    await assert.rejects(() => build(), /must be an https URL/);
+  } finally {
+    if (previous === undefined) delete process.env.CELIA_REAL_SERVICE_URL;
+    else process.env.CELIA_REAL_SERVICE_URL = previous;
+    await build();
+  }
+});

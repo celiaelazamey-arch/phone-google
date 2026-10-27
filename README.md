@@ -56,7 +56,7 @@
 
 ## الجديد في 0.2.1 — Free Launch Runtime
 
-**[دليل النشر المجاني الفعلي](docs/free-hosting.md)** · افتح `/deploy` لمركز التشغيل والفحص.
+**[دليل النشر المجاني الفعلي](docs/free-hosting.md)** · **[خطة التشغيل الحر بلا بطاقة](deploy/free-always-on/README.md)** (خدمة واحدة + نداء دوري، وحدود صريحة: لا SLA ولا «24/7 مضمون») · **[خطة التشغيل المكتمل الأركان](docs/go-live-plan.md)** (الأركان والبوابات والأدلة؛ `npm run verify:live` للقبول الحي) · افتح `/deploy` لمركز التشغيل والفحص.
 
 - Google OAuth/REST وWhatsApp Webhook/REST وMCP والواجهة على خدمة واحدة عند `CELIA_ENABLE_INTEGRATIONS=true`؛ الافتراضي القديم باقٍ.
 - MySQL دائمة مع TLS/CA موثقة، وتهيئة صريحة لقاعدة جديدة فارغة فقط؛ schema1 الحالية لم تتغير ولا migration تلقائي لقاعدة قائمة.

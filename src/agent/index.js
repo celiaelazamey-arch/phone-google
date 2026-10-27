@@ -30,6 +30,18 @@ export function readAgentMode(env = process.env) {
   return raw;
 }
 
+/**
+ * Boot recovery is an explicit policy, not a default. On a free tier the process is
+ * killed on every idle sleep, so the owner decides whether a waking process settles
+ * abandoned outbox rows as `unknown` and resumes parked runs — or leaves that to a
+ * human (the pre-existing behaviour). Nothing in either policy re-sends an effect.
+ */
+export function readAgentBootRecovery(env = process.env) {
+  const raw = String(env.CELIA_AGENT_RESUME_ON_BOOT ?? 'false').trim().toLowerCase();
+  if (!['true', 'false'].includes(raw)) throw new Error('CELIA_AGENT_RESUME_ON_BOOT must be true or false');
+  return raw === 'true';
+}
+
 function positiveInt(value, fallback) {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
@@ -117,6 +129,13 @@ export function createAgentHost({
   } catch (error) {
     failure = { code: 'invalid_agent_mode', message: error.message };
   }
+  let resumeOnBoot = false;
+  try {
+    resumeOnBoot = readAgentBootRecovery(env);
+  } catch (error) {
+    failure = failure || { code: 'invalid_agent_boot_recovery', message: error.message };
+  }
+  let lastBootRecovery = null;
   const nodeEnv = config.nodeEnv || env.NODE_ENV || 'development';
 
   const ready = (async () => {
@@ -161,6 +180,12 @@ export function createAgentHost({
     return runtime;
   })();
 
+  const bootRecoveryPolicy = () => ({
+    policy: resumeOnBoot ? 'resume' : 'manual',
+    env: 'CELIA_AGENT_RESUME_ON_BOOT',
+    last: lastBootRecovery
+  });
+
   return {
     get mode() {
       return mode;
@@ -172,13 +197,58 @@ export function createAgentHost({
       }
       try {
         const runtime = await ready;
-        return runtime.status();
+        return { ...runtime.status(), bootRecovery: bootRecoveryPolicy() };
       } catch (error) {
         return { enabled: false, mode, reason: error.code || 'agent_unavailable', message: error.message };
       }
     },
     async get() {
       return ready;
+    },
+    /**
+     * Runs the boot recovery once, if the policy allows it. Never throws: a failed
+     * recovery is recorded in `status().bootRecovery.last` and the server stays up.
+     */
+    async recoverOnBoot() {
+      const record = (report) => {
+        lastBootRecovery = { ...report, at: report.at || new Date().toISOString() };
+        return lastBootRecovery;
+      };
+      if (mode === 'off') return record({ performed: false, reason: 'agent_runtime_disabled' });
+      if (!resumeOnBoot) {
+        return record({ performed: false, reason: 'boot_recovery_disabled', requiredEnv: 'CELIA_AGENT_RESUME_ON_BOOT=true' });
+      }
+      try {
+        const runtime = await ready;
+        return record({ performed: true, ...(await runtime.recoverOnBoot()) });
+      } catch (error) {
+        return record({ performed: false, reason: error.code || 'boot_recovery_failed' });
+      }
     }
   };
+}
+
+/**
+ * Entry points call this right after `listen`: recovery runs in the background so
+ * readiness is never delayed, and a failure is logged by code only.
+ */
+export function scheduleBootRecovery({ agentHost, logger = console, delayMs = 0 } = {}) {
+  if (!agentHost?.recoverOnBoot) return null;
+  const timer = setTimeout(() => {
+    agentHost
+      .recoverOnBoot()
+      .then((report) => {
+        if (!report.performed) {
+          logger.info?.(`Agent boot recovery not performed: ${report.reason}`);
+          return;
+        }
+        logger.info?.(
+          `Agent boot recovery: ${report.staleOutbox.length} abandoned outbox row(s) settled as unknown, ` +
+            `${report.runs.attempted} parked run(s) resumed in ${report.durationMs}ms.`
+        );
+      })
+      .catch((error) => logger.error?.('Agent boot recovery failed:', error?.code || 'boot_recovery_failed'));
+  }, Math.max(0, Number(delayMs) || 0));
+  timer.unref?.();
+  return timer;
 }

@@ -668,6 +668,26 @@ export function createAgentRuntime({
       }
       return { attempted: pending.length, resumed };
     },
+    /**
+     * What a process must do when it comes back — after a crash, a deploy, or a free
+     * tier waking from sleep. Order matters and nothing here re-sends anything:
+     *   1. outbox rows a vanished dispatcher left `dispatching` become `unknown`
+     *      (the outcome is exactly what is unknown; reconciliation decides, DEC-007/015);
+     *   2. runs left `queued`/`running` with an expired lease resume from their last
+     *      confirmed step; one whose call is unresolved parks in `needs_reconciliation`.
+     * The report carries ids and statuses only — never message or payload content.
+     */
+    async recoverOnBoot({ limit = 5, staleLimit = 50 } = {}) {
+      const startedAt = clock();
+      const stale = await outbox.recoverStale({ limit: staleLimit });
+      const pending = await runtime.resumePending({ limit });
+      return {
+        at: new Date(startedAt).toISOString(),
+        durationMs: Math.max(0, clock() - startedAt),
+        staleOutbox: stale.recovered.map((entry) => ({ id: entry.id, runId: entry.runId, status: entry.status })),
+        runs: pending
+      };
+    },
     async cancel(runId, requesterId = ownerId) {
       const run = await store.requestCancel(runId, requesterId);
       if (!run) throw httpError(404, 'run_not_found', 'run_not_found');
