@@ -296,7 +296,16 @@
 
 /* مفتاح التفعيل */
 .cr-switch { position: relative; display: inline-block; width: 46px; height: 26px; }
-.cr-switch input { opacity: 0; width: 0; height: 0; }
+.cr-switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 2;
+}
 .cr-switch .cr-slider {
   position: absolute;
   inset: 0;
