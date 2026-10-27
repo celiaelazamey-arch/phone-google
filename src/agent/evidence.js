@@ -24,6 +24,9 @@ export const EVIDENCE_KIND = Object.freeze({
   // and the settlement (what the provider answered, or that it is unknown).
   externalEffectEnqueued: 'external_effect_enqueued',
   externalEffectSettled: 'external_effect_settled',
+  // A human decision that closed an `unknown`/`started` outcome. It attests to the
+  // owner's stated finding, never to an observation this process could not make.
+  reconciliation: 'reconciliation',
   verification: 'verification',
   delivery: 'delivery'
 });

@@ -45,7 +45,9 @@ test('approval gate: an external effect parks the run with a durable pending app
   assert.equal(approvals.length, 1);
   assert.equal(approvals[0].decision, APPROVAL_DECISION.pending);
   assert.equal(approvals[0].toolName, 'calendar.create');
-  assert.equal(approvals[0].idempotencyKey, `approval:${run.id}:calendar.create`);
+  // The key is bound to the exact payload, not just the tool name (DEC-016).
+  assert.equal(approvals[0].idempotencyKey.startsWith(`approval:${run.id}:calendar.create:`), true);
+  assert.match(approvals[0].idempotencyKey, /^approval:.+:calendar\.create:[a-f0-9]{12}$/);
   assert.ok(approvals[0].requestedAt);
 
   const detail = await runtime.detail(run.id);

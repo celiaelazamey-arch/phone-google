@@ -437,6 +437,39 @@ export function createAgentStore({ driver, clock = Date.now, idFactory = crypto.
       const rows = await driver.all('SELECT * FROM agent_tool_runs WHERE run_id = ? ORDER BY created_at ASC', [runId]);
       return rows.map(mapToolRun);
     },
+    /**
+     * A tool run another process may have started and never settled. Matched by its
+     * idempotency key so a reconciled outbox intent and its tool run stay one truth.
+     */
+    async findToolRunByKey(runId, idempotencyKey) {
+      return mapToolRun(
+        await driver.get('SELECT * FROM agent_tool_runs WHERE run_id = ? AND idempotency_key = ?', [runId, idempotencyKey])
+      );
+    },
+    /**
+     * Conditional reconciliation of an uncertain call. Only `started`/`unknown` may
+     * move: a settled row is a historical fact and is never rewritten by a later
+     * human guess. Returns `{ changed: false }` when the conditional UPDATE missed,
+     * so the caller can report a conflict instead of a silent overwrite.
+     */
+    async reconcileToolRun(toolRunId, { status, outcome = null, from = [TOOL_RUN_STATUS.started, TOOL_RUN_STATUS.unknown] } = {}) {
+      if (!['succeeded', 'failed'].includes(status)) throw new Error(`Invalid reconciled tool status: ${status}`);
+      const sources = from.length ? from : [TOOL_RUN_STATUS.unknown];
+      const placeholders = sources.map(() => '?').join(', ');
+      const result = await driver.run(
+        `UPDATE agent_tool_runs SET status = ?, outcome = ?, updated_at = ?
+         WHERE id = ? AND status IN (${placeholders})`,
+        [
+          status,
+          outcome === null ? null : text(typeof outcome === 'string' ? outcome : JSON.stringify(outcome), 4000),
+          nowIso(clock),
+          toolRunId,
+          ...sources
+        ]
+      );
+      const toolRun = mapToolRun(await driver.get('SELECT * FROM agent_tool_runs WHERE id = ?', [toolRunId]));
+      return { changed: result.changes > 0, toolRun };
+    },
     /** Runs a previous process left behind: queued, or running with an expired lease. */
     async findResumableRuns({ limit = 10 } = {}) {
       const at = nowIso(clock);
@@ -529,13 +562,15 @@ export function createAgentStore({ driver, clock = Date.now, idFactory = crypto.
       return { changed: true, approval: mapApproval(await driver.get('SELECT * FROM agent_approvals WHERE id = ?', [approvalId])) };
     },
     /** Move a parked run back to the queue after an approval; only waiting_approval is eligible. */
-    async requeueRun(runId) {
+    async requeueRun(runId, { from = [RUN_STATUS.waitingApproval] } = {}) {
       const at = nowIso(clock);
+      const sources = from.length ? from : [RUN_STATUS.waitingApproval];
+      const placeholders = sources.map(() => '?').join(', ');
       const result = await driver.run(
         `UPDATE agent_runs
-           SET status = ?, lease_until = NULL, lease_owner = NULL, last_error = NULL, updated_at = ?
-         WHERE id = ? AND status = ?`,
-        [RUN_STATUS.queued, at, runId, RUN_STATUS.waitingApproval]
+           SET status = ?, lease_until = NULL, lease_owner = NULL, last_error = NULL, finished_at = NULL, updated_at = ?
+         WHERE id = ? AND status IN (${placeholders})`,
+        [RUN_STATUS.queued, at, runId, ...sources]
       );
       return result.changes > 0;
     },
@@ -734,6 +769,43 @@ export function createAgentStore({ driver, clock = Date.now, idFactory = crypto.
         ]
       );
       return mapOutbox(await driver.get('SELECT * FROM agent_outbox WHERE id = ?', [outboxId]));
+    },
+    /**
+     * Conditional human reconciliation of an intentionally uncertain intent.
+     *
+     * Only `unknown` — or a `dispatching` row whose lease has expired — may move. A
+     * live dispatch keeps its lease (another worker may still be mid-request), and a
+     * settled row (`sent`/`failed`/`cancelled`) is never rewritten: it is a fact, not
+     * an opinion. No request is made here; the caller records a human finding only.
+     */
+    async reconcileOutboxEntry(outboxId, { status, externalRef = null, result = null, lastError = null, at = null } = {}) {
+      if (!['sent', 'failed', 'cancelled'].includes(status)) throw new Error(`Invalid reconciled outbox status: ${status}`);
+      const now = nowIso(clock);
+      // `at` lets a caller state the observation instant (tests, offline audits); the
+      // lease comparison must use the same instant or the check would be meaningless.
+      const reference = at ?? now;
+      const changed = await driver.run(
+        `UPDATE agent_outbox
+           SET status = ?, external_ref = COALESCE(?, external_ref), result = COALESCE(?, result),
+               last_error = ?, lease_until = NULL, lease_owner = NULL, settled_at = ?, updated_at = ?
+         WHERE id = ? AND (status = ? OR (status = ? AND (lease_until IS NULL OR lease_until < ?)))`,
+        [
+          text(status, 16),
+          externalRef === null ? null : text(externalRef, 240),
+          result === null ? null : JSON.stringify(result),
+          lastError === null ? null : text(lastError, 120),
+          at ?? now,
+          now,
+          outboxId,
+          OUTBOX_STATUS.unknown,
+          OUTBOX_STATUS.dispatching,
+          reference
+        ]
+      );
+      return {
+        changed: changed.changes > 0,
+        entry: mapOutbox(await driver.get('SELECT * FROM agent_outbox WHERE id = ?', [outboxId]))
+      };
     },
     /** A rejected approval cancels its intents: nothing was, or will be, sent. */
     async cancelPendingOutbox(runId) {

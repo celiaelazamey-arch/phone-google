@@ -118,6 +118,23 @@
       </ul>
 
       <div class="subhead">
+        <h3>المصالحة والإعادة</h3>
+        <span id="reconcile-badge" class="pill idle">—</span>
+      </div>
+      <p class="hint">لا يخرج أي طلب من هذا القسم. المصالحة تسجّل قرارك فقط: «الأثر موجود» أو «لم يصل»، ثم يستأنف التشغيل إن لم يبقَ شيء غير محسوم. لا شيء يُعاد إرساله تلقائيًا، والنية الفاشلة تُعاد بنفس مفتاحها بعد قرارك وليس قبله.</p>
+      <ul id="reconcile" class="outbox" aria-live="polite">
+        <li class="empty">لا شيء يحتاج مصالحة.</li>
+      </ul>
+      <label class="field" id="reconcile-note-field" hidden>
+        <span>ملاحظة القرار (≤500 حرف)</span>
+        <input id="reconcile-note" type="text" maxlength="500" autocomplete="off" placeholder="مثال: تحققت من التقويم ولا يوجد موعد">
+      </label>
+      <label class="field" id="reconcile-ref-field" hidden>
+        <span>المرجع الخارجي إن وُجد (اختياري)</span>
+        <input id="reconcile-ref" type="text" maxlength="240" autocomplete="off" placeholder="مثال: event id من المزوّد">
+      </label>
+
+      <div class="subhead">
         <h3>سجل الأدلة المسلسل</h3>
         <span id="chain-badge" class="pill idle">—</span>
       </div>
