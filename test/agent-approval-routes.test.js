@@ -5,7 +5,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { createApp } from '../src/app.js';
 import { createAgentHost } from '../src/agent/index.js';
-import { createFakeCalendar } from './support/agent-fixtures.js';
 
 const TOKEN = 'test-token-with-at-least-32-characters';
 const config = {
@@ -19,13 +18,12 @@ const config = {
 const pool = { execute: async () => [[]] };
 const auth = { authorization: `Bearer ${TOKEN}` };
 
-async function startApp(env, { connectors = null } = {}) {
+async function startApp(env) {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'celia-approval-routes-'));
   const agentHost = createAgentHost({
     config,
     env: { ...env, CELIA_AGENT_SQLITE_PATH: path.join(directory, 'agent.sqlite3') },
     statusProvider: () => ({ version: '0.2.1', storage: 'test' }),
-    connectors,
     logger: { error() {} }
   });
   const server = createApp({ pool, config, agentHost }).listen(0);
@@ -72,9 +70,8 @@ async function parkedCalendarRun(app) {
   return { runId: started.runId, detail };
 }
 
-test('approval routes: full approve flow resumes the run and exposes contract, approvals, outbox, evidence and verdict', async (t) => {
-  const calendar = createFakeCalendar();
-  const app = await startApp({ CELIA_AGENT_RUNTIME: 'sqlite' }, { connectors: calendar.connectors });
+test('approval routes: full approve flow resumes the run and exposes contract, approvals, evidence and verdict', async (t) => {
+  const app = await startApp({ CELIA_AGENT_RUNTIME: 'sqlite' });
   t.after(() => app.close());
 
   const { runId, detail } = await parkedCalendarRun(app);
@@ -87,11 +84,6 @@ test('approval routes: full approve flow resumes the run and exposes contract, a
   const approvalsResponse = await fetch(`${app.baseUrl}/api/agent/runs/${runId}/approvals`, { headers: auth });
   assert.equal(approvalsResponse.status, 200);
   assert.equal((await approvalsResponse.json()).approvals[0].decision, 'pending');
-
-  const parkedOutbox = await (await fetch(`${app.baseUrl}/api/agent/runs/${runId}/outbox`, { headers: auth })).json();
-  assert.equal(parkedOutbox.outbox.length, 1);
-  assert.equal(parkedOutbox.outbox[0].status, 'pending');
-  assert.equal(calendar.sends.length, 0, 'nothing is sent while the approval is pending');
 
   const first = await fetch(`${app.baseUrl}/api/agent/runs/${runId}/approval`, {
     method: 'POST',
@@ -117,12 +109,6 @@ test('approval routes: full approve flow resumes the run and exposes contract, a
   assert.ok(completed.evidence.some((entry) => entry.kind === 'verification'));
   assert.ok(completed.evidence.some((entry) => entry.kind === 'approval' && entry.verdict === 'PASS'));
   assert.equal(completed.evidenceChain.ok, true);
-
-  const sentOutbox = await (await fetch(`${app.baseUrl}/api/agent/runs/${runId}/outbox`, { headers: auth })).json();
-  assert.equal(sentOutbox.outbox.length, 1, 'one intent, never duplicated by the retry');
-  assert.equal(sentOutbox.outbox[0].status, 'sent');
-  assert.equal(sentOutbox.outbox[0].attempts, 1);
-  assert.equal(calendar.sends.length, 1, 'an idempotent HTTP retry must not send twice');
 });
 
 test('approval routes: rejection cancels the run without any tool invocation', async (t) => {

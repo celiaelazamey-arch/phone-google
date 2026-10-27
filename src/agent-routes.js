@@ -162,19 +162,6 @@ export function createAgentRouter({ agent, authorize, logger = console }) {
     }
   });
 
-  // Durable intents for external effects: pending/approved payloads, sent references
-  // and honest `unknown` settlements. Read-only; sending happens only inside the run.
-  router.get('/runs/:id/outbox', async (req, res) => {
-    const current = await runtime(res);
-    if (!current) return undefined;
-    try {
-      const detail = await current.detail(req.params.id, current.status().ownerId);
-      return res.json({ outbox: detail.outbox });
-    } catch (error) {
-      return fail(res, error);
-    }
-  });
-
   router.get('/runs/:id/approvals', async (req, res) => {
     const current = await runtime(res);
     if (!current) return undefined;

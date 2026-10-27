@@ -4,13 +4,12 @@ import path from 'node:path';
 import { createSqliteDriver } from '../../src/agent/drivers.js';
 import { createAgentStore } from '../../src/agent/store.js';
 import { createToolRegistry, RISK } from '../../src/agent/tools.js';
-import { createCalendarConnector, createConnectorRegistry } from '../../src/agent/connectors.js';
 
-export async function createTempStore({ clock = null } = {}) {
+export async function createTempStore() {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'celia-agent-test-'));
   const file = path.join(directory, 'agent.sqlite3');
   const driver = await createSqliteDriver({ path: file });
-  const store = createAgentStore({ driver, ...(clock ? { clock } : {}) });
+  const store = createAgentStore({ driver });
   return {
     store,
     driver,
@@ -19,7 +18,7 @@ export async function createTempStore({ clock = null } = {}) {
     async reopen() {
       await driver.close();
       const nextDriver = await createSqliteDriver({ path: file });
-      const nextStore = createAgentStore({ driver: nextDriver, ...(clock ? { clock } : {}) });
+      const nextStore = createAgentStore({ driver: nextDriver });
       return { store: nextStore, driver: nextDriver };
     },
     cleanup() {
@@ -76,8 +75,7 @@ export function createRecordingTools({ failTools = {}, slowMs = 0 } = {}) {
       name: 'calendar.create',
       description: 'external effect',
       risk: RISK.externalEffect,
-      requiresApproval: true,
-      connector: 'google.calendar'
+      requiresApproval: true
     },
     {
       name: 'sandbox.exec',
@@ -116,51 +114,4 @@ export function createObservedPlanner({ sequence = ['read.alpha', 'read.beta', '
       return { action: 'finish', summary };
     }
   };
-}
-
-/**
- * Fake Google Calendar transport for tests. It records every request so a test can
- * prove "exactly one send", and it can be told to fail before the provider acts
- * (definitive) or after the request may have landed (ambiguous → unknown).
- */
-export function createFakeCalendar({ failWith = null, duplicate = false } = {}) {
-  const sends = [];
-  let sequence = 0;
-  const transport = {
-    async insertEvent({ calendarId, event, signal }) {
-      sends.push({ calendarId, event, at: Date.now() });
-      if (failWith === 'ambiguous') {
-        throw Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' });
-      }
-      if (failWith === 'definitive') {
-        throw Object.assign(new Error('bad request'), { status: 400, code: 'invalid' });
-      }
-      if (failWith === 'unauthorized') {
-        throw Object.assign(new Error('not connected'), { status: 409 });
-      }
-      if (duplicate) {
-        throw Object.assign(new Error('duplicate iCalUID'), { status: 409, code: 'duplicate' });
-      }
-      sequence += 1;
-      return { id: `evt-${sequence}`, htmlLink: `https://calendar.example/${sequence}`, iCalUID: event.iCalUID };
-    }
-  };
-  const connectors = createConnectorRegistry([createCalendarConnector({ transport })]);
-  return { sends, transport, connectors };
-}
-
-/** Connector registry whose `send` throws a chosen error, for classifier tests. */
-export function createFailingConnectors(error, name = 'google.calendar') {
-  const calls = [];
-  const registry = createConnectorRegistry([
-    {
-      name,
-      description: 'failing connector',
-      async send(payload, options) {
-        calls.push({ payload, ...options });
-        throw error;
-      }
-    }
-  ]);
-  return { calls, connectors: registry };
 }

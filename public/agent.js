@@ -125,19 +125,8 @@ const EVIDENCE_LABELS = {
   tool_call: 'استدعاء أداة',
   tool_call_reconciled: 'استدعاء مُصالح',
   approval: 'قرار موافقة',
-  external_effect_enqueued: 'نية أثر خارجي',
-  external_effect_settled: 'تسوية أثر خارجي',
   verification: 'حكم تحقق',
   delivery: 'تسليم'
-};
-
-const OUTBOX_LABELS = {
-  pending: ['بانتظار قرار', 'decision-pending'],
-  dispatching: ['قيد الإرسال', 'running'],
-  sent: ['أُرسل', 'ok'],
-  failed: ['فشل مؤكد (لم يُرسل)', 'bad'],
-  unknown: ['غير محسوم', 'warn'],
-  cancelled: ['ملغى', 'warn']
 };
 
 function shortHash(hash) {
@@ -185,41 +174,6 @@ function renderApprovals(approvals = [], runStatus) {
   $('reject').disabled = !canDecide;
 }
 
-function renderOutbox(outbox = []) {
-  const list = $('outbox');
-  if (!outbox.length) {
-    list.innerHTML = '<li class="empty">لا نوايا خارجية بعد.</li>';
-  } else {
-    list.innerHTML = '';
-    for (const entry of outbox) {
-      const [label, cls] = OUTBOX_LABELS[entry.status] || [entry.status, ''];
-      const payload = entry.payload ? JSON.stringify(entry.payload).slice(0, 220) : '—';
-      const item = document.createElement('li');
-      item.innerHTML = `
-        <div class="head"><b>${escapeHtml(entry.toolName)}</b><span class="${cls}">${label}</span></div>
-        <div class="meta">الموصل: ${escapeHtml(entry.connector || '—')} · المحاولات: ${entry.attempts}${entry.externalRef ? ` · المرجع: ${escapeHtml(entry.externalRef)}` : ''}${entry.lastError ? ` · الخطأ: ${escapeHtml(entry.lastError)}` : ''}</div>
-        <div class="meta hash">${escapeHtml(payload)} · key:${shortHash(entry.idempotencyKey)}</div>`;
-      list.append(item);
-    }
-  }
-  const badge = $('outbox-badge');
-  const sent = outbox.filter((entry) => entry.status === 'sent').length;
-  const unknown = outbox.filter((entry) => entry.status === 'unknown').length;
-  if (unknown) {
-    badge.textContent = `${unknown} غير محسوم`;
-    badge.className = 'pill warn';
-  } else if (sent) {
-    badge.textContent = `أُرسل ${sent} مرة واحدة`;
-    badge.className = 'pill ok';
-  } else if (outbox.length) {
-    badge.textContent = 'لا إرسال';
-    badge.className = 'pill idle';
-  } else {
-    badge.textContent = '—';
-    badge.className = 'pill idle';
-  }
-}
-
 function renderEvidence(evidence = [], chain, verification) {
   const list = $('evidence');
   if (!evidence.length) {
@@ -264,7 +218,6 @@ function escapeHtml(value) {
 function resetGovernancePanels() {
   renderContract(null);
   renderApprovals([], null);
-  renderOutbox([]);
   renderEvidence([], null, null);
 }
 
@@ -274,7 +227,6 @@ function handleEvent(event) {
     setUsage(event.run?.usage);
     renderContract(event.goalContract || null);
     renderApprovals(event.approvals || [], event.run?.status);
-    renderOutbox(event.outbox || []);
     renderEvidence(event.evidence || [], event.evidenceChain || null, event.verification || null);
     $('steps').innerHTML = '';
     (event.steps || []).forEach(renderStep);
@@ -359,7 +311,6 @@ async function refreshDetail() {
     setUsage(detail.run?.usage);
     renderContract(detail.goalContract || null);
     renderApprovals(detail.approvals || [], detail.run?.status);
-    renderOutbox(detail.outbox || []);
     renderEvidence(detail.evidence || [], detail.evidenceChain || null, detail.verification || null);
   } catch (error) {
     setAuthStatus(`تعذّر تحديث التفاصيل: ${error.message}`, 'bad');

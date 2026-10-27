@@ -20,10 +20,6 @@ export const EVIDENCE_KIND = Object.freeze({
   // the ledger write. It attests to the stored row; it never claims to have watched the call.
   toolCallReconciled: 'tool_call_reconciled',
   approval: 'approval',
-  // An external effect is evidenced twice: the durable intent (before any request)
-  // and the settlement (what the provider answered, or that it is unknown).
-  externalEffectEnqueued: 'external_effect_enqueued',
-  externalEffectSettled: 'external_effect_settled',
   verification: 'verification',
   delivery: 'delivery'
 });

@@ -114,84 +114,6 @@ export function createVerifier({ tools, clock = Date.now } = {}) {
     }
   }
 
-  /**
-   * Outbox checks (AGENT-002). An external effect is only ever claimed through this
-   * table, so the verifier can state precisely what happened: sent, provably not
-   * attempted, or genuinely unknown.
-   */
-  function outboxChecks({ outbox = [], approvals = [], evidence = [], toolRuns = [], checks } = {}) {
-    const approvalsById = new Map(approvals.map((approval) => [approval.id, approval]));
-    const evidenced = new Set();
-    for (const entry of evidence) {
-      for (const sourceId of parseIds(entry.source_ids ?? entry.sourceIds)) evidenced.add(sourceId);
-    }
-
-    const attempted = outbox.filter((entry) =>
-      ['dispatching', 'sent', 'unknown'].includes(entry.status)
-    );
-    const unapproved = attempted.filter((entry) => {
-      const approval = entry.approvalId ? approvalsById.get(entry.approvalId) : null;
-      return approval?.decision !== 'approved';
-    });
-    checks.push(
-      unapproved.length === 0
-        ? {
-            id: 'outbox_approval',
-            status: CHECK.pass,
-            detail: `${attempted.length} dispatched effect(s) each carry a recorded approved decision`
-          }
-        : {
-            id: 'outbox_approval',
-            status: CHECK.block,
-            detail: `external effect without an approved decision: ${unapproved
-              .map((entry) => `${entry.toolName}(${entry.status})`)
-              .join(', ')}`
-          }
-    );
-
-    const unsettled = outbox.filter((entry) =>
-      ['pending', 'dispatching', 'unknown'].includes(entry.status)
-    );
-    checks.push(
-      unsettled.length === 0
-        ? { id: 'outbox_outcome', status: CHECK.pass, detail: 'every intent reached a readable settlement' }
-        : {
-            id: 'outbox_outcome',
-            status: CHECK.unknown,
-            detail: `unsettled intent(s): ${unsettled
-              .map((entry) => `${entry.toolName}=${entry.status}`)
-              .join(', ')} — no delivery is claimed`
-          }
-    );
-
-    const unevidenced = outbox.filter((entry) => !evidenced.has(entry.id));
-    checks.push(
-      unevidenced.length === 0
-        ? { id: 'outbox_evidence', status: CHECK.pass, detail: `${outbox.length} intent(s) evidenced` }
-        : {
-            id: 'outbox_evidence',
-            status: CHECK.block,
-            detail: `intent without a ledger entry: ${unevidenced.map((entry) => entry.toolName).join(', ')}`
-          }
-    );
-
-    // A sent intent must be backed by a successful tool run, and vice versa.
-    const sentTools = new Set(outbox.filter((entry) => entry.status === 'sent').map((entry) => entry.toolName));
-    const succeededExternal = new Set(
-      toolRuns.filter((item) => item.status === 'succeeded').map((item) => item.toolName)
-    );
-    const mismatched = [...sentTools].filter((tool) => !succeededExternal.has(tool));
-    checks.push(
-      mismatched.length === 0
-        ? { id: 'outbox_tool_run_parity', status: CHECK.pass, detail: 'sent intents match successful tool runs' }
-        : {
-            id: 'outbox_tool_run_parity',
-            status: CHECK.block,
-            detail: `intent marked sent without a successful tool run: ${mismatched.join(', ')}`
-          }
-    );
-  }
-
   async function verifyRun({
     run,
     contract = null,
@@ -199,7 +121,6 @@ export function createVerifier({ tools, clock = Date.now } = {}) {
     toolRuns = [],
     evidence = [],
     approvals = [],
-    outbox = [],
     messages = []
   } = {}) {
     const checks = [];
@@ -294,9 +215,6 @@ export function createVerifier({ tools, clock = Date.now } = {}) {
           : { id: 'goal_contract', status: CHECK.block, detail: contractFailures.join('; ') }
       );
     }
-
-    // 8. External effects: the outbox is the only exit, so judge it directly.
-    outboxChecks({ outbox, approvals, evidence, toolRuns, checks });
 
     const verdict = checks.some((check) => check.status === CHECK.block)
       ? VERDICT.block

@@ -4,8 +4,6 @@ import { RISK } from './tools.js';
 import { buildGoalContract } from './goal-contract.js';
 import { EVIDENCE_KIND } from './evidence.js';
 import { createVerifier, VERDICT } from './verifier.js';
-import { createOutbox, OUTBOX_STATUS } from './outbox.js';
-import { createEmptyConnectorRegistry } from './connectors.js';
 
 /**
  * Agent runtime — the M1 loop (AGENT-001).
@@ -49,7 +47,6 @@ export function createAgentRuntime({
   planner,
   ownerId = 'owner',
   limits = {},
-  connectors = createEmptyConnectorRegistry(),
   clock = Date.now,
   workerId = `w-${crypto.randomBytes(4).toString('hex')}`,
   logger = console
@@ -59,7 +56,6 @@ export function createAgentRuntime({
   if (!planner?.plan) throw new Error('Agent runtime requires a planner');
   const config = Object.freeze({ ...DEFAULT_LIMITS, ...limits });
   const verifier = createVerifier({ tools, clock });
-  const outbox = createOutbox({ store, connectors, clock, workerId: `${workerId}-outbox` });
   const listeners = new Map();
   const controllers = new Map();
   const active = new Map();
@@ -77,18 +73,17 @@ export function createAgentRuntime({
   }
 
   async function contextFor(run, signal) {
-    const [messages, steps, approvals, goalContract, outboxEntries] = await Promise.all([
+    const [messages, steps, approvals, goalContract] = await Promise.all([
       store.listMessages(run.threadId),
       store.listSteps(run.id),
       store.listApprovals(run.id),
-      store.getGoalContract(run.id),
-      store.listOutbox(run.id)
+      store.getGoalContract(run.id)
     ]);
     const toolRuns = (await store.listToolRuns(run.id)).map((toolRun) => ({
       ...toolRun,
       parsedOutcome: parseOutcome(toolRun.outcome)
     }));
-    return { run, messages, steps, toolRuns, approvals, outbox: outboxEntries, goalContract, signal, limits: config };
+    return { run, messages, steps, toolRuns, approvals, goalContract, signal, limits: config };
   }
 
   function withTimeout(promise, controller, timeoutMs, signal) {
@@ -151,150 +146,6 @@ export function createAgentRuntime({
     return changed;
   }
 
-  /**
-   * Evidence for the durable intent, written exactly once. The gate may be re-entered
-   * after a restart, so the check is the ledger itself, not process memory.
-   */
-  async function ensureEnqueueEvidence(runId, stepId, entry) {
-    const evidence = await store.listEvidence(runId);
-    if (evidence.some((row) => row.sourceIds.includes(entry.id))) return false;
-    await store.appendEvidence({
-      runId,
-      stepId,
-      kind: EVIDENCE_KIND.externalEffectEnqueued,
-      input: { tool: entry.toolName, connector: entry.connector, payload: entry.payload },
-      output: { outboxId: entry.id, status: entry.status, approvalId: entry.approvalId },
-      sourceIds: [entry.id],
-      verdict: null
-    });
-    return true;
-  }
-
-  /**
-   * Turn one approved intent into at most one request. The tool run is started before
-   * the call, so a process that dies mid-flight leaves a `started` row the reconciler
-   * turns into `unknown` — never a silent replay.
-   */
-  async function dispatchExternalEffect({ runId, tool, entry, controller }) {
-    const started = await store.startToolRun({
-      runId,
-      stepId: entry.stepId,
-      toolName: tool.name,
-      risk: tool.risk,
-      idempotencyKey: entry.idempotencyKey
-    });
-    if (!started.created) {
-      if (started.toolRun.status === TOOL_RUN_STATUS.succeeded) {
-        return { status: OUTBOX_STATUS.sent, outcome: started.toolRun.parsedOutcome ?? null, reused: true };
-      }
-      if (started.toolRun.status === TOOL_RUN_STATUS.started || started.toolRun.status === TOOL_RUN_STATUS.unknown) {
-        return { status: OUTBOX_STATUS.unknown, outcome: null, reused: true };
-      }
-    }
-    const toolRun = started.toolRun;
-    const dispatched = await outbox.dispatch(entry.id, { signal: controller.signal });
-    const outcome = {
-      outboxId: entry.id,
-      outboxStatus: dispatched.status,
-      externalRef: dispatched.entry?.externalRef ?? null,
-      providerResult: dispatched.entry?.result ?? null,
-      error: dispatched.error ?? null,
-      lastError: dispatched.entry?.lastError ?? null
-    };
-    const toolStatus =
-      dispatched.status === OUTBOX_STATUS.sent
-        ? TOOL_RUN_STATUS.succeeded
-        : dispatched.status === OUTBOX_STATUS.failed
-          ? TOOL_RUN_STATUS.failed
-          : TOOL_RUN_STATUS.unknown;
-    await store.finishToolRun(toolRun.id, toolStatus, JSON.stringify(outcome));
-    await store.appendEvidence({
-      runId,
-      stepId: entry.stepId,
-      kind: EVIDENCE_KIND.externalEffectSettled,
-      input: { tool: tool.name, outboxId: entry.id, idempotencyKey: entry.idempotencyKey },
-      output: outcome,
-      sourceIds: [entry.id, toolRun.id],
-      verdict:
-        dispatched.status === OUTBOX_STATUS.sent
-          ? VERDICT.pass
-          : dispatched.status === OUTBOX_STATUS.unknown
-            ? VERDICT.unknown
-            : VERDICT.block
-    });
-    return { status: dispatched.status, outcome, error: dispatched.error ?? null, toolRunId: toolRun.id };
-  }
-
-  /**
-   * Settle one intent and say what the run must do next. Used by both entry points:
-   * the gate (planner asked again while approved) and the resume drain (approved
-   * intents are dispatched even if the planner never repeats the call).
-   */
-  async function handleExternalEffect({ runId, entry, controller }) {
-    const tool = tools.get(entry.toolName);
-    if (!tool) {
-      await addStep(runId, {
-        kind: 'decide',
-        title: 'أداة غير مسجلة',
-        summary: `النية الخارجية تشير إلى أداة غير مسجلة: ${entry.toolName}`
-      });
-      return { finish: { status: RUN_STATUS.failed, error: 'unknown_tool' } };
-    }
-    const effect = await dispatchExternalEffect({ runId, tool, entry, controller });
-    if (effect.status === OUTBOX_STATUS.sent) {
-      await addStep(runId, {
-        kind: 'observe',
-        title: `${tool.name} ✓ (outbox)`,
-        summary: `أُرسل الأثر الخارجي مرة واحدة بعد موافقة مسجلة؛ المرجع ${effect.outcome?.externalRef || '—'}.`,
-        toolName: tool.name
-      });
-      return { sent: true };
-    }
-    if (effect.status === OUTBOX_STATUS.failed) {
-      const unavailable = effect.error === 'connector_unavailable';
-      await addStep(runId, {
-        kind: 'decide',
-        title: unavailable ? 'موافقة بلا منفذ تنفيذ' : 'فشل الأثر الخارجي',
-        summary: unavailable
-          ? `الموافقة على ${tool.name} مسجلة، لكن لا موصل مُهيَّأ لهذا الأثر؛ أُغلقت النية كفشل مؤكد دون أي طلب خارجي.`
-          : `رفض الموصل الطلب قبل أي أثر (${effect.error}); النية مسجلة failed ولا إعادة محاولة.`,
-        toolName: tool.name
-      });
-      return {
-        finish: {
-          status: RUN_STATUS.failed,
-          error: unavailable ? 'external_connector_unavailable' : 'external_effect_failed'
-        }
-      };
-    }
-    // unknown / still in progress: reconciliation first, never a replay (DEC-007).
-    await addStep(runId, {
-      kind: 'observe',
-      title: 'أثر خارجي غير محسوم',
-      summary: `لم يُحسم إرسال ${tool.name} (${effect.error || 'outcome_unknown'}); لا إعادة إرسال عمياء والمصالحة مطلوبة.`,
-      toolName: tool.name
-    });
-    return { finish: { status: RUN_STATUS.needsReconciliation, error: 'outcome_unknown' } };
-  }
-
-  /** Dispatch every approved-and-still-pending intent. Returns a terminal run, or null. */
-  async function drainApprovedIntents(runId, controller) {
-    const [entries, approvals] = await Promise.all([store.listOutbox(runId), store.listApprovals(runId)]);
-    const approved = new Set(
-      approvals.filter((approval) => approval.decision === APPROVAL_DECISION.approved).map((approval) => approval.id)
-    );
-    const ready = entries.filter(
-      (entry) => entry.status === OUTBOX_STATUS.pending && entry.approvalId && approved.has(entry.approvalId)
-    );
-    for (const entry of ready) {
-      const handled = await handleExternalEffect({ runId, entry, controller });
-      if (handled.finish) {
-        return finish(runId, handled.finish.status, { error: handled.finish.error });
-      }
-    }
-    return null;
-  }
-
   async function finish(runId, status, { error = null } = {}) {
     const run = await store.finishRun(runId, status, { error });
     emit(runId, { type: 'run.finished', status, run });
@@ -354,12 +205,6 @@ export function createAgentRuntime({
           return { run: await finish(runId, RUN_STATUS.needsReconciliation, { error: 'outcome_unknown' }), claimed: true };
         }
 
-        // Approved intents are dispatched here, before the planner is asked anything:
-        // the outbox is the sender, so a planner that forgets to repeat its call can
-        // never strand an approved external effect.
-        const drained = await drainApprovedIntents(runId, controller);
-        if (drained) return { run: drained, claimed: true };
-
         const context = await contextFor(run, controller.signal);
         let decision;
         try {
@@ -383,7 +228,6 @@ export function createAgentRuntime({
             toolRuns: verifyContext.toolRuns,
             evidence: priorEvidence,
             approvals: verifyContext.approvals,
-            outbox: verifyContext.outbox,
             messages: verifyContext.messages
           });
           const verifyStep = await addStep(runId, {
@@ -451,38 +295,24 @@ export function createAgentRuntime({
             idempotencyKey: `approval:${runId}:${tool.name}`
           });
           const approval = requested.approval;
-          // The intent is durable before the decision exists: the owner approves an exact
-          // payload, and a crash can never lose the request or mint a second one.
-          const enqueued = await outbox.enqueue({
-            runId,
-            stepId: gateStep.id,
-            approvalId: approval.id,
-            toolName: tool.name,
-            connector: tool.connector,
-            payload: decision.args ?? null
-          });
-          await ensureEnqueueEvidence(runId, gateStep.id, enqueued.entry);
-          if (enqueued.created) emit(runId, { type: 'outbox.enqueued', entry: enqueued.entry });
-
           if (approval.decision === APPROVAL_DECISION.rejected) {
-            await store.cancelPendingOutbox(runId);
             await addStep(runId, {
               kind: 'decide',
               title: 'موافقة مرفوضة',
-              summary: `المالك رفض الموافقة على ${tool.name}؛ أُلغيت النية في outbox ولم يُرسل أي طلب خارجي.`,
+              summary: `المالك رفض الموافقة على ${tool.name}؛ أُوقف التشغيل دون أي أثر خارجي.`,
               toolName: tool.name
             });
             return { run: await finish(runId, RUN_STATUS.cancelled, { error: 'approval_rejected' }), claimed: true };
           }
           if (approval.decision === APPROVAL_DECISION.approved) {
-            const handled = await handleExternalEffect({ runId, entry: enqueued.entry, controller });
-            if (handled.finish) {
-              return {
-                run: await finish(runId, handled.finish.status, { error: handled.finish.error }),
-                claimed: true
-              };
-            }
-            continue;
+            // Safety net: an approval without the AGENT-002 outbox connector must never fake execution.
+            await addStep(runId, {
+              kind: 'decide',
+              title: 'موافقة بلا منفذ تنفيذ',
+              summary: `الموافقة على ${tool.name} مسجلة، لكن منفذ الأثر الخارجي (outbox AGENT-002) غير مبني بعد؛ لا تنفيذ وهمي ولا إعادة محاولة.`,
+              toolName: tool.name
+            });
+            return { run: await finish(runId, RUN_STATUS.failed, { error: 'external_connector_unavailable' }), claimed: true };
           }
           emit(runId, { type: 'approval.requested', approval });
           return { run: await finish(runId, RUN_STATUS.waitingApproval, { error: 'approval_required' }), claimed: true };
@@ -587,8 +417,6 @@ export function createAgentRuntime({
         verifier: verifier.name,
         approvalGate: true,
         evidenceLedger: 'sha256-hash-chain-v1',
-        outbox: 'transactional-single-dispatch-v1',
-        connectors: connectors.list(),
         ownerId,
         limits: config,
         tools: tools.list(),
@@ -665,14 +493,13 @@ export function createAgentRuntime({
     async detail(runId, requesterId = ownerId) {
       const run = await store.getRunForOwner(runId, requesterId);
       if (!run) throw httpError(404, 'run_not_found', 'run_not_found');
-      const [steps, rawToolRuns, goalContract, approvals, evidence, evidenceChain, outboxEntries] = await Promise.all([
+      const [steps, rawToolRuns, goalContract, approvals, evidence, evidenceChain] = await Promise.all([
         store.listSteps(runId),
         store.listToolRuns(runId),
         store.getGoalContract(runId),
         store.listApprovals(runId),
         store.listEvidence(runId),
-        store.verifyEvidenceChain(runId),
-        store.listOutbox(runId)
+        store.verifyEvidenceChain(runId)
       ]);
       const toolRuns = rawToolRuns.map((toolRun) => ({ ...toolRun, outcome: parseOutcome(toolRun.outcome) }));
       const verificationEntry = [...evidence].reverse().find((entry) => entry.kind === EVIDENCE_KIND.verification) || null;
@@ -682,7 +509,6 @@ export function createAgentRuntime({
         toolRuns,
         goalContract,
         approvals,
-        outbox: outboxEntries,
         evidence,
         evidenceChain,
         verification: verificationEntry
@@ -745,14 +571,10 @@ export function createAgentRuntime({
       }
       emit(runId, { type: 'approval.decided', decision, approvals: decided });
       if (decision === APPROVAL_DECISION.rejected) {
-        // The intent never leaves the outbox: cancelling it is the whole effect of a rejection.
-        const cancelledIntents = await store.cancelPendingOutbox(runId);
         await addStep(runId, {
           kind: 'decide',
           title: 'موافقة مرفوضة',
-          summary:
-            `رفض المالك الأثر الخارجي (${decided.map((approval) => approval.toolName).join('، ')}؛ ` +
-            `أُلغيت ${cancelledIntents} نية في outbox ولم يُرسل أي طلب.`
+          summary: `رفض المالك الأثر الخارجي (${decided.map((approval) => approval.toolName).join('، ')}؛ أُوقف التشغيل دون أي أثر.`
         });
         const cancelled = await finish(runId, RUN_STATUS.cancelled, { error: 'approval_rejected' });
         return { run: cancelled, approvals: decided, resumed: false };

@@ -121,33 +121,7 @@ const SQLITE_DDL = [
     created_at TEXT NOT NULL
   )`,
   'CREATE UNIQUE INDEX IF NOT EXISTS uq_agent_evidence_seq ON agent_evidence (run_id, seq)',
-  'CREATE INDEX IF NOT EXISTS idx_agent_evidence_run ON agent_evidence (run_id, seq)',
-  `CREATE TABLE IF NOT EXISTS agent_outbox (
-    id TEXT PRIMARY KEY,
-    run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
-    step_id TEXT NULL,
-    approval_id TEXT NULL,
-    tool_name TEXT NOT NULL,
-    connector TEXT NOT NULL,
-    idempotency_key TEXT NOT NULL,
-    payload TEXT NOT NULL,
-    payload_hash TEXT NOT NULL,
-    status TEXT NOT NULL,
-    attempts INTEGER NOT NULL DEFAULT 0,
-    lease_until TEXT NULL,
-    lease_owner TEXT NULL,
-    external_ref TEXT NULL,
-    result TEXT NULL,
-    last_error TEXT NULL,
-    enqueued_at TEXT NOT NULL,
-    dispatched_at TEXT NULL,
-    settled_at TEXT NULL,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  )`,
-  'CREATE UNIQUE INDEX IF NOT EXISTS uq_agent_outbox_key ON agent_outbox (idempotency_key)',
-  'CREATE INDEX IF NOT EXISTS idx_agent_outbox_run ON agent_outbox (run_id, enqueued_at)',
-  'CREATE INDEX IF NOT EXISTS idx_agent_outbox_status ON agent_outbox (status, lease_until)'
+  'CREATE INDEX IF NOT EXISTS idx_agent_evidence_run ON agent_evidence (run_id, seq)'
 ];
 
 const MYSQL_AGENT_TABLES = [
@@ -158,8 +132,7 @@ const MYSQL_AGENT_TABLES = [
   'agent_tool_runs',
   'agent_approvals',
   'agent_goal_contracts',
-  'agent_evidence',
-  'agent_outbox'
+  'agent_evidence'
 ];
 
 function uniqueViolation(error) {
