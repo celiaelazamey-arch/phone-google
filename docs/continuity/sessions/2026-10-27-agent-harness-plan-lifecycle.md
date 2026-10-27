@@ -38,7 +38,8 @@
      `src/agent/automation/schema.js` مع الحفاظ على التوافق الخلفي لـ`schema_version: "1.0"`.
    - تنفيذ `explainExtractedFields` و`explainValidationOutcome` و`evaluateComprehensionGate` و`buildComprehensionExplanation`
      وربط فحص `comprehension_gate_grounding` في `src/agent/verifier.js` و`src/agent/planner.js`.
-   - إضافة اختبارات `CL-01` إلى `CL-10` في `test/agent-comprehension-gate.test.js`.
+   - إضافة اختبارات `CL-01` إلى `CL-10` في `test/agent-comprehension-gate.test.js`، وتعزيز `integration/mysql.integration.mjs`
+     بفحص تكاملي لـ`DEC-020` و`DEC-021` على MySQL 8.4 الحقيقية.
 
 ## 2. نتائج الفحوص الفعلية
 
