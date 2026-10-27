@@ -319,6 +319,42 @@
   `.env.example`، `docs/agent-runtime.md`، خطة الطبقة المجانية وعقدها. **لا تغيير في `render.yaml` ولا
   `schema 1` ولا الإصدار ولا أدوات MCP.**
 
+## DEC-019 — دورة «خطّط، اعرض، انتظر، ثم نفّذ» (`EDITED`/`APPROVED`/`REJECTED`) ومعمارية Agent Harness الـ10 مكونات وفحص Chromium التشخيصي
+
+- **التاريخ:** 27 أكتوبر 2026 (مساءً) · **الحالة:** منفذ ومختبر محليًا (251 اختبارًا في `npm test`) · **المهمة:** AGENT-001،
+  AGENT-002، SEC-001، QA-003
+- **السياق:** طلب المالك تثبيت ثلاث ركائز حاكمة: (1) دورة العمل الإلزامية «خطّط، اعرض، انتظر، ثم نفّذ» بانتقالات
+  الحالة الصريحة `PLAN_READY → WAITING_FOR_APPROVAL → APPROVED → EXECUTING` مع مساريْ `EDITED` (تعديل الخطة وإعادة فحص
+  السياسات وإعادة طلب الموافقة على النسخة المعدّلة دون تنفيذ) و`REJECTED` (إلغاء آمن بلا أثر) ومنع أي تغيير صامت
+  للخطوات الحساسة بعد الموافقة؛ (2) معمارية **Agent Harness** المكونة من 10 مراحل تنفيذية و10 مكونات قابلة للفحص
+  واختبارات قاعة العمليات (War Room) لكسر الحلقة؛ و(3) تشخيص Playwright Chromium الصريح (`pageerror`، `console`،
+  `requestfailed`، `response >= 400`، `crash`، `chromium-diagnostics.txt`، `screenshot: 'only-on-failure'`).
+- **القرار:**
+  1. **آلة حالات الخطة (`src/agent/harness.js` + `src/agent/runtime.js`):** تُحفظ حالة الخطة في `agent_runs.plan_summary`
+     وتُشتق عبر `derivePlanView` بالمراحل الأربع (`understand`، `plan`، `present_and_wait`، `execute_and_verify`)
+     والمسار الكامل للانتقالات (`PLAN_READY`، `WAITING_FOR_APPROVAL`، `EDITED`، `APPROVED`، `REJECTED`، `EXECUTING`).
+  2. **مسار التعديل المحكوم (`editPlan` / `decision: 'edited'`):** عند تعديل المالك للخطة في `waiting_approval`،
+     يفحص `validatePlanEditPolicy` الحمولة الجديدة ضد `inputSchema` الخاص بالأداة ويرفض تغيير اسم الأداة أو حقول غير
+     مصرّح بها (`plan_edit_policy_violation` / `plan_edit_tool_mismatch`). عند النجاح يُسجَّل القرار السابق `edited`،
+     ويُنشأ صف موافقة جديد `pending` مربوط ببصمة الحمولة الجديدة، وتُحدَّث نية الـoutbox المعلّقة، ويُسجَّل مدخل
+     `plan_edited` في سلسلة SHA-256، ويبقى التشغيل في `waiting_approval` (`resumed: false`).
+  3. **منع العبث بالحمل بعد الموافقة (`verifyApprovedEffectIntegrity` + `verifier.js`):** قبل أي إرسال خارجي، يقارن
+     وقت التشغيل والمُتحقِّق المستقل بين `hashOf(entry.payload)` و`entry.payloadHash` وبصمة مفتاح الموافقة المعتمد
+     (`approval:<runId>:<tool>:<hash12>`). أي تعديل صامت بعد الموافقة يُحظر فورًا (`post_approval_payload_tampered` /
+     `outbox_payload_hash_tampered`) دون استدعاء الموصل.
+  4. **التشخيص البصري والوظيفي لـChromium (`e2e/diagnostics.js` + `e2e/agent.spec.js`):** إرفاق المستمعات الخمسة قبل
+     `page.goto(...)` مع لقطة شاشة وتقرير `chromium-diagnostics.txt` عند الفشل، وإصلاح الروابط النسبية في
+     `public/agent.html` و`public/kb.html` و`scripts/build-pages.mjs` و`scripts/static/celia-static-shim.template.js`
+     وتباين ألوان زر `.primary` وعرض الشبكة عند `320px`.
+- **السبب:** ضمان ألا يتحول التخطيط إلى تنفيذ تلقائي عند التعديل، وألا تمر أي حمولة معدّلة خارج السياسات أو بعد
+  الموافقة، وألا تمر أخطاء المتصفح أو روابط المسار الفرعي `/phone-google/` بصمت.
+- **البدائل المرفوضة:** (أ) تنفيذ الخطة فور تعديلها دون موافقة ثانية — يخالف «اعرض، انتظر، ثم نفّذ»؛ (ب) تعديل صف
+  الموافقة القديم في مكانه بدل تسجيل `edited` وإنشاء طلب جديد — يمحو أثر المراجعة من الدفتر؛ (ج) الاكتفاء بفحص
+  البصمة وقت الإدراج دون إعادة فحصها قبل الإرسال وفي المُتحقِّق — يترك ثغرة تعديل ما بعد الموافقة.
+- **الأثر:** `src/agent/harness.js`، تحديثات `src/agent/{runtime,store,verifier,tools,evidence,goal-contract,index}.js`
+  و`src/agent-routes.js` و`public/agent.{html,css,js}` و`public/kb.{html,js}` و`e2e/{diagnostics,agent.spec,system.spec,deploy.spec}.js`
+  و`test/agent-harness.test.js`. **لا ترحيل SQL جديد ولا تغيير في `schema 1` أو الإصدار `0.2.1` أو أدوات MCP الـ12.**
+
 ## إضافة قرار لاحق
 
 استخدم معرفًا جديدًا، والتاريخ والحالة والسياق والبدائل والقرار والسبب والأثر ومرجع المهمة، واذكر صراحة القرار المستبدل إن وجد. لا تنسخ أسرارًا أو مخطط إنتاج يحوي بيانات شخصية إلى سجل القرار.

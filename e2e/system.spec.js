@@ -1,34 +1,38 @@
 import { RELEASE, RELEASE_HISTORY } from '../src/version.js';
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { attachChromiumDiagnostics } from "./diagnostics.js";
 
 const server = "http://127.0.0.1:3100/system";
 const staticSite = "http://127.0.0.1:3101/phone-google/system.html";
 
 test("server dashboard is real, responsive, navigable and exports a JSON report", async ({
   page,
-}) => {
-  const errors = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto(server);
-  await expect(page.locator("#metric-version")).toHaveText(`v${RELEASE.version}`);
-  await expect(page.locator(".component-card")).toHaveCount(7);
-  await expect(page.locator("#metric-storage")).toHaveText("ذاكرة مؤقتة");
-  await expect(page.locator("#notice")).toContainText("ليست نسخة احتياطية");
-  await expect(page.locator("#release-list .release-card")).toHaveCount(RELEASE_HISTORY.length);
-  await page.locator(".hero-actions a").click();
-  await expect(page).toHaveURL(/#releases$/);
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  ).toBe(true);
-  const downloadEvent = page.waitForEvent("download");
-  await page.locator("#download").click();
-  expect((await downloadEvent).suggestedFilename()).toBe(
-    `celia-system-${RELEASE.version}.json`,
-  );
-  expect(errors).toEqual([]);
+}, testInfo) => {
+  const { diagnostics, flush } = attachChromiumDiagnostics(page);
+  try {
+    await page.goto(server);
+    await expect(page.locator("#metric-version")).toHaveText(`v${RELEASE.version}`);
+    await expect(page.locator(".component-card")).toHaveCount(7);
+    await expect(page.locator("#metric-storage")).toHaveText("ذاكرة مؤقتة");
+    await expect(page.locator("#notice")).toContainText("ليست نسخة احتياطية");
+    await expect(page.locator("#release-list .release-card")).toHaveCount(RELEASE_HISTORY.length);
+    await page.locator(".hero-actions a").click();
+    await expect(page).toHaveURL(/#releases$/);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    const downloadEvent = page.waitForEvent("download");
+    await page.locator("#download").click();
+    expect((await downloadEvent).suggestedFilename()).toBe(
+      `celia-system-${RELEASE.version}.json`,
+    );
+    expect(diagnostics, diagnostics.join("\n")).toEqual([]);
+  } finally {
+    await flush(testInfo);
+  }
 });
 
 test("failed status panel retains the release panel and explicitly marks stale data", async ({

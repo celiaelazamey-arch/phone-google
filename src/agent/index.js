@@ -1,14 +1,32 @@
-import { createAgentRuntime } from './runtime.js';
+import { createAgentRuntime, PLAN_LIFECYCLE_STATE } from './runtime.js';
 import { createAgentStore } from './store.js';
 import { createMysqlDriver, createSqliteDriver } from './drivers.js';
 import { createToolRegistry, defaultToolDefinitions } from './tools.js';
 import { createDemoPlanner } from './planner.js';
+import {
+  HARNESS_LIFECYCLE_STAGES,
+  HARNESS_COMPONENT_IDS,
+  inspectAgentHarness,
+  derivePlanView,
+  validatePlanEditPolicy,
+  verifyApprovedEffectIntegrity
+} from './harness.js';
 import {
   createCalendarConnector,
   createConnectorRegistry,
   createEmptyConnectorRegistry,
   createGoogleCalendarTransport
 } from './connectors.js';
+
+export {
+  PLAN_LIFECYCLE_STATE,
+  HARNESS_LIFECYCLE_STAGES,
+  HARNESS_COMPONENT_IDS,
+  inspectAgentHarness,
+  derivePlanView,
+  validatePlanEditPolicy,
+  verifyApprovedEffectIntegrity
+};
 
 /**
  * Explicit agent wiring. Three states only: `off` (default), `mysql` (production

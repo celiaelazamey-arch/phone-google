@@ -1,11 +1,31 @@
 # الحالة الحالية — ابدأ من هنا
 
-**آخر مراجعة:** 27 أكتوبر 2026 (مساءً) · **نوع الجلسة الحالية:** طلب المالك **«الخطوات التالية للتشغيل الحقيقي
-المكتمل الأركان بناءً على المعايير المتفق عليها»** — خطة أركان مرتبة ببوابات + إغلاق فجوة الاستعادة عند الإقلاع +
-قبول حي قابل للتنفيذ (DEC-018) · سجل الجلسة: [2026-10-27-go-live-steps](sessions/2026-10-27-go-live-steps.md) ·
+**آخر مراجعة:** 27 أكتوبر 2026 (مساءً) · **نوع الجلسة الحالية:** تنفيذ **دورة «خطّط، اعرض، انتظر، ثم نفّذ»
+(`PLAN_READY → WAITING_FOR_APPROVAL → EDITED | APPROVED | REJECTED → EXECUTING`) ومعمارية Agent Harness الـ10 مكونات
+وتشخيص Playwright Chromium** (DEC-019) على الفرع `arena/5fccc4e6-phone-google` · سجل الجلسة:
+[2026-10-27-agent-harness-plan-lifecycle](sessions/2026-10-27-agent-harness-plan-lifecycle.md) · سجل الجلسة السابقة:
+[2026-10-27-go-live-steps](sessions/2026-10-27-go-live-steps.md) ·
 الخطة: [docs/go-live-plan.md](../go-live-plan.md) · المرجع التشغيلي: [deploy/free-always-on/README.md](../../deploy/free-always-on/README.md)
 
-## الطلب الحالي (أعلى أولوية) — الخطوات التالية للتشغيل الحقيقي
+## الطلب الحالي (أعلى أولوية) — دورة الخطة والـAgent Harness وتشخيص Chromium (DEC-019)
+
+- **ما نُفِّذ في هذه الجلسة (`arena/5fccc4e6-phone-google`):**
+  - **آلة حالات الخطة (`src/agent/harness.js` + `src/agent/runtime.js`):** انتقالات صريحة
+    `PLAN_READY → WAITING_FOR_APPROVAL → APPROVED → EXECUTING` مع مسار التعديل المحكوم
+    `PLAN_READY → WAITING_FOR_APPROVAL → EDITED → WAITING_FOR_APPROVAL` ومسار الرفض `REJECTED`.
+  - **تعديل الخطة وإعادة فحص السياسات (`POST /api/agent/runs/:id/plan` و`decision: 'edited'`):** يتحقق من
+    الحمولة المعدّلة ضد `inputSchema` ويرفض تغيير الأداة أو الحقول غير المصرّح بها، ويسجل القرار السابق `edited`
+    وينشئ طلب موافقة جديدًا مربوطًا ببصمة الحمولة الجديدة ويحدّث نية الـoutbox المعلّقة ويدوّن `plan_edited` في
+    سلسلة SHA-256، ويبقي التشغيل في `waiting_approval` دون أي تنفيذ خارجي حتى موافقة المالك.
+  - **حارس النزاهة بعد الموافقة (`verifyApprovedEffectIntegrity` + `verifier.js`):** يمنع أي تلاعب صامت بحمولة
+    الـoutbox بعد صدور الموافقة قبل استدعاء أي موصل خارجي.
+  - **معمارية Agent Harness الـ10 مكونات (`GET /api/agent/harness`)** وواجهة تعديل الخطة في `/agent`، وتشخيص
+    Playwright Chromium الصريح (`e2e/diagnostics.js`، `e2e/agent.spec.js`، `playwright.config.js`)، وإصلاح
+    الروابط النسبية وتباين WCAG 2.2 AA وعرض 320px في `/agent` و`/kb`.
+  - **الفحوص المحلية:** `npm test` **251/251** ناجحة، و`check` و`release:check` و`check:continuity` و`check:secrets`
+    و`build:pages` كلها خضراء.
+
+## الطلب السابق — الخطوات التالية للتشغيل الحقيقي (DEC-018)
 
 **الفرع `arena/0220ec0b-phone-google` بُني فوق فرع PR #36 (`daf815a` مدمج فيه)** لأن كل خطوة تعتمد على DEC-017
 وقائمة §5. الترتيب الصحيح: دمج #36 ثم هذا الفرع (أو دمج هذا الفرع وحده فيحمل #36 معه).

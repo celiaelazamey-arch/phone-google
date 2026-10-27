@@ -53,16 +53,19 @@ npm run migrate -- --status
 
 | المسار | الوظيفة |
 |---|---|
-| `GET /api/agent/status` | هل الحلقة مفعلة، المخزن، المخطط، السقوف، الأدوات |
+|GET `/api/agent/status` | هل الحلقة مفعلة، المخزن، المخطط، السقوف، الأدوات |
+| `GET /api/agent/harness` | فحص المكونات العشرة لـAgent Harness ودورة التنفيذ الـ10 مراحل (DEC-019) |
 | `POST /api/agent/threads` | خيط جديد `{title}` |
 | `GET /api/agent/threads` · `GET /api/agent/threads/:id` | الخيوط، الرسائل، التشغيلات |
 | `POST /api/agent/threads/:id/runs` | `{message, clientMessageId}` أو ترويسة `Idempotency-Key` → `202` جديد / `200` مكرر |
-| `GET /api/agent/runs/:id` | التشغيل + الخطوات + الاستدعاءات + عقد الهدف + الموافقات + الـoutbox + الأدلة + حكم المُتحقِّق (بلا أسرار) |
-| `GET /api/agent/runs/:id/events` | SSE: `snapshot` ثم `step`/`approval.requested`/`approval.decided`/`verification`/`run.finished` |
+| `GET /api/agent/runs/:id` | التشغيل + الخطة (`plan`) + الخطوات + الاستدعاءات + عقد الهدف + الموافقات + الـoutbox + الأدلة + حكم المُتحقِّق (بلا أسرار) |
+| `GET /api/agent/runs/:id/events` | SSE: `snapshot` ثم `step`/`approval.requested`/`approval.decided`/`plan.edited`/`verification`/`run.finished` |
 | `POST /api/agent/runs/:id/cancel` | طلب إلغاء يُطبَّق بين الخطوات |
+| `GET /api/agent/runs/:id/plan` | عرض الخطة المهيكل (`PLAN_READY`, `WAITING_FOR_APPROVAL`, `EDITED`, `APPROVED`, `REJECTED`, `EXECUTING`) والانتقالات |
+| `POST /api/agent/runs/:id/plan` | تعديل الخطة المتوقفة (`{payload, summary?, note?}` مع `Idempotency-Key`): يعيد فحص السياسات ويبقي التشغيل في `waiting_approval` |
 | `GET /api/agent/runs/:id/approvals` | قرارات الموافقة المسجلة للتشغيل |
 | `GET /api/agent/runs/:id/outbox` | نوايا الأثر الخارجي: الحالة، المحاولات، المرجع الخارجي، رمز الخطأ الآمن |
-| `POST /api/agent/runs/:id/approval` | قرار المالك `{decision: approved\|rejected, note?}` مع `Idempotency-Key`؛ 409 إن كان التشغيل بلا بوابة أو وجد استدعاء `unknown` |
+| `POST /api/agent/runs/:id/approval` | قرار المالك `{decision: approved\|rejected\|edited, payload?, note?}` مع `Idempotency-Key`؛ 409 إن كان التشغيل بلا بوابة أو وجد استدعاء `unknown` |
 | `POST /api/agent/runs/:id/reconcile` | مخرج `needs_reconciliation` (DEC-016): `{target: tool_run\|outbox, targetId, outcome: applied\|not_applied, externalRef?, note?, resume?}` مع `Idempotency-Key`؛ لا يستدعي أي موصل |
 
 `clientMessageId` يجب أن يطابق `^[A-Za-z0-9_-]{8,64}$`. خطأ الإدخال `400`، الملكية `404`، والحلقة غير المفعلة `503`.

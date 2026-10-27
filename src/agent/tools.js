@@ -19,6 +19,79 @@ export const RISK = Object.freeze({
 });
 
 const EXECUTABLE = new Set([RISK.read, RISK.internalWrite]);
+const FORBIDDEN_SECRET_KEYS = new Set([
+  'apiKey',
+  'api_key',
+  'accessToken',
+  'access_token',
+  'refreshToken',
+  'refresh_token',
+  'clientSecret',
+  'client_secret',
+  'authorization'
+]);
+
+/**
+ * Validate tool arguments against the tool's declared contract and safety policy.
+ * Returns `{ ok: true }` or `{ ok: false, code, message }`.
+ */
+export function validateToolInput(tool, args) {
+  if (!tool) return { ok: false, code: 'unknown_tool', message: 'Tool is not registered' };
+  if (args === null || args === undefined) return { ok: true };
+  if (typeof args !== 'object' || Array.isArray(args)) {
+    return { ok: false, code: 'invalid_tool_arguments', message: 'Tool arguments must be a JSON object' };
+  }
+  for (const key of Object.keys(args)) {
+    if (FORBIDDEN_SECRET_KEYS.has(key)) {
+      return { ok: false, code: 'policy_violation_secret_in_args', message: `Secret field ${key} is forbidden in tool arguments` };
+    }
+  }
+  const declared = tool.arguments && typeof tool.arguments === 'object' ? tool.arguments : {};
+  const declaredKeys = Object.keys(declared);
+  if (declaredKeys.length > 0) {
+    for (const [key, value] of Object.entries(args)) {
+      if (value === undefined || value === null) continue;
+      if (!(key in declared)) {
+        return { ok: false, code: 'policy_violation_unknown_argument', message: `Argument ${key} is not in tool contract for ${tool.name}` };
+      }
+      const expectedType = declared[key];
+      if (expectedType && typeof value !== expectedType) {
+        return {
+          ok: false,
+          code: 'policy_violation_argument_type',
+          message: `Argument ${key} must be of type ${expectedType}`
+        };
+      }
+    }
+  }
+  if (tool.name === 'google.calendar_create_event' || tool.name === 'calendar.create') {
+    if ('summary' in args && (!args.summary || typeof args.summary !== 'string' || !args.summary.trim())) {
+      return { ok: false, code: 'policy_violation_summary_required', message: 'Event summary must be a non-empty string' };
+    }
+    if ('start' in args || 'end' in args) {
+      const startMs = Date.parse(String(args.start || ''));
+      const endMs = Date.parse(String(args.end || ''));
+      if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) {
+        return {
+          ok: false,
+          code: 'policy_violation_invalid_time_range',
+          message: 'Event start and end must be valid ISO timestamps with end > start'
+        };
+      }
+    }
+  }
+  if (typeof tool.validate === 'function') {
+    const custom = tool.validate(args);
+    if (custom && custom.ok === false) {
+      return {
+        ok: false,
+        code: custom.code || 'policy_violation_custom',
+        message: custom.message || custom.code || 'Tool policy validation failed'
+      };
+    }
+  }
+  return { ok: true };
+}
 
 export function createToolRegistry(definitions = []) {
   const tools = new Map();
@@ -41,16 +114,22 @@ export function createToolRegistry(definitions = []) {
       return tools.has(name);
     },
     list() {
-      return [...tools.values()].map(({ name, description, risk, arguments: args = {} }) => ({
+      return [...tools.values()].map(({ name, description, risk, requiresApproval = false, connector = null, arguments: args = {} }) => ({
         name,
         description,
         risk,
+        requiresApproval: Boolean(requiresApproval || !EXECUTABLE.has(risk)),
+        connector,
         arguments: args
       }));
     },
     executable(name) {
       const tool = tools.get(name);
       return Boolean(tool && EXECUTABLE.has(tool.risk) && typeof tool.execute === 'function');
+    },
+    validateInput(name, args) {
+      const tool = tools.get(name);
+      return validateToolInput(tool, args);
     }
   };
 }

@@ -2,33 +2,38 @@ import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { readFile } from 'node:fs/promises';
 import { RELEASE } from '../src/version.js';
+import { attachChromiumDiagnostics } from './diagnostics.js';
 
 const server = 'http://127.0.0.1:3100/deploy';
 
-test('deployment centre reads real status, reports blockers and exports sanitized evidence', async ({ page }) => {
-  const external = [], errors = [];
+test('deployment centre reads real status, reports blockers and exports sanitized evidence', async ({ page }, testInfo) => {
+  const { diagnostics, flush } = attachChromiumDiagnostics(page);
+  const external = [];
   page.on('request', (request) => { if (!request.url().startsWith('http://127.0.0.1:3100')) external.push(request.url()); });
-  page.on('pageerror', (error) => errors.push(error.message));
-  await page.goto(server);
-  await expect(page.locator('#version')).toHaveText(`v${RELEASE.version}`);
-  await expect(page.locator('.check-card')).toHaveCount(6);
-  await expect(page.locator('#environment-label')).toContainText('النشر الدائم غير متحقق');
-  await expect(page.locator('#checks-grid')).toContainText('غير دائم / غير متاح');
-  await expect(page.locator('#readiness-notice')).toContainText('لا يمكن اعتماد');
-  const href = await page.locator('#deploy-link').getAttribute('href');
-  const target = new URL(href);
-  expect(target.origin).toBe('https://render.com');
-  expect(target.searchParams.get('repo')).toBe('https://github.com/celiaelazamey-arch/phone-google');
-  const event = page.waitForEvent('download');
-  await page.locator('#export-report').click();
-  const download = await event;
-  const report = JSON.parse(await readFile(await download.path(), 'utf8'));
-  expect(report.storage.durable).toBe(false);
-  expect(report.fullApiMounted).toBe(false);
-  expect(report.allCapabilitiesVerified).toBe(false);
-  expect(report.stale).toBe(false);
-  expect(errors).toEqual([]);
-  expect(external).toEqual([]);
+  try {
+    await page.goto(server);
+    await expect(page.locator('#version')).toHaveText(`v${RELEASE.version}`);
+    await expect(page.locator('.check-card')).toHaveCount(6);
+    await expect(page.locator('#environment-label')).toContainText('النشر الدائم غير متحقق');
+    await expect(page.locator('#checks-grid')).toContainText('غير دائم / غير متاح');
+    await expect(page.locator('#readiness-notice')).toContainText('لا يمكن اعتماد');
+    const href = await page.locator('#deploy-link').getAttribute('href');
+    const target = new URL(href);
+    expect(target.origin).toBe('https://render.com');
+    expect(target.searchParams.get('repo')).toBe('https://github.com/celiaelazamey-arch/phone-google');
+    const event = page.waitForEvent('download');
+    await page.locator('#export-report').click();
+    const download = await event;
+    const report = JSON.parse(await readFile(await download.path(), 'utf8'));
+    expect(report.storage.durable).toBe(false);
+    expect(report.fullApiMounted).toBe(false);
+    expect(report.allCapabilitiesVerified).toBe(false);
+    expect(report.stale).toBe(false);
+    expect(diagnostics, diagnostics.join('\n')).toEqual([]);
+    expect(external).toEqual([]);
+  } finally {
+    await flush(testInfo);
+  }
 });
 
 test('failed refresh retains and labels stale evidence instead of manufacturing success', async ({ page }) => {

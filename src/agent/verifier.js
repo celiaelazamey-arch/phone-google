@@ -129,25 +129,64 @@ export function createVerifier({ tools, clock = Date.now } = {}) {
     const attempted = outbox.filter((entry) =>
       ['dispatching', 'sent', 'unknown'].includes(entry.status)
     );
-    const unapproved = attempted.filter((entry) => {
+    const unapproved = [];
+    const tampered = [];
+    for (const entry of attempted) {
       const approval = entry.approvalId ? approvalsById.get(entry.approvalId) : null;
-      return approval?.decision !== 'approved';
-    });
+      if (approval?.decision !== 'approved') {
+        unapproved.push(entry);
+        continue;
+      }
+      const recomputedPayloadHash = hashOf(entry.payload ?? null);
+      if (entry.payloadHash && recomputedPayloadHash !== entry.payloadHash) {
+        tampered.push(`${entry.toolName}(payload_hash_mismatch)`);
+        continue;
+      }
+      const keyMatch = /^approval:[^:]+:[^:]+:([a-f0-9]{12})(?::|$)/.exec(String(approval.idempotencyKey || ''));
+      if (keyMatch && entry.payloadHash && keyMatch[1] !== entry.payloadHash.slice(0, 12)) {
+        tampered.push(`${entry.toolName}(approval_fingerprint_mismatch)`);
+      }
+    }
     checks.push(
-      unapproved.length === 0
+      unapproved.length === 0 && tampered.length === 0
         ? {
             id: 'outbox_approval',
             status: CHECK.pass,
-            detail: `${attempted.length} dispatched effect(s) each carry a recorded approved decision`
+            detail: `${attempted.length} dispatched effect(s) each carry a recorded approved decision matching the exact payload hash`
           }
         : {
             id: 'outbox_approval',
             status: CHECK.block,
-            detail: `external effect without an approved decision: ${unapproved
-              .map((entry) => `${entry.toolName}(${entry.status})`)
-              .join(', ')}`
+            detail: [
+              unapproved.length
+                ? `external effect without an approved decision: ${unapproved
+                    .map((entry) => `${entry.toolName}(${entry.status})`)
+                    .join(', ')}`
+                : null,
+              tampered.length ? `approved payload tampered after decision: ${tampered.join(', ')}` : null
+            ]
+              .filter(Boolean)
+              .join('; ')
           }
     );
+
+    const editedApprovals = approvals.filter((approval) => approval.decision === 'edited');
+    if (editedApprovals.length > 0) {
+      const uneditedEvidence = editedApprovals.filter((approval) => !evidenced.has(approval.id));
+      checks.push(
+        uneditedEvidence.length === 0
+          ? {
+              id: 'plan_edit_evidence',
+              status: CHECK.pass,
+              detail: `${editedApprovals.length} edited plan revision(s) witnessed in evidence chain`
+            }
+          : {
+              id: 'plan_edit_evidence',
+              status: CHECK.block,
+              detail: `edited approval without ledger evidence: ${uneditedEvidence.map((item) => item.toolName).join(', ')}`
+            }
+      );
+    }
 
     const unsettled = outbox.filter((entry) =>
       ['pending', 'dispatching', 'unknown'].includes(entry.status)

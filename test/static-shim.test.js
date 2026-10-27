@@ -385,8 +385,10 @@ test('الطبقة الثابتة تعلن غياب حلقة الوكيل بصد
   // The static preview intercepts only documented GETs. A fake approval or
   // reconciliation in the browser would be a lie about a durable decision.
   assert.equal(CeliaStatic.isKnownRoute('GET', '/api/agent/status'), true);
+  assert.equal(CeliaStatic.isKnownRoute('GET', '/api/kb/status'), true);
   assert.equal(CeliaStatic.isKnownRoute('POST', '/api/agent/threads'), false);
   assert.equal(CeliaStatic.isKnownRoute('POST', '/api/agent/runs/x/approval'), false);
+  assert.equal(CeliaStatic.isKnownRoute('POST', '/api/agent/runs/x/plan'), false);
   assert.equal(CeliaStatic.isKnownRoute('POST', '/api/agent/runs/x/reconcile'), false);
 
   const { payload } = await CeliaStatic.handleRest('GET', '/api/agent/status');
@@ -396,6 +398,21 @@ test('الطبقة الثابتة تعلن غياب حلقة الوكيل بصد
   // No memory fallback is ever offered, and no connector is claimed.
   assert.doesNotMatch(JSON.stringify(payload), /sqlite|memory/);
   assert.equal(payload.realService.verified, false);
+
+  const kbStatus = await CeliaStatic.handleRest('GET', '/api/kb/status');
+  assert.equal(kbStatus.status, 200);
+  assert.equal(kbStatus.payload.enabled, false);
+  assert.equal(kbStatus.payload.reason, 'knowledge_disabled');
+
+  const agentHtml = await readFile(path.join(DIST_DIR, 'agent.html'), 'utf8');
+  assert.match(agentHtml, /celia-static-shim\.js/);
+  assert.match(agentHtml, /href="\.\/kb\.html"/);
+  assert.doesNotMatch(agentHtml, /(?:href|src)="\/(?!\/)/);
+
+  const kbHtml = await readFile(path.join(DIST_DIR, 'kb.html'), 'utf8');
+  assert.match(kbHtml, /celia-static-shim\.js/);
+  assert.match(kbHtml, /href="\.\/agent\.html"/);
+  assert.doesNotMatch(kbHtml, /(?:href|src)="\/(?!\/)/);
 });
 
 test('نقطة اكتشاف الاستضافة تقول «غير متحقق» وتشير إلى خطة موجودة فعلًا', async () => {

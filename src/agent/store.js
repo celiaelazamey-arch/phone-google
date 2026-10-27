@@ -47,7 +47,21 @@ export const TOOL_RUN_STATUS = Object.freeze({
 export const APPROVAL_DECISION = Object.freeze({
   pending: 'pending',
   approved: 'approved',
-  rejected: 'rejected'
+  rejected: 'rejected',
+  edited: 'edited'
+});
+
+export const PLAN_LIFECYCLE_STATE = Object.freeze({
+  goalUnderstood: 'GOAL_UNDERSTOOD',
+  planReady: 'PLAN_READY',
+  waitingForApproval: 'WAITING_FOR_APPROVAL',
+  edited: 'EDITED',
+  approved: 'APPROVED',
+  rejected: 'REJECTED',
+  executing: 'EXECUTING',
+  verified: 'VERIFIED',
+  needsReconciliation: 'NEEDS_RECONCILIATION',
+  failed: 'FAILED'
 });
 
 const nowIso = (clock) => new Date(clock()).toISOString();
@@ -721,6 +735,36 @@ export function createAgentStore({ driver, clock = Date.now, idFactory = crypto.
         outboxId
       ]);
       return mapOutbox(await driver.get('SELECT * FROM agent_outbox WHERE id = ?', [outboxId]));
+    },
+    /**
+     * Update a pending outbox intent when the owner edits a plan before approving it.
+     * Conditional on `status = pending`: once an intent is claimed (`dispatching`) or
+     * settled (`sent`/`failed`/`unknown`/`cancelled`), its payload is immutable.
+     */
+    async updatePendingOutboxPayload(
+      outboxId,
+      { payload = null, idempotencyKey = null, approvalId = null, stepId = null } = {}
+    ) {
+      const payloadText = JSON.stringify(payload ?? null);
+      const payloadHash = hashOf(payload ?? null);
+      const at = nowIso(clock);
+      const existing = await driver.get('SELECT * FROM agent_outbox WHERE id = ?', [outboxId]);
+      if (!existing || existing.status !== OUTBOX_STATUS.pending) {
+        return { changed: false, entry: mapOutbox(existing) };
+      }
+      const nextKey = idempotencyKey ? text(idempotencyKey, 120) : existing.idempotency_key;
+      const nextApprovalId = approvalId ?? existing.approval_id;
+      const nextStepId = stepId ?? existing.step_id;
+      const result = await driver.run(
+        `UPDATE agent_outbox
+           SET payload = ?, payload_hash = ?, idempotency_key = ?, approval_id = ?, step_id = ?, updated_at = ?
+         WHERE id = ? AND status = ?`,
+        [payloadText, payloadHash, nextKey, nextApprovalId, nextStepId, at, outboxId, OUTBOX_STATUS.pending]
+      );
+      return {
+        changed: result.changes > 0,
+        entry: mapOutbox(await driver.get('SELECT * FROM agent_outbox WHERE id = ?', [outboxId]))
+      };
     },
     async getOutbox(outboxId) {
       return mapOutbox(await driver.get('SELECT * FROM agent_outbox WHERE id = ?', [outboxId]));

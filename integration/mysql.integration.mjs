@@ -346,7 +346,7 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
   assert.equal(recovered.status, 'needs_reconciliation');
   assert.equal((await store.listToolRuns(crash.run.id)).find((r) => r.id === inFlight.toolRun.id).status, 'unknown');
 
-  // External effect through the outbox on real MySQL 8.4: parked, approved, sent once.
+  // External effect through the outbox on real MySQL 8.4: parked, edited, re-approved, sent once.
   const calendarThread = await store.createThread({ ownerId: config.userId, title: 'calendar' });
   const calendarRun = await runtime.submit({
     threadId: calendarThread.id,
@@ -359,10 +359,25 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
   assert.equal(parkedRows.length, 1);
   assert.equal(parkedRows[0].status, 'pending');
 
+  // Edit the plan on real MySQL 8.4: must stay in waiting_approval with revision 2.
+  const editedResult = await runtime.editPlan(calendarRun.run.id, {
+    payload: {
+      ...parkedRows[0].payload,
+      summary: 'موعد مراجعة أسبوعية (معدّل على MySQL 8.4)'
+    },
+    note: 'تعديل العنوان قبل الاعتماد',
+    idempotencyKey: 'mysql-edit-plan-0001'
+  });
+  assert.equal(editedResult.resumed, false);
+  assert.equal(editedResult.run.status, 'waiting_approval');
+  assert.equal(editedResult.plan.revision, 2);
+  assert.equal(calendarSends.length, 0, 'editing a plan never dispatches the outbox');
+
   await runtime.approve(calendarRun.run.id, { decision: 'approved', note: 'MySQL acceptance' });
   const calendarFinished = await runtime.runToCompletion(calendarRun.run.id);
   assert.equal(calendarFinished.status, 'succeeded');
   assert.equal(calendarSends.length, 1, 'exactly one external request');
+  assert.equal(calendarSends[0].event.summary, 'موعد مراجعة أسبوعية (معدّل على MySQL 8.4)');
   const sentRows = await store.listOutbox(calendarRun.run.id);
   assert.equal(sentRows.length, 1);
   assert.equal(sentRows[0].status, 'sent');

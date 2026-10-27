@@ -305,7 +305,8 @@ $('load-entities').addEventListener('click', loadEntities);
 $('entity-type').addEventListener('change', loadEntities);
 $('stale-btn').addEventListener('click', showStale);
 
-const STATIC_HOST = /\.github\.io$/i.test(location.hostname);
+const STATIC_HOST =
+  document.documentElement.dataset.celiaStatic === 'true' || /\.github\.io$/i.test(location.hostname);
 if (STATIC_HOST) {
   // Pages is a static snapshot: no API, no index. Say it instead of failing silently.
   const badge = $('kb-badge');
