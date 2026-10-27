@@ -87,6 +87,8 @@
 | `npm run celia:mcp:verify` | selfTest passed · **12** أداة MCP (لم تتغير — `kb.*` أدوات وكيل فقط) |
 | `npm run release:check` | 0.2.1 · schema 1 |
 | `npm run build:pages` | 7 صفحات بما فيها `kb.html` |
+| CI على `dc17493` (run `40502456740`) | الوظائف السبع ناجحة، وخطتا المعرفة (`verify/import/search/entity/stale` و`export→restore`) ناجحتان |
+| كشف حي (معاينة) | `/api/kb/status` = enabled · 56 عنصرًا · 55 حافة؛ `/api/kb/search` «كيف أربط جوجل» = 3 أدلة مع `uri` وترخيص؛ تشغيل وكيل ناجح بخطوة `kb.search` أولًا وتسليم يسرد المراجع |
 
 ## الحدود المعلنة (لا تُخفى في العرض)
 
