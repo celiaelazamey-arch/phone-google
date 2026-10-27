@@ -207,9 +207,10 @@ export function defaultToolDefinitions({ statusProvider, kb } = {}) {
     },
     {
       name: 'google.calendar_create_event',
-      description: 'إنشاء موعد في Google Calendar — أثر خارجي يحتاج موافقة صريحة',
+      description: 'إنشاء موعد في Google Calendar — أثر خارجي يمرّ بـ outbox بعد موافقة صريحة',
       risk: RISK.externalEffect,
       requiresApproval: true,
+      connector: 'google.calendar',
       arguments: { summary: 'string', start: 'string', end: 'string' }
     },
     {

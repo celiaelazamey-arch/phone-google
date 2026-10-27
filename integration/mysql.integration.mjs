@@ -257,14 +257,19 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
     assert.equal(before.ledger, 'missing', 'dry run reports the missing ledger and writes nothing');
 
     const applied = await runMigrations({ connection: migrationConnection, directory, apply: true });
-    assert.deepEqual(applied.appliedNow, ['0002_agent-runtime.sql', '0003_agent-governance.sql']);
+    assert.deepEqual(applied.appliedNow, [
+      '0002_agent-runtime.sql',
+      '0003_agent-governance.sql',
+      '0004_agent-outbox.sql'
+    ]);
 
     const second = await runMigrations({ connection: migrationConnection, directory, apply: true });
     assert.deepEqual(second.pending, [], 'a second apply is a no-op');
     const status = await runMigrations({ connection: migrationConnection, directory, statusOnly: true });
-    assert.equal(status.applied.length, 2);
+    assert.equal(status.applied.length, 3);
     assert.equal(status.applied[0].version, 2);
     assert.equal(status.applied[1].version, 3);
+    assert.equal(status.applied[2].version, 4);
   } finally {
     await migrationConnection.end();
   }
@@ -275,7 +280,7 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
       cwd: root,
       env: { ...process.env, ...mysqlEnv }
     });
-    assert.equal(JSON.parse(stdout).applied.length, 2);
+    assert.equal(JSON.parse(stdout).applied.length, 3);
   } catch (error) {
     throw new Error(`migrate CLI failed: ${String(error?.stderr || error?.message || '').slice(0, 600)}`);
   }
@@ -283,10 +288,25 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
   pool = mysql.createPool({ ...config.mysql, database: schema, charset: 'utf8mb4', timezone: 'Z', connectionLimit: 4 });
   await pool.execute('INSERT INTO app_users (id) VALUES (?) ON DUPLICATE KEY UPDATE id = VALUES(id)', [config.userId]);
   const store = createAgentStore({ driver: createMysqlDriver(pool) });
+  // Real MySQL connector seam: a fake transport, so the outbox path is exercised
+  // against InnoDB without touching a real Google account.
+  const { createConnectorRegistry, createCalendarConnector } = await import('../src/agent/connectors.js');
+  const calendarSends = [];
+  const connectors = createConnectorRegistry([
+    createCalendarConnector({
+      transport: {
+        async insertEvent({ calendarId, event }) {
+          calendarSends.push({ calendarId, event });
+          return { id: `mysql-evt-${calendarSends.length}`, htmlLink: null, iCalUID: event.iCalUID };
+        }
+      }
+    })
+  ]);
   const runtime = createAgentRuntime({
     store,
     tools: createDefaultTools({ statusProvider: () => ({ version: '0.2.1', storage: 'mysql' }) }),
     planner: createDemoPlanner(),
+    connectors,
     ownerId: config.userId,
     logger: { error() {} }
   });
@@ -326,9 +346,33 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
   assert.equal(recovered.status, 'needs_reconciliation');
   assert.equal((await store.listToolRuns(crash.run.id)).find((r) => r.id === inFlight.toolRun.id).status, 'unknown');
 
+  // External effect through the outbox on real MySQL 8.4: parked, approved, sent once.
+  const calendarThread = await store.createThread({ ownerId: config.userId, title: 'calendar' });
+  const calendarRun = await runtime.submit({
+    threadId: calendarThread.id,
+    message: 'أنشئ موعد مراجعة أسبوعية',
+    clientMessageId: 'mysql-calendar-0001'
+  });
+  assert.equal((await runtime.runToCompletion(calendarRun.run.id)).status, 'waiting_approval');
+  assert.equal(calendarSends.length, 0, 'nothing leaves before the owner decides');
+  const parkedRows = await store.listOutbox(calendarRun.run.id);
+  assert.equal(parkedRows.length, 1);
+  assert.equal(parkedRows[0].status, 'pending');
+
+  await runtime.approve(calendarRun.run.id, { decision: 'approved', note: 'MySQL acceptance' });
+  const calendarFinished = await runtime.runToCompletion(calendarRun.run.id);
+  assert.equal(calendarFinished.status, 'succeeded');
+  assert.equal(calendarSends.length, 1, 'exactly one external request');
+  const sentRows = await store.listOutbox(calendarRun.run.id);
+  assert.equal(sentRows.length, 1);
+  assert.equal(sentRows[0].status, 'sent');
+  assert.equal(sentRows[0].attempts, 1);
+  assert.ok(sentRows[0].externalRef);
+
   // The five core tables are untouched by the additive migration.
   const [tables] = await pool.execute('SELECT TABLE_NAME AS name FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()');
   const names = tables.map((row) => row.name);
-  assert.equal(names.filter((name) => name.startsWith('agent_')).length, 8);
+  assert.equal(names.filter((name) => name.startsWith('agent_')).length, 9);
+  assert.ok(names.includes('agent_outbox'));
   assert.ok(['app_users', 'oauth_states', 'google_credentials', 'whatsapp_contacts', 'whatsapp_messages'].every((name) => names.includes(name)));
 });

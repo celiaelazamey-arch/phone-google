@@ -293,3 +293,142 @@ test('verifier: a tampered ledger is BLOCK at the chain check, and verification 
   const after = await fixture.store.listEvidence(submitted.run.id);
   assert.equal(after.length, before.length, 'the verifier is read-only');
 });
+
+// ── Outbox checks (AGENT-002) ────────────────────────────────────────────────
+async function verifierShape(t) {
+  const fixture = await createTempStore();
+  t.after(() => fixture.cleanup());
+  const recorder = createRecordingTools();
+  const verifier = createVerifier({ tools: recorder.tools });
+  const thread = await fixture.store.createThread({ ownerId: 'owner', title: 'outbox-verify' });
+  const run = await runShape(fixture.store, thread);
+  return { fixture, verifier, run };
+}
+
+const step = [{ id: 's1', kind: 'plan', title: 'خطوة' }];
+
+test('verifier: a sent effect backed by an approved decision and a successful tool run passes', async (t) => {
+  const { fixture, verifier, run } = await verifierShape(t);
+  const entry = await fixture.store.appendEvidence({
+    runId: run.id,
+    kind: 'external_effect_enqueued',
+    input: { tool: 'calendar.create' },
+    output: { outboxId: 'ob-1' },
+    sourceIds: ['ob-1']
+  });
+  const evidence = await fixture.store.listEvidence(run.id);
+  const result = await verifier.verifyRun({
+    run,
+    contract: unitContract(run),
+    steps: step,
+    toolRuns: [{ id: 'tr-1', toolName: 'calendar.create', status: 'succeeded', outcome: '{"outboxStatus":"sent"}' }],
+    evidence,
+    approvals: [{ id: 'ap-1', toolName: 'calendar.create', decision: 'approved' }],
+    outbox: [{ id: 'ob-1', toolName: 'calendar.create', status: 'sent', approvalId: 'ap-1', externalRef: 'evt-1' }],
+    messages: []
+  });
+  assert.equal(entry.seq, 1);
+  assert.equal(result.checks.find((check) => check.id === 'outbox_approval').status, 'PASS');
+  assert.equal(result.checks.find((check) => check.id === 'outbox_outcome').status, 'PASS');
+  assert.equal(result.checks.find((check) => check.id === 'outbox_evidence').status, 'PASS');
+  assert.equal(result.checks.find((check) => check.id === 'outbox_tool_run_parity').status, 'PASS');
+});
+
+test('verifier: a sent effect without an approved decision is BLOCK', async (t) => {
+  const { fixture, verifier, run } = await verifierShape(t);
+  await fixture.store.appendEvidence({
+    runId: run.id,
+    kind: 'external_effect_settled',
+    input: { tool: 'calendar.create' },
+    output: { status: 'sent' },
+    sourceIds: ['ob-1']
+  });
+  const evidence = await fixture.store.listEvidence(run.id);
+  const result = await verifier.verifyRun({
+    run,
+    contract: unitContract(run),
+    steps: step,
+    toolRuns: [],
+    evidence,
+    approvals: [{ id: 'ap-1', toolName: 'calendar.create', decision: 'rejected' }],
+    outbox: [{ id: 'ob-1', toolName: 'calendar.create', status: 'sent', approvalId: 'ap-1' }],
+    messages: []
+  });
+  assert.equal(result.checks.find((check) => check.id === 'outbox_approval').status, 'BLOCK');
+  assert.equal(result.verdict, VERDICT.block);
+});
+
+test('verifier: an unsettled intent is UNKNOWN — no delivery is claimed', async (t) => {
+  const { fixture, verifier, run } = await verifierShape(t);
+  await fixture.store.appendEvidence({
+    runId: run.id,
+    kind: 'external_effect_enqueued',
+    input: { tool: 'calendar.create' },
+    output: { status: 'pending' },
+    sourceIds: ['ob-1']
+  });
+  const evidence = await fixture.store.listEvidence(run.id);
+  const result = await verifier.verifyRun({
+    run,
+    contract: unitContract(run),
+    steps: step,
+    toolRuns: [],
+    evidence,
+    approvals: [],
+    outbox: [{ id: 'ob-1', toolName: 'calendar.create', status: 'pending', approvalId: null }],
+    messages: []
+  });
+  assert.equal(result.checks.find((check) => check.id === 'outbox_outcome').status, 'UNKNOWN');
+  assert.equal(result.checks.find((check) => check.id === 'outbox_status_or')?.status, undefined);
+  assert.equal(result.verdict, VERDICT.unknown);
+});
+
+test('verifier: an intent missing from the ledger is BLOCK', async (t) => {
+  const { fixture, verifier, run } = await verifierShape(t);
+  await fixture.store.appendEvidence({
+    runId: run.id,
+    kind: 'goal_contract',
+    input: { objective: 'x' },
+    output: null,
+    sourceIds: ['message-1']
+  });
+  const evidence = await fixture.store.listEvidence(run.id);
+  const result = await verifier.verifyRun({
+    run,
+    contract: unitContract(run),
+    steps: step,
+    toolRuns: [],
+    evidence,
+    approvals: [],
+    outbox: [{ id: 'ob-ghost', toolName: 'calendar.create', status: 'failed', approvalId: null }],
+    messages: []
+  });
+  const check = result.checks.find((item) => item.id === 'outbox_evidence');
+  assert.equal(check.status, 'BLOCK');
+  assert.match(check.detail, /calendar\.create/);
+  assert.equal(result.verdict, VERDICT.block);
+});
+
+test('verifier: a sent intent with no matching successful tool run is BLOCK', async (t) => {
+  const { fixture, verifier, run } = await verifierShape(t);
+  await fixture.store.appendEvidence({
+    runId: run.id,
+    kind: 'external_effect_settled',
+    input: { tool: 'calendar.create' },
+    output: { status: 'sent' },
+    sourceIds: ['ob-1', 'tr-1']
+  });
+  const evidence = await fixture.store.listEvidence(run.id);
+  const result = await verifier.verifyRun({
+    run,
+    contract: unitContract(run),
+    steps: step,
+    toolRuns: [{ id: 'tr-1', toolName: 'read.alpha', status: 'succeeded', outcome: '{"alpha":true}' }],
+    evidence,
+    approvals: [{ id: 'ap-1', toolName: 'calendar.create', decision: 'approved' }],
+    outbox: [{ id: 'ob-1', toolName: 'calendar.create', status: 'sent', approvalId: 'ap-1' }],
+    messages: []
+  });
+  assert.equal(result.checks.find((check) => check.id === 'outbox_tool_run_parity').status, 'BLOCK');
+  assert.equal(result.verdict, VERDICT.block);
+});
