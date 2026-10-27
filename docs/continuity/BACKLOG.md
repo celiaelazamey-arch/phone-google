@@ -93,7 +93,7 @@
 
 | المعرف | الأولوية | الحالة | يعتمد على | التسليم ومعيار القبول |
 |---|---|---|---|---|
-| SPDR-001 | P1 | جارٍ — حزمة `celia-google-spider/` مبنية واختبارات محلية 10/10 (unittest وpytest) ومصافحة MCP stdio تُظهر الأدوات الست؛ أخضر CI بعد الدفع | — | حزمة كاملة `celia_spider/` وفق DEC-011 مع الأدوات الست وفهرس SQLite وتطبيع عربي/إنجليزي و`README.md` عربي وZIP؛ `python -m unittest discover -s tests -v` و`pytest -q` ناجحتان دون اتصال Drive |
+| SPDR-001 | P1 | متحقق — اختبارات محلية 10/10 (unittest وpytest) ومصافحة MCP stdio تُظهر الأدوات الست، وCI أخضر في run 40486458531 (وظيفة `spider` + verify + container + browser + mysql) | — | حزمة كاملة `celia_spider/` وفق DEC-011 مع الأدوات الست وفهرس SQLite وتطبيع عربي/إنجليزي و`README.md` عربي وZIP؛ `python -m unittest discover -s tests -v` و`pytest -q` ناجحتان دون اتصال Drive |
 | SPDR-002 | P2 | بانتظار معلومات المالك — لا اعتماد حي | SPDR-001 | مزامنة فعلية بحساب المالك و`credentials.json` محلي (خارج Git): قبول خارجي لأدوات البحث والاستكشاف وحدود عدم الحذف؛ لا يُغلق ببيئة تطوير بلا بيانات اعتماد |
 
 ## ترتيب البدء
