@@ -85,6 +85,16 @@ export function createAgentRouter({ agent, authorize, logger = console }) {
     }
   });
 
+  router.delete('/threads/:id', async (req, res) => {
+    const current = await runtime(res);
+    if (!current) return undefined;
+    try {
+      return res.json(await current.deleteThread(req.params.id, current.status().ownerId));
+    } catch (error) {
+      return fail(res, error);
+    }
+  });
+
   router.post('/threads/:id/runs', json, async (req, res) => {
     const current = await runtime(res);
     if (!current) return undefined;
@@ -118,6 +128,17 @@ export function createAgentRouter({ agent, authorize, logger = console }) {
     if (!current) return undefined;
     try {
       return res.json(await current.detail(req.params.id, current.status().ownerId));
+    } catch (error) {
+      return fail(res, error);
+    }
+  });
+
+  router.get('/runs/:id/audit-bundle', async (req, res) => {
+    const current = await runtime(res);
+    if (!current) return undefined;
+    try {
+      const bundle = await current.exportAuditBundle(req.params.id, current.status().ownerId);
+      return res.set('Cache-Control', 'no-store').json(bundle);
     } catch (error) {
       return fail(res, error);
     }

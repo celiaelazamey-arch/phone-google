@@ -1386,6 +1386,39 @@ export function createAgentRuntime({
       const [messages, runs] = await Promise.all([store.listMessages(threadId), store.listRuns(threadId)]);
       return { thread, messages, runs };
     },
+    async deleteThread(threadId, requesterId = ownerId) {
+      const result = await store.deleteThread(threadId, requesterId);
+      if (!result.deleted) {
+        if (result.reason === 'thread_not_found') {
+          throw httpError(404, 'thread_not_found', 'thread_not_found');
+        }
+        throw httpError(409, result.reason || 'thread_delete_blocked', result.reason || 'thread_delete_blocked');
+      }
+      return result;
+    },
+    async exportAuditBundle(runId, requesterId = ownerId) {
+      const detail = await runtime.detail(runId, requesterId);
+      const bundleBody = {
+        schema_version: '1.0',
+        capability: 'agent_audit_bundle',
+        run: detail.run,
+        goalContract: detail.goalContract,
+        plan: detail.plan,
+        truthPartition: detail.truthPartition,
+        steps: detail.steps,
+        toolRuns: detail.toolRuns,
+        approvals: detail.approvals,
+        outbox: detail.outbox,
+        evidence: detail.evidence,
+        evidenceChain: detail.evidenceChain,
+        verification: detail.verification
+      };
+      return {
+        ...bundleBody,
+        exported_at: new Date(clock()).toISOString(),
+        bundle_sha256: hashOf(bundleBody)
+      };
+    },
     subscribe(runId, listener) {
       if (typeof listener !== 'function') throw new Error('listener is required');
       if (!listeners.has(runId)) listeners.set(runId, new Set());

@@ -48,14 +48,17 @@
    - إنشاء `src/agent/evaluation.js` و`docs/ai-workflow-6-steps.md` و`test/agent-evaluation.test.js` وتحديث `public/agent.{html,js}` و`src/agent-routes.js` (`GET /api/agent/metrics` وعرض الفصل الثلاثي `executed / verified / unverified` وبوابة الفهم في `/agent`).
    - تسجيل الأداتين الحتميتين `product.catalog_audit` و`creative.workflow_plan` في `src/agent/tools.js` و`src/knowledge/tool-policy.js`.
 
+10. **حزمة التدقيق الموقّعة واستئناف وحذف الخيوط وضبط البيئة (`DEC-024`):**
+   - إضافة `exportAuditBundle` (`GET /api/agent/runs/:id/audit-bundle`) و`deleteThread` (`DELETE /api/agent/threads/:id`) في `src/agent/store.js` و`src/agent/runtime.js` و`src/agent-routes.js`، وتحديث `public/agent.{html,css,js}` و`src/config.js` و`src/secrets-hub.js` مع اختبارات `AUDIT-01..AUDIT-03` في `test/agent-audit-bundle.test.js` (إجمالي **280/280** في `npm test`).
+
 ## 2. نتائج الفحوص الفعلية (محليًا وفي GitHub Actions CI)
 
 - `npm run build:pages`: ناجح (8 صفحات ثابتة في `dist/`).
-- `npm run check`: ناجح (`97` ملف JavaScript).
+- `npm run check`: ناجح (`98` ملف JavaScript).
 - `npm run release:check`: ناجح (`0.2.1` / `schema: 1`).
 - `npm run check:continuity`: ناجح.
 - `npm run check:secrets`: ناجح (`wiringVerified: true`، `zeroLeakVerified: true`).
-- `npm test`: **277/277** اختبارًا ناجحًا (منها 4 في `test/agent-evaluation.test.js`، و13 في `test/agent-connectors.test.js`، و10 في `test/agent-comprehension-gate.test.js`، و7 في `test/agent-document-automation.test.js`).
+- `npm test`: **280/280** اختبارًا ناجحًا (منها 3 في `test/agent-audit-bundle.test.js`، و4 في `test/agent-evaluation.test.js`، و13 في `test/agent-connectors.test.js`، و10 في `test/agent-comprehension-gate.test.js`، و7 في `test/agent-document-automation.test.js`).
 - **إغلاق فجوة التحقق في GitHub Actions CI (`Phase 3 — Verification Closure`):**
   - دُفع الفرع `arena/5fccc4e6-phone-google` إلى `origin` بعد موافقة المالك (`موافق على تنفيذ Verification Closure`).
   - كشفت التشغيلة الأولى `40592598360` (`6bf47b3`) أن طول JSON لمخرج `data.report` (`4494` حرفًا) تجاوز حد عمود

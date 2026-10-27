@@ -42,7 +42,7 @@ export function loadConfig(env = process.env) {
     }),
     userId: env.APP_USER_ID || 'owner',
     ownerEmail: env.APP_OWNER_EMAIL || '',
-    ownerPhone: env.APP_OWNER_PHONE_E164 || null,
+    ownerPhone: (env.APP_OWNER_PHONE_E164 || env.PHONE_NUMBER || '').trim() || null,
     encryptionKey,
     mysql: loadMysqlConfig(env),
     google: {

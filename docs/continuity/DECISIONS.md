@@ -395,6 +395,24 @@
   حزمة مرجعية ذهبية في `test/fixtures/documents/`، واختبارات `test/agent-document-automation.test.js`. **لا ترحيل SQL جديد
   ولا تغيير في `schema 1` أو الإصدار `0.2.1` أو أدوات MCP الـ12.**
 
+## DEC-024 — حزمة التدقيق الموقّعة (`Audit Bundle`)، واستئناف وحذف الخيوط (`UX-001`)، وضبط متغيرات البيئة
+
+- **التاريخ:** 27 أكتوبر 2026 (مساءً) · **الحالة:** منفذ ومختبر محليًا (3 اختبارات في `test/agent-audit-bundle.test.js`، إجمالي 280/280 في `npm test`) · **المهمة:** UX-001، DATA-002، DATA-004، SEC-001
+- **السياق:** استكمال المتطلبات البرمجية قبل إطلاق النسخة الأولى (`v0.2.1`): توفير تصدير تدقيق موقّع، واستئناف وحذف الخيوط
+  من واجهة `/agent`، ودعم `PHONE_NUMBER` كبديل توافقي لـ`APP_OWNER_PHONE_E164`.
+- **القرار:**
+  1. **تصدير حزمة التدقيق الموقّعة (`exportAuditBundle` و`GET /api/agent/runs/:id/audit-bundle`):**
+     - يُرجع حزمة JSON منقّحة تحتوي على `run`، `goalContract`، `plan`، `truthPartition`، `steps`، `toolRuns`،
+       `approvals`، `outbox`، `evidence`، `evidenceChain`، و`verification` مع بصمة شاملة `bundle_sha256` محسوبة بـ`hashOf`.
+  2. **حذف الخيوط المحكوم (`deleteThread` و`DELETE /api/agent/threads/:id`):**
+     - يحذف الخيط وجميع سجلاته التابعة في معاملة واحدة، ويرفض الحذف بـ`409 thread_has_active_or_uncertain_work` إذا كان
+       في الخيط تشغيل قيد التنفيذ (`running`) أو يحتاج إلى مصالحة (`needs_reconciliation`) أو نية `dispatching`/`unknown`.
+  3. **استئناف الخيوط في `/agent` (`public/agent.{html,css,js}`):**
+     - إضافة قائمة اختيار الخيوط السابقة (`#thread-select`)، وزر حذف الخيط (`#delete-thread`)، وزر تنزيل حزمة التدقيق (`#export-audit`).
+  4. **ضبط متغيرات البيئة (`src/config.js` و`src/secrets-hub.js`):**
+     - دعم `PHONE_NUMBER` كبديل توافقي احتياطي لـ`APP_OWNER_PHONE_E164`، وإضافة `inspectUnwiredEnvironmentVariables` لرصد
+       أسماء المتغيرات غير الموصولة (`CLOUDFLARE_R2_*`, `CELIAOS_CRONJOB_ORG_API_KEY`) دون كشف أي قيمة سرية.
+
 ## DEC-023 — محرك التطبيق والقياس ذو الخطوات الست (`6-Step AI Application & Evaluation Engine` + `Product Catalog Audit` + `6-Stage Creative Workflow` + `3-Way Truth Partition`)
 
 - **التاريخ:** 27 أكتوبر 2026 (مساءً) · **الحالة:** منفذ ومختبر محليًا (4 اختبارات في `test/agent-evaluation.test.js`، إجمالي 277/277 في `npm test`) · **المهمة:** AGENT-001، AI-001، AI-002، OPS-001، UX-001

@@ -7,6 +7,32 @@ const FIGMA_FILE_KEY_RE = /^[A-Za-z0-9_-]{5,128}$/;
 const MAX_VOICE_TEXT_LENGTH = 1000;
 const MAX_AUDIO_BYTES = 5 * 1024 * 1024;
 
+const UNWIRED_KNOWN_ENV_KEYS = Object.freeze([
+  'CELIAOS_CRONJOB_ORG_API_KEY',
+  'CLOUDFLARE_ACCOUNT_ID',
+  'CLOUDFLARE_API_TOKEN',
+  'CLOUDFLARE_R2_ACCESS_KEY_ID',
+  'CLOUDFLARE_R2_SECRET_ACCESS_KEY',
+  'CLOUDFLARE_R2_S3_ENDPOINT'
+]);
+
+export function inspectUnwiredEnvironmentVariables(env = process.env) {
+  const presentUnwired = UNWIRED_KNOWN_ENV_KEYS.filter(
+    (name) => typeof env?.[name] === 'string' && env[name].trim().length > 0
+  );
+  const phoneAliasUsed =
+    !String(env?.APP_OWNER_PHONE_E164 || '').trim() &&
+    Boolean(String(env?.PHONE_NUMBER || '').trim());
+  return {
+    presentUnwiredNames: presentUnwired,
+    phoneAliasUsed,
+    noteAr:
+      presentUnwired.length > 0
+        ? `المتغيرات (${presentUnwired.join(', ')}) موجودة في البيئة لكن لا يوجد لها موصل مفعّل في الكود الحالي؛ لا تُقرأ ولا تُسرب.`
+        : 'لا توجد متغيرات إضافية غير موصولة في البيئة الحالية.'
+  };
+}
+
 export function buildSecretsReadiness(config = {}, services = null) {
   const circuits = new Map((services?.snapshot?.() || []).map((c) => [c.name, c.state]));
   const stateOf = (boundary) => circuits.get(boundary) || (config.features?.[boundary] === false ? 'disabled' : 'closed');

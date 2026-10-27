@@ -284,6 +284,34 @@ export function createAgentStore({ driver, clock = Date.now, idFactory = crypto.
       );
       return rows.map(mapThread);
     },
+    async deleteThread(threadId, ownerId) {
+      const thread = await store.getThread(threadId, ownerId);
+      if (!thread) return { deleted: false, reason: 'thread_not_found' };
+      const runs = await store.listRuns(threadId);
+      for (const r of runs) {
+        if (['queued', 'running', 'needs_reconciliation'].includes(r.status)) {
+          return { deleted: false, reason: 'thread_has_active_or_uncertain_work', runId: r.id };
+        }
+        const outboxRows = await store.listOutbox(r.id);
+        if (outboxRows.some((o) => o.status === 'dispatching' || o.status === 'unknown')) {
+          return { deleted: false, reason: 'thread_has_active_or_uncertain_work', runId: r.id };
+        }
+      }
+      await driver.transaction(async (tx) => {
+        for (const r of runs) {
+          await tx.run('DELETE FROM agent_outbox WHERE run_id = ?', [r.id]);
+          await tx.run('DELETE FROM agent_approvals WHERE run_id = ?', [r.id]);
+          await tx.run('DELETE FROM agent_evidence WHERE run_id = ?', [r.id]);
+          await tx.run('DELETE FROM agent_tool_runs WHERE run_id = ?', [r.id]);
+          await tx.run('DELETE FROM agent_goal_contracts WHERE run_id = ?', [r.id]);
+          await tx.run('DELETE FROM agent_steps WHERE run_id = ?', [r.id]);
+        }
+        await tx.run('DELETE FROM agent_runs WHERE thread_id = ? AND owner_id = ?', [threadId, ownerId]);
+        await tx.run('DELETE FROM agent_messages WHERE thread_id = ?', [threadId]);
+        await tx.run('DELETE FROM agent_threads WHERE id = ? AND owner_id = ?', [threadId, ownerId]);
+      });
+      return { deleted: true, threadId, deletedRunsCount: runs.length };
+    },
     async appendMessage({ threadId, role, content, clientMessageId = null }) {
       const id = idFactory();
       const at = nowIso(clock);
