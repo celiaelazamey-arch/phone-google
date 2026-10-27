@@ -58,4 +58,9 @@
 
 ## نتيجة التسليم النهائية
 
-قيد التحقق من commit/الدفع وCI في هذه الجلسة؛ هذا السطر يُستبدل بعد ظهور النتيجة الفعلية.
+- حُفظت الحزمة ودفعت فعليًا في `8e34efe2f8a5f7bae141ed927af760ca1a803ea9` وفتح [PR22](https://github.com/celiaelazamey-arch/phone-google/pull/22).
+- [CI الدفع40469933172](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40469933172) و[CI PR40469984037](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40469984037) ناجحان فعليًا: Node22/24 وDocker والمتصفح وMySQL8.4 مع restart وN−1 وrestore مصطنعة. Gemini الحي متجاوز عمدًا دون مفاتيح.
+- أثر MySQL المنقح رُفع في CI. تنزيله من الجهاز توقف عند مضيف Azure المحظور شبكيًا؛ لم ندّع قراءة ملف JSON أو إصدار patch للمحرك من ذلك. نجاح المهمة وخطوتي SQL/upload مثبت من Jobs API. لا إعادة لمحاولة التنزيل دون تغير الشبكة.
+- المعاينة أُعيد تشغيلها من commit المدفوع الصحيح على3010؛ API يثبت0.2.1 وSHA8e34efe وdurable=false وallCapabilitiesVerified=false. ليست استضافة عامة دائمة.
+- مراجعة mysql2 أظهرت أن الثقة بالـCA لا تفعّل hostname validation تلقائيًا. شُدد `verifyIdentity=true` صراحة وأضيف اختبار TLS فعلي يثق بشهادة MySQL المُصدرة محليًا ثم يرفض اسم مضيف غير مطابق. هذا تحديث أمان بعد CI الأول؛ نتيجة أحدث commit توثق لاحقًا.
+- لا merge أو GitHub Release أو نشر دائم؛ عائق تفويض Render/Aiven والحسابات الخارجية باقٍ.

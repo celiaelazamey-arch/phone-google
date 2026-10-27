@@ -36,6 +36,6 @@ export function loadMysqlConfig(env = process.env) {
     database: env.MYSQL_DATABASE || 'phone_google',
     user: env.MYSQL_USER || 'phone_google',
     password: env.MYSQL_PASSWORD || '',
-    ...(tls ? { ssl: Object.freeze({ minVersion: 'TLSv1.2', rejectUnauthorized: true, ...(ca ? { ca } : {}) }) } : {})
+    ...(tls ? { ssl: Object.freeze({ minVersion: 'TLSv1.2', rejectUnauthorized: true, verifyIdentity: true, ...(ca ? { ca } : {}) }) } : {})
   });
 }

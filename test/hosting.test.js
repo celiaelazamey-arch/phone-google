@@ -18,6 +18,7 @@ test('MySQL TLS verifies certificates and supports an explicit CA without exposi
   const config = loadMysqlConfig({ NODE_ENV: 'production', MYSQL_SSL_CA_BASE64: encoded, MYSQL_PORT: '25060' });
   assert.equal(config.port, 25060);
   assert.equal(config.ssl.rejectUnauthorized, true);
+  assert.equal(config.ssl.verifyIdentity, true);
   assert.equal(config.ssl.minVersion, 'TLSv1.2');
   assert.equal(config.ssl.ca, rootCertificates[0]);
   assert.equal(loadMysqlConfig({}).ssl, undefined);

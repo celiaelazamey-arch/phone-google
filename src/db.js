@@ -11,7 +11,7 @@ export function createPool(config, { prepareOwner = true } = {}) {
     connectTimeout: 1500,
     charset: 'utf8mb4',
     timezone: 'Z',
-    ssl: config.mysql.ssl ? { ...config.mysql.ssl } : (config.nodeEnv === 'production' ? { minVersion: 'TLSv1.2', rejectUnauthorized: true } : undefined)
+    ssl: config.mysql.ssl ? { ...config.mysql.ssl } : (config.nodeEnv === 'production' ? { minVersion: 'TLSv1.2', rejectUnauthorized: true, verifyIdentity: true } : undefined)
   });
   let prepared;
   const prepare = () => {

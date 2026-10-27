@@ -7,6 +7,8 @@ import { mkdir, mkdtemp, writeFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import mysql from 'mysql2/promise';
+import { connect as connectSocket } from 'node:net';
+import { loadMysqlConfig } from '../src/mysql-config.js';
 import { bootstrapEmptySchema } from '../src/bootstrap-schema.js';
 import { loadCeliaMcpConfig, createCeliaMcpApp, MCP_TOOLS } from '../src/celia-mcp.js';
 import { createPool, ensureOwner } from '../src/db.js';
@@ -82,6 +84,21 @@ test('real MySQL 8.4 acceptance: installation, persistence, signed webhook, lega
     const [rows] = await admin.query('SELECT VERSION() AS version');
     version = rows[0].version;
     assert.match(version, /^8\.4\./);
+  });
+  await check('real MySQL TLS rejects a trusted certificate with the wrong hostname', async () => {
+    // MySQL's auto-generated server certificate is intentionally NOT valid for localhost.
+    // Trust its CA, then require an ALTNAME rejection: issuer validation alone is insufficient.
+    const ca = await pipeCommand('docker', ['exec', container, 'cat', '/var/lib/mysql/ca.pem']);
+    const tlsConfig = loadMysqlConfig({ ...env, MYSQL_HOST: 'localhost', MYSQL_SSL: 'true', MYSQL_SSL_CA_BASE64: ca.toString('base64') });
+    let socket, unexpectedConnection;
+    try {
+      await assert.rejects(async () => {
+        unexpectedConnection = await mysql.createConnection({ ...tlsConfig, ssl: { ...tlsConfig.ssl }, connectTimeout: 5000, stream: () => (socket = connectSocket({ host, port })) });
+      }, (error) => error.code === 'ERR_TLS_CERT_ALTNAME_INVALID');
+    } finally {
+      if (unexpectedConnection) await unexpectedConnection.end();
+      socket?.destroy();
+    }
   });
   await check('first initialization creates five tables and a second initialization leaves existing data intact', async () => {
     assert.equal((await bootstrapEmptySchema(config)).action, 'initialized-empty-database');
@@ -173,7 +190,7 @@ test('real MySQL 8.4 acceptance: installation, persistence, signed webhook, lega
       assert.equal(decryptJson(tokens[0].encrypted_tokens, key).refresh_token, 'synthetic-token-only');
     } finally { await connection.end(); }
   });
-  assert.equal(checks.length, 8, 'No passing evidence file may be written if any acceptance check failed');
+  assert.equal(checks.length, 9, 'No passing evidence file may be written if any acceptance check failed');
   await mkdir(path.join(root, '.validation-artifacts'), { recursive: true });
   const evidence = { scope: 'isolated-ci-synthetic-data-only', engine: version, commit: process.env.GITHUB_SHA || null, baseline, checks, createdAt: new Date().toISOString(), productionDeployed: false, productionBackupVerified: false, externalProviderActions: 'not-tested', secretsOrCustomerDataIncluded: false };
   await writeFile(path.join(root, '.validation-artifacts/mysql-evidence.json'), JSON.stringify(evidence, null, 2) + '\n');
