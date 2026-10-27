@@ -1,8 +1,31 @@
 # الحالة الحالية — ابدأ من هنا
 
-**آخر مراجعة:** 27 أكتوبر 2026 · **نوع الجلسة الحالية:** تنفيذ **AGENT-001/M1 + COMP-003** — حلقة وكيل دائمة وسجل ترحيل، بلا نشر وبلا ادعاء Manus · سجل الجلسة: [2026-10-27-agent-m1-runtime](sessions/2026-10-27-agent-m1-runtime.md)
+**آخر مراجعة:** 27 أكتوبر 2026 · **نوع الجلسة الحالية:** تنفيذ **شبكة المعرفة (KB-001…KB-004)** — من CSV موثّق
+إلى دليل يستخدمه الوكيل · سجل الجلسة: [2026-10-27-knowledge-network](sessions/2026-10-27-knowledge-network.md) ·
+المرجع الكامل: [docs/knowledge-network.md](../knowledge-network.md)
 
-## الطلب الحالي (أعلى أولوية) — تنفيذ لا إرشاد، وبلا بطاقة
+## الطلب الحالي (أعلى أولوية) — «نفذ بالكامل بشكل انتاجي»
+
+بعد تصميم شبكة المعرفة نصيًا، أمر المالك بتنفيذها إنتاجيًا. المنفَّذ الآن في `src/knowledge/` و`src/kb-routes.js`
+و`public/kb.*` و`data/kb/` و`scripts/kb*.mjs`:
+
+- **السجلات:** 5 ملفات CSV (56 صفًا) مولّدة من الكود، مع `manifest.json` ببصمات SHA-256؛ تعديل يدوي بلا `kb:manifest`
+  يُفشل الاستيراد. كل صف يحمل ترخيصًا وثقة ومصدرًا، وأي سر أو خطر مخالف لـ`CANONICAL_TOOLS` يُرفض برمزه وسطره.
+- **المخزن:** SQLite + FTS5 بمخطط إصدار 1 مستقل عن `schema: 1`؛ `UNIQUE(content_hash)`، `item_aliases`،
+  `absent_since` بدل الحذف، وكل كيان/حافة لها `evidence_item_id` إلزامي.
+- **الاسترجاع:** تطبيع عربي مع خريطة إزاحات، توسيع سوابق/لواحق عند الاستعلام فقط، و`score = 0.55 lexical + 0.20 trust
+  + 0.15 freshness + 0.10 graph`، وحزمة أدلة بسقف `limit/maxChars` وإعلان `truncated/omitted`، وسبب صريح عند عدم المطابقة.
+- **الأسطح:** `/api/kb` مالك فقط بلا كتابة، و`import` معطّل إلا ببوابة صريحة؛ `kb.search`/`kb.tool_profile`/
+  `kb.project_context` أدوات وكيل قراءة فقط تُسجَّل فقط عند `CELIA_KB=sqlite`، والمخطط يسرد المراجع الفعلية في التسليم
+  ويعمل بلا LLM. صفحة `/kb` عربية RTL ببناء DOM آمن.
+- **الأدلة المقاسة:** `verify` 56 مضافًا/55 حافة/0 مرفوض · إعادة استيراد `unchanged 56` · «كيف أربط جوجل» → 3 نتائج ·
+  «موعد تقويم» → كيان التقويم بخطره وموافقته · `npm test` **153/153** · `check` 78 ملفًا · `celia:mcp:verify` 12 أداة بلا تغيير.
+- **الحدود المعلنة:** Drive غير مزامن، لا embeddings ولا بحث دلالي، تخطيط حتمي لا لغوي، فهرس محلي لا يُدَّعى دوامه
+  (`status.durability.persistent=false`)، والنسخة البعيدة المشفرة غير منفذة (KB-004 باقٍ). Claude/Drive/NAS ليست بديلًا موثقًا.
+- **CI:** أُضيفت خطوة تشغيل `kb verify → import --apply → search → export → entity → stale` داخل وظيفة Node، ولم تُشاهد
+  نتيجتها بعد على هذه الدفعة.
+
+## الطلب السابق — AGENT-001/M1 + COMP-003 (مكتمل جزئيًا ومدموج)
 
 طلب المالك: **«بقدر ما تستطيع»** — تنفيذ فعلي لا خطوات، وتوقف صريح عند أي بطاقة/تكلفة. في هذه الجلسة نُفِّذ
 المسار الوحيد القابل للإثبات بلا حساب خارجي: **حلقة الوكيل M1** ومعه **سجل الترحيل**.
@@ -96,13 +119,14 @@ pass/warn/fail، بلا شبكة وبلا طباعة أي سر) · `npm run goog
 
 بيئة محلية Node 22.22.3 / npm 10.9.8، بلا MySQL أو Docker أو Chromium:
 
-- `npm test`: **124/124** ناجحة بعد `git fetch --unshallow`. الجديد: `test/agent-store.test.js` 6/6،
-  `test/agent-runtime.test.js` 16/16، `test/agent-routes.test.js` 3/3.
-- `npm run check`: ناجح — 68 ملف JavaScript (كان 62).
+- `npm test`: **153/153** ناجحة بعد `git fetch --unshallow`. الجديد: `knowledge-normalize` 6، `knowledge-ingest` 9،
+  `knowledge-store` 8، `kb-routes` 6، إضافة إلى اختبارات الوكيل 25.
+- `npm run check`: ناجح — 78 ملف JavaScript.
+- `npm run kb -- verify|import|search|export`: ناجحة على قاعدة نظيفة — 56 عنصرًا و55 حافة و0 مرفوض، والاستيراد الثاني متطابق.
 - `npm run release:check`: ناجح — `0.2.1` / السابق `0.2.0` / `databaseSchema: 1`.
 - `npm run check:continuity`: ناجح — 23 وثيقة و59 رابطًا و47 معرفًا بلا دورات.
 - `npm run check:secrets`: ناجح · `npm run celia:mcp:verify`: ناجح — 12 أداة، `storage=memory` صريح.
-- `npm run build:pages`: ناجح — 7 صفحات (`agent.html` ضمنها) · `npm audit --omit=dev --audit-level=moderate`: 0 ثغرات.
+- `npm run build:pages`: ناجح — 7 صفحات (`agent.html` و`kb.html` ضمنها) · `npm audit --omit=dev --audit-level=moderate`: 0 ثغرات.
 - `npm run migrate` (dry-run) و`-- --apply` **لم يُنفَّذا**: لا MySQL في البيئة؛ الكود يرفض الذاكرة ويطلب قاعدة حقيقية.
 - اختبارات المتصفح وMySQL 8.4 تُشغَّل في CI فقط. **لا نتيجة CI لهذه الجلسة بعد الدفع** — المرجع الحي هو PR الفرع.
 
@@ -110,7 +134,8 @@ pass/warn/fail، بلا شبكة وبلا طباعة أي سر) · `npm run goog
 
 - أسرار المستودع التسعة لا تُقرأ ولا تُطبع ولا تُضاف لملفات الحزمة؛ و`credentials.json` و`token.json` ممنوعان من Git مهما طُلب من التوثيق.
 - الحزمة ليست موصلة ChatGPT (خارج النطاق صراحةً) ولا تدّعي بحثًا دلاليًا ولا حذفًا تلقائيًا، ولا يُعلن نشرها كمكوّن من النظام قبل قبول المالك (SPDR-002).
-- لا مستودع GitHub جديد ولا دفع خارج `arena/bc862105-phone-google`؛ لا releases ولا دمج PR من هذه الجلسة دون طلب صريح.
+- لا مستودع GitHub جديد ولا دفع خارج `arena/c0d6fcba-phone-google`؛ لا releases ولا دمج PR من هذه الجلسة دون طلب صريح.
+- شبكة المعرفة ليست «بحثًا دلاليًا» وليست مزامنة Drive، ولا يُعرض فهرس محلي كأنه مخزن دائم على مضيف بلا قرص.
 - إن زوّد المالك `RULE.MD`: حفظ حرفي في الجذر وتوثيق الفروق في `DECISIONS.md` دون اختلاق.
 - مهام الخطة الأخرى تبقى كما هي في `BACKLOG.md` (COMP-001/DATA-001/SEC-001… ) دون ادعاء إغلاقها.
 

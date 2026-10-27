@@ -77,8 +77,85 @@ function outline(goal) {
  * Default M1 tools. Nothing here reaches the network or a third party, so an
  * offline run is a truthful offline run.
  */
-export function createDefaultTools({ statusProvider } = {}) {
-  return createToolRegistry([
+export function createDefaultTools(options = {}) {
+  return createToolRegistry(defaultToolDefinitions(options));
+}
+
+/**
+ * Read-only knowledge tools. They never reach the network: the knowledge store is
+ * a local index, and every answer carries source, licence and trust level.
+ */
+export function knowledgeToolDefinitions({ kb } = {}) {
+  if (!kb) return [];
+  return [
+    {
+      name: 'kb.search',
+      description: 'بحث في شبكة المعرفة المحلية وإرجاع أدلة مع المصدر والترخيص ومستوى الثقة',
+      risk: RISK.read,
+      timeoutMs: 5000,
+      arguments: { query: 'string', limit: 'number' },
+      async execute(args) {
+        const query = typeof args?.query === 'string' ? args.query.trim() : '';
+        if (!query) throw new Error('query is required');
+        const limit = Number.isInteger(args?.limit) ? Math.min(Math.max(args.limit, 1), 8) : 4;
+        const result = await kb.search({ query, limit, maxChars: 900 });
+        return {
+          terms: result.terms,
+          items: result.items.map((item) => ({
+            id: item.id,
+            title: item.title,
+            uri: item.uri,
+            kind: item.kind,
+            trust: item.trust,
+            licence: item.licence,
+            snippet: String(item.snippet || '').slice(0, 300)
+          })),
+          entities: result.entities.slice(0, 5).map((entity) => ({
+            type: entity.type,
+            key: entity.key,
+            title: entity.title,
+            risk: entity.risk,
+            requiresApproval: entity.requiresApproval,
+            wired: entity.wired
+          })),
+          omitted: result.omitted,
+          reason: result.reason || null
+        };
+      }
+    },
+    {
+      name: 'kb.tool_profile',
+      description: 'ملف أداة من شبكة المعرفة: تصنيف المخاطر، الموافقة، التسجيل في الكود، والدليل',
+      risk: RISK.read,
+      timeoutMs: 5000,
+      arguments: { name: 'string' },
+      async execute(args) {
+        const name = typeof args?.name === 'string' ? args.name.trim() : '';
+        if (!name) throw new Error('name is required');
+        const detail = await kb.entity('tool', name);
+        if (!detail) throw new Error('tool_not_found');
+        return detail;
+      }
+    },
+    {
+      name: 'kb.project_context',
+      description: 'سياق مشروع من شبكة المعرفة مع المهارات والحواف المرتبطة',
+      risk: RISK.read,
+      timeoutMs: 5000,
+      arguments: { key: 'string' },
+      async execute(args) {
+        const key = typeof args?.key === 'string' ? args.key.trim() : '';
+        if (!key) throw new Error('key is required');
+        const detail = await kb.entity('project', key);
+        if (!detail) throw new Error('project_not_found');
+        return detail;
+      }
+    }
+  ];
+}
+
+export function defaultToolDefinitions({ statusProvider, kb } = {}) {
+  return [
     {
       name: 'celia.system_status',
       description: 'قراءة حالة النظام والإصدار والتخزين دون أي أسرار',
@@ -134,6 +211,7 @@ export function createDefaultTools({ statusProvider } = {}) {
       risk: RISK.irreversible,
       requiresApproval: true,
       arguments: { code: 'string' }
-    }
-  ]);
+    },
+    ...knowledgeToolDefinitions({ kb })
+  ];
 }

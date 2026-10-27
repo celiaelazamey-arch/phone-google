@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "note": "Provenance for each registry CSV. A file becomes importable only through this list plus manifest.json (SHA-256).",
+  "files": [
+    {
+      "name": "sources_registry.csv",
+      "kind": "sources",
+      "sourceId": "src-source-catalog",
+      "sourceKind": "csv",
+      "uri": "repo://data/kb/sources_registry.csv",
+      "license": "internal-owner",
+      "trust": "T3",
+      "stale_after_days": 365,
+      "last_sync": "2026-10-27"
+    },
+    {
+      "name": "tools_registry.csv",
+      "kind": "tools",
+      "sourceId": "src-tool-policy",
+      "sourceKind": "csv",
+      "uri": "repo://data/kb/tools_registry.csv",
+      "license": "internal-owner",
+      "trust": "T3",
+      "stale_after_days": 180,
+      "last_sync": "2026-10-27"
+    },
+    {
+      "name": "skills_registry.csv",
+      "kind": "skills",
+      "sourceId": "src-skill-catalog",
+      "sourceKind": "csv",
+      "uri": "repo://data/kb/skills_registry.csv",
+      "license": "internal-owner",
+      "trust": "T2",
+      "stale_after_days": 180,
+      "last_sync": "2026-10-27"
+    },
+    {
+      "name": "projects_registry.csv",
+      "kind": "projects",
+      "sourceId": "src-project-catalog",
+      "sourceKind": "csv",
+      "uri": "repo://data/kb/projects_registry.csv",
+      "license": "internal-owner",
+      "trust": "T2",
+      "stale_after_days": 180,
+      "last_sync": "2026-10-27"
+    },
+    {
+      "name": "knowledge_registry.csv",
+      "kind": "knowledge",
+      "sourceId": "src-repo-docs",
+      "sourceKind": "github",
+      "uri": "https://github.com/celiaelazamey-arch/phone-google",
+      "license": "internal-owner",
+      "trust": "T2",
+      "stale_after_days": 90,
+      "last_sync": "2026-10-27"
+    }
+  ]
+}

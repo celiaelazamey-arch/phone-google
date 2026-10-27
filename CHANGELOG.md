@@ -3,10 +3,14 @@
 ## Unreleased
 
 ### Added
+- Knowledge network (KB-001…KB-004, optional, default `off`): five checksum-manifested CSV registries feed a validated ingestion into a derived SQLite/FTS5 index with named graph edges, `UNIQUE(content_hash)` deduplication, `absent_since` instead of deletion, and a mandatory evidence item per entity. Arabic search returns evidence packs (`uri`, `licence`, `trust`, score breakdown) with `limit`/`maxChars` budgets and an explicit no-match reason instead of invented references.
+- Read-only agent tools `kb.search`, `kb.tool_profile`, `kb.project_context` are registered only when `CELIA_KB=sqlite`; the deterministic planner searches first and cites the actual evidence it used. Owner-only `/api/kb` (status/search/entities/stale/export) never writes, and remote import is gated behind `CELIA_KB_ALLOW_REMOTE_IMPORT`.
+- `npm run kb -- status|verify|import|search|entity|entities|stale|export|restore`, an Arabic RTL `/kb` page, and a CI step that verifies, imports, searches, exports and reports staleness on a clean runner.
 - Offline Google connection preflight (GOOG-002): `npm run google:doctor` and owner-only `GET /api/google/preflight` report the ten environment conditions behind `503 google_not_configured`, `redirect_uri_mismatch`, a silently disabled owner-identity check and a `localhost`-only consent link, with a concrete fix per failure and exit code 1 on any blocker.
 - Preflight output is sanitized by contract and covered by tests: no client secret, API token or encryption key is ever printed or returned.
 
 ### Limits
+- The knowledge index is derived and local: it is not a durable store on a disk-less host (`status.durability.persistent=false`), contains no semantic/embedding search, does not sync Google Drive, and its planner is deterministic. Remote encrypted backup is not implemented.
 - The preflight is offline: it cannot prove the OAuth client exists in Google Cloud, that the owner email is listed under Test users, or that the public domain is live. Live connection still requires an owner OAuth client and public HTTPS (HOST-003).
 
 ## 0.2.1 — Free Launch Runtime — 2026-10-27

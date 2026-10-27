@@ -4,9 +4,22 @@
 
 ## خطة 2026 والاستمرارية بين الجلسات
 
-[خطة التطوير الشاملة](docs/2026-development-plan.md) · [الحالة الحالية والخطوة التالية](docs/continuity/STATE.md) · [قائمة المهام](docs/continuity/BACKLOG.md) · [سجل القرارات](docs/continuity/DECISIONS.md) · [عقد التوافق](docs/compatibility-contract.md) · [نحو وكيل متكامل (خطة M1–M4)](docs/agent-runtime-plan.md) · [ربط حساب Google خطوة بخطوة](docs/google-connect.md).
+[خطة التطوير الشاملة](docs/2026-development-plan.md) · [الحالة الحالية والخطوة التالية](docs/continuity/STATE.md) · [قائمة المهام](docs/continuity/BACKLOG.md) · [سجل القرارات](docs/continuity/DECISIONS.md) · [عقد التوافق](docs/compatibility-contract.md) · [نحو وكيل متكامل (خطة M1–M4)](docs/agent-runtime-plan.md) · [ربط حساب Google خطوة بخطوة](docs/google-connect.md) · [شبكة المعرفة](docs/knowledge-network.md).
 
 قبل أي جلسة تطوير، اقرأ [AGENTS.md](AGENTS.md) و[بروتوكول الاستمرارية](docs/continuity/README.md). الخطة تفصل بين حفظ سياق التطوير في Git وذاكرة محادثات التطبيق الدائمة **المخططة وغير المنفذة بعد**، وتفرض جرد البيئة والتوافق والنسخ والاستعادة قبل التغيير. بدأ تنفيذ إضافات 0.2.1 الاختيارية؛ لا تعني اعتماد الخطة أو نجاح الاختبارات نشر حسابات الإنتاج أو إكمال كل المهام. التقارير القديمة محفوظة كلقطات تاريخية، لا كمرجع حالة حي.
+
+## الجديد في هذه الجلسة — شبكة المعرفة (KB-001…KB-004، اختيارية، معطلة افتراضيًا)
+
+سجلات CSV موثثة (5 ملفات، 56 صفًا) ← تحقق (ترخيص/ثقة/خطر/أسرار/بصمة مانيفست) ← SQLite + FTS5
+بـ`UNIQUE(content_hash)` وحواف مسماة لكل منها دليل ← بحث عربي مع حزمة أدلة (`uri` و`licence` و`trust`) ←
+أدوات وكيل قراءة فقط `kb.search`/`kb.tool_profile`/`kb.project_context` وصفحة مالك `/kb`.
+
+- التفعيل صريح: `CELIA_KB=sqlite` (+ `CELIA_KB_PATH`)؛ الافتراضي `off`، ولا ارتداد صامت إلى الذاكرة.
+- الاستيراد بأمر صريح لا عند الإقلاع: `npm run kb -- verify` ثم `npm run kb -- import --apply --full`.
+- **حدود معلنة:** لا بحث دلالي/embeddings، Drive غير مزامن، التخطيط حتمي، والفهرس ملف محلي لا يُدَّعى دوامه
+  على مضيف بلا قرص (`status.durability.persistent=false`). النسخة البعيدة المشفرة غير منفذة.
+
+التفاصيل والحدود: [docs/knowledge-network.md](docs/knowledge-network.md).
 
 ## الجديد في هذه الجلسة — حلقة الوكيل M1 (اختيارية، معطلة افتراضيًا)
 

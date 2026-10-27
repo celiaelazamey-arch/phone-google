@@ -1,0 +1,7 @@
+id,name,domain,status,priority,owner,repo_url,related,aliases,notes
+proj-celia-mcp,Celia MCP — التشغيل الموحد,assistant-platform,active,P0,celiaelazamey-arch,https://github.com/celiaelazamey-arch/phone-google,skill-mcp-protocol;skill-google-oauth;skill-whatsapp-hmac,المنصة;الخادم الموحد,خدمة Node واحدة للواجهة وMCP وGoogle وWhatsApp
+proj-agent-m1,حلقة الوكيل M1,agent-runtime,active,P0,celiaelazamey-arch,https://github.com/celiaelazamey-arch/phone-google/blob/main/docs/agent-runtime.md,skill-agent-loop,الوكيل;الحلقة الدائمة,منفذة ومختبرة؛ مخطط حتمي حتى AI-002
+proj-knowledge-network,شبكة معرفة CeliaOS,knowledge,active,P0,celiaelazamey-arch,https://github.com/celiaelazamey-arch/phone-google/blob/main/docs/knowledge-network.md,skill-arabic-search;skill-arabic-rtl-ui,شبكة المعرفة;الفهرس,CSV + SQLite/FTS5 + حواف مسمّاة + أدوات kb.* للوكيل
+proj-celia-google-spider,Celia Google Spider,knowledge,active,P1,celiaelazamey-arch,https://github.com/celiaelazamey-arch/phone-google/blob/main/celia-google-spider/README.md,skill-google-spider,السبابة;درايف,حزمة Python مستقلة؛ المزامنة الحية تنتظر SPDR-002
+proj-free-hosting,النشر المجاني,ops,paused,P0,celiaelazamey-arch,https://github.com/celiaelazamey-arch/phone-google/blob/main/docs/free-hosting.md,skill-release-rollback,النشر;الاستضافة المجانية,متوقف على تفعيل Pages/تفويض حساب؛ لا بطاقة دفع
+proj-landing,صفحة الهبوط والنسخة الثابتة,marketing,active,P1,celiaelazamey-arch,https://github.com/celiaelazamey-arch/phone-google/blob/main/public/landing.html,skill-arabic-rtl-ui,الصفحة التعريفية,أصول محلية بلا تتبّع خارجي

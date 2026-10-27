@@ -1,0 +1,5 @@
+id,name,kind,uri,license,last_sync,trust_level,stale_after_days,notes
+src-repo-docs,وثائق المستودع,github,https://github.com/celiaelazamey-arch/phone-google,internal-owner,2026-10-27,T2,90,وثائق داخل المستودع؛ كل سجل معرفة يشير إلى ملفه بـhttps
+src-repo-registry,سجلات CSV داخل المستودع,csv,repo://data/kb,internal-owner,2026-10-27,T3,180,تُستورد عبر manifest ببصمات SHA-256 فقط
+src-google-drive,Google Drive للمالك,drive,https://drive.google.com/drive/,internal-owner,2026-10-27,T2,90,مصدر معلن لم تُجرَ مزامنة حية بعد (SPDR-002)؛ لا عناصر منه في الفهرس الحالي
+src-wikidata,Wikidata,open_data,https://www.wikidata.org/wiki/Wikidata:Main_Page,CC0-1.0,2026-10-27,T1,365,مرجع خارجي CC0 صالح للاستيراد بعد التحقق؛ لم يُستورد منه شيء بعد

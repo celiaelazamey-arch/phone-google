@@ -1,7 +1,7 @@
 import { createAgentRuntime } from './runtime.js';
 import { createAgentStore } from './store.js';
 import { createMysqlDriver, createSqliteDriver } from './drivers.js';
-import { createDefaultTools } from './tools.js';
+import { createToolRegistry, defaultToolDefinitions } from './tools.js';
 import { createDemoPlanner } from './planner.js';
 
 /**
@@ -41,7 +41,7 @@ export function readAgentLimits(env = process.env) {
  * A host keeps agent initialization out of the request path of unrelated routes.
  * `ready` resolves to the runtime, or to `null` when the mode is `off`.
  */
-export function createAgentHost({ config = {}, pool = null, env = process.env, statusProvider, logger = console } = {}) {
+export function createAgentHost({ config = {}, pool = null, env = process.env, statusProvider, kbHost = null, logger = console } = {}) {
   let mode = 'off';
   let failure = null;
   try {
@@ -79,10 +79,11 @@ export function createAgentHost({ config = {}, pool = null, env = process.env, s
       });
     }
     const store = createAgentStore({ driver });
+    const kb = kbHost && kbHost.mode === 'sqlite' ? kbHost : null;
     const runtime = createAgentRuntime({
       store,
-      tools: createDefaultTools({ statusProvider }),
-      planner: createDemoPlanner(),
+      tools: createToolRegistry(defaultToolDefinitions({ statusProvider, kb })),
+      planner: createDemoPlanner({ knowledge: Boolean(kb) }),
       ownerId: config.userId || env.APP_USER_ID || 'owner',
       limits: readAgentLimits(env),
       logger

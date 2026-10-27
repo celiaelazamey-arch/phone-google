@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "generated_at": "2026-10-27T12:07:27.462Z",
+  "files": [
+    {
+      "name": "sources_registry.csv",
+      "kind": "sources",
+      "sourceId": "src-source-catalog",
+      "sourceKind": "csv",
+      "uri": "repo://data/kb/sources_registry.csv",
+      "license": "internal-owner",
+      "trust": "T3",
+      "stale_after_days": 365,
+      "last_sync": "2026-10-27",
+      "sha256": "8d3439a2605f7e7abcfce02224394d4e957b7b3b539f50e06fc698711f0f7094"
+    },
+    {
+      "name": "tools_registry.csv",
+      "kind": "tools",
+      "sourceId": "src-tool-policy",
+      "sourceKind": "csv",
+      "uri": "repo://data/kb/tools_registry.csv",
+      "license": "internal-owner",
+      "trust": "T3",
+      "stale_after_days": 180,
+      "last_sync": "2026-10-27",
+      "sha256": "c8cae78cd49c45025a15e3b39f6f75afc16b50cb84367631b772133c7eb999e9"
+    },
+    {
+      "name": "skills_registry.csv",
+      "kind": "skills",
+      "sourceId": "src-skill-catalog",
+      "sourceKind": "csv",
+      "uri": "repo://data/kb/skills_registry.csv",
+      "license": "internal-owner",
+      "trust": "T2",
+      "stale_after_days": 180,
+      "last_sync": "2026-10-27",
+      "sha256": "547376c5c649cceee65a95028b44b26cf2b07254e11e1f261e8697fdab181410"
+    },
+    {
+      "name": "projects_registry.csv",
+      "kind": "projects",
+      "sourceId": "src-project-catalog",
+      "sourceKind": "csv",
+      "uri": "repo://data/kb/projects_registry.csv",
+      "license": "internal-owner",
+      "trust": "T2",
+      "stale_after_days": 180,
+      "last_sync": "2026-10-27",
+      "sha256": "7c684e0b3097422b14bd748bccc425a4b133eb4fff25f7dc19886de8d8ef99dc"
+    },
+    {
+      "name": "knowledge_registry.csv",
+      "kind": "knowledge",
+      "sourceId": "src-repo-docs",
+      "sourceKind": "github",
+      "uri": "https://github.com/celiaelazamey-arch/phone-google",
+      "license": "internal-owner",
+      "trust": "T2",
+      "stale_after_days": 90,
+      "last_sync": "2026-10-27",
+      "sha256": "18f4598036814375bc3d70bdd5d50c085868175bb9860ae7d925f3076faedc79"
+    }
+  ]
+}
