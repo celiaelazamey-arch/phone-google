@@ -20,7 +20,7 @@ pass/warn/fail، بلا شبكة وبلا طباعة أي سر) · `npm run goog
 (مالك فقط) · قسم 6 في [دليل الربط](../google-connect.md). **تثبيت CLI في هذه الجلسة:** صار `--json`
 يُخرج JSON وحده، مع الأمر الموثق `npm run --silent google:doctor -- --json` لمنع ترويسة npm؛ أُضيفت
 3 اختبارات CLI للنجاح والفشل وعدم التسريب، فصارت فحوص GOOG-002 **15/15** والمجموع **98/98** و`npm run check`
-على **62** ملفًا. **PR #27 وPR #28 مدموجان**؛ لا يثبت الفحص قبول Google نفسه ولا يُغني عن `200` حي.
+على **62** ملفًا. **PR #27 وPR #28 مدموجان**، وتثبيت CLI محفوظ في [PR #29](https://github.com/celiaelazamey-arch/phone-google/pull/29) للمراجعة؛ لا يثبت الفحص قبول Google نفسه ولا يُغني عن `200` حي.
 
 **سياق (جلسة جوجل):** المالك أرسل مقتطف ربط Google من محادثة أخرى ليُضاف إلى `src/server.js`. التدقيق بالكود أثبت أن
 الربط **منفذ بالفعل** في `src/google.js` بشكل أقوى، وأن المقتطف غير صالح هنا: `require` في مشروع ESM، وملف
@@ -82,7 +82,7 @@ pass/warn/fail، بلا شبكة وبلا طباعة أي سر) · `npm run goog
 - `CELIA_CONTINUITY_BASE=10b9b5dd4ca81e7b53541819b795d369fd859120 npm run check:continuity`: ناجح — 23 وثيقة و59 رابطًا و47 معرفًا بلا دورات، وبوابة handoff مفعلة (STATE وسجل الجلسة ضمن نطاق التغيير).
 - اختبارات المتصفح وMySQL 8.4 لا تُشغَّل محليًا (ثنائيات/خدمة غير متاحة)؛ فحصهما آلي في CI.
 - **CI الفعلي على PR #25 (run `40486458531` على `eac8eec`): كل الوظائف خضراء** — `Python 3.11 · Celia Google Spider tests` (جديد) و`verify` على Node 22/24 (شامل بوابة الاستمرارية و`check:secrets` و`celia:mcp:verify` و`build:pages`) و`container` و`browser` و`mysql`، و`live-gemini` مُتخطّاة بتصميمها.
-- **CI الفعلي على PR #28 المدموج:** Node 22/24 وcontainer وMySQL 8.4 والمتصفح وPython خضراء؛ فحص المزود الخارجي الاختياري متخطى. نتائج تعديل CLI الحالي محلية حتى يرتبط بـPR وCI خاصين به.
+- **CI الفعلي على PR #28 المدموج:** Node 22/24 وcontainer وMySQL 8.4 والمتصفح وPython خضراء؛ فحص المزود الخارجي الاختياري متخطى. نتائج تعديل CLI أعلاه محلية، و[PR #29](https://github.com/celiaelazamey-arch/phone-google/pull/29) هو المرجع الحي لحالة CI الخاصة به.
 
 ## حدود لا يجوز نسيانها
 
