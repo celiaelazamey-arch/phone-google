@@ -13,6 +13,9 @@ export const DECISION = Object.freeze({
 });
 
 const EXTERNAL_HINTS = /(تقويم|موعد|اجتماع|calendar|event|meeting)/i;
+const DOCUMENT_HINTS = /(فاتورة|فواتير|مستند|استخرج|invoice|receipt)/i;
+const DOCUMENT_FILE_RE = /\b([A-Za-z0-9._/-]+\.(?:csv|json|txt|md))\b/i;
+const COMMIT_LEDGER_HINTS = /(سجل\s*المشتريات|دفتر\s*المشتريات|purchase\s*ledger|commit\s*invoice)/i;
 const SLOT_DURATION_MS = 30 * 60 * 1000;
 
 /**
@@ -65,6 +68,108 @@ export function createDemoPlanner({ externalEffectTool = 'google.calendar_create
         if (failed(toolRuns, 'kb.search')) return this.giveUp(toolRuns, 'kb.search');
         return { action: DECISION.call, tool: 'kb.search', args: { query: goal, limit: 4 } };
       }
+
+      const fileMatch = DOCUMENT_FILE_RE.exec(goal);
+      if (DOCUMENT_HINTS.test(goal) && fileMatch) {
+        const docPath = fileMatch[1];
+        if (!succeeded(toolRuns, 'document.read')) {
+          if (failed(toolRuns, 'document.read')) return this.giveUp(toolRuns, 'document.read');
+          return { action: DECISION.call, tool: 'document.read', args: { path: docPath } };
+        }
+        const readOut = outcomeOf(toolRuns, 'document.read');
+        if (!succeeded(toolRuns, 'document.extract')) {
+          if (failed(toolRuns, 'document.extract')) return this.giveUp(toolRuns, 'document.extract');
+          return { action: DECISION.call, tool: 'document.extract', args: { document: readOut, documentType: 'invoice' } };
+        }
+        const extractedOut = outcomeOf(toolRuns, 'document.extract');
+        if (!succeeded(toolRuns, 'data.validate')) {
+          if (failed(toolRuns, 'data.validate')) return this.giveUp(toolRuns, 'data.validate');
+          return { action: DECISION.call, tool: 'data.validate', args: { extracted: extractedOut } };
+        }
+        const validationOut = outcomeOf(toolRuns, 'data.validate');
+        const commitRequested = COMMIT_LEDGER_HINTS.test(goal);
+        if (!succeeded(toolRuns, 'data.report')) {
+          if (failed(toolRuns, 'data.report')) return this.giveUp(toolRuns, 'data.report');
+          return {
+            action: DECISION.call,
+            tool: 'data.report',
+            args: {
+              taskId: run?.id || 'task-doc',
+              goal,
+              docPath,
+              commitRequested,
+              extracted: extractedOut,
+              validation: validationOut,
+              actionStatus: 'not_committed'
+            }
+          };
+        }
+        const reportOut = outcomeOf(toolRuns, 'data.report');
+        const comprehensionGateStatus = reportOut?.explanation?.comprehension_gate?.status || 'PASS';
+        const simpleSummary = reportOut?.explanation?.simple_summary || '';
+        const commitAttempted = toolRuns.some((tr) => tr.toolName === 'document.commit_purchase_ledger');
+        if (commitRequested && !commitAttempted) {
+          if (validationOut?.status !== 'valid' || comprehensionGateStatus !== 'PASS') {
+            return {
+              action: DECISION.finish,
+              summary: [
+                `اكتمل استخراج المستند (${docPath}) وفحصه عبر document_data_automation: الحالة «${validationOut?.status || 'review_required'}» (${(validationOut?.errors || []).join('، ') || 'يتطلب مراجعة'}).`,
+                simpleSummary ? `الشرح المبسّط: ${simpleSummary}` : null,
+                'لم يُنفَّذ أي إدراج في سجل المشتريات (action.status = not_committed).'
+              ]
+                .filter(Boolean)
+                .join('\n')
+            };
+          }
+          const commitApproval = approvals.find((a) => a.toolName === 'document.commit_purchase_ledger');
+          if (commitApproval?.decision === 'rejected') {
+            return {
+              action: DECISION.finish,
+              failed: true,
+              summary: 'رفض المالك إدراج الفاتورة في سجل المشتريات؛ بقي السجل غير معتمد (not_committed).'
+            };
+          }
+          const f = extractedOut?.fields || {};
+          return {
+            action: DECISION.call,
+            tool: 'document.commit_purchase_ledger',
+            args: {
+              invoice_fingerprint: validationOut.invoice_fingerprint,
+              invoice_number: f.invoice_number,
+              supplier_name: f.supplier_name,
+              supplier_tax_id: f.supplier_tax_id || '',
+              issue_date: f.issue_date,
+              currency: f.currency,
+              subtotal: f.subtotal ?? f.total,
+              tax: f.tax ?? 0,
+              total: f.total,
+              file_sha256: extractedOut?.source?.file_sha256 || '',
+              validation_status: validationOut.status
+            },
+            reason:
+              simpleSummary ||
+              'الفاتورة اجتازت التحقق الحتمي وبوابة الفهم؛ إدراجها في سجل المشتريات يتطلب موافقة المالك عبر outbox'
+          };
+        }
+        const committedOutbox = outbox.find(
+          (entry) => entry.toolName === 'document.commit_purchase_ledger' && entry.status === 'sent'
+        );
+        return {
+          action: DECISION.finish,
+          summary: [
+            `تمت معالجة المستند «${docPath}» عبر قدرة document_data_automation (schema ${reportOut?.schema_version || '1.0'}).`,
+            `رقم الفاتورة: ${reportOut?.fields?.invoice_number || '—'} · الإجمالي: ${reportOut?.fields?.total ?? '—'} ${reportOut?.fields?.currency || ''}.`,
+            `حالة التحقق: ${reportOut?.validation?.status || '—'}${reportOut?.validation?.errors?.length ? ` (${reportOut.validation.errors.join('، ')})` : ''}.`,
+            simpleSummary ? `الشرح المبسّط: ${simpleSummary}` : null,
+            committedOutbox
+              ? `تم اعتماد السجل في سجل المشتريات بعد موافقة المالك (المرجع: ${committedOutbox.externalRef}).`
+              : `حالة الإجراء: ${reportOut?.action?.status || 'not_committed'}.`
+          ]
+            .filter(Boolean)
+            .join('\n')
+        };
+      }
+
       if (!succeeded(toolRuns, 'celia.thread_context')) {
         if (failed(toolRuns, 'celia.thread_context')) return this.giveUp(toolRuns, 'celia.thread_context');
         return { action: DECISION.call, tool: 'celia.thread_context', args: {} };

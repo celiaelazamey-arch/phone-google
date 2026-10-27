@@ -35,6 +35,12 @@ export function createAgentRouter({ agent, authorize, logger = console }) {
     res.set('Cache-Control', 'no-store').json(await agent.status());
   });
 
+  router.get('/harness', async (_req, res) => {
+    const current = await runtime(res);
+    if (!current) return undefined;
+    return res.set('Cache-Control', 'no-store').json(current.harness());
+  });
+
   router.post('/threads', json, async (req, res) => {
     const current = await runtime(res);
     if (!current) return undefined;
@@ -214,20 +220,59 @@ export function createAgentRouter({ agent, authorize, logger = console }) {
     if (!current) return undefined;
     try {
       const detail = await current.detail(req.params.id, current.status().ownerId);
-      return res.json({ approvals: detail.approvals });
+      return res.json({ approvals: detail.approvals, plan: detail.plan });
+    } catch (error) {
+      return fail(res, error);
+    }
+  });
+
+  router.get('/runs/:id/plan', async (req, res) => {
+    const current = await runtime(res);
+    if (!current) return undefined;
+    try {
+      const detail = await current.detail(req.params.id, current.status().ownerId);
+      return res.json({ plan: detail.plan, approvals: detail.approvals, outbox: detail.outbox });
+    } catch (error) {
+      return fail(res, error);
+    }
+  });
+
+  router.post('/runs/:id/plan', json, async (req, res) => {
+    const current = await runtime(res);
+    if (!current) return undefined;
+    const headerKey = req.get('idempotency-key');
+    const idempotencyKey = headerKey || req.body?.idempotencyKey || null;
+    if (idempotencyKey !== null && !CLIENT_ID.test(String(idempotencyKey))) {
+      return res.status(400).json({ error: 'invalid_client_message_id' });
+    }
+    const note = typeof req.body?.note === 'string' ? req.body.note.slice(0, 500) : null;
+    try {
+      const result = await current.editPlan(
+        req.params.id,
+        {
+          payload: req.body?.payload ?? null,
+          summary: req.body?.summary ?? null,
+          note,
+          idempotencyKey
+        },
+        current.status().ownerId
+      );
+      return res.json(result);
     } catch (error) {
       return fail(res, error);
     }
   });
 
   // Owner decision on a parked run. Idempotent via Idempotency-Key or body key.
+  // Supports `approved`, `rejected`, and `edited` (updates the plan, re-validates
+  // policies, and returns the run to waiting_approval for review).
   // A run with an unresolved (`unknown`/`started`) tool call is refused with 409
   // reconciliation_required: approval must never replay an uncertain call.
   router.post('/runs/:id/approval', json, async (req, res) => {
     const current = await runtime(res);
     if (!current) return undefined;
     const decision = String(req.body?.decision || '').trim().toLowerCase();
-    if (!['approved', 'rejected'].includes(decision)) {
+    if (!['approved', 'rejected', 'edited'].includes(decision)) {
       return res.status(400).json({ error: 'invalid_approval_decision' });
     }
     const headerKey = req.get('idempotency-key');
@@ -239,7 +284,13 @@ export function createAgentRouter({ agent, authorize, logger = console }) {
     try {
       const result = await current.approve(
         req.params.id,
-        { decision, note, idempotencyKey },
+        {
+          decision,
+          payload: req.body?.payload ?? null,
+          summary: req.body?.summary ?? null,
+          note,
+          idempotencyKey
+        },
         current.status().ownerId
       );
       return res.json(result);

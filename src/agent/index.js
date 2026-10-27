@@ -1,14 +1,78 @@
-import { createAgentRuntime } from './runtime.js';
+import { createAgentRuntime, PLAN_LIFECYCLE_STATE } from './runtime.js';
 import { createAgentStore } from './store.js';
 import { createMysqlDriver, createSqliteDriver } from './drivers.js';
 import { createToolRegistry, defaultToolDefinitions } from './tools.js';
 import { createDemoPlanner } from './planner.js';
+import {
+  HARNESS_LIFECYCLE_STAGES,
+  HARNESS_COMPONENT_IDS,
+  inspectAgentHarness,
+  derivePlanView,
+  validatePlanEditPolicy,
+  verifyApprovedEffectIntegrity
+} from './harness.js';
+import {
+  CAPABILITY_NAME,
+  AUTOMATION_SCHEMA_VERSION,
+  DOCUMENT_TYPES,
+  VALIDATION_STATUS,
+  ACTION_STATUS,
+  COMPREHENSION_GATE_STATUS,
+  EXPLANATION_VERIFICATION_STATUS,
+  NEXT_PERMITTED_ACTION,
+  validateAutomationSchema,
+  validateExplanationContract,
+  readLocalDocument,
+  extractStructuredDocument,
+  explainExtractedFields,
+  measureExtractionAccuracy,
+  validateExtractedData,
+  explainValidationOutcome,
+  evaluateComprehensionGate,
+  buildComprehensionExplanation,
+  buildAutomationReport,
+  createPurchaseLedgerStore,
+  createPurchaseLedgerConnector,
+  documentAutomationToolDefinitions
+} from './automation/index.js';
 import {
   createCalendarConnector,
   createConnectorRegistry,
   createEmptyConnectorRegistry,
   createGoogleCalendarTransport
 } from './connectors.js';
+
+export {
+  PLAN_LIFECYCLE_STATE,
+  HARNESS_LIFECYCLE_STAGES,
+  HARNESS_COMPONENT_IDS,
+  inspectAgentHarness,
+  derivePlanView,
+  validatePlanEditPolicy,
+  verifyApprovedEffectIntegrity,
+  CAPABILITY_NAME,
+  AUTOMATION_SCHEMA_VERSION,
+  DOCUMENT_TYPES,
+  VALIDATION_STATUS,
+  ACTION_STATUS,
+  COMPREHENSION_GATE_STATUS,
+  EXPLANATION_VERIFICATION_STATUS,
+  NEXT_PERMITTED_ACTION,
+  validateAutomationSchema,
+  validateExplanationContract,
+  readLocalDocument,
+  extractStructuredDocument,
+  explainExtractedFields,
+  measureExtractionAccuracy,
+  validateExtractedData,
+  explainValidationOutcome,
+  evaluateComprehensionGate,
+  buildComprehensionExplanation,
+  buildAutomationReport,
+  createPurchaseLedgerStore,
+  createPurchaseLedgerConnector,
+  documentAutomationToolDefinitions
+};
 
 /**
  * Explicit agent wiring. Three states only: `off` (default), `mysql` (production

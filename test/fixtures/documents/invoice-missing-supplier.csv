@@ -1,0 +1,2 @@
+invoice_number,supplier_name,supplier_tax_id,issue_date,currency,subtotal,tax,total,item_description,quantity,unit_price,line_amount
+INV-1043,مؤسسة الأفق التجاري,,2026-10-21,EGP,1000.00,250.00,1250.00,مستلزمات مكتبية,10,100.00,1000.00

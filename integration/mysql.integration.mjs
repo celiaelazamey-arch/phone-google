@@ -291,7 +291,9 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
   // Real MySQL connector seam: a fake transport, so the outbox path is exercised
   // against InnoDB without touching a real Google account.
   const { createConnectorRegistry, createCalendarConnector } = await import('../src/agent/connectors.js');
+  const { createPurchaseLedgerStore, createPurchaseLedgerConnector } = await import('../src/agent/automation/index.js');
   const calendarSends = [];
+  const ledgerStore = createPurchaseLedgerStore();
   const connectors = createConnectorRegistry([
     createCalendarConnector({
       transport: {
@@ -300,13 +302,15 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
           return { id: `mysql-evt-${calendarSends.length}`, htmlLink: null, iCalUID: event.iCalUID };
         }
       }
-    })
+    }),
+    createPurchaseLedgerConnector({ ledgerStore })
   ]);
   const runtime = createAgentRuntime({
     store,
-    tools: createDefaultTools({ statusProvider: () => ({ version: '0.2.1', storage: 'mysql' }) }),
+    tools: createDefaultTools({ statusProvider: () => ({ version: '0.2.1', storage: 'mysql' }), ledgerStore }),
     planner: createDemoPlanner(),
     connectors,
+    limits: { maxSteps: 14, maxCostMicros: 100_000 },
     ownerId: config.userId,
     logger: { error() {} }
   });
@@ -346,7 +350,7 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
   assert.equal(recovered.status, 'needs_reconciliation');
   assert.equal((await store.listToolRuns(crash.run.id)).find((r) => r.id === inFlight.toolRun.id).status, 'unknown');
 
-  // External effect through the outbox on real MySQL 8.4: parked, approved, sent once.
+  // External effect through the outbox on real MySQL 8.4: parked, edited, re-approved, sent once.
   const calendarThread = await store.createThread({ ownerId: config.userId, title: 'calendar' });
   const calendarRun = await runtime.submit({
     threadId: calendarThread.id,
@@ -359,15 +363,74 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
   assert.equal(parkedRows.length, 1);
   assert.equal(parkedRows[0].status, 'pending');
 
+  // Edit the plan on real MySQL 8.4: must stay in waiting_approval with revision 2.
+  const editedResult = await runtime.editPlan(calendarRun.run.id, {
+    payload: {
+      ...parkedRows[0].payload,
+      summary: 'موعد مراجعة أسبوعية (معدّل على MySQL 8.4)'
+    },
+    note: 'تعديل العنوان قبل الاعتماد',
+    idempotencyKey: 'mysql-edit-plan-0001'
+  });
+  assert.equal(editedResult.resumed, false);
+  assert.equal(editedResult.run.status, 'waiting_approval');
+  assert.equal(editedResult.plan.revision, 2);
+  assert.equal(calendarSends.length, 0, 'editing a plan never dispatches the outbox');
+
   await runtime.approve(calendarRun.run.id, { decision: 'approved', note: 'MySQL acceptance' });
   const calendarFinished = await runtime.runToCompletion(calendarRun.run.id);
   assert.equal(calendarFinished.status, 'succeeded');
   assert.equal(calendarSends.length, 1, 'exactly one external request');
+  assert.equal(calendarSends[0].event.summary, 'موعد مراجعة أسبوعية (معدّل على MySQL 8.4)');
   const sentRows = await store.listOutbox(calendarRun.run.id);
   assert.equal(sentRows.length, 1);
   assert.equal(sentRows[0].status, 'sent');
   assert.equal(sentRows[0].attempts, 1);
   assert.ok(sentRows[0].externalRef);
+
+  // DEC-020 & DEC-021 on real MySQL 8.4:
+  // 1) Invalid invoice total is explained in plain language and never committed or enqueued.
+  const docThread = await store.createThread({ ownerId: config.userId, title: 'mysql-document-automation' });
+  const badInvoiceRun = await runtime.submit({
+    threadId: docThread.id,
+    message: 'استخرج بيانات الفاتورة invoice-bad-total.csv وأضفها إلى سجل المشتريات',
+    clientMessageId: 'mysql-doc-bad-total-0001'
+  });
+  const badInvoiceFinished = await runtime.runToCompletion(badInvoiceRun.run.id);
+  assert.equal(badInvoiceFinished.status, 'succeeded');
+  assert.equal(ledgerStore.list().length, 0, 'invalid invoice must never be committed on MySQL 8.4');
+  const badInvoiceDetail = await runtime.detail(badInvoiceRun.run.id);
+  const badReport = badInvoiceDetail.toolRuns.find((tr) => tr.toolName === 'data.report')?.outcome;
+  assert.equal(badReport?.validation?.status, 'invalid');
+  assert.equal(badReport?.action?.status, 'not_committed');
+  assert.match(badReport?.explanation?.simple_summary || '', /مجموع 1000 و140 يساوي 1140، وليس 1999/);
+  assert.equal(badReport?.explanation?.comprehension_gate?.status, 'PASS');
+  assert.equal((await store.listOutbox(badInvoiceRun.run.id)).length, 0);
+
+  // 2) Valid invoice stops at WAITING_FOR_APPROVAL with 0 writes, then commits once after owner approval.
+  const validInvoiceRun = await runtime.submit({
+    threadId: docThread.id,
+    message: 'استخرج بيانات الفاتورة invoice-valid-1042.csv وأضفها إلى سجل المشتريات',
+    clientMessageId: 'mysql-doc-valid-0002'
+  });
+  const validParked = await runtime.runToCompletion(validInvoiceRun.run.id);
+  assert.equal(validParked.status, 'waiting_approval');
+  assert.equal(ledgerStore.list().length, 0, 'valid invoice must wait for owner approval before writing');
+  const validParkedDetail = await runtime.detail(validInvoiceRun.run.id);
+  assert.equal(validParkedDetail.plan.state, 'WAITING_FOR_APPROVAL');
+  assert.equal(validParkedDetail.plan.proposedEffect.toolName, 'document.commit_purchase_ledger');
+
+  await runtime.approve(validInvoiceRun.run.id, {
+    decision: 'approved',
+    note: 'MySQL 8.4 purchase ledger approval',
+    idempotencyKey: 'mysql-approve-doc-1042'
+  });
+  const validFinished = await runtime.runToCompletion(validInvoiceRun.run.id);
+  assert.equal(validFinished.status, 'succeeded');
+  assert.equal(ledgerStore.list().length, 1);
+  assert.equal(ledgerStore.list()[0].invoice_number, 'INV-1042');
+  const validFinalDetail = await runtime.detail(validInvoiceRun.run.id);
+  assert.equal(validFinalDetail.verification.verdict, 'PASS');
 
   // The five core tables are untouched by the additive migration.
   const [tables] = await pool.execute('SELECT TABLE_NAME AS name FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()');

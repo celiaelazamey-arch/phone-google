@@ -30,6 +30,22 @@ function clip(value, max = TEXT_MAX) {
   return String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
+const EXTERNAL_HINTS_RE = /(تقويم|موعد|اجتماع|calendar|event|meeting)/i;
+const EXPLICIT_ISO_TIME_RE = /\b\d{4}-\d{2}-\d{2}(?:[T\s]\d{2}:\d{2})?/;
+
+/**
+ * Identify what information is missing from the raw user request so the plan can
+ * surface proposals explicitly instead of inventing silent defaults.
+ */
+export function detectMissingInformation(objective) {
+  const text = clip(objective, OBJECTIVE_MAX);
+  const missing = [];
+  if (EXTERNAL_HINTS_RE.test(text) && !EXPLICIT_ISO_TIME_RE.test(text)) {
+    missing.push('وقت البداية والنهاية الدقيق للموعد غير محدد نصيًا؛ سيقترح المخطط فترة مبدئية في الخطة بانتظار موافقتك أو تعديلك');
+  }
+  return Object.freeze(missing);
+}
+
 /**
  * Build the contract for a new run. `limits` are the runtime's resolved limits
  * (maxSteps/maxCostMicros/maxDurationMs) so the contract never promises more than
@@ -41,9 +57,15 @@ export function buildGoalContract({ objective, limits = {}, createdAt = Date.now
   const maxCostMicros = Number.isInteger(limits.maxCostMicros) && limits.maxCostMicros >= 0 ? limits.maxCostMicros : 0;
   const maxDurationMs = Number.isInteger(limits.maxDurationMs) && limits.maxDurationMs > 0 ? limits.maxDurationMs : 0;
   const deadline = new Date(createdAt + maxDurationMs).toISOString();
+  const missingInformation = detectMissingInformation(text);
+  const requiresExternalApproval = EXTERNAL_HINTS_RE.test(text);
   return Object.freeze({
     version: GOAL_CONTRACT_VERSION,
     objective: text,
+    required_outcome: requiresExternalApproval
+      ? 'إعداد خطة تنفيذية وعرض أثر التقويم المقترح في بوابة الموافقات قبل أي إرسال خارجي'
+      : 'إعداد مخرج موثق بالأدلة والتحقق المستقل ضمن حدود الميزانية والخطوات',
+    missing_information: missingInformation,
     success_criteria: Object.freeze([
       'اكتمال حلقة plan→act→observe مع خطوة تسليم مسجلة',
       'كل استدعاء أداة له مخرج محفوظ في سجل الأدلة المسلسل',

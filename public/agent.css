@@ -54,7 +54,7 @@ nav { display: flex; gap: 1rem; font-size: 0.9rem; }
 .layout {
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
   padding: clamp(1rem, 2.5vw, 2rem);
   max-width: 1280px;
   margin: 0 auto;
@@ -109,7 +109,7 @@ button {
 button:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.06); }
 button:disabled { opacity: 0.45; cursor: not-allowed; }
 
-.primary { background: linear-gradient(135deg, #6f8cff, #8f6bff); color: #fff; }
+.primary { background: linear-gradient(135deg, #2d4ec8, #4338ca); color: #fff; }
 .ghost { background: transparent; border-color: var(--line); color: var(--text); }
 .danger { background: rgba(255, 123, 138, 0.14); border-color: rgba(255, 123, 138, 0.5); color: var(--bad); }
 
@@ -193,6 +193,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .pill.chain-bad { color: var(--bad); border-color: rgba(255, 123, 138, 0.5); }
 .decision-pending { color: var(--warn); }
 .decision-approved { color: var(--ok); }
+.decision-edited { color: var(--accent); }
 .decision-rejected { color: var(--bad); }
 
 @media (prefers-reduced-motion: reduce) {

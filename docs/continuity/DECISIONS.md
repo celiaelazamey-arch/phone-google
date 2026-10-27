@@ -319,6 +319,113 @@
   `.env.example`، `docs/agent-runtime.md`، خطة الطبقة المجانية وعقدها. **لا تغيير في `render.yaml` ولا
   `schema 1` ولا الإصدار ولا أدوات MCP.**
 
+## DEC-019 — دورة «خطّط، اعرض، انتظر، ثم نفّذ» (`EDITED`/`APPROVED`/`REJECTED`) ومعمارية Agent Harness الـ10 مكونات وفحص Chromium التشخيصي
+
+- **التاريخ:** 27 أكتوبر 2026 (مساءً) · **الحالة:** منفذ ومختبر محليًا (251 اختبارًا في `npm test`) · **المهمة:** AGENT-001،
+  AGENT-002، SEC-001، QA-003
+- **السياق:** طلب المالك تثبيت ثلاث ركائز حاكمة: (1) دورة العمل الإلزامية «خطّط، اعرض، انتظر، ثم نفّذ» بانتقالات
+  الحالة الصريحة `PLAN_READY → WAITING_FOR_APPROVAL → APPROVED → EXECUTING` مع مساريْ `EDITED` (تعديل الخطة وإعادة فحص
+  السياسات وإعادة طلب الموافقة على النسخة المعدّلة دون تنفيذ) و`REJECTED` (إلغاء آمن بلا أثر) ومنع أي تغيير صامت
+  للخطوات الحساسة بعد الموافقة؛ (2) معمارية **Agent Harness** المكونة من 10 مراحل تنفيذية و10 مكونات قابلة للفحص
+  واختبارات قاعة العمليات (War Room) لكسر الحلقة؛ و(3) تشخيص Playwright Chromium الصريح (`pageerror`، `console`،
+  `requestfailed`، `response >= 400`، `crash`، `chromium-diagnostics.txt`، `screenshot: 'only-on-failure'`).
+- **القرار:**
+  1. **آلة حالات الخطة (`src/agent/harness.js` + `src/agent/runtime.js`):** تُحفظ حالة الخطة في `agent_runs.plan_summary`
+     وتُشتق عبر `derivePlanView` بالمراحل الأربع (`understand`، `plan`، `present_and_wait`، `execute_and_verify`)
+     والمسار الكامل للانتقالات (`PLAN_READY`، `WAITING_FOR_APPROVAL`، `EDITED`، `APPROVED`، `REJECTED`، `EXECUTING`).
+  2. **مسار التعديل المحكوم (`editPlan` / `decision: 'edited'`):** عند تعديل المالك للخطة في `waiting_approval`،
+     يفحص `validatePlanEditPolicy` الحمولة الجديدة ضد `inputSchema` الخاص بالأداة ويرفض تغيير اسم الأداة أو حقول غير
+     مصرّح بها (`plan_edit_policy_violation` / `plan_edit_tool_mismatch`). عند النجاح يُسجَّل القرار السابق `edited`،
+     ويُنشأ صف موافقة جديد `pending` مربوط ببصمة الحمولة الجديدة، وتُحدَّث نية الـoutbox المعلّقة، ويُسجَّل مدخل
+     `plan_edited` في سلسلة SHA-256، ويبقى التشغيل في `waiting_approval` (`resumed: false`).
+  3. **منع العبث بالحمل بعد الموافقة (`verifyApprovedEffectIntegrity` + `verifier.js`):** قبل أي إرسال خارجي، يقارن
+     وقت التشغيل والمُتحقِّق المستقل بين `hashOf(entry.payload)` و`entry.payloadHash` وبصمة مفتاح الموافقة المعتمد
+     (`approval:<runId>:<tool>:<hash12>`). أي تعديل صامت بعد الموافقة يُحظر فورًا (`post_approval_payload_tampered` /
+     `outbox_payload_hash_tampered`) دون استدعاء الموصل.
+  4. **التشخيص البصري والوظيفي لـChromium (`e2e/diagnostics.js` + `e2e/agent.spec.js`):** إرفاق المستمعات الخمسة قبل
+     `page.goto(...)` مع لقطة شاشة وتقرير `chromium-diagnostics.txt` عند الفشل، وإصلاح الروابط النسبية في
+     `public/agent.html` و`public/kb.html` و`scripts/build-pages.mjs` و`scripts/static/celia-static-shim.template.js`
+     وتباين ألوان زر `.primary` وعرض الشبكة عند `320px`.
+- **السبب:** ضمان ألا يتحول التخطيط إلى تنفيذ تلقائي عند التعديل، وألا تمر أي حمولة معدّلة خارج السياسات أو بعد
+  الموافقة، وألا تمر أخطاء المتصفح أو روابط المسار الفرعي `/phone-google/` بصمت.
+- **البدائل المرفوضة:** (أ) تنفيذ الخطة فور تعديلها دون موافقة ثانية — يخالف «اعرض، انتظر، ثم نفّذ»؛ (ب) تعديل صف
+  الموافقة القديم في مكانه بدل تسجيل `edited` وإنشاء طلب جديد — يمحو أثر المراجعة من الدفتر؛ (ج) الاكتفاء بفحص
+  البصمة وقت الإدراج دون إعادة فحصها قبل الإرسال وفي المُتحقِّق — يترك ثغرة تعديل ما بعد الموافقة.
+- **الأثر:** `src/agent/harness.js`، تحديثات `src/agent/{runtime,store,verifier,tools,evidence,goal-contract,index}.js`
+  و`src/agent-routes.js` و`public/agent.{html,css,js}` و`public/kb.{html,js}` و`e2e/{diagnostics,agent.spec,system.spec,deploy.spec}.js`
+  و`test/agent-harness.test.js`. **لا ترحيل SQL جديد ولا تغيير في `schema 1` أو الإصدار `0.2.1` أو أدوات MCP الـ12.**
+
+## DEC-020 — القدرة الأصيلة `document_data_automation`: استخراج وتطبيع وتحقق حتمي وموافقة وبصمات أدلة دون محرك موازٍ
+
+- **التاريخ:** 27 أكتوبر 2026 (مساءً) · **الحالة:** منفذ ومختبر محليًا (7 اختبارات شاملة لـ8 حالات فشل/هجوم، إجمالي 258/258 في `npm test`) · **المهمة:** AGENT-001، AGENT-002، SEC-003، DATA-003
+- **السياق:** طلب المالك إضافة القدرة الأصيلة `document_data_automation` داخل CeliaOS بحيث تمر كل مهمة عبر سلسلة
+  واضحة وقابلة للتدقيق: استلام المستند أو الجدول ← استخراج الحقول ← تحويلها إلى مخرجات JSON منظمة وفق مخطط معلوم
+  الإصدار (`1.0`) ← التحقق الحتمي من صحة البيانات ومنع التكرار ← تطبيق قواعد السياسات والموافقات عند الحاجة ← تنفيذ
+  الإجراء المصرح به مرة واحدة فقط ← حفظ المخرجات وبصمات الأدلة ← التحقق النهائي عبر المُتحقِّق المستقل، مع إبقاء
+  الشبكة والبوابات الخارجية مغلقة افتراضيًا (`NETWORK = DENY`، `EXTERNAL GATES = CLOSED`).
+- **القرار:**
+  1. **الدمج داخل البنية القائمة لا كنظام منفصل:** أُنشئت وحدة `src/agent/automation/{schema,reader,extractor,validator,index}.js`
+     تُركَّب فوق `Tool Registry` و`Evidence Chain` و`Approval Gate` و`Outbox` و`Independent Verifier` دون جداول موازية أو
+     محرك سير عمل منفصل.
+  2. **الأدوات الأربع الأساسية + أداة الاعتماد المحكومة:**
+     - `document.read` (`RISK.read`، حتمية): قراءة ملفات محلية ضمن الجذور المسموحة فقط (`CSV` عبر `parseCsv`، `JSON`، `TXT`)
+       وحساب `file_sha256` ومواضع الحقول والأسطر (`row:X,col:Y` أو `line:N`).
+     - `document.extract` (`RISK.read`): استخراج حقول الفاتورة/المستند مع مرجع المصدر لكل حقل ودعم موجه نماذج اختياري
+       (`modelRouter`) يتحقق من مطابقة JSON الصارمة للمخطط ويرفض أي نص غير مطابق دون كتابة بيانات فاسدة، مع دالة قياس
+       الدقة `measureExtractionAccuracy` على حزمة مرجعية ذهبية (`test/fixtures/documents/`).
+     - `data.validate` (`RISK.read`، حتمية): فحص الحقول الإلزامية، صلاحية التاريخ والعملة، مطابقة مجموع البنود والضريبة
+       للإجمالي (`total_mismatch`)، كشف الفواتير المكررة (`duplicate_invoice`) عبر بصمة حتمية `invoice_fingerprint`،
+       وفحص حقن التعليمات داخل المستند (`scanUntrustedDocumentInjection` → `prompt_injection_detected`)، وتصنيف النتيجة
+       إلى `valid` أو `review_required` أو `invalid`.
+     - `data.report` (`RISK.internalWrite`): بناء التقرير الموحد (`schema_version: "1.0"`) وحفظه في `agent_tool_runs`
+       وربط بصمته في `agent_evidence`.
+     - `document.commit_purchase_ledger` (`RISK.externalWrite`، موصل `purchases.ledger`): يرفض في `inputSchema` أي مستند
+       حالته غير `valid` (`policy_violation_unvalidated_document`)، ويوقف التشغيل في `WAITING_FOR_APPROVAL` قبل أي كتابة،
+       وينفذ الإدراج مرة واحدة فقط بعد موافقة المالك وبمفتاح تفرد يمنع التكرار.
+  3. **فحوص المُتحقِّق المستقل (`documentAutomationChecks` في `src/agent/verifier.js`):** يتحقق من مطابقة `data.report`
+     للنسخة `1.0` (`document_automation_schema`)، ومن بقاء أي مستند غير صالح في حالة `not_committed` دون محاولة إرسال
+     (`document_automation_policy`)، ومن تطابق السجل المعتمد في سجل المشتريات مع الحمولة الموافق عليها
+     (`document_automation_commit_parity`).
+- **السبب:** توفير أتمتة مستندات وبيانات قابلة للتدقيق الكامل تعمل محليًا بنسبة 100% دون الحاجة إلى مزود خارجي، مع
+  تجهيز نقطة ربط محكومة لموجه النماذج عندما يُفعَّل لاحقًا.
+- **البدائل المرفوضة:** (أ) بناء خدمة أو قاعدة بيانات موازية للأتمتة خارج `agent_*` — يكسر وحدة سجل الأدلة والـoutbox؛
+  (ب) السماح للنموذج اللغوي بتحديد صحة الإجمالي الحسابي أو تمرير كتابة دون `data.validate` حتمي — يخالف فصل الاستخراج
+  عن التحقق؛ (ج) تمرير محتوى المستند كتعليمات للوكيل — يفتح ثغرة حقن المطالبات غير المباشر.
+- **الأثر:** `src/agent/automation/{schema,reader,extractor,validator,index}.js`، تحديث `src/agent/{tools,verifier,planner,index}.js`،
+  حزمة مرجعية ذهبية في `test/fixtures/documents/`، واختبارات `test/agent-document-automation.test.js`. **لا ترحيل SQL جديد
+  ولا تغيير في `schema 1` أو الإصدار `0.2.1` أو أدوات MCP الـ12.**
+
+## DEC-021 — Phase 3 Comprehension Gate (`Explain to Understand`): بوابة الفهم والشرح المبسّط المدعوم بالأدلة
+
+- **التاريخ:** 27 أكتوبر 2026 (مساءً) · **الحالة:** منفذ ومتحقق محليًا (10 اختبارات `CL-01..CL-10`، إجمالي 268/268 في `npm test`) وفي GitHub Actions CI (التشغيلة `40593284086` على Commit `99b7895` شاملة Chromium وMySQL 8.4) · **المهمة:** AGENT-001، AGENT-002، SEC-003، DATA-003، QA-001، QA-003
+- **السياق:** بعد إتمام المرحلة الثانية (`document_data_automation`، DEC-020)، طُلب إضافة المرحلة الثالثة
+  **`Comprehension Gate — Explain to Understand`** فوق المكونات المنفذة بالفعل دون بناء محرك موازٍ: أن يشرح النظام
+  الهدف والخطة والنتيجة بلغة بسيطة، مع التمييز الصارم بين الحقائق المثبتة بمواضعها (`verified_facts`) والافتراضات
+  (`assumptions`) وما لم يُتحقق منه (`unknowns`)، وكشف أي شرح مقنع لغويًا لكنه يناقض الأدلة أو التحقق الحتمي، وعدم
+  السماح لأي شرح بتجاوز فشل التحقق أو غياب الموافقة.
+- **القرار:**
+  1. **تثبيت القاعدة في `AGENTS.md` وعقد الشرح المتوافق عكسيًا في `src/agent/automation/schema.js`:** أُضيف حقل
+     `explanation` الاختياري المتوافق عكسيًا مع `schema_version: "1.0"`، ويُفحص عبر `validateExplanationContract`
+     (`goal_plain`، `success_criteria`، `plan_steps`، `verified_facts`، `assumptions`، `unknowns`،
+     `risks_and_side_effects`، `simple_summary`، `verification_status`، `next_permitted_action`، `comprehension_gate`).
+  2. **شرح الاستخراج والتحقق بالرجوع إلى الأدلة (`extractor.js` + `validator.js`):**
+     - `explainExtractedFields`: يربط كل حقل مستخرج بموضعه (`row:X,col:Y` أو `line:N`) في `verified_facts`، ويفصل
+       القيم المشتقة/الافتراضية (مثل المجموع الفرعي المشتق من جمع البنود أو الضريبة 0 عند عدم ذكرها) في `assumptions`،
+       ويسرد الحقول الغائبة في `unknown_fields` دون اختلاق.
+     - `explainValidationOutcome`: يترجم أخطاء التحقق الحتمية إلى لغة مبسطة، مثل شرح عدم تطابق الإجمالي:
+       «الفاتورة تحتاج إلى تصحيح. مجموع 1000 و140 يساوي 1140، وليس 1500. لذلك لا يمكن اعتماد الفاتورة حتى يُحلّ الاختلاف.».
+  3. **بوابة التقييم وفحص المُتحقِّق المستقل (`evaluateComprehensionGate` + `verifier.js`):**
+     - يقارن `evaluateComprehensionGate` ادعاءات الشرح مع القيم الفعلية في `fields` ومواضع `provenance` وحالة `validation.status`
+       وحالة `action.status`. أي ادعاء غير مدعوم أو متناقض (مثل وصف فاتورة فاشلة بأنها صحيحة أو تزوير رقم/موضع) يُسجَّل
+       `BLOCK`، ويُفحص في `verifier.js` عبر `comprehension_gate_grounding`.
+     - لا يغيّر الشرح أبدًا قرار `validation.status` ولا يتجاوز `WAITING_FOR_APPROVAL`.
+- **السبب:** جعل قرارات الأتمتة مفهومة للمستخدم وقابلة للتدقيق مقابل نفس سلسلة الأدلة دون منح النص اللغوي سلطة تجاوز
+  الفحص البرمجي الحتمي.
+- **البدائل المرفوضة:** (أ) تغيير `schema_version` بصورة تكسر التقارير السابقة — استُخدم امتداد متوافق عكسيًا على `1.0`؛
+  (ب) الوثوق بالنص التفسيري لتحديد صلاحية الفاتورة — مرفوض؛ (ج) خلط القيم الافتراضية مع الحقائق المثبتة من المصدر — مرفوض.
+- **الأثر:** تحديث `AGENTS.md` و`src/agent/automation/{schema,extractor,validator,index}.js` و`src/agent/{planner,verifier,store,index}.js`
+  وإضافة `test/agent-comprehension-gate.test.js` (`CL-01..CL-10`). **لا ترحيل SQL جديد ولا تغيير في `schema 1` أو الإصدار `0.2.1`.**
+
 ## إضافة قرار لاحق
 
 استخدم معرفًا جديدًا، والتاريخ والحالة والسياق والبدائل والقرار والسبب والأثر ومرجع المهمة، واذكر صراحة القرار المستبدل إن وجد. لا تنسخ أسرارًا أو مخطط إنتاج يحوي بيانات شخصية إلى سجل القرار.

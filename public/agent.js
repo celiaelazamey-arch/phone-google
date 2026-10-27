@@ -117,11 +117,14 @@ function emptySteps() {
 const DECISION_LABELS = {
   pending: ['بانتظار قرار المالك', 'decision-pending'],
   approved: ['موافقة مسجلة', 'decision-approved'],
+  edited: ['معدّلة (أُعيد الفحص)', 'decision-edited'],
   rejected: ['مرفوضة', 'decision-rejected']
 };
 
 const EVIDENCE_LABELS = {
   goal_contract: 'عقد الهدف',
+  plan_ready: 'خطة جاهزة',
+  plan_edited: 'تعديل خطة',
   tool_call: 'استدعاء أداة',
   tool_call_reconciled: 'استدعاء مُصالح',
   approval: 'قرار موافقة',
@@ -162,8 +165,24 @@ function renderContract(contract) {
     </dl>`;
 }
 
-function renderApprovals(approvals = [], runStatus) {
+function renderApprovals(approvals = [], runStatus, plan = null, outbox = []) {
   const list = $('approvals');
+  const planBadge = $('plan-state');
+  if (planBadge) {
+    if (!plan || !plan.state) {
+      planBadge.textContent = 'بلا خطة';
+      planBadge.className = 'pill idle';
+    } else {
+      const tone =
+        plan.state === 'APPROVED' || plan.state === 'EXECUTING'
+          ? 'ok'
+          : plan.state === 'REJECTED'
+            ? 'bad'
+            : 'warn';
+      planBadge.textContent = `${plan.state} · #${plan.revision || 1}`;
+      planBadge.className = `pill ${tone}`;
+    }
+  }
   if (!approvals.length) {
     list.innerHTML = '<li class="empty">لا طلبات موافقة بعد.</li>';
   } else {
@@ -181,7 +200,16 @@ function renderApprovals(approvals = [], runStatus) {
   const canDecide = runStatus === 'waiting_approval' && hasPending;
   $('approval-actions').hidden = !canDecide;
   $('approval-note-field').hidden = !canDecide;
+  const payloadField = $('approval-payload-field');
+  const payloadInput = $('approval-payload');
+  if (payloadField) payloadField.hidden = !canDecide;
+  if (canDecide && payloadInput && document.activeElement !== payloadInput) {
+    const pendingOutbox = (outbox || []).find((entry) => entry.status === 'pending') || null;
+    const candidatePayload = plan?.proposedEffect?.payload ?? pendingOutbox?.payload ?? {};
+    payloadInput.value = JSON.stringify(candidatePayload, null, 2);
+  }
   $('approve').disabled = !canDecide;
+  if ($('edit-plan')) $('edit-plan').disabled = !canDecide;
   $('reject').disabled = !canDecide;
 }
 
@@ -353,7 +381,7 @@ function handleEvent(event) {
     setRunState(event.run?.status);
     setUsage(event.run?.usage);
     renderContract(event.goalContract || null);
-    renderApprovals(event.approvals || [], event.run?.status);
+    renderApprovals(event.approvals || [], event.run?.status, event.plan || null, event.outbox || []);
     renderOutbox(event.outbox || []);
     renderReconcile(event, event.run?.status);
     renderEvidence(event.evidence || [], event.evidenceChain || null, event.verification || null);
@@ -365,6 +393,8 @@ function handleEvent(event) {
   if (
     event.type === 'approval.requested' ||
     event.type === 'approval.decided' ||
+    event.type === 'plan.edited' ||
+    event.type === 'run.approved' ||
     event.type === 'verification' ||
     event.type === 'reconciliation.recorded' ||
     event.type === 'run.reconciled'
@@ -445,7 +475,7 @@ async function refreshDetail() {
     setRunState(detail.run?.status);
     setUsage(detail.run?.usage);
     renderContract(detail.goalContract || null);
-    renderApprovals(detail.approvals || [], detail.run?.status);
+    renderApprovals(detail.approvals || [], detail.run?.status, detail.plan || null, detail.outbox || []);
     renderOutbox(detail.outbox || []);
     renderReconcile(detail, detail.run?.status);
     renderEvidence(detail.evidence || [], detail.evidenceChain || null, detail.verification || null);
@@ -457,14 +487,31 @@ async function refreshDetail() {
 async function decide(decision) {
   if (!state.runId) return;
   const note = $('approval-note').value.trim() || null;
-  const buttons = [$('approve'), $('reject')];
+  let payload = undefined;
+  if (decision === 'edited') {
+    const rawPayload = $('approval-payload')?.value?.trim() || '{}';
+    try {
+      payload = JSON.parse(rawPayload);
+    } catch {
+      setAuthStatus('حمولة JSON غير صالحة لتعديل الخطة.', 'bad');
+      return;
+    }
+  }
+  const buttons = [$('approve'), $('edit-plan'), $('reject')].filter(Boolean);
   buttons.forEach((button) => { button.disabled = true; });
   try {
     const result = await api(`/api/agent/runs/${state.runId}/approval`, {
       method: 'POST',
-      body: JSON.stringify({ decision, note })
+      body: JSON.stringify({ decision, note, ...(payload !== undefined ? { payload } : {}) })
     });
-    setAuthStatus(decision === 'approved' ? 'سُجلت الموافقة واستؤنف التشغيل.' : 'سُجل الرفض وأُوقف التشغيل دون أثر.', 'ok');
+    setAuthStatus(
+      decision === 'approved'
+        ? 'سُجلت الموافقة واستؤنف التشغيل.'
+        : decision === 'edited'
+          ? 'حُفظ تعديل الخطة وأُعيد فحص السياسات؛ بانتظار الموافقة على النسخة المعدّلة.'
+          : 'سُجل الرفض وأُوقف التشغيل دون أثر.',
+      'ok'
+    );
     await refreshDetail();
     if (result.resumed) {
       streamRun(state.runId);
@@ -519,6 +566,7 @@ $('reconcile').addEventListener('click', (event) => {
 });
 
 $('approve').addEventListener('click', () => decide('approved'));
+if ($('edit-plan')) $('edit-plan').addEventListener('click', () => decide('edited'));
 $('reject').addEventListener('click', () => decide('rejected'));
 
 async function ensureThread() {
@@ -614,7 +662,8 @@ $('cancel').addEventListener('click', async () => {
   }
 });
 
-const STATIC_HOST = /\.github\.io$/i.test(location.hostname);
+const STATIC_HOST =
+  document.documentElement.dataset.celiaStatic === 'true' || /\.github\.io$/i.test(location.hostname);
 if (STATIC_HOST) {
   // The Pages build is a static snapshot: it must say so instead of pretending to run a server.
   $('mode-badge').textContent = 'نسخة ثابتة — لا حلقة هنا';
@@ -629,10 +678,6 @@ if (STATIC_HOST) {
   connect();
 } else {
   emptySteps();
-  api('/api/agent/status')
-    .then(renderStatus)
-    .catch(() => {
-      $('mode-badge').textContent = 'أدخل الرمز لعرض الحالة';
-      $('mode-badge').className = 'badge off';
-    });
+  $('mode-badge').textContent = 'أدخل الرمز لعرض الحالة';
+  $('mode-badge').className = 'badge off';
 }

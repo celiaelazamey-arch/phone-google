@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
   <title>مساحة الوكيل — سيليا</title>
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/fonts.css">
-  <link rel="stylesheet" href="/agent.css">
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./fonts.css">
+  <link rel="stylesheet" href="./agent.css">
 </head>
 <body>
   <header class="top">
@@ -19,10 +19,10 @@
       </div>
     </div>
     <nav aria-label="روابط">
-      <a href="/kb">شبكة المعرفة</a>
-      <a href="/studio">الاستوديو</a>
-      <a href="/system">حالة النظام</a>
-      <a href="/deploy">النشر</a>
+      <a href="./kb">شبكة المعرفة</a>
+      <a href="./studio">الاستوديو</a>
+      <a href="./system">حالة النظام</a>
+      <a href="./deploy">النشر</a>
     </nav>
   </header>
 
@@ -94,17 +94,25 @@
 
       <div class="subhead">
         <h3>بوابة الموافقات</h3>
-        <span id="verification-badge" class="pill idle">بلا تحقق</span>
+        <div class="row">
+          <span id="plan-state" class="pill idle">بلا خطة</span>
+          <span id="verification-badge" class="pill idle">بلا تحقق</span>
+        </div>
       </div>
       <ul id="approvals" class="approvals">
         <li class="empty">لا طلبات موافقة بعد.</li>
       </ul>
+      <label class="field" id="approval-payload-field" hidden>
+        <span>تعديل حمولة الخطة المقترحة (JSON يخضع لإعادة فحص السياسات)</span>
+        <textarea id="approval-payload" rows="3" spellcheck="false" dir="ltr"></textarea>
+      </label>
       <label class="field" id="approval-note-field" hidden>
         <span>ملاحظة المالك مع القرار (اختياري)</span>
         <input id="approval-note" type="text" maxlength="500" autocomplete="off" placeholder="مثال: وافق فقط إن كان الاجتماع داخليًا">
       </label>
       <div class="row actions" id="approval-actions" hidden>
         <button id="approve" class="primary" type="button">موافقة واستئناف</button>
+        <button id="edit-plan" class="ghost" type="button">تعديل الخطة وإعادة الفحص</button>
         <button id="reject" class="danger" type="button">رفض وإيقاف</button>
       </div>
 
@@ -148,6 +156,6 @@
     <p>الحلقة دائمة ومختبرة: عقد هدف لكل تشغيل، بوابة موافقات مسجلة قابلة للاستئناف (لا تعيد استدعاءً حالته unknown)، سجل أدلة إضافي بسلسلة بصمات SHA-256، ومُتحقِّق مستقل بأحكام PASS/BLOCK/UNKNOWN قبل أي تسليم. الأثر الخارجي يمرّ بـ outbox (نية واحدة، إرسال واحد، ولا إعادة عمياء بعد outcome unknown) بعد موافقة مسجلة — لكنه لا يعمل إلا إذا فعّل المالك موصلًا صريحًا (CELIA_AGENT_CONNECTORS=calendar) وكان حساب Google متصلًا. المخطط حتمي لا نموذج لغوي، والعزل وتنفيذ الكود (AGENT-003) غير مبنيين بعد — لا تدّعِ هذه الصفحة وكيلًا عامًا.</p>
   </footer>
 
-  <script src="/agent.js" type="module"></script>
+  <script src="./agent.js" type="module"></script>
 </body>
 </html>

@@ -1,11 +1,59 @@
 # الحالة الحالية — ابدأ من هنا
 
-**آخر مراجعة:** 27 أكتوبر 2026 (مساءً) · **نوع الجلسة الحالية:** طلب المالك **«الخطوات التالية للتشغيل الحقيقي
-المكتمل الأركان بناءً على المعايير المتفق عليها»** — خطة أركان مرتبة ببوابات + إغلاق فجوة الاستعادة عند الإقلاع +
-قبول حي قابل للتنفيذ (DEC-018) · سجل الجلسة: [2026-10-27-go-live-steps](sessions/2026-10-27-go-live-steps.md) ·
+**آخر مراجعة:** 27 أكتوبر 2026 (مساءً) · **نوع الجلسة الحالية:** تنفيذ **دورة «خطّط، اعرض، انتظر، ثم نفّذ»
+(`PLAN_READY → WAITING_FOR_APPROVAL → EDITED | APPROVED | REJECTED → EXECUTING`) ومعمارية Agent Harness الـ10 مكونات
+وتشخيص Playwright Chromium (DEC-019) والقدرة الأصيلة `document_data_automation` (DEC-020) وبوابة الفهم والشرح المبسّط
+المدعوم بالأدلة `Comprehension Gate` (DEC-021)** على الفرع
+`arena/5fccc4e6-phone-google` · سجل الجلسة:
+[2026-10-27-agent-harness-plan-lifecycle](sessions/2026-10-27-agent-harness-plan-lifecycle.md) · سجل الجلسة السابقة:
+[2026-10-27-go-live-steps](sessions/2026-10-27-go-live-steps.md) ·
 الخطة: [docs/go-live-plan.md](../go-live-plan.md) · المرجع التشغيلي: [deploy/free-always-on/README.md](../../deploy/free-always-on/README.md)
 
-## الطلب الحالي (أعلى أولوية) — الخطوات التالية للتشغيل الحقيقي
+## الطلب الحالي (أعلى أولوية) — دورة الخطة والـAgent Harness وقدرة `document_data_automation` وبوابة `Comprehension Gate` (DEC-019، DEC-020، DEC-021)
+
+- **ما نُفِّذ في هذه الجلسة (`arena/5fccc4e6-phone-google`):**
+  - **آلة حالات الخطة (`src/agent/harness.js` + `src/agent/runtime.js`):** انتقالات صريحة
+    `PLAN_READY → WAITING_FOR_APPROVAL → APPROVED → EXECUTING` مع مسار التعديل المحكوم
+    `PLAN_READY → WAITING_FOR_APPROVAL → EDITED → WAITING_FOR_APPROVAL` ومسار الرفض `REJECTED`.
+  - **تعديل الخطة وإعادة فحص السياسات (`POST /api/agent/runs/:id/plan` و`decision: 'edited'`):** يتحقق من
+    الحمولة المعدّلة ضد `inputSchema` ويرفض تغيير الأداة أو الحقول غير المصرّح بها، ويسجل القرار السابق `edited`
+    وينشئ طلب موافقة جديدًا مربوطًا ببصمة الحمولة الجديدة ويحدّث نية الـoutbox المعلّقة ويدوّن `plan_edited` في
+    سلسلة SHA-256، ويبقي التشغيل في `waiting_approval` دون أي تنفيذ خارجي حتى موافقة المالك.
+  - **حارس النزاهة بعد الموافقة (`verifyApprovedEffectIntegrity` + `verifier.js`):** يمنع أي تلاعب صامت بحمولة
+    الـoutbox بعد صدور الموافقة قبل استدعاء أي موصل خارجي.
+  - **القدرة الأصيلة `document_data_automation` (`src/agent/automation/{schema,reader,extractor,validator,index}.js`، DEC-020):**
+    تعمل محليًا بالكامل (`NETWORK = DENY`، `EXTERNAL GATES = CLOSED` افتراضيًا) فوق بنية CeliaOS القائمة:
+    قراءة مستندات محلية معروفة النوع (`CSV`/`JSON`/`TXT`) ببصمة `SHA-256` ومراجع الحقول/الأسطر (`document.read`)،
+    واستخراج منظم وفق مخطط معلوم الإصدار `schema_version: "1.0"` مع عزل محتوى المستند كبيانات غير موثوقة وقياس الدقة
+    على حزمة مرجعية ذهبية (`document.extract` + `measureExtractionAccuracy`)، وفحص حتمي للقيم والتواريخ والعملات
+    ومطابقة الإجماليات والتكرارات ومؤشرات حقن التعليمات (`data.validate`)، وتوليد تقرير موحد مع ربط البصمات بسلسلة
+    الأدلة (`data.report`)، وإدراج محكوم اختياري في سجل المشتريات بعد موافقة المالك عبر `agent_outbox`
+    (`document.commit_purchase_ledger`) مع فحوص المُتحقِّق المستقل (`document_automation_schema`،
+    `document_automation_policy`، `document_automation_commit_parity`).
+  - **بوابة الفهم والشرح المبسّط المدعوم بالأدلة (`Comprehension Gate — Explain to Understand`، DEC-021):**
+    إضافة القاعدة إلى `AGENTS.md`، وعقد الشرح المتوافق عكسيًا مع `schema_version: "1.0"` (`validateExplanationContract`)،
+    وشرح الحقول بالرجوع إلى مواضعها (`explainExtractedFields`) مع فصل الحقائق المثبتة (`verified_facts`) عن الافتراضات
+    (`assumptions`) والحقول الغائبة/غير المحسومة (`unknowns`)، وتفسير نتائج التحقق بلغة بسيطة (`explainValidationOutcome`)،
+    وفاحص البوابة (`evaluateComprehensionGate`) وربطه في `src/agent/verifier.js` (`comprehension_gate_grounding`) و`src/agent/planner.js`،
+    واختبارات `CL-01` إلى `CL-10` في `test/agent-comprehension-gate.test.js`.
+  - **معمارية Agent Harness الـ10 مكونات (`GET /api/agent/harness`)** وواجهة تعديل الخطة في `/agent`، وتشخيص
+    Playwright Chromium الصريح (`e2e/diagnostics.js`، `e2e/agent.spec.js`، `playwright.config.js`)، وإصلاح
+    الروابط النسبية وتباين WCAG 2.2 AA وعرض 320px في `/agent` و`/kb`.
+  - **الفحوص المحلية وفحوص GitHub Actions CI الفعلية (`Verification Closure`):**
+    - محليًا: `npm test` **268/268** ناجحة (منها 7 اختبارات في `test/agent-document-automation.test.js` و10 اختبارات
+      `CL-01..CL-10` في `test/agent-comprehension-gate.test.js`)، و`check` و`release:check` و`check:continuity`
+      و`check:secrets` و`build:pages` كلها خضراء.
+    - في GitHub Actions CI على الفرع `arena/5fccc4e6-phone-google`:
+      - التشغيلة الأولى `40592598360` (`6bf47b3`) كشفت تجاوز طول مخرج `data.report` لسقف `VARCHAR(4000)` في
+        `agent_tool_runs.outcome` تحت وضع `STRICT_TRANS_TABLES` في MySQL 8.4؛ عُولج بضبط حجم التقرير ليظل `< 4000`
+        حرف وتثبيت الحد `4000` في `src/agent/store.js`.
+      - التشغيلة الثانية **`40593284086`** (الـCommit `99b789582911043f6d1cd45aa9ca9f135cd380f0`) **نجحت بالكامل في جميع
+        الوظائف الست**: `Node 22` (`122502699179`)، `Node 24` (`122502699163`)، `Python 3.11 Spider` (`122502699173`)،
+        `Node 24 Container` (`122502699186`)، **`RTL dashboard · Playwright Chromium`** (`122502699198` في 48 ثانية)،
+        و**`MySQL 8.4 · persistence / N−1 / backup restore`** (`122502699207` في 45 ثانية شاملة `DEC-019` و`DEC-020` و`DEC-021`).
+    - **ما يظل مغلقًا (`not-verified`):** النشر الحي على Render وAiven MySQL وتشغيل `verify:live` على رابط عام.
+
+## الطلب السابق — الخطوات التالية للتشغيل الحقيقي (DEC-018)
 
 **الفرع `arena/0220ec0b-phone-google` بُني فوق فرع PR #36 (`daf815a` مدمج فيه)** لأن كل خطوة تعتمد على DEC-017
 وقائمة §5. الترتيب الصحيح: دمج #36 ثم هذا الفرع (أو دمج هذا الفرع وحده فيحمل #36 معه).

@@ -53,16 +53,19 @@ npm run migrate -- --status
 
 | المسار | الوظيفة |
 |---|---|
-| `GET /api/agent/status` | هل الحلقة مفعلة، المخزن، المخطط، السقوف، الأدوات |
+|GET `/api/agent/status` | هل الحلقة مفعلة، المخزن، المخطط، السقوف، الأدوات |
+| `GET /api/agent/harness` | فحص المكونات العشرة لـAgent Harness ودورة التنفيذ الـ10 مراحل (DEC-019) |
 | `POST /api/agent/threads` | خيط جديد `{title}` |
 | `GET /api/agent/threads` · `GET /api/agent/threads/:id` | الخيوط، الرسائل، التشغيلات |
 | `POST /api/agent/threads/:id/runs` | `{message, clientMessageId}` أو ترويسة `Idempotency-Key` → `202` جديد / `200` مكرر |
-| `GET /api/agent/runs/:id` | التشغيل + الخطوات + الاستدعاءات + عقد الهدف + الموافقات + الـoutbox + الأدلة + حكم المُتحقِّق (بلا أسرار) |
-| `GET /api/agent/runs/:id/events` | SSE: `snapshot` ثم `step`/`approval.requested`/`approval.decided`/`verification`/`run.finished` |
+| `GET /api/agent/runs/:id` | التشغيل + الخطة (`plan`) + الخطوات + الاستدعاءات + عقد الهدف + الموافقات + الـoutbox + الأدلة + حكم المُتحقِّق (بلا أسرار) |
+| `GET /api/agent/runs/:id/events` | SSE: `snapshot` ثم `step`/`approval.requested`/`approval.decided`/`plan.edited`/`verification`/`run.finished` |
 | `POST /api/agent/runs/:id/cancel` | طلب إلغاء يُطبَّق بين الخطوات |
+| `GET /api/agent/runs/:id/plan` | عرض الخطة المهيكل (`PLAN_READY`, `WAITING_FOR_APPROVAL`, `EDITED`, `APPROVED`, `REJECTED`, `EXECUTING`) والانتقالات |
+| `POST /api/agent/runs/:id/plan` | تعديل الخطة المتوقفة (`{payload, summary?, note?}` مع `Idempotency-Key`): يعيد فحص السياسات ويبقي التشغيل في `waiting_approval` |
 | `GET /api/agent/runs/:id/approvals` | قرارات الموافقة المسجلة للتشغيل |
 | `GET /api/agent/runs/:id/outbox` | نوايا الأثر الخارجي: الحالة، المحاولات، المرجع الخارجي، رمز الخطأ الآمن |
-| `POST /api/agent/runs/:id/approval` | قرار المالك `{decision: approved\|rejected, note?}` مع `Idempotency-Key`؛ 409 إن كان التشغيل بلا بوابة أو وجد استدعاء `unknown` |
+| `POST /api/agent/runs/:id/approval` | قرار المالك `{decision: approved\|rejected\|edited, payload?, note?}` مع `Idempotency-Key`؛ 409 إن كان التشغيل بلا بوابة أو وجد استدعاء `unknown` |
 | `POST /api/agent/runs/:id/reconcile` | مخرج `needs_reconciliation` (DEC-016): `{target: tool_run\|outbox, targetId, outcome: applied\|not_applied, externalRef?, note?, resume?}` مع `Idempotency-Key`؛ لا يستدعي أي موصل |
 
 `clientMessageId` يجب أن يطابق `^[A-Za-z0-9_-]{8,64}$`. خطأ الإدخال `400`، الملكية `404`، والحلقة غير المفعلة `503`.
@@ -144,8 +147,10 @@ CELIA_AGENT_RESUME_ON_BOOT=true      # الافتراضي false: لا يستأن
 4. **لا تعدد مستخدمين:** الملكية مفروضة على كل صف، لكن الإعداد الحالي لمالك واحد (AGENT-004 لاحقًا).
 5. **MySQL:** لا خدمة MySQL في بيئة الجلسة، لذلك اختبارات التطوير على SQLite. اختبار القبول في
    [integration/mysql.integration.mjs](../integration/mysql.integration.mjs) شُغِّل فعليًا على **MySQL 8.4** في
-   CI (run `40499146250`، commit `5cfa05d`): الترحيل طُبق مرتين، الحلقة نُفذت، التكرار مُنع، والاستدعاء المنقطع
-   أصبح `unknown`. يبقى غير متحقق: تطبيق الترحيل على **قاعدة إنتاج** أو Aiven، وسلوك التشغيل تحت حمل حقيقي.
+   CI (run `40593284086`، commit `99b7895` على الفرع `arena/5fccc4e6-phone-google`): الترحيل طُبق مرتين، الحلقة نُفذت،
+   التكرار مُنع، الاستدعاء المنقطع أصبح `unknown`، وتعديل الخطة `editPlan` وأتمتة المستندات `DEC-020` وبوابة الفهم
+   `DEC-021` تحققت جميعها على MySQL 8.4. يبقى غير متحقق: تطبيق الترحيل على **قاعدة إنتاج** أو Aiven، وسلوك التشغيل
+   تحت حمل حقيقي.
 6. **الاستئناف عند الإقلاع قرار صريح لا افتراضي:** `recoverOnBoot()` موصولة بنقطتي الدخول (`celia-mcp.js`
    و`server.js`) لكنها لا تعمل إلا بـ`CELIA_AGENT_RESUME_ON_BOOT=true` (DEC-018). الافتراضي `false` يحافظ على
    السلوك السابق (الاستئناف بيد إنسان)، ولا يوجد استئناف دوري بمؤقّت.
@@ -160,10 +165,13 @@ node --test test/agent-verifier.test.js            # 8/8 المُتحقِّق ا
 node --test test/agent-approval-routes.test.js     # 4/4 مسارات HTTP
 node --test test/agent-reconciliation.test.js      # 14/14 مصالحة وإعادة وملكية
 node --test test/agent-reconcile-routes.test.js    # 4/4 مسار المصالحة عبر HTTP
+node --test test/agent-harness.test.js             # 5/5 دورة الخطة ومعمارية Agent Harness
+node --test test/agent-document-automation.test.js # 7/7 أتمتة المستندات والبيانات (8 حالات فشل/هجوم)
+node --test test/agent-comprehension-gate.test.js  # 10/10 بوابة الفهم والشرح المبسّط (CL-01..CL-10)
 node --test test/agent-store.test.js               # 6/6
 node --test test/agent-runtime.test.js             # 16/16
 node --test test/agent-routes.test.js              # 3/3
-npm test                                            # 229 اختبارًا (228 أخضر محليًا؛ الإخفاق الوحيد بيئي: استنساخ ضحل)
+npm test                                            # 268/268 اختبارًا ناجحًا محليًا
 npm run check                                       # 87 ملف JS
 npm run release:check                               # 0.2.1 / previous 0.2.0 / schema 1
 npm run check:continuity                            # وثائق وروابط بلا دورات

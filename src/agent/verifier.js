@@ -1,6 +1,13 @@
 import { RISK } from './tools.js';
 import { validateGoalContract } from './goal-contract.js';
 import { hashOf, verifyChain } from './evidence.js';
+import {
+  validateAutomationSchema,
+  VALIDATION_STATUS,
+  ACTION_STATUS,
+  COMPREHENSION_GATE_STATUS
+} from './automation/schema.js';
+import { evaluateComprehensionGate } from './automation/validator.js';
 
 /**
  * Independent verifier (roadmap unit 7).
@@ -76,13 +83,13 @@ export function createVerifier({ tools, clock = Date.now } = {}) {
       const id = `deterministic_reexecution:${toolRun.toolName}`;
       let args;
       try {
-        args = tool.replayArgs({ messages, toolRun });
+        args = tool.replayArgs({ messages, toolRun, context: { messages, toolRuns } });
       } catch (error) {
         checks.push({ id, status: CHECK.unknown, detail: `replay_args_failed:${error?.code || 'error'}` });
         continue;
       }
       try {
-        const fresh = await tool.execute(args, { context: { messages } });
+        const fresh = await tool.execute(args, { context: { messages, toolRuns } });
         const recorded = parseOutcome(toolRun);
         if (hashOf(fresh) === hashOf(recorded)) {
           checks.push({ id, status: CHECK.pass, detail: 'output_hash_matches_recorded_outcome' });
@@ -114,6 +121,104 @@ export function createVerifier({ tools, clock = Date.now } = {}) {
     }
   }
 
+  function documentAutomationChecks({ toolRuns = [], outbox = [], checks } = {}) {
+    const reports = toolRuns.filter((item) => item.toolName === 'data.report' && item.status === 'succeeded');
+    for (const reportRun of reports) {
+      const outcome = parseOutcome(reportRun);
+      const schemaCheck = validateAutomationSchema(outcome);
+      if (!schemaCheck.ok) {
+        checks.push({
+          id: 'document_automation_schema',
+          status: CHECK.block,
+          detail: `data.report violated schema 1.0: ${schemaCheck.errors.join(', ')}`
+        });
+        continue;
+      }
+      checks.push({
+        id: 'document_automation_schema',
+        status: CHECK.pass,
+        detail: `data.report conforms to schema ${outcome.schema_version} (${outcome.validation?.status})`
+      });
+
+      if (outcome.explanation) {
+        const gateEval = evaluateComprehensionGate({
+          explanation: outcome.explanation,
+          extracted: outcome,
+          validation: outcome.validation,
+          action: outcome.action
+        });
+        const issues = [...gateEval.contradictions, ...gateEval.ungrounded_claims];
+        checks.push(
+          gateEval.status === COMPREHENSION_GATE_STATUS.pass
+            ? {
+                id: 'comprehension_gate_grounding',
+                status: CHECK.pass,
+                detail: `explanation grounded (${outcome.explanation.verified_facts?.length || 0} verified facts, status=${outcome.explanation.verification_status})`
+              }
+            : gateEval.status === COMPREHENSION_GATE_STATUS.unknown
+              ? {
+                  id: 'comprehension_gate_grounding',
+                  status: CHECK.unknown,
+                  detail: 'explanation reflects unresolved (unknown) execution state'
+                }
+              : {
+                  id: 'comprehension_gate_grounding',
+                  status: CHECK.block,
+                  detail: `explanation contradicts evidence or lacks provenance: ${issues.join(', ')}`
+                }
+        );
+      }
+
+      if (outcome.validation?.status !== VALIDATION_STATUS.valid) {
+        const illegalCommitAttempt = outbox.some(
+          (entry) =>
+            entry.toolName === 'document.commit_purchase_ledger' &&
+            ['dispatching', 'sent'].includes(entry.status)
+        );
+        if (outcome.action?.status !== ACTION_STATUS.notCommitted || illegalCommitAttempt) {
+          checks.push({
+            id: 'document_automation_policy',
+            status: CHECK.block,
+            detail: `non-valid document (${outcome.validation?.status}) attempted or claimed commitment`
+          });
+        } else {
+          checks.push({
+            id: 'document_automation_policy',
+            status: CHECK.pass,
+            detail: `non-valid document (${outcome.validation?.status}) remained not_committed`
+          });
+        }
+      }
+    }
+
+    const ledgerCommits = outbox.filter(
+      (entry) => entry.toolName === 'document.commit_purchase_ledger' && entry.status === 'sent'
+    );
+    for (const commitEntry of ledgerCommits) {
+      const payload = commitEntry.payload || {};
+      const savedRecord = commitEntry.result?.record || null;
+      const parityOk =
+        payload.validation_status === VALIDATION_STATUS.valid &&
+        savedRecord &&
+        savedRecord.invoice_fingerprint === payload.invoice_fingerprint &&
+        savedRecord.invoice_number === payload.invoice_number &&
+        savedRecord.total === payload.total;
+      checks.push(
+        parityOk
+          ? {
+              id: 'document_automation_commit_parity',
+              status: CHECK.pass,
+              detail: `committed purchase ledger record ${savedRecord.id} matches approved invoice ${payload.invoice_number}`
+            }
+          : {
+              id: 'document_automation_commit_parity',
+              status: CHECK.block,
+              detail: 'committed purchase ledger record does not match approved invoice payload'
+            }
+      );
+    }
+  }
+
   /**
    * Outbox checks (AGENT-002). An external effect is only ever claimed through this
    * table, so the verifier can state precisely what happened: sent, provably not
@@ -129,25 +234,64 @@ export function createVerifier({ tools, clock = Date.now } = {}) {
     const attempted = outbox.filter((entry) =>
       ['dispatching', 'sent', 'unknown'].includes(entry.status)
     );
-    const unapproved = attempted.filter((entry) => {
+    const unapproved = [];
+    const tampered = [];
+    for (const entry of attempted) {
       const approval = entry.approvalId ? approvalsById.get(entry.approvalId) : null;
-      return approval?.decision !== 'approved';
-    });
+      if (approval?.decision !== 'approved') {
+        unapproved.push(entry);
+        continue;
+      }
+      const recomputedPayloadHash = hashOf(entry.payload ?? null);
+      if (entry.payloadHash && recomputedPayloadHash !== entry.payloadHash) {
+        tampered.push(`${entry.toolName}(payload_hash_mismatch)`);
+        continue;
+      }
+      const keyMatch = /^approval:[^:]+:[^:]+:([a-f0-9]{12})(?::|$)/.exec(String(approval.idempotencyKey || ''));
+      if (keyMatch && entry.payloadHash && keyMatch[1] !== entry.payloadHash.slice(0, 12)) {
+        tampered.push(`${entry.toolName}(approval_fingerprint_mismatch)`);
+      }
+    }
     checks.push(
-      unapproved.length === 0
+      unapproved.length === 0 && tampered.length === 0
         ? {
             id: 'outbox_approval',
             status: CHECK.pass,
-            detail: `${attempted.length} dispatched effect(s) each carry a recorded approved decision`
+            detail: `${attempted.length} dispatched effect(s) each carry a recorded approved decision matching the exact payload hash`
           }
         : {
             id: 'outbox_approval',
             status: CHECK.block,
-            detail: `external effect without an approved decision: ${unapproved
-              .map((entry) => `${entry.toolName}(${entry.status})`)
-              .join(', ')}`
+            detail: [
+              unapproved.length
+                ? `external effect without an approved decision: ${unapproved
+                    .map((entry) => `${entry.toolName}(${entry.status})`)
+                    .join(', ')}`
+                : null,
+              tampered.length ? `approved payload tampered after decision: ${tampered.join(', ')}` : null
+            ]
+              .filter(Boolean)
+              .join('; ')
           }
     );
+
+    const editedApprovals = approvals.filter((approval) => approval.decision === 'edited');
+    if (editedApprovals.length > 0) {
+      const uneditedEvidence = editedApprovals.filter((approval) => !evidenced.has(approval.id));
+      checks.push(
+        uneditedEvidence.length === 0
+          ? {
+              id: 'plan_edit_evidence',
+              status: CHECK.pass,
+              detail: `${editedApprovals.length} edited plan revision(s) witnessed in evidence chain`
+            }
+          : {
+              id: 'plan_edit_evidence',
+              status: CHECK.block,
+              detail: `edited approval without ledger evidence: ${uneditedEvidence.map((item) => item.toolName).join(', ')}`
+            }
+      );
+    }
 
     const unsettled = outbox.filter((entry) =>
       ['pending', 'dispatching', 'unknown'].includes(entry.status)
@@ -362,6 +506,9 @@ export function createVerifier({ tools, clock = Date.now } = {}) {
 
     // 9. Human reconciliation must be witnessed by the chain, never asserted alone.
     reconciliationChecks({ toolRuns, outbox, evidence, checks });
+
+    // 10. Document & Data Automation schema, policy, and ledger parity checks.
+    documentAutomationChecks({ toolRuns, outbox, checks });
 
     const verdict = checks.some((check) => check.status === CHECK.block)
       ? VERDICT.block

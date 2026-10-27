@@ -15,6 +15,8 @@ import crypto from 'node:crypto';
 
 export const EVIDENCE_KIND = Object.freeze({
   goalContract: 'goal_contract',
+  planReady: 'plan_ready',
+  planEdited: 'plan_edited',
   toolCall: 'tool_call',
   // Reconstructed after a crash that durably recorded the tool run but interrupted
   // the ledger write. It attests to the stored row; it never claims to have watched the call.

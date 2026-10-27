@@ -1,11 +1,27 @@
 import crypto from 'node:crypto';
-import { RUN_STATUS, TOOL_RUN_STATUS, APPROVAL_DECISION, isTerminalStatus } from './store.js';
+import {
+  RUN_STATUS,
+  TOOL_RUN_STATUS,
+  APPROVAL_DECISION,
+  PLAN_LIFECYCLE_STATE,
+  isTerminalStatus
+} from './store.js';
 import { RISK } from './tools.js';
 import { buildGoalContract } from './goal-contract.js';
 import { EVIDENCE_KIND, hashOf } from './evidence.js';
 import { createVerifier, VERDICT } from './verifier.js';
-import { createOutbox, OUTBOX_STATUS } from './outbox.js';
+import { createOutbox, OUTBOX_STATUS, outboxKey } from './outbox.js';
 import { createEmptyConnectorRegistry } from './connectors.js';
+import {
+  buildPlanSummaryRecord,
+  derivePlanView,
+  inspectAgentHarness,
+  parsePlanSummaryRecord,
+  validatePlanEditPolicy,
+  verifyApprovedEffectIntegrity
+} from './harness.js';
+
+export { PLAN_LIFECYCLE_STATE };
 
 /**
  * Agent runtime — the M1 loop (AGENT-001).
@@ -241,7 +257,7 @@ export function createAgentRuntime({
    * the gate (planner asked again while approved) and the resume drain (approved
    * intents are dispatched even if the planner never repeats the call).
    */
-  async function handleExternalEffect({ runId, entry, controller }) {
+  async function handleExternalEffect({ runId, entry, approval = null, controller }) {
     const tool = tools.get(entry.toolName);
     if (!tool) {
       await addStep(runId, {
@@ -251,6 +267,50 @@ export function createAgentRuntime({
       });
       return { finish: { status: RUN_STATUS.failed, error: 'unknown_tool' } };
     }
+    const resolvedApproval =
+      approval || (await store.listApprovals(runId)).find((item) => item.id === entry.approvalId) || null;
+    const integrity = verifyApprovedEffectIntegrity({ entry, approval: resolvedApproval });
+    if (!integrity.ok) {
+      await store.appendEvidence({
+        runId,
+        stepId: entry.stepId,
+        kind: EVIDENCE_KIND.externalEffectSettled,
+        input: { tool: tool.name, outboxId: entry.id, approvalId: entry.approvalId },
+        output: { error: integrity.code, reason: integrity.reason },
+        sourceIds: [entry.id, ...(resolvedApproval ? [resolvedApproval.id] : [])],
+        verdict: VERDICT.block
+      });
+      await addStep(runId, {
+        kind: 'decide',
+        title: 'منع تغيير صامت للخطة المعتمدة',
+        summary: `رفضت بوابة الموافقات تنفيذ ${tool.name} (${integrity.code}): بصمة الحمولة لا تطابق القرار المعتمد.`,
+        toolName: tool.name
+      });
+      return { finish: { status: RUN_STATUS.failed, error: integrity.code } };
+    }
+    const existingRun = await store.getRun(runId);
+    const prevPlan = parsePlanSummaryRecord(existingRun?.planSummary);
+    await store.setPlanSummary(
+      runId,
+      JSON.stringify(
+        buildPlanSummaryRecord({
+          revision: prevPlan?.revision || 1,
+          state: PLAN_LIFECYCLE_STATE.executing,
+          toolName: tool.name,
+          risk: tool.risk,
+          connector: entry.connector,
+          payload: entry.payload,
+          transitions: [
+            ...(prevPlan?.transitions || [
+              PLAN_LIFECYCLE_STATE.planReady,
+              PLAN_LIFECYCLE_STATE.waitingForApproval,
+              PLAN_LIFECYCLE_STATE.approved
+            ]),
+            PLAN_LIFECYCLE_STATE.executing
+          ]
+        })
+      )
+    );
     const effect = await dispatchExternalEffect({ runId, tool, entry, controller });
     if (effect.status === OUTBOX_STATUS.sent) {
       await addStep(runId, {
@@ -291,14 +351,21 @@ export function createAgentRuntime({
   /** Dispatch every approved-and-still-pending intent. Returns a terminal run, or null. */
   async function drainApprovedIntents(runId, controller) {
     const [entries, approvals] = await Promise.all([store.listOutbox(runId), store.listApprovals(runId)]);
-    const approved = new Set(
-      approvals.filter((approval) => approval.decision === APPROVAL_DECISION.approved).map((approval) => approval.id)
+    const approvedById = new Map(
+      approvals
+        .filter((approval) => approval.decision === APPROVAL_DECISION.approved)
+        .map((approval) => [approval.id, approval])
     );
     const ready = entries.filter(
-      (entry) => entry.status === OUTBOX_STATUS.pending && entry.approvalId && approved.has(entry.approvalId)
+      (entry) => entry.status === OUTBOX_STATUS.pending && entry.approvalId && approvedById.has(entry.approvalId)
     );
     for (const entry of ready) {
-      const handled = await handleExternalEffect({ runId, entry, controller });
+      const handled = await handleExternalEffect({
+        runId,
+        entry,
+        approval: approvedById.get(entry.approvalId) || null,
+        controller
+      });
       if (handled.finish) {
         return finish(runId, handled.finish.status, { error: handled.finish.error });
       }
@@ -480,6 +547,24 @@ export function createAgentRuntime({
 
           if (approval.decision === APPROVAL_DECISION.rejected) {
             await store.cancelPendingOutbox(runId);
+            await store.setPlanSummary(
+              runId,
+              JSON.stringify(
+                buildPlanSummaryRecord({
+                  revision: 1,
+                  state: PLAN_LIFECYCLE_STATE.rejected,
+                  toolName: tool.name,
+                  risk: tool.risk,
+                  connector: tool.connector,
+                  payload: decision.args ?? null,
+                  transitions: [
+                    PLAN_LIFECYCLE_STATE.planReady,
+                    PLAN_LIFECYCLE_STATE.waitingForApproval,
+                    PLAN_LIFECYCLE_STATE.rejected
+                  ]
+                })
+              )
+            );
             await addStep(runId, {
               kind: 'decide',
               title: 'موافقة مرفوضة',
@@ -489,7 +574,7 @@ export function createAgentRuntime({
             return { run: await finish(runId, RUN_STATUS.cancelled, { error: 'approval_rejected' }), claimed: true };
           }
           if (approval.decision === APPROVAL_DECISION.approved) {
-            const handled = await handleExternalEffect({ runId, entry: enqueued.entry, controller });
+            const handled = await handleExternalEffect({ runId, entry: enqueued.entry, approval, controller });
             if (handled.finish) {
               return {
                 run: await finish(runId, handled.finish.status, { error: handled.finish.error }),
@@ -498,6 +583,20 @@ export function createAgentRuntime({
             }
             continue;
           }
+          await store.setPlanSummary(
+            runId,
+            JSON.stringify(
+              buildPlanSummaryRecord({
+                revision: 1,
+                state: PLAN_LIFECYCLE_STATE.waitingForApproval,
+                toolName: tool.name,
+                risk: tool.risk,
+                connector: tool.connector,
+                payload: decision.args ?? null,
+                transitions: [PLAN_LIFECYCLE_STATE.planReady, PLAN_LIFECYCLE_STATE.waitingForApproval]
+              })
+            )
+          );
           emit(runId, { type: 'approval.requested', approval });
           return { run: await finish(runId, RUN_STATUS.waitingApproval, { error: 'approval_required' }), claimed: true };
         }
@@ -710,8 +809,21 @@ export function createAgentRuntime({
       ]);
       const toolRuns = rawToolRuns.map((toolRun) => ({ ...toolRun, outcome: parseOutcome(toolRun.outcome) }));
       const verificationEntry = [...evidence].reverse().find((entry) => entry.kind === EVIDENCE_KIND.verification) || null;
+      const verification = verificationEntry
+        ? { seq: verificationEntry.seq, verdict: verificationEntry.verdict, at: verificationEntry.createdAt, hash: verificationEntry.hash }
+        : null;
+      const plan = derivePlanView({
+        run,
+        goalContract,
+        steps,
+        approvals,
+        outbox: outboxEntries,
+        toolRuns,
+        verification
+      });
       return {
         run,
+        plan,
         steps,
         toolRuns,
         goalContract,
@@ -719,16 +831,216 @@ export function createAgentRuntime({
         outbox: outboxEntries,
         evidence,
         evidenceChain,
-        verification: verificationEntry
-          ? { seq: verificationEntry.seq, verdict: verificationEntry.verdict, at: verificationEntry.createdAt, hash: verificationEntry.hash }
-          : null
+        verification
+      };
+    },
+    harness() {
+      return inspectAgentHarness({
+        store,
+        tools,
+        planner,
+        verifier,
+        connectors,
+        limits: config
+      });
+    },
+    /**
+     * Edit a parked plan (`PLAN_READY → WAITING_FOR_APPROVAL → EDITED → WAITING_FOR_APPROVAL`).
+     *
+     * Saves the owner's modification, re-validates policies against the tool contract,
+     * marks the previous approval row `edited`, creates a new pending approval bound to
+     * the new payload hash, updates the pending outbox intent, appends a `plan_edited`
+     * entry to the SHA-256 evidence chain, and keeps the run in `waiting_approval`
+     * until the owner explicitly approves or rejects the edited version.
+     */
+    async editPlan(
+      runId,
+      { payload = null, summary = null, note = null, idempotencyKey = null } = {},
+      requesterId = ownerId
+    ) {
+      const run = await store.getRunForOwner(runId, requesterId);
+      if (!run) throw httpError(404, 'run_not_found', 'run_not_found');
+      if (idempotencyKey !== null && !CLIENT_ID.test(String(idempotencyKey))) {
+        throw httpError(400, 'invalid_client_message_id', 'invalid_client_message_id');
+      }
+      if (idempotencyKey) {
+        const existingApprovals = await store.listApprovals(runId);
+        const replay = existingApprovals.filter(
+          (approval) => approval.decision === APPROVAL_DECISION.edited && approval.decisionKey === idempotencyKey
+        );
+        if (replay.length) {
+          const detail = await runtime.detail(runId, requesterId);
+          return {
+            run: detail.run,
+            plan: detail.plan,
+            editedApproval: replay[0],
+            pendingApproval: detail.approvals.find((item) => item.decision === APPROVAL_DECISION.pending) || null,
+            approvals: detail.approvals,
+            outbox: detail.outbox,
+            resumed: false,
+            idempotentReplay: true
+          };
+        }
+      }
+      if (run.status !== RUN_STATUS.waitingApproval) {
+        throw httpError(409, 'run_not_waiting_approval', 'run_not_waiting_approval');
+      }
+      const unresolved = (await store.listToolRuns(runId)).filter(
+        (toolRun) => toolRun.status === TOOL_RUN_STATUS.unknown || toolRun.status === TOOL_RUN_STATUS.started
+      );
+      if (unresolved.length) {
+        await store.finishRun(runId, RUN_STATUS.needsReconciliation, { error: 'outcome_unknown' });
+        throw httpError(409, 'reconciliation_required', 'reconciliation_required');
+      }
+      const allApprovals = await store.listApprovals(runId);
+      const pending = allApprovals.filter((approval) => approval.decision === APPROVAL_DECISION.pending);
+      if (!pending.length) throw httpError(409, 'approval_request_missing', 'approval_request_missing');
+      const currentApproval = pending[pending.length - 1];
+      const tool = tools.get(currentApproval.toolName);
+      const requestedToolName =
+        summary && typeof summary === 'object' && typeof summary.toolName === 'string' ? summary.toolName : null;
+      const policyCheck = validatePlanEditPolicy({ tool, payload, requestedToolName, tools });
+      if (!policyCheck.ok) {
+        throw httpError(policyCheck.status || 400, policyCheck.code, policyCheck.message);
+      }
+
+      const outboxEntries = await store.listOutbox(runId);
+      const pendingOutbox =
+        outboxEntries.find(
+          (entry) => entry.approvalId === currentApproval.id && entry.status === OUTBOX_STATUS.pending
+        ) ||
+        outboxEntries.find(
+          (entry) => entry.toolName === currentApproval.toolName && entry.status === OUTBOX_STATUS.pending
+        );
+      if (!pendingOutbox) {
+        throw httpError(409, 'outbox_intent_not_editable', 'outbox_intent_not_editable');
+      }
+
+      const memo = typeof note === 'string' ? note.trim().slice(0, 500) || null : null;
+      const newPayloadHash = hashOf(payload);
+      const decisionKey =
+        idempotencyKey || `edit:${runId}:${currentApproval.id}:${newPayloadHash.slice(0, 12)}`;
+      const decidedEdit = await store.decideApproval({
+        approvalId: currentApproval.id,
+        decision: APPROVAL_DECISION.edited,
+        actor: requesterId,
+        note: memo,
+        decisionKey
+      });
+
+      const revision =
+        allApprovals.filter((approval) => approval.decision === APPROVAL_DECISION.edited).length + 2;
+      const editStep = await addStep(runId, {
+        kind: 'decide',
+        title: `تعديل الخطة (مراجعة #${revision})`,
+        summary:
+          `حُفظ تعديل المالك (${requesterId}) على خطة ${tool.name} وأُعيد التحقق من السياسات بنجاح؛ ` +
+          `الخطة بانتظار الموافقة على النسخة المعدّلة.${memo ? ` ملاحظة: ${memo}` : ''}`,
+        toolName: tool.name
+      });
+
+      const nextApprovalKey = `approval:${runId}:${tool.name}:${newPayloadHash.slice(0, 12)}:r${revision}`;
+      const nextRequested = await store.requestApproval({
+        runId,
+        stepId: editStep.id,
+        toolName: tool.name,
+        risk: tool.risk,
+        idempotencyKey: nextApprovalKey
+      });
+      const nextApproval = nextRequested.approval;
+      const nextOutboxKey = outboxKey({ runId, toolName: tool.name, payload });
+      const updatedOutbox = await store.updatePendingOutboxPayload(pendingOutbox.id, {
+        payload,
+        idempotencyKey: nextOutboxKey,
+        approvalId: nextApproval.id,
+        stepId: editStep.id
+      });
+      if (!updatedOutbox.changed) {
+        throw httpError(409, 'outbox_intent_not_editable', 'outbox_intent_not_editable');
+      }
+
+      await store.appendEvidence({
+        runId,
+        stepId: editStep.id,
+        kind: EVIDENCE_KIND.planEdited,
+        input: {
+          tool: tool.name,
+          revision,
+          previousPayloadHash: pendingOutbox.payloadHash,
+          newPayloadHash,
+          payload,
+          actor: requesterId,
+          note: memo
+        },
+        output: {
+          outboxId: updatedOutbox.entry.id,
+          previousApprovalId: currentApproval.id,
+          pendingApprovalId: nextApproval.id,
+          policyCheck: 'PASS'
+        },
+        sourceIds: [currentApproval.id, nextApproval.id, updatedOutbox.entry.id],
+        verdict: VERDICT.pass
+      });
+
+      const prevPlan = parsePlanSummaryRecord(run.planSummary);
+      const transitions = [
+        ...(prevPlan?.transitions || [
+          PLAN_LIFECYCLE_STATE.planReady,
+          PLAN_LIFECYCLE_STATE.waitingForApproval
+        ]),
+        PLAN_LIFECYCLE_STATE.edited,
+        PLAN_LIFECYCLE_STATE.waitingForApproval
+      ];
+      await store.setPlanSummary(
+        runId,
+        JSON.stringify(
+          buildPlanSummaryRecord({
+            revision,
+            state: PLAN_LIFECYCLE_STATE.waitingForApproval,
+            toolName: tool.name,
+            risk: tool.risk,
+            connector: tool.connector,
+            payload,
+            note: memo,
+            transitions
+          })
+        )
+      );
+
+      emit(runId, {
+        type: 'plan.edited',
+        revision,
+        editedApproval: decidedEdit.approval,
+        approval: nextApproval,
+        outbox: updatedOutbox.entry
+      });
+      emit(runId, { type: 'approval.requested', approval: nextApproval });
+
+      const detail = await runtime.detail(runId, requesterId);
+      return {
+        run: detail.run,
+        plan: detail.plan,
+        editedApproval: decidedEdit.approval,
+        pendingApproval: nextApproval,
+        approvals: detail.approvals,
+        outbox: detail.outbox,
+        resumed: false,
+        idempotentReplay: false
       };
     },
     /**
      * Owner decision on a parked run. The strict rule: an approval never resumes a
      * call whose outcome is `unknown`/`started` — reconciliation comes first.
+     * Supports `approved`, `rejected`, and `edited` (which delegates to `editPlan`).
      */
-    async approve(runId, { decision, note = null, idempotencyKey = null } = {}, requesterId = ownerId) {
+    async approve(
+      runId,
+      { decision, payload = null, summary = null, note = null, idempotencyKey = null } = {},
+      requesterId = ownerId
+    ) {
+      if (decision === APPROVAL_DECISION.edited) {
+        return runtime.editPlan(runId, { payload, summary, note, idempotencyKey }, requesterId);
+      }
       const run = await store.getRunForOwner(runId, requesterId);
       if (!run) throw httpError(404, 'run_not_found', 'run_not_found');
       if (![APPROVAL_DECISION.approved, APPROVAL_DECISION.rejected].includes(decision)) {
@@ -739,7 +1051,8 @@ export function createAgentRuntime({
         if (idempotencyKey) {
           const replay = (await store.listApprovals(runId)).filter((approval) => approval.decisionKey === idempotencyKey);
           if (replay.length) {
-            return { run: await store.getRun(runId), approvals: replay, resumed: false, idempotentReplay: true };
+            const detail = await runtime.detail(runId, requesterId);
+            return { run: detail.run, plan: detail.plan, approvals: replay, resumed: false, idempotentReplay: true };
           }
         }
         throw httpError(409, 'run_not_waiting_approval', 'run_not_waiting_approval');
@@ -777,10 +1090,29 @@ export function createAgentRuntime({
           verdict: decision === APPROVAL_DECISION.approved ? VERDICT.pass : VERDICT.block
         });
       }
+      const prevPlan = parsePlanSummaryRecord(run.planSummary);
+      const baseTransitions = prevPlan?.transitions || [
+        PLAN_LIFECYCLE_STATE.planReady,
+        PLAN_LIFECYCLE_STATE.waitingForApproval
+      ];
       emit(runId, { type: 'approval.decided', decision, approvals: decided });
       if (decision === APPROVAL_DECISION.rejected) {
         // The intent never leaves the outbox: cancelling it is the whole effect of a rejection.
         const cancelledIntents = await store.cancelPendingOutbox(runId);
+        await store.setPlanSummary(
+          runId,
+          JSON.stringify(
+            buildPlanSummaryRecord({
+              revision: prevPlan?.revision || 1,
+              state: PLAN_LIFECYCLE_STATE.rejected,
+              toolName: decided[0]?.toolName || prevPlan?.toolName || null,
+              risk: decided[0]?.risk || prevPlan?.risk || null,
+              connector: prevPlan?.connector || null,
+              note,
+              transitions: [...baseTransitions, PLAN_LIFECYCLE_STATE.rejected]
+            })
+          )
+        );
         await addStep(runId, {
           kind: 'decide',
           title: 'موافقة مرفوضة',
@@ -789,15 +1121,31 @@ export function createAgentRuntime({
             `أُلغيت ${cancelledIntents} نية في outbox ولم يُرسل أي طلب.`
         });
         const cancelled = await finish(runId, RUN_STATUS.cancelled, { error: 'approval_rejected' });
-        return { run: cancelled, approvals: decided, resumed: false };
+        const detail = await runtime.detail(runId, requesterId);
+        return { run: cancelled, plan: detail.plan, approvals: decided, resumed: false };
       }
+      await store.setPlanSummary(
+        runId,
+        JSON.stringify(
+          buildPlanSummaryRecord({
+            revision: prevPlan?.revision || 1,
+            state: PLAN_LIFECYCLE_STATE.approved,
+            toolName: decided[0]?.toolName || prevPlan?.toolName || null,
+            risk: decided[0]?.risk || prevPlan?.risk || null,
+            connector: prevPlan?.connector || null,
+            note,
+            transitions: [...baseTransitions, PLAN_LIFECYCLE_STATE.approved]
+          })
+        )
+      );
       const requeued = await store.requeueRun(runId);
       const updated = await store.getRun(runId);
-      emit(runId, { type: 'run.approved', run: updated });
+      const detail = await runtime.detail(runId, requesterId);
+      emit(runId, { type: 'run.approved', run: updated, plan: detail.plan });
       if (requeued) {
         runtime.start(runId).catch((error) => logger.error?.('Approved run resume failed:', error?.code || 'resume_failed'));
       }
-      return { run: updated, approvals: decided, resumed: requeued };
+      return { run: updated, plan: detail.plan, approvals: decided, resumed: requeued };
     },
     /**
      * Everything in this run whose truth is still unknown. Reconciliation is complete

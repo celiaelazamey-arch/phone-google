@@ -96,6 +96,8 @@ function rewriteStaticHostLinks(html) {
     .replace(/href="\.\/landing\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./landing.html${suffix}"`)
     .replace(/href="\.\/index\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./index.html${suffix}"`)
     .replace(/href="\.\/studio\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./index.html${suffix}"`)
+    .replace(/href="\.\/agent\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./agent.html${suffix}"`)
+    .replace(/href="\.\/kb\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./kb.html${suffix}"`)
     // روابط التشخيص المباشرة: Pages يخدم ملفات فقط، لذا تشير إلى لقطات JSON ثابتة.
     .replace(/href="\.\/health"/g, 'href="./health.json"')
     .replace(/href="\.\/api\/live"/g, 'href="./api/live.json"')

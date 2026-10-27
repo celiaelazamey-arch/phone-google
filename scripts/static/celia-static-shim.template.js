@@ -944,6 +944,7 @@
     'GET /api/live': true,
     'GET /api/skills': true,
     'GET /api/agent/status': true,
+    'GET /api/kb/status': true,
     'GET /api/deployment/hosting': true,
     'POST /mcp': true,
     'POST /ui/workspace/rpc': true,
@@ -1028,6 +1029,20 @@
       };
     }
 
+    if (verb === 'GET' && route === '/api/kb/status') {
+      return {
+        status: 200,
+        payload: {
+          enabled: false,
+          mode: 'off',
+          reason: 'knowledge_disabled',
+          required: 'CELIA_KB=sqlite',
+          scope: 'browser-demo',
+          note: 'هذه معاينة ثابتة: شبكة المعرفة تحتاج خدمة Node مع ملف SQLite. لا تُحاكى قراءة الفهرس هنا.'
+        }
+      };
+    }
+
     // Discovery only. It says where the always-on service is expected and that it is
     // NOT verified from this build — never that a deployment exists.
     if (verb === 'GET' && route === '/api/deployment/hosting') {
@@ -1077,6 +1092,9 @@
       return `/${pathname.slice(basePath.length)}`;
     }
     if (basePath === '/' || !basePath) return pathname;
+    if (/^\/(?:api|ui|health|healthz|readyz|version|mcp)(?:\/|$)/.test(pathname)) {
+      return pathname;
+    }
     return null;
   }
 
