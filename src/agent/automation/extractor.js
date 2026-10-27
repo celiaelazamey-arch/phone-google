@@ -85,7 +85,7 @@ function findTextField(lines, field) {
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index].trim();
     if (!line || !pattern.test(line)) continue;
-    if (field === 'total' && /(?:الإجمالي\\s+الفرعي|الاجمالي\\s+الفرعي|المجموع\\s+قبل\\s+الضريبة|subtotal)/i.test(line)) continue;
+    if (field === 'total' && /(?:الإجمالي\s+الفرعي|الاجمالي\s+الفرعي|المجموع\s+قبل\s+الضريبة|subtotal)/i.test(line)) continue;
     const separator = line.search(/[:：=]/);
     if (separator < 0) continue;
     const value = line.slice(separator + 1).trim();
