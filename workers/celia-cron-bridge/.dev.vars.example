@@ -1,0 +1,8 @@
+# انسخ إلى .dev.vars للتطوير المحلي عبر `wrangler dev`. هذا الملف مثال فقط.
+# .dev.vars مُستثنى من Git بقاعدة .env.* في .gitignore الجذري.
+CRONJOB_API_KEY=replace-with-cron-job-org-console-key
+CELIA_ADMIN_TOKEN=replace-with-min-32-random-hex-chars
+# أصل واجهة Pages أثناء المعاينة المحلية (باب 3101 في اختبارات المستودع):
+ALLOWED_ORIGIN=http://127.0.0.1:3101
+# للاختبارات فقط ضد محاكٍ محلي، ولا يُضبط في الإنتاج:
+# CRONJOB_API_BASE=http://127.0.0.1:9099

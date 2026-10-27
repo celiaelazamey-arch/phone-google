@@ -1,0 +1,16 @@
+# انسخ هذا الملف إلى wrangler.toml عند النشر، ثم اضبط اسم الحساب/النطاق.
+# الأصولر الحقيقية لا تُكتب هنا إطلاقًا — تُضبط عبر:
+#   wrangler secret put CRONJOB_API_KEY
+#   wrangler secret put CELIA_ADMIN_TOKEN
+name = "celia-cron-bridge"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+
+# أصل صفحات GitHub Pages الذي يُسمح له بمناداة الجسر من المتصفح (بدون شرطة مائلة أخيرة).
+# فارغ = نفس المنشأ فقط. للنشر المجاني الحالي اضبط:
+# [vars]
+# ALLOWED_ORIGIN = "https://celiaelazamey-arch.github.io"
+#
+# ملاحظات:
+# - CRONJOB_API_BASE متروك للافتراضي https://api.cron-job.org ولا يُكتب في الإنتاج.
+# - الخطة المجانية لـ Workers تكفي حاليًا (100 ألف طلب/يوم) قبل أي قرار ترقية.

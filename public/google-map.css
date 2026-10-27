@@ -1,0 +1,235 @@
+/* سيليا — خريطة خدمات Google المجانية. يعتمد على رموز styles.css. */
+
+.skip-link {
+  position: absolute;
+  inset-inline-start: -999px;
+  top: 0;
+  background: var(--accent);
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 0 0 10px 0;
+  z-index: 100;
+}
+.skip-link:focus { inset-inline-start: 0; }
+
+.gm-main {
+  width: min(1200px, 100%);
+  margin: 0 auto;
+  padding: 26px 18px 56px;
+  overflow: auto;
+}
+
+/* ───────────────────────── المقدمة ───────────────────────── */
+.gm-hero {
+  border: 1px solid var(--border-subtle);
+  border-radius: 18px;
+  padding: 26px 24px;
+  margin-bottom: 22px;
+  background:
+    radial-gradient(520px circle at 92% -20%, rgba(66, 133, 244, .12), transparent 60%),
+    radial-gradient(460px circle at 6% 110%, rgba(16, 185, 129, .10), transparent 60%),
+    var(--bg-surface);
+}
+.gm-eyebrow {
+  color: var(--accent);
+  letter-spacing: .16em;
+  font-size: .78rem;
+  font-weight: 700;
+  margin: 0 0 10px;
+}
+.gm-hero h1 {
+  margin: 0 0 10px;
+  font-size: clamp(1.5rem, 3.4vw, 2.15rem);
+  line-height: 1.35;
+}
+.gm-lead {
+  color: var(--text-secondary);
+  max-width: 760px;
+  margin: 0 0 18px;
+}
+.gm-filter { display: flex; gap: 8px; flex-wrap: wrap; }
+.gm-chip {
+  border: 1px solid var(--border-strong);
+  background: var(--bg-surface-2);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-size: .86rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.gm-chip:hover { background: var(--bg-hover); color: var(--text-primary); }
+.gm-chip.active { background: var(--accent); border-color: transparent; color: #fff; }
+.gm-chip-decision.active { background: var(--amber); }
+
+/* ───────────────────────── الممرات والبطاقات ───────────────────────── */
+.gm-lane { margin-bottom: 26px; }
+.gm-lane-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 1.02rem;
+  margin: 0 0 12px;
+  color: var(--text-primary);
+}
+.gm-lane-mark { color: var(--accent); }
+.gm-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 14px;
+}
+.gm-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  border-radius: 16px;
+  padding: 16px;
+  transition: border-color .15s ease, transform .15s ease;
+}
+.gm-card:hover { border-color: var(--border-strong); transform: translateY(-2px); }
+.gm-card[hidden] { display: none; }
+.gm-card header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 8px;
+}
+.gm-card h3 { margin: 0; font-size: 1rem; flex: 1; }
+.gm-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 1rem;
+}
+.gm-card p { color: var(--text-secondary); font-size: .88rem; margin: 0 0 10px; flex: 1; }
+.gm-badge {
+  font-size: .7rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+.gm-badge-ok { background: var(--emerald-soft); color: var(--emerald); }
+.gm-badge-plan { background: var(--violet-soft); color: var(--violet); }
+.gm-badge-decision { background: var(--amber-soft); color: var(--amber); }
+.gm-meta { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.gm-meta li { font-size: .8rem; color: var(--text-muted); display: flex; gap: 6px; flex-wrap: wrap; }
+.gm-meta span { color: var(--text-secondary); font-weight: 600; }
+.gm-meta code {
+  direction: ltr;
+  unicode-bidi: embed;
+  color: var(--text-secondary);
+  background: var(--bg-code);
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-size: .74rem;
+}
+.gm-meta li.gm-warn {
+  border: 1px solid rgba(245, 158, 11, .35);
+  background: var(--amber-soft);
+  border-radius: 10px;
+  padding: 8px 10px;
+  color: var(--text-secondary);
+}
+.gm-meta li.gm-warn span { color: var(--amber); }
+
+/* ───────────────────────── المسار والخطوات ───────────────────────── */
+.gm-flow, .gm-sequence, .gm-gates {
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 22px;
+}
+.gm-flow h2, .gm-sequence h2, .gm-gates h2 { margin: 0 0 14px; font-size: 1.05rem; }
+.gm-flow-track {
+  list-style: none;
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 0;
+  margin: 0;
+}
+.gm-flow-track li {
+  flex: 1 1 170px;
+  min-width: 150px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: center;
+}
+.gm-flow-track span { color: var(--text-muted); font-size: .78rem; }
+.gm-flow-arrow { align-self: center; color: var(--text-muted); }
+
+.gm-steps { margin: 0; padding-inline-start: 0; list-style: none; counter-reset: gmstep; display: grid; gap: 10px; }
+.gm-steps li {
+  counter-increment: gmstep;
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  gap: 12px;
+  align-items: start;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.gm-steps li::before {
+  content: counter(gmstep);
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+}
+.gm-steps strong { display: block; margin-bottom: 2px; }
+.gm-steps span { color: var(--text-secondary); font-size: .86rem; }
+
+/* ───────────────────────── الحواجز ───────────────────────── */
+.gm-gate-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.gm-gate {
+  border: 1px solid rgba(245, 158, 11, .28);
+  background: linear-gradient(160deg, var(--amber-soft), transparent 65%), var(--bg-surface-2);
+  border-radius: 14px;
+  padding: 15px;
+}
+.gm-gate-icon { font-size: 1.3rem; display: block; margin-bottom: 8px; }
+.gm-gate h3 { margin: 0 0 6px; font-size: .95rem; }
+.gm-gate p { margin: 0; color: var(--text-secondary); font-size: .84rem; }
+.gm-gate code {
+  direction: ltr;
+  unicode-bidi: embed;
+  color: var(--amber);
+  font-size: .78rem;
+}
+
+.gm-foot {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  color: var(--text-muted);
+  font-size: .82rem;
+}
+.gm-foot a { color: var(--accent); text-decoration: none; }
+.gm-foot a:hover { text-decoration: underline; }
+
+@media (max-width: 720px) {
+  .gm-flow-arrow { transform: rotate(90deg); }
+  .gm-flow-track { flex-direction: column; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gm-card { transition: none; }
+}

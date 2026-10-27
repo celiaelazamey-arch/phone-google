@@ -2,6 +2,8 @@ node_modules/
 .env
 .env.*
 !.env.example
+.dev.vars
+.wrangler/
 coverage/
 .DS_Store
 npm-debug.log*

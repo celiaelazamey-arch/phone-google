@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="ar" dir="rtl" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <meta name="theme-color" content="#0b0c10" />
+  <meta
+    name="description"
+    content="خريطة ربط CeliaOS بخدمات Google المجانية: الأدوار والحدود وقرارات الخصوصية وترتيب التنفيذ."
+  />
+  <title>خريطة Google المجانية — سيليا</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="./fonts.css" />
+  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./google-map.css" />
+</head>
+<body>
+  <a class="skip-link" href="#gm-main">انتقل إلى المحتوى</a>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-cluster">
+        <div class="brand-orb" aria-hidden="true"><span class="orb-core"></span></div>
+        <div class="brand-text">
+          <div class="brand-title-row">
+            <span class="brand-name">سيليا</span>
+            <span class="brand-year">2026 · MAP</span>
+          </div>
+          <span class="brand-sub">خريطة خدمات Google المجانية — الأدوار والحدود والقرارات</span>
+        </div>
+      </div>
+      <nav class="nav-pills" aria-label="أقسام المنصة">
+        <a class="nav-pill" href="./studio"><span>✦</span><span>مساحة الوكيل</span></a>
+        <a class="nav-pill" href="./cron"><span>◷</span><span>المهام المجدولة</span></a>
+        <a class="nav-pill active" href="./google-map"><span>⬡</span><span>خريطة Google</span></a>
+        <a class="nav-pill" href="./live"><span>●</span><span>النظام الحي</span></a>
+      </nav>
+    </header>
+
+    <main class="gm-main" id="gm-main">
+      <section class="gm-hero">
+        <p class="gm-eyebrow">FREE-TIER ARCHITECTURE · بلا بطاقة بنكية</p>
+        <h1>خريطة ربط CeliaOS بخدمات Google المجانية</h1>
+        <p class="gm-lead">
+          كل خدمة لها دور محدد وحدود مجانية وثمن خصوصية. الخريطة تميّز ما هو
+          <strong>منفّذ برمجيًا في المستودع</strong> عما هو <strong>مخطط</strong> وما يحتاج
+          <strong>قرارًا صريحًا من المالك</strong> قبل أي بيانات حقيقية.
+        </p>
+        <div class="gm-filter" role="group" aria-label="تصفية الخدمات حسب الحالة">
+          <button type="button" class="gm-chip active" data-filter="all" aria-pressed="true">الكل <span id="gm-count-all"></span></button>
+          <button type="button" class="gm-chip" data-filter="implemented" aria-pressed="false">منفّذ برمجيًا</button>
+          <button type="button" class="gm-chip" data-filter="planned" aria-pressed="false">مخطط</button>
+          <button type="button" class="gm-chip gm-chip-decision" data-filter="decision" aria-pressed="false">قرار مطلوب</button>
+        </div>
+      </section>
+
+      <section class="gm-lane" aria-labelledby="gm-lane-core">
+        <h2 id="gm-lane-core" class="gm-lane-title"><span class="gm-lane-mark">◈</span> النواة والذكاء</h2>
+        <div class="gm-cards">
+          <article class="gm-card" data-status="implemented">
+            <header><span class="gm-icon">✦</span><h3>CeliaOS Core</h3><span class="gm-badge gm-badge-ok">منفّذ</span></header>
+            <p>نواة Express/MCP مع عزل صلاحيات وبوابة موافقات وسجل أدلة — مركز كل الخدمات.</p>
+            <ul class="gm-meta">
+              <li><span>الدليل:</span><code>src/server.js · src/celia-mcp.js</code></li>
+              <li><span>الحد المجاني:</span>يعمل محليًا وعلى خطة Free بلا مزوّد سحابي إلزامي</li>
+            </ul>
+          </article>
+          <article class="gm-card" data-status="decision">
+            <header><span class="gm-icon">🆓</span><h3>Gemini API — الفئة المجانية</h3><span class="gm-badge gm-badge-decision">قرار مطلوب</span></header>
+            <p>محرك التخطيط والتلخيص واقتراح الأدوات. الكود موجود لكن التفعيل يحتاج مفتاحًا وقبول الشروط.</p>
+            <ul class="gm-meta">
+              <li><span>الحد المجاني:</span>حصص طلبات تتغير حسب النموذج والحساب</li>
+              <li class="gm-warn"><span>الخصوصية:</span>شروط الفئة المجانية تسمح لـGoogle باستخدام المحتوى لتحسين المنتجات وقد يراجعه بشر — لا رسائل عملاء ولا أسرار قبل قرارك</li>
+              <li><span>الدليل:</span><code>src/gemini.js · AI-002</code></li>
+            </ul>
+          </article>
+          <article class="gm-card" data-status="planned">
+            <header><span class="gm-icon">🏠</span><h3>Ollama المحلي</h3><span class="gm-badge gm-badge-plan">مخطط</span></header>
+            <p>بديل بلا مشاركة بيانات: نموذج لغوي على جهازك للبيانات الحساسة عندما يقبل الأداء.</p>
+            <ul class="gm-meta">
+              <li><span>الحد المجاني:</span>صفر تكلفة سحابية، مقابل جهاز بمواصفات مناسبة</li>
+              <li><span>الدليل:</span><code>src/ollama.js</code></li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="gm-lane" aria-labelledby="gm-lane-google">
+        <h2 id="gm-lane-google" class="gm-lane-title"><span class="gm-lane-mark">G</span> خدمات Google — الحساب الموحّد</h2>
+        <div class="gm-cards">
+          <article class="gm-card" data-status="implemented">
+            <header><span class="gm-icon">📅</span><h3>Google Calendar</h3><span class="gm-badge gm-badge-ok">منفّذ</span></header>
+            <p>إنشاء وقراءة أحداث عبر OAuth بنطاق ضيق <code>calendar.events</code>، وموصل وكيل بمعرّف حتمي للمصالحة.</p>
+            <ul class="gm-meta">
+              <li><span>الحالة:</span>الربط الحي بحساب حقيقي غير مختبر بعد — GOOG-001/002</li>
+              <li><span>الدليل:</span><code>src/google.js · docs/google-connect.md</code></li>
+            </ul>
+          </article>
+          <article class="gm-card" data-status="implemented">
+            <header><span class="gm-icon">✉</span><h3>Gmail · Drive · People</h3><span class="gm-badge gm-badge-ok">منفّذ</span></header>
+            <p>أربع واجهات مفعّلة في إعداد OAuth: بحث بريد وملفات وجهات اتصال، بتشفير AES-256-GCM للتوكنات.</p>
+            <ul class="gm-meta">
+              <li><span>الأمان:</span>تحقق من بريد المالك وstate أحادي الاستخدام، بلا توكنات خام في الجداول</li>
+              <li><span>الدليل:</span><code>src/google.js · test/google-consent.test.js</code></li>
+            </ul>
+          </article>
+          <article class="gm-card" data-status="planned">
+            <header><span class="gm-icon">🗂</span><h3>Google Drive — الذاكرة والنسخ</h3><span class="gm-badge gm-badge-plan">مخطط</span></header>
+            <p>نسخ مشفرة وملفات معرفة وشبكة KB. ليس مكانًا لقاعدة SQLite تشغيلية مشتركة.</p>
+            <ul class="gm-meta">
+              <li><span>الحد المجاني:</span>سعة تخزين مشتركة مع الحساب (15GB للاستهلاك الشخصي عادة)</li>
+              <li><span>الدليل:</span>KB-004 · DATA-001</li>
+            </ul>
+          </article>
+          <article class="gm-card" data-status="planned">
+            <header><span class="gm-icon">▦</span><h3>Google Sheets — سجل التشغيل</h3><span class="gm-badge gm-badge-plan">مخطط</span></header>
+            <p>سجل خفيف للمهام والنتائج والأخطاء قابل للعرض والبحث، وليس بديلاً عن قاعدة النظام.</p>
+            <ul class="gm-meta">
+              <li><span>الحد المجاني:</span>حصص Sheets API كافية للاستخدام الشخصي؛ راجع Console عند التوسع</li>
+            </ul>
+          </article>
+          <article class="gm-card" data-status="planned">
+            <header><span class="gm-icon">⚙</span><h3>Apps Script</h3><span class="gm-badge gm-badge-plan">مخطط</span></header>
+            <p>أتمتة خفيفة تربط خدمات Google ببعضها دون خادم — بديل للجسر في مهام بسيطة فقط.</p>
+            <ul class="gm-meta">
+              <li><span>الحدود:</span>حصص تنفيذ يومية وليس خادمًا دائمًا — لا يصلح بديلاً كاملًا لـCeliaOS</li>
+            </ul>
+          </article>
+          <article class="gm-card" data-status="planned">
+            <header><span class="gm-icon">🧪</span><h3>Google Colab</h3><span class="gm-badge gm-badge-plan">مخطط</span></header>
+            <p>ورشة تطوير وتجارب Python وتحليل بيانات دون إعداد بيئة محلية؛ الجلسات ليست خدمة على مدار الساعة.</p>
+            <ul class="gm-meta">
+              <li><span>الحدود:</span>الجلسات تنقطع، والموارد المجانية غير مضمونة</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="gm-lane" aria-labelledby="gm-lane-schedule">
+        <h2 id="gm-lane-schedule" class="gm-lane-title"><span class="gm-lane-mark">◷</span> النشر والجدولة — حافتا النظام المجانيتان</h2>
+        <div class="gm-cards">
+          <article class="gm-card" data-status="implemented">
+            <header><span class="gm-icon">⌁</span><h3>GitHub + Pages</h3><span class="gm-badge gm-badge-ok">منفّذ</span></header>
+            <p>مستودع الكود وواجهات ثابتة بHTTPS مجانًا. Pages ملفات فقط — لا أسرار ولا كود خادم.</p>
+            <ul class="gm-meta">
+              <li><span>الدليل:</span><code>scripts/build-pages.mjs · .github/workflows/pages.yml</code></li>
+            </ul>
+          </article>
+          <article class="gm-card" data-status="implemented">
+            <header><span class="gm-icon">☁</span><h3>Cloudflare Worker — celia-cron-bridge</h3><span class="gm-badge gm-badge-ok">منفّذ</span></header>
+            <p>جسر يحمل سرّي الجدولة ويترجم سبع أدوات إلى cron-job.org، بقائمة سماح للحقول وCORS صريح.</p>
+            <ul class="gm-meta">
+              <li><span>الحد المجاني:</span>100 ألف طلب/يوم</li>
+              <li><span>الدليل:</span><code>workers/celia-cron-bridge/</code></li>
+            </ul>
+          </article>
+          <article class="gm-card" data-status="implemented">
+            <header><span class="gm-icon">◷</span><h3>cron-job.org</h3><span class="gm-badge gm-badge-ok">منفّذ</span></header>
+            <p>نداءات HTTPS في الموعد. حد المزوّد 5 طلبات/ثانية، والحصة اليومية للخطة المجانية قد تتغير.</p>
+            <ul class="gm-meta">
+              <li><span>العقد:</span>REST موثّق في <code>docs/cron-bridge-contract.md</code></li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="gm-flow" aria-labelledby="gm-flow-title">
+        <h2 id="gm-flow-title">مسار المهمة المجدولة عبر الخدمات</h2>
+        <ol class="gm-flow-track">
+          <li><strong>cron-job.org</strong><span>نداء HTTPS في الموعد</span></li>
+          <li class="gm-flow-arrow" aria-hidden="true">←</li>
+          <li><strong>Worker / Apps Script</strong><span>تحقق وصلاحيات</span></li>
+          <li class="gm-flow-arrow" aria-hidden="true">←</li>
+          <li><strong>CeliaOS + Gemini</strong><span>تحليل وقرار مسموح</span></li>
+          <li class="gm-flow-arrow" aria-hidden="true">←</li>
+          <li><strong>Sheets / Drive</strong><span>سجل ونسخ</span></li>
+        </ol>
+      </section>
+
+      <section class="gm-sequence" aria-labelledby="gm-seq-title">
+        <h2 id="gm-seq-title">ترتيب التنفيذ الموصى به — خطوة بلا بطاقة بنكية</h2>
+        <ol class="gm-steps">
+          <li><strong>GitHub + Pages</strong><span>الكود والواجهة الثابتة، وتفعيل Pages بضغطة المالك.</span></li>
+          <li><strong>Drive + Sheets</strong><span>ذاكرة ونسخ وسجل تشغيل قبل أي أتمتة.</span></li>
+          <li><strong>Gemini المجاني</strong><span>بعد قرار شروط الخصوصية الصريح، ولبداية بيانات غير حساسة فقط.</span></li>
+          <li><strong>جسر cron-job.org</strong><span>نشر Worker بسرّيه ثم ربط لوحة المهام المجدولة.</span></li>
+          <li><strong>Apps Script</strong><span>عند ظهور حاجة أتمتة خفيفة لا تستحق خادمًا.</span></li>
+        </ol>
+      </section>
+
+      <section class="gm-gates" aria-labelledby="gm-gates-title">
+        <h2 id="gm-gates-title">حواجز قرار لا تُتجاوز تلقائيًا</h2>
+        <div class="gm-gate-grid">
+          <div class="gm-gate">
+            <span class="gm-gate-icon">🔐</span>
+            <h3>لا أسرار على Pages</h3>
+            <p>المفاتيح في Worker secrets أو خادم سيليا فقط. الصفحات الثابتة لا تحتوي <code>CRONJOB_API_KEY</code> ولا أي رمز.</p>
+          </div>
+          <div class="gm-gate">
+            <span class="gm-gate-icon">🧠</span>
+            <h3>قرار Gemini قبل البيانات</h3>
+            <p>الفئة المجانية قد تُستخدم بياناتها لتحسين المنتجات. لا رسائل عملاء ولا أسرار قبل موافقتك الصريحة.</p>
+          </div>
+          <div class="gm-gate">
+            <span class="gm-gate-icon">🗑</span>
+            <h3>سياسة الاحتفاظ والحذف</h3>
+            <p>تُكتب وتُعتمد قبل أول رسالة عميل حقيقية، وتشمل السجلات والنسخ والمهام المجدولة.</p>
+          </div>
+          <div class="gm-gate">
+            <span class="gm-gate-icon">✅</span>
+            <h3>صلاحيات أضيق نطاقًا</h3>
+            <p>ربط Google بنطاقات محددة وتحقق من هوية المالك، ولا توسيع للصلاحيات بلا حاجة موثقة.</p>
+          </div>
+        </div>
+      </section>
+
+      <footer class="gm-foot">
+        <a href="./cron.html">لوحة المهام المجدولة ↗</a>
+        <span>·</span>
+        <a href="https://github.com/celiaelazamey-arch/phone-google/blob/main/docs/google-connect.md" target="_blank" rel="noopener noreferrer">دليل ربط Google الكامل ↗</a>
+        <span>·</span>
+        <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener noreferrer">شروط Gemini API ↗</a>
+        <span>·</span>
+        <span class="mono" id="gm-stamp"></span>
+      </footer>
+    </main>
+  </div>
+  <script type="module" src="./google-map.js"></script>
+</body>
+</html>

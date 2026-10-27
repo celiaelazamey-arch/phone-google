@@ -98,11 +98,41 @@ test('روابط التشخيص وكل الروابط المحلية في الن
   assert.equal(apiLive.tools, EXPECTED_TOOLS.length);
   assert.equal(apiLive.summary.toolsCount, EXPECTED_TOOLS.length);
 
-  for (const page of ['index.html', 'live.html', 'skills.html', 'landing.html', '404.html']) {
+  for (const page of ['index.html', 'live.html', 'skills.html', 'landing.html', '404.html', 'cron.html', 'google-map.html']) {
     const html = await readFile(path.join(DIST_DIR, page), 'utf8');
     const localLinks = [...html.matchAll(/href="(\.\/[^"#?]+)(?:[?#][^"]*)?"/g)];
     assert.ok(localLinks.length > 0, `${page} should contain local links`);
     for (const match of localLinks) {
+      await access(path.join(DIST_DIR, match[1]));
+    }
+  }
+});
+
+test('لوحة المهام المجدولة وخريطة Google ثابتتان بلا أسرار وأصولهما كاملة', async () => {
+  const cronHtml = await readFile(path.join(DIST_DIR, 'cron.html'), 'utf8');
+  assert.match(cronHtml, /<html lang="ar" dir="rtl"/);
+  assert.equal((cronHtml.match(/<h1\b/g) || []).length, 1);
+  assert.match(cronHtml, /src="\.\/cron\.js"/);
+  assert.match(cronHtml, /href="\.\/cron\.css"/);
+  assert.match(cronHtml, /href="\.\/google-map\.html"/);
+  await readFile(path.join(DIST_DIR, 'cron.js'));
+  await readFile(path.join(DIST_DIR, 'cron-lib.js'));
+  await readFile(path.join(DIST_DIR, 'cron.css'));
+  assert.doesNotMatch(cronHtml, /__CELIA_/);
+  assert.doesNotMatch(cronHtml, /CRONJOB_API_KEY\s*=\s*[^\s<]/);
+  assert.doesNotMatch(cronHtml, /CELIA_ADMIN_TOKEN\s*=\s*[^\s<]/);
+  assert.match(cronHtml, /id="cr-connect-dialog"/);
+  assert.match(cronHtml, /cron\.list|cron\.delete/);
+
+  const mapHtml = await readFile(path.join(DIST_DIR, 'google-map.html'), 'utf8');
+  assert.equal((mapHtml.match(/<h1\b/g) || []).length, 1);
+  assert.match(mapHtml, /href="\.\/cron\.html"/);
+  assert.match(mapHtml, /Gemini API/);
+  await readFile(path.join(DIST_DIR, 'google-map.js'));
+  await readFile(path.join(DIST_DIR, 'google-map.css'));
+  for (const html of [cronHtml, mapHtml]) {
+    const resources = [...html.matchAll(/<(?:link|script)\b[^>]*(?:href|src)="(\.\/[^"]+)"/g)];
+    for (const match of resources) {
       await access(path.join(DIST_DIR, match[1]));
     }
   }

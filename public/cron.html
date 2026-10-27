@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="ar" dir="rtl" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <meta name="theme-color" content="#0b0c10" />
+  <meta
+    name="description"
+    content="لوحة CeliaOS لإدارة المهام المجدولة عبر جسر cron-job.org — واجهة ثابتة بلا أسرار."
+  />
+  <title>لوحة المهام المجدولة — سيليا</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="./fonts.css" />
+  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./cron.css" />
+</head>
+<body>
+  <a class="skip-link" href="#cr-main">انتقل إلى المحتوى</a>
+  <div class="app-shell" id="app-shell">
+    <header class="topbar">
+      <div class="brand-cluster">
+        <div class="brand-orb" aria-hidden="true"><span class="orb-core"></span></div>
+        <div class="brand-text">
+          <div class="brand-title-row">
+            <span class="brand-name">سيليا</span>
+            <span class="brand-year">2026 · CRON</span>
+          </div>
+          <span class="brand-sub">لوحة المهام المجدولة — CeliaOS × cron-job.org</span>
+        </div>
+      </div>
+      <nav class="nav-pills" aria-label="أقسام المنصة">
+        <a class="nav-pill" href="./studio"><span>✦</span><span>مساحة الوكيل</span></a>
+        <a class="nav-pill active" href="./cron"><span>◷</span><span>المهام المجدولة</span></a>
+        <a class="nav-pill" href="./google-map"><span>⬡</span><span>خريطة Google</span></a>
+        <a class="nav-pill" href="./live"><span>●</span><span>النظام الحي</span></a>
+      </nav>
+      <div class="topbar-actions">
+        <span class="status-chip" id="cr-mode-chip" title="وضع اللوحة الحالي">
+          <span class="status-dot" id="cr-mode-dot"></span>
+          <span id="cr-mode-label">وضع المحاكاة</span>
+        </span>
+      </div>
+    </header>
+
+    <main class="cr-main" id="cr-main">
+      <header class="cr-page-head">
+        <p class="cr-eyebrow">SCHEDULED TASKS · CRON-JOB.ORG BRIDGE</p>
+        <h1>إدارة المهام المجدولة</h1>
+        <p>سبع أدوات موثّقة — عرض وإنشاء وتعديل وتفعيل وتعطيل وسجل وحذف — عبر جسر آمن بلا أسرار في الواجهة.</p>
+      </header>
+
+      <section class="cr-banner" id="cr-banner" aria-live="polite">
+        <span class="cr-banner-icon" aria-hidden="true">🛈</span>
+        <div>
+          <strong id="cr-banner-title">وضع المحاكاة — بلا اتصال حقيقي.</strong>
+          <p id="cr-banner-text">البيانات تجريبية داخل ذاكرة المتصفح ولا تُرسل أي طلب. اربط جسر Cloudflare Worker لتعمل الأدوات على حساب cron-job.org الحقيقي.</p>
+        </div>
+      </section>
+
+      <section class="cr-flow" aria-labelledby="cr-flow-title">
+        <h2 id="cr-flow-title" class="cr-section-title">مسار الطلب المعماري</h2>
+        <ol class="cr-flow-track">
+          <li class="cr-node">
+            <span class="cr-node-num">1</span>
+            <strong>مساحة الوكيل</strong>
+            <small>يطلب جدولة مهمة</small>
+          </li>
+          <li class="cr-arrow" aria-hidden="true">←</li>
+          <li class="cr-node">
+            <span class="cr-node-num">2</span>
+            <strong>بوابة السياسة</strong>
+            <small>هوية وصلاحيات وموافقة</small>
+          </li>
+          <li class="cr-arrow" aria-hidden="true">←</li>
+          <li class="cr-node cr-node-bridge">
+            <span class="cr-node-num">3</span>
+            <strong>جسر Worker</strong>
+            <small>celia-cron-bridge</small>
+          </li>
+          <li class="cr-arrow" aria-hidden="true">←</li>
+          <li class="cr-node cr-node-upstream">
+            <span class="cr-node-num">4</span>
+            <strong>cron-job.org</strong>
+            <small>تنفيذ في الموعد</small>
+          </li>
+          <li class="cr-arrow" aria-hidden="true">←</li>
+          <li class="cr-node">
+            <span class="cr-node-num">5</span>
+            <strong>خادم سيليا</strong>
+            <small>يستقبل النداء ويسجّل</small>
+          </li>
+        </ol>
+        <p class="cr-secret-note">
+          <span aria-hidden="true">🔒</span>
+          سرّا <code>CRONJOB_API_KEY</code> و<code>CELIA_ADMIN_TOKEN</code> محفوظان داخل Worker فقط.
+          هذه الصفحة على GitHub Pages ثابتة ولا تحتوي أي سر — الرمز يُدخل في جلستك ولا يُكتب في الكود.
+        </p>
+      </section>
+
+      <section class="cr-stats" aria-label="ملخص الوظائف">
+        <article class="cr-stat"><span class="cr-stat-label">إجمالي الوظائف</span><strong class="cr-stat-value" id="cr-stat-total">0</strong></article>
+        <article class="cr-stat cr-stat-ok"><span class="cr-stat-label">مفعّلة</span><strong class="cr-stat-value" id="cr-stat-enabled">0</strong></article>
+        <article class="cr-stat cr-stat-off"><span class="cr-stat-label">معطّلة</span><strong class="cr-stat-value" id="cr-stat-disabled">0</strong></article>
+        <article class="cr-stat cr-stat-warn"><span class="cr-stat-label">فشل في آخر ٢٤ ساعة</span><strong class="cr-stat-value" id="cr-stat-failed">—</strong></article>
+      </section>
+
+      <section class="cr-panel" aria-labelledby="cr-jobs-title">
+        <div class="cr-panel-head">
+          <div>
+            <h2 id="cr-jobs-title">الوظائف المجدولة</h2>
+            <p class="cr-panel-sub" id="cr-last-sync">آخر مزامنة: —</p>
+          </div>
+          <div class="cr-actions">
+            <button type="button" class="cr-btn cr-btn-ghost" id="cr-btn-connect">
+              <span aria-hidden="true">🔑</span> ربط الجسر
+            </button>
+            <button type="button" class="cr-btn cr-btn-ghost" id="cr-btn-refresh">
+              <span aria-hidden="true">⟳</span> تحديث
+            </button>
+            <button type="button" class="cr-btn cr-btn-primary" id="cr-btn-create">
+              <span aria-hidden="true">＋</span> وظيفة جديدة
+            </button>
+          </div>
+        </div>
+
+        <ul class="cr-tool-legend" aria-label="أدوات الجدولة السبع">
+          <li><code>cron.list</code><span>عرض</span></li>
+          <li class="cr-sensitive"><code>cron.create</code><span>إنشاء</span></li>
+          <li class="cr-sensitive"><code>cron.update</code><span>تعديل</span></li>
+          <li><code>cron.enable</code><span>تفعيل</span></li>
+          <li><code>cron.disable</code><span>تعطيل</span></li>
+          <li><code>cron.history</code><span>السجل</span></li>
+          <li class="cr-sensitive"><code>cron.delete</code><span>حذف</span></li>
+        </ul>
+
+        <div class="cr-table-wrap">
+          <table class="cr-table">
+            <thead>
+              <tr>
+                <th scope="col">الوظيفة</th>
+                <th scope="col">الرابط والطريقة</th>
+                <th scope="col">الجدول</th>
+                <th scope="col">الحالة</th>
+                <th scope="col">إجراءات</th>
+              </tr>
+            </thead>
+            <tbody id="cr-tbody"></tbody>
+          </table>
+          <div class="cr-empty" id="cr-empty" hidden>
+            <p>لا توجد وظائف بعد.</p>
+            <button type="button" class="cr-btn cr-btn-primary" id="cr-empty-create">أنشئ أول وظيفة</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="cr-panel cr-limits" aria-labelledby="cr-limits-title">
+        <h2 id="cr-limits-title">حدود الخطة المجانية وضوابطها</h2>
+        <ul>
+          <li><strong>cron-job.org:</strong> حد المزوّد ٥ طلبات API/ثانية؛ الحصص اليومية للخطة المجانية قد تتغيّر — راجع Console.</li>
+          <li><strong>Cloudflare Workers:</strong> ١٠٠ ألف طلب/يوم في الخطة المجانية؛ الجسر بلا حالة ويستهلك النداءات فقط.</li>
+          <li><strong>GitHub Pages:</strong> ملفات ثابتة فقط — لا أسرار ولا كود خادم؛ كل الكتابة تمر عبر الجسر.</li>
+          <li><strong>العمليات الحسّاسة</strong> (إنشاء/تعديل/حذف) تتطلب تأكيدًا صريحًا في الواجهة وقرار بوابة السياسة في المسار الكامل.</li>
+        </ul>
+      </section>
+
+      <footer class="cr-foot">
+        <a href="./google-map.html">خريطة ربط خدمات Google المجانية ↗</a>
+        <span>·</span>
+        <a href="https://github.com/celiaelazamey-arch/phone-google" target="_blank" rel="noopener noreferrer">المستودع ↗</a>
+        <span>·</span>
+        <span class="mono">celia-cron-bridge · static-safe</span>
+      </footer>
+    </main>
+  </div>
+
+  <!-- modal ربط الجسر -->
+  <dialog class="cr-dialog" id="cr-connect-dialog" aria-labelledby="cr-connect-title">
+    <form method="dialog" class="cr-dialog-body" id="cr-connect-form">
+      <h2 id="cr-connect-title">ربط جسر العمال</h2>
+      <p class="cr-dialog-hint">
+        الرمز يبقى في <code>sessionStorage</code> لهذه التبويب فقط ويُمسح فور إغلاقها أو قطع الاتصال.
+        لا يُرسل إلا إلى الجسر في ترويسة <code>Authorization</code>.
+      </p>
+      <label class="cr-field">
+        <span>رابط الجسر (Worker)</span>
+        <input id="cr-bridge-url" type="url" inputmode="url" dir="ltr" autocomplete="off"
+          placeholder="https://celia-cron-bridge.&lt;account&gt;.workers.dev" data-testid="bridge-url" />
+        <small class="cr-field-error" id="cr-bridge-url-error"></small>
+      </label>
+      <label class="cr-field">
+        <span>الرمز الإداري (CELIA_ADMIN_TOKEN)</span>
+        <input id="cr-bridge-token" type="password" autocomplete="off" spellcheck="false"
+          placeholder="الصق الرمز هنا — لن يظهر في أي رابط" data-testid="bridge-token" />
+        <small class="cr-field-error" id="cr-bridge-token-error"></small>
+      </label>
+      <div class="cr-dialog-actions">
+        <button type="button" class="cr-btn cr-btn-danger-ghost" id="cr-btn-disconnect">قطع الاتصال ومسح الرمز</button>
+        <span class="cr-spacer"></span>
+        <button type="button" class="cr-btn cr-btn-ghost" data-close>إلغاء</button>
+        <button type="button" class="cr-btn cr-btn-primary" id="cr-btn-save-connect" data-testid="connect-save">اختبار وربط</button>
+      </div>
+      <p class="cr-dialog-status" id="cr-connect-status" role="status"></p>
+    </form>
+  </dialog>
+
+  <!-- modal إنشاء/تعديل -->
+  <dialog class="cr-dialog cr-dialog-wide" id="cr-job-dialog" aria-labelledby="cr-job-title">
+    <form method="dialog" class="cr-dialog-body" id="cr-job-form">
+      <h2 id="cr-job-title">وظيفة مجدولة جديدة</h2>
+      <div class="cr-form-grid">
+        <label class="cr-field">
+          <span>العنوان</span>
+          <input id="cr-job-name" type="text" maxlength="120" autocomplete="off" placeholder="مثال: فحص صحة الخادم" data-testid="job-title" />
+          <small class="cr-field-error" id="cr-job-name-error"></small>
+        </label>
+        <label class="cr-field">
+          <span>رابط الويب هوك (HTTPS)</span>
+          <input id="cr-job-url" type="url" dir="ltr" autocomplete="off" placeholder="https://your-host/webhook" data-testid="job-url" />
+          <small class="cr-field-error" id="cr-job-url-error"></small>
+        </label>
+        <label class="cr-field">
+          <span>الطريقة</span>
+          <select id="cr-job-method"></select>
+        </label>
+        <label class="cr-field">
+          <span>المنطقة الزمنية</span>
+          <select id="cr-job-tz">
+            <option value="Africa/Cairo">Africa/Cairo</option>
+            <option value="UTC">UTC</option>
+            <option value="Europe/Berlin">Europe/Berlin</option>
+          </select>
+        </label>
+        <label class="cr-field">
+          <span>نوع الجدول</span>
+          <select id="cr-job-kind" data-testid="job-kind">
+            <option value="every-minute">كل دقيقة</option>
+            <option value="hourly">كل ساعة</option>
+            <option value="daily" selected>يوميًا</option>
+            <option value="weekly">أسبوعيًا</option>
+            <option value="monthly">شهريًا</option>
+          </select>
+        </label>
+        <label class="cr-field cr-field-time" id="cr-field-time">
+          <span>الوقت</span>
+          <input id="cr-job-time" type="time" value="09:00" />
+        </label>
+        <label class="cr-field cr-field-hidden" id="cr-field-minute">
+          <span>دقيقة كل ساعة</span>
+          <input id="cr-job-minute" type="number" min="0" max="59" value="0" />
+        </label>
+        <label class="cr-field cr-field-hidden" id="cr-field-weekday">
+          <span>اليوم الأسبوعي</span>
+          <select id="cr-job-weekday">
+            <option value="0">الأحد</option>
+            <option value="1">الاثنين</option>
+            <option value="2">الثلاثاء</option>
+            <option value="3">الأربعاء</option>
+            <option value="4">الخميس</option>
+            <option value="5" selected>الجمعة</option>
+            <option value="6">السبت</option>
+          </select>
+        </label>
+        <label class="cr-field cr-field-hidden" id="cr-field-monthday">
+          <span>يوم الشهر</span>
+          <input id="cr-job-monthday" type="number" min="1" max="31" value="1" />
+        </label>
+      </div>
+      <div class="cr-toggle-row">
+        <label class="cr-check"><input type="checkbox" id="cr-job-enabled" checked /> <span>مفعّلة عند الحفظ</span></label>
+        <label class="cr-check"><input type="checkbox" id="cr-job-save" checked /> <span>حفظ الاستجابات للسجل</span></label>
+      </div>
+      <p class="cr-schedule-preview" id="cr-schedule-preview" role="status">المعاينة: —</p>
+      <div class="cr-dialog-actions">
+        <span class="cr-spacer"></span>
+        <button type="button" class="cr-btn cr-btn-ghost" data-close>إلغاء</button>
+        <button type="button" class="cr-btn cr-btn-primary" id="cr-btn-save-job" data-testid="job-save">حفظ الوظيفة</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- drawer السجل -->
+  <dialog class="cr-dialog cr-dialog-wide" id="cr-history-dialog" aria-labelledby="cr-history-title">
+    <div class="cr-dialog-body">
+      <h2 id="cr-history-title">سجل التنفيذ</h2>
+      <p class="cr-dialog-hint" id="cr-history-sub"></p>
+      <div class="cr-table-wrap">
+        <table class="cr-table">
+          <thead>
+            <tr><th scope="col">الوقت المخطط</th><th scope="col">الحالة</th><th scope="col">HTTP</th><th scope="col">المدة</th></tr>
+          </thead>
+          <tbody id="cr-history-body"></tbody>
+        </table>
+      </div>
+      <p class="cr-next-runs" id="cr-next-runs"></p>
+      <div class="cr-dialog-actions">
+        <span class="cr-spacer"></span>
+        <button type="button" class="cr-btn cr-btn-ghost" data-close>إغلاق</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- تأكيد الحذف -->
+  <dialog class="cr-dialog" id="cr-delete-dialog" aria-labelledby="cr-delete-title">
+    <div class="cr-dialog-body">
+      <h2 id="cr-delete-title">تأكيد حذف وظيفة</h2>
+      <p class="cr-dialog-hint">العملية حسّاسة ولا يمكن التراجع عنها على cron-job.org.</p>
+      <p class="cr-delete-target" id="cr-delete-target"></p>
+      <div class="cr-dialog-actions">
+        <span class="cr-spacer"></span>
+        <button type="button" class="cr-btn cr-btn-ghost" data-close>إلغاء</button>
+        <button type="button" class="cr-btn cr-btn-danger" id="cr-btn-confirm-delete" data-testid="confirm-delete">أفهم، احذف</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="cr-toast" id="cr-toast" role="status" aria-live="polite" hidden></div>
+  <script type="module" src="./cron.js"></script>
+</body>
+</html>

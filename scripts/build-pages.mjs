@@ -94,6 +94,8 @@ function rewriteStaticHostLinks(html) {
     .replace(/href="\.\/live\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./live.html${suffix}"`)
     .replace(/href="\.\/skills\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./skills.html${suffix}"`)
     .replace(/href="\.\/landing\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./landing.html${suffix}"`)
+    .replace(/href="\.\/cron\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./cron.html${suffix}"`)
+    .replace(/href="\.\/google-map\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./google-map.html${suffix}"`)
     .replace(/href="\.\/index\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./index.html${suffix}"`)
     .replace(/href="\.\/studio\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./index.html${suffix}"`)
     // روابط التشخيص المباشرة: Pages يخدم ملفات فقط، لذا تشير إلى لقطات JSON ثابتة.

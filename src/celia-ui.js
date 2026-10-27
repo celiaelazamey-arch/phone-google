@@ -74,6 +74,15 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, oper
   router.get('/system.css', (_req, res) => res.type('text/css').sendFile(path.join(PUBLIC_DIR, 'system.css')));
   router.get('/system.js', (_req, res) => res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'system.js')));
 
+  // لوحة المهام المجدولة وخريطة Google: واجهتان ثابتتان بلا أسرار تتكلمان مع جسر Worker.
+  router.get(['/cron', '/cron.html'], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'cron.html')));
+  router.get('/cron.css', (_req, res) => res.type('text/css').sendFile(path.join(PUBLIC_DIR, 'cron.css')));
+  router.get('/cron.js', (_req, res) => res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'cron.js')));
+  router.get('/cron-lib.js', (_req, res) => res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'cron-lib.js')));
+  router.get(['/google-map', '/google-map.html'], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'google-map.html')));
+  router.get('/google-map.css', (_req, res) => res.type('text/css').sendFile(path.join(PUBLIC_DIR, 'google-map.css')));
+  router.get('/google-map.js', (_req, res) => res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'google-map.js')));
+
   router.get('/live', (_req, res) => {
     res.sendFile(path.join(PUBLIC_DIR, 'live.html'));
   });
