@@ -441,7 +441,7 @@ export function createAgentStore({ driver, clock = Date.now, idFactory = crypto.
     async finishToolRun(toolRunId, status, outcome = null) {
       await driver.run('UPDATE agent_tool_runs SET status = ?, outcome = ?, updated_at = ? WHERE id = ?', [
         status,
-        outcome === null ? null : text(typeof outcome === 'string' ? outcome : JSON.stringify(outcome), 16000),
+        outcome === null ? null : text(typeof outcome === 'string' ? outcome : JSON.stringify(outcome), 4000),
         nowIso(clock),
         toolRunId
       ]);

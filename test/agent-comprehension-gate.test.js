@@ -228,7 +228,7 @@ test('CL-06: explains why an incomplete invoice requires human review without in
   assert.match(report.explanation.simple_summary, /الفاتورة تحتاج إلى مراجعة بشرية قبل أي اعتماد/);
   assert.match(report.explanation.simple_summary, /الرقم الضريبي للمورد غير مذكور/);
   assert.equal(report.explanation.next_permitted_action, NEXT_PERMITTED_ACTION.requestHumanReview);
-  assert.ok(report.explanation.unknowns.some((u) => u.includes('الرقم الضريبي للمورد')));
+  assert.ok(report.explanation.unknowns.some((u) => u.includes('الرقم الضريبي')));
 });
 
 test('CL-07: explains that untrusted prompt injection inside a document is treated strictly as data, not commands', async (t) => {

@@ -24,12 +24,12 @@ function cleanString(raw) {
 const FIELD_LABELS_AR = Object.freeze({
   invoice_number: 'رقم الفاتورة',
   supplier_name: 'اسم المورد',
-  supplier_tax_id: 'الرقم الضريبي للمورد',
-  issue_date: 'تاريخ الإصدار',
+  supplier_tax_id: 'الرقم الضريبي',
+  issue_date: 'التاريخ',
   currency: 'العملة',
   subtotal: 'المجموع الفرعي',
   tax: 'الضريبة',
-  total: 'الإجمالي المسجل'
+  total: 'الإجمالي'
 });
 
 /**
@@ -69,32 +69,32 @@ export function explainExtractedFields(extracted = {}) {
           field,
           value,
           source_ref: prov.ref,
-          plain_statement: `${label} هو «${value}» (${prov.ref}).`
+          plain_statement: `${label}: ${value}`
         });
       } else if (field === 'tax' && value === 0) {
         assumptions.push({
           id: 'default_zero_tax',
           field: 'tax',
           assumed_value: 0,
-          plain_statement: 'لم يرد حقل ضريبة صريح في المستند، فافترض النظام أن الضريبة 0.'
+          plain_statement: 'افترض النظام أن الضريبة 0 لغيابها.'
         });
       } else if (field === 'subtotal') {
         assumptions.push({
           id: 'derived_subtotal_from_lines',
           field: 'subtotal',
           assumed_value: value,
-          plain_statement: `حُسب المجموع الفرعي (${value}) من جمع مبالغ البنود المستخرجة.`
+          plain_statement: `حُسب المجموع الفرعي (${value}) من جمع البنود.`
         });
       } else {
         unknown_fields.push({
           field,
-          plain_statement: `${label} (${value}) يفتقر إلى موضع مصدر صريح.`
+          plain_statement: `${label} بلا موضع مصدر.`
         });
       }
     } else {
       unknown_fields.push({
         field,
-        plain_statement: `${label} غير مذكور في المستند، ولم يخترع النظام قيمة له.`
+        plain_statement: `${label} غير مذكور في المستند.`
       });
     }
   }

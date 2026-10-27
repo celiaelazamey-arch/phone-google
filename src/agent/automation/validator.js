@@ -428,36 +428,36 @@ export function buildComprehensionExplanation({
   const valExp = explainValidationOutcome({ extracted, validation, executionState });
 
   const goal_plain = commitRequested
-    ? `نريد قراءة الفاتورة (${docLabel}) واستخراج أرقامها والتحقق من صحتها، ثم عرضها على المالك للموافقة قبل إضافتها إلى سجل المشتريات.`
-    : `نريد قراءة الفاتورة (${docLabel}) واستخراج بياناتها والتحقق حسابيًا من صحتها، ثم تقديم تقرير موثق بالأدلة دون أي كتابة خارجية.`;
+    ? `نريد قراءة الفاتورة (${docLabel}) والتحقق من صحتها، ثم عرضها على المالك للموافقة قبل إضافتها إلى سجل المشتريات.`
+    : `نريد قراءة الفاتورة (${docLabel}) والتحقق من صحتها، وتقديم تقرير بالأدلة دون أي كتابة خارجية.`;
 
   const success_criteria = [
-    'قراءة المستند وحساب بصمة SHA-256 ومواضع الحقول',
-    'استخراج الحقول وفق المخطط (1.0) وربط كل حقل بموضعه',
-    'تطابق المجموع والضريبة مع الإجمالي وعدم التكرار أو الحقن',
-    'لا كتابة في سجل المشتريات إلا لفاتورة صالحة وبعد موافقة المالك'
+    'حساب بصمة SHA-256 ومواضع الحقول',
+    'استخراج الحقول وفق المخطط 1.0',
+    'مطابقة الإجمالي وعدم التكرار',
+    'لا كتابة قبل موافقة المالك'
   ];
 
   const plan_steps = [
     {
       step: 1,
       tool: 'document.read',
-      why_plain: 'فتح الملف المحلي وحساب بصمة SHA-256 وتحديد موضع كل سطر أو عمود.'
+      why_plain: 'فتح الملف المحلي وحساب بصمة SHA-256 ومواضع الحقول.'
     },
     {
       step: 2,
       tool: 'document.extract',
-      why_plain: 'استخراج رقم الفاتورة والمورد والتاريخ والمبالغ وربطها بمواضعها.'
+      why_plain: 'استخراج بيانات الفاتورة وربطها بمواضعها في المستند.'
     },
     {
       step: 3,
       tool: 'data.validate',
-      why_plain: 'مراجعة الحسابات والتواريخ والتكرارات وفحص خلو النص من حقن الأوامر.'
+      why_plain: 'فحص صحة المبالغ والتاريخ والتكرار وخلو النص من الأوامر.'
     },
     {
       step: 4,
       tool: 'data.report',
-      why_plain: 'إعداد تقرير مبسّط يوضح ما ثبت بالدليل وما يحتاج إلى مراجعة أو تصحيح.'
+      why_plain: 'إعداد تقرير مبسّط يوضح النتيجة بالأدلة.'
     }
   ];
 
@@ -465,7 +465,7 @@ export function buildComprehensionExplanation({
     plan_steps.push({
       step: 5,
       tool: 'document.commit_purchase_ledger',
-      why_plain: 'طلب موافقة المالك أولًا ثم إدراج الفاتورة الصالحة مرة واحدة في سجل المشتريات.'
+      why_plain: 'طلب موافقة المالك ثم الحفظ مرة واحدة في سجل المشتريات.'
     });
   }
 
@@ -473,7 +473,7 @@ export function buildComprehensionExplanation({
 
   const assumptions = [
     ...fieldExp.assumptions.map((item) => item.plain_statement || String(item)),
-    'نفترض أن الملف المحلي يمثل النسخة المقدمة للفحص حتى يراجعه المالك.'
+    'نفترض أن الملف المحلي يمثل النسخة المقدمة للفحص.'
   ];
 
   const unknowns = [
@@ -481,12 +481,12 @@ export function buildComprehensionExplanation({
   ];
   if (executionState === 'unknown') {
     unknowns.push(
-      'حالة التنفيذ غير محسومة (unknown) بسبب انقطاع العملية قبل اكتمالها؛ تلزم المصالحة البشرية.'
+      'حالة التنفيذ غير محسومة (unknown) بسبب انقطاع العملية؛ تلزم المصالحة.'
     );
   }
 
   const risks_and_side_effects = [
-    'يُعامل محتوى المستند كبيانات غير موثوقة ولا يُنفَّذ أبدًا كأوامر.',
+    'يُعامل محتوى المستند كبيانات غير موثوقة ولا يُنفَّذ كأوامر.',
     'لا كتابة خارجية قبل موافقة المالك (WAITING_FOR_APPROVAL).'
   ];
   if (extracted?.security?.promptInjectionDetected) {
@@ -587,6 +587,11 @@ export function buildAutomationReport({
     });
   }
 
+  const compactProvenance = {};
+  for (const [k, v] of Object.entries(extracted?.provenance || {})) {
+    compactProvenance[k] = v?.ref ? { ref: v.ref } : v;
+  }
+
   const report = {
     task_id: String(taskId || 'task-unknown'),
     capability: CAPABILITY_NAME,
@@ -594,8 +599,15 @@ export function buildAutomationReport({
     schema_version: AUTOMATION_SCHEMA_VERSION,
     source: extracted?.source || null,
     fields: extracted?.fields || {},
-    provenance: extracted?.provenance || {},
-    security: extracted?.security || { untrustedContent: true, promptInjectionDetected: false, findings: [] },
+    provenance: compactProvenance,
+    security: {
+      untrustedContent: true,
+      promptInjectionDetected: Boolean(extracted?.security?.promptInjectionDetected),
+      findings: (extracted?.security?.findings || []).map((f) => ({
+        ruleId: f.ruleId,
+        excerpt: String(f.excerpt || '').slice(0, 40)
+      }))
+    },
     validation: {
       status: validation?.status || VALIDATION_STATUS.invalid,
       errors: Array.isArray(validation?.errors) ? validation.errors : ['missing_validation'],
