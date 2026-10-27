@@ -55,6 +55,17 @@ test('document.read rejects path traversal before reading outside the allowliste
   );
 });
 
+test('document.read rejects symlinks that target hidden files inside the inbox', async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'celia-doc-link-'));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await fs.writeFile(path.join(root, '.env'), 'API_KEY=do-not-read');
+  await fs.symlink(path.join(root, '.env'), path.join(root, 'invoice.csv'));
+  await assert.rejects(
+    readDocument({ path: 'invoice.csv', rootDir: root }),
+    (error) => error.code === 'document_sensitive_filename_denied'
+  );
+});
+
 test('document.read rejects invalid JSON and unsupported binary/PDF input', async () => {
   await assert.rejects(
     readDocument({ content: '{broken', format: 'json' }),
