@@ -25,6 +25,7 @@
       </div>
 
       <nav class="nav-pills" aria-label="أقسام المنصة">
+        <a class="nav-pill" href="./system"><span class="nav-icon">◇</span><span>مركز النظام والإصدارات</span></a>
         <button type="button" class="nav-pill active" data-view="studio">
           <span class="nav-icon">✦</span>
           <span>مساحة الوكيل</span>
@@ -81,7 +82,7 @@
                   <span class="pulse-dot"></span>
                   <span>وكيل 2026 مجاني 100% · بدون اشتراكات مدفوعة</span>
                 </span>
-                <span class="hero-pill subtle" id="hero-actions-pill">✓ Gemini متصل في GitHub Actions</span>
+                <span class="hero-pill subtle" id="hero-actions-pill">حالة المزوّد تُفحص عند الاستخدام</span>
               </div>
 
               <h1 class="hero-heading">أهلًا بك في سيليا، وكيلك الذكي للهاتف وGoogle</h1>
@@ -323,9 +324,9 @@
                   <span class="model-cost">مجاني 100% بلا حدود</span>
                 </div>
                 <h3>🦙 Ollama المحلي (<code>qwen2.5:7b</code>)</h3>
-                <p>يعمل على جهازك الشخصي مجانًا وبخصوصية تامة. للربط المباشر مع المتصفح على Windows شغّل في PowerShell:</p>
-                <code class="inline-cmd" dir="ltr">$env:OLLAMA_ORIGINS="*"; ollama run qwen2.5:7b</code>
-                <input type="text" id="vault-ollama-url" value="http://127.0.0.1:11434" dir="ltr" aria-label="عنوان Ollama" />
+                <p>يعمل على جهاز الخادم أو شبكة موثوقة. يُستدعى عبر MCP برمز المالك؛ لا يحتاج المتصفح إلى localhost أو فتح CORS للجميع.</p>
+                <code class="inline-cmd" dir="ltr">ollama run qwen2.5:7b</code>
+                <p>اضبط <code>OLLAMA_BASE_URL</code> في أسرار بيئة الخادم فقط.</p>
               </div>
 
               <!-- Free Option 4: Groq Free Cloud -->

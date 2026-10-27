@@ -1,6 +1,18 @@
 # مساعد الهاتف + Google
 
-نقطة بداية لخادم API يربط Google OAuth مع WhatsApp Cloud API ويخزن حالة التكامل ورسائل WhatsApp في MySQL.
+سيليا: مساعد عربي يربط Google وWhatsApp، مع أدوات MCP وواجهة استوديو، وتخزين MySQL مشفّر للرموز وموافقات صريحة للعملاء.
+
+## الجديد في 0.2.0 — Resilient Core
+
+- **إصدارات لها طريق عودة:** SemVer موحد، حزم مصدر/موقع + SBOM + SHA256، نشر GitHub بإثبات OIDC وصور Docker ثابتة بالـdigest.
+- **تبديل ورجوع مُداران:** فحص مرشّح ثم فحص النسخة الفعالة، محاولة استعادة تلقائية عند فشل التبديل، وقفل وسجل تعافٍ ذري. لا حذف بيانات أو ترحيل هدّام تلقائيًا.
+- **عزل أعطال التكاملات:** قاطع ومهلة وحد تزامن لكل خدمة، وبديل قواعد محلي عند فشل AI في `auto`؛ تعطل MySQL لا يتحول بصمت إلى قاعدة فارغة.
+- **مركز النظام والإصدارات:** `/system` (أو `system.html` في Pages) يعرض حالات فعلية وحدود التشغيل، ولا يدّعي اتصال الخدمات غير المُهيّأة.
+- **بوابات الجودة:** اختبارات وحدات/انقطاع/استعادة + هاتف وحاسوب وإتاحة آلية، CI على Node 22/24، وsmoke test للحاوية.
+
+**ابدأ هنا:** [دليل الإصدارات والرجوع](docs/releases-and-recovery.md) · [العزل والمراقبة](docs/resilience.md) · [سجل التغييرات](CHANGELOG.md) · [الأمان](SECURITY.md).
+
+> لا يوجد نظام مضمون بلا أعطال. العزل الحالي منطقي داخل عملية Node؛ انهيار العملية/الجهاز ونسخ البيانات الاحتياطية يحتاجان بنية تشغيل مستقلة. أول نشر مُدار لا يختلق نسخة سابقة؛ `0.1.0` خط أساس مصدر، لا صورة مُدارة جاهزة للرجوع.
 
 **تشغيل حيّ كامل (مجاني، بلا مفاتيح):**
 
@@ -37,7 +49,7 @@ CELIA_MCP_HOST=0.0.0.0 CELIA_MCP_PORT=3010 node src/celia-mcp.js
 
 ## المتطلبات
 
-Node.js 20+، MySQL 8+، وبيانات اعتماد OAuth من Google وبيانات WhatsApp Cloud API من Meta. مفتاح Gemini مطلوب فقط للردود الذكية الآلية.
+Node.js 22+ (24 LTS موصى به)، MySQL 8+، وبيانات اعتماد OAuth من Google وبيانات WhatsApp Cloud API من Meta. مفتاح Gemini مطلوب فقط للردود الذكية الآلية.
 
 ## التشغيل المحلي
 
@@ -76,7 +88,7 @@ npm start
 
 ## المصادقة وواجهات API
 
-كل مسارات `/api/*` تتطلب `Authorization: Bearer $APP_API_TOKEN`.
+مسارات إدارة Google/WhatsApp تتطلب `Authorization: Bearer $APP_API_TOKEN`. مسارات المراقبة المنقّحة `/api/system` و`/api/releases` عامة؛ `/api/system/diagnostics` يتطلب رمز المالك (رمز MCP على خادم MCP).
 
 - `GET /api/google/gmail/search?q=<Gmail query>`
 - `GET /api/google/drive/search?q=<name>`
@@ -114,7 +126,7 @@ npm run build:pages      # يولّد dist/ من public/ + طبقة المحاك
 # o افتح dist/index.html عبر أي خادم ثابت أو ارفع dist/ كما هي
 ```
 
-- سكربت البناء `scripts/build-pages.mjs` يستخرج `MCP_TOOLS` و`SERVER_INFO` و`MCP_PROTOCOL_VERSION` من `src/celia-mcp.js` ويحقنها في `dist/celia-static-shim.js`، ثم يحقن الوسم في كل صفحة ويضيف `.nojekyll` و`404.html`.
+- سكربت البناء `scripts/build-pages.mjs` يستخرج `MCP_TOOLS` و`MCP_PROTOCOL_VERSION` من `src/celia-mcp.js` وهوية `SERVER_INFO` من `src/version.js` ويحقنها في `dist/celia-static-shim.js`، ويقرأ هوية الإصدار الموحدة من `releases/current.json`، ثم يحقن الوسم في كل صفحة ويضيف `.nojekyll` و`404.html`.
 - روابط التشخيص في `live.html` تُحوَّل في النسخة الثابتة إلى لقطات JSON حقيقية (`health.json`, `api/live.json`, `mcp.json`) حتى لا تُفضي إلى `404` على Pages؛ والطبقة الثابتة تبقى مصدر القيم اللحظية داخل المتصفح.
 - الطبقة الثابتة تخدم `GET /health` و`POST /ui/workspace/rpc` و`POST /mcp` و`POST /ui/workspace/crypto-lab` داخل المتصفح: `initialize`, `ping`, `tools/list`, `tools/call` (١٢ أداة), `resources/*`, `prompts/*`.
 - النشر تلقائي عبر `.github/workflows/pages.yml` عند كل دفع إلى `main` (بيئة `github-pages`, `build_type: workflow`). لا يحتاج أي سر ولا بطاقة دفع.
@@ -122,7 +134,26 @@ npm run build:pages      # يولّد dist/ من public/ + طبقة المحاك
 
 ### قيود النسخة الثابتة (معلنة في الواجهة)
 
-- التخزين في ذاكرة التبويب فقط (`storage: memory`) ويُصفَّر عند التحديث.
+- التخزين في ذاكرة التبويب فقط (`storage: memory`) ويُصفَّر عند التحديث؛ ليس نسخة احتياطية أو قاعدة إنتاجية.
 - Google/WhatsApp تُرجع بيانات `demo: true`؛ لا OAuth حقيقي ولا إرسال رسائل، ولا استقبال Webhook (Pages لا تقبل POST خارجيًا).
 - الردود يولّدها محرك السياسة العربي المدمج `celia-local-policy-engine` بلا مفتاح؛ وللردود السحابية الصق مفتاحك في تبويب «النماذج المجانية» (يبقى في `sessionStorage` بمتصفحك).
 - للترقية إلى خدمة كاملة: Render/Koyeb/Cloudflare + MySQL مُدار، ثم إضافة الأسرار في منصة الاستضافة وربط Webhook واتساب.
+
+## أوامر الجودة والتشغيل الحديثة
+
+```bash
+npm ci
+npm run check && npm run release:check && npm test
+npm run test:resilience
+npm audit --omit=dev
+# اختبارات المتصفح (تحتاج تنزيل Chromium أول مرة):
+npx playwright install --with-deps chromium
+npm run test:browser
+# معاينة Pages محلية حقيقية، افتراضيًا المنفذ 3101:
+npm run preview:pages
+# أوامر المشغّل؛ اقرأ الدليل قبل الإنتاج:
+npm run deploy:release -- status
+npm run deploy:release -- rollback
+```
+
+`npm run release:bundle` يتطلب شجرة Git نظيفة وcommit محفوظًا، ويكتب إلى `.release-artifacts/` المتجاهل. نشر الإصدار من GitHub يدوي على `main`؛ دفع فرع أو فتح PR ليس نشرًا للإنتاج. راجع [الدليل](docs/releases-and-recovery.md) لإعداد الموافقات وصورة GHCR وملف البيئة والنسخ الاحتياطية والرجوع في Pages.

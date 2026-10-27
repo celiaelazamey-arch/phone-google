@@ -2,12 +2,13 @@
 /**
  * بناء نسخة ثابتة من واجهة سيليا للنشر المجاني على GitHub Pages.
  *
- * المبدأ: مصدر الحقيقة الوحيد هو src/celia-mcp.js — يُستخرج منه MCP_TOOLS و SERVER_INFO
+ * المبدأ: تعريفات الأدوات من src/celia-mcp.js والنسخة من releases/current.json — يُستخرج منه MCP_TOOLS و SERVER_INFO
  * نصًّا (بدون تشغيل اعتماديات Node) ويُحقنان في طبقة محاكاة داخل المتصفح،
  * فلا تتباعد نسختان من تعريفات الأدوات.
  */
 import { mkdir, readFile, readdir, rm, writeFile, copyFile, cp, stat } from 'node:fs/promises';
 import path from 'node:path';
+import { RELEASE, RELEASE_HISTORY, SERVER_INFO } from '../src/version.js';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -58,9 +59,7 @@ export async function loadMcpTools() {
       throw new Error(`أداة MCP غير مكتملة: ${JSON.stringify(tool)?.slice(0, 80)}`);
     }
   }
-  const serverInfoMatch = /const SERVER_INFO = Object\.freeze\(\{([\s\S]*?)\}\);/.exec(source);
-  if (!serverInfoMatch) throw new Error('لم يتم العثور على SERVER_INFO');
-  const serverInfo = new Function(`return ({${serverInfoMatch[1]}});`)();
+  const serverInfo = SERVER_INFO;
   const protocolMatch = /const MCP_PROTOCOL_VERSION = '([^']+)'/.exec(source);
   if (!protocolMatch) throw new Error('لم يتم العثور على MCP_PROTOCOL_VERSION');
   return { tools, serverInfo, protocolVersion: protocolMatch[1] };
@@ -90,6 +89,7 @@ function injectShimScript(html) {
 
 function rewriteStaticHostLinks(html) {
   return html
+    .replace(/href="\.\/system\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./system.html${suffix}"`)
     .replace(/href="\.\/live\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./live.html${suffix}"`)
     .replace(/href="\.\/skills\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./skills.html${suffix}"`)
     .replace(/href="\.\/landing\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./landing.html${suffix}"`)
@@ -116,7 +116,9 @@ export async function build() {
   const shim = template
     .replaceAll('/*__CELIA_TOOLS_JSON__*/', JSON.stringify(tools, null, 2))
     .replaceAll('/*__CELIA_SERVER_INFO__*/', JSON.stringify(serverInfo, null, 2))
-    .replaceAll('/*__CELIA_BUILD_META__*/', JSON.stringify(buildMeta, null, 2));
+    .replaceAll('/*__CELIA_BUILD_META__*/', JSON.stringify(buildMeta, null, 2))
+    .replaceAll('/*__CELIA_RELEASE__*/', JSON.stringify(RELEASE, null, 2))
+    .replaceAll('/*__CELIA_RELEASE_HISTORY__*/', JSON.stringify(RELEASE_HISTORY, null, 2));
 
   if (shim.includes('__CELIA_')) throw new Error('بقيت علامة قالب غير مستبدلة في الطبقة الثابتة');
   try {
@@ -176,6 +178,8 @@ export async function build() {
     )}\n`,
     'utf8'
   );
+
+  await writeFile(path.join(DIST_DIR, 'version.json'), `${JSON.stringify({ ...RELEASE, commit }, null, 2)}\n`);
 
   // لقطات JSON ثابتة لروابط التشخيص في live.html (لا تُخدم نقاط POST على Pages).
   await writeFile(

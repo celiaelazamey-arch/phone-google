@@ -1,0 +1,24 @@
+[
+  {
+    "version": "0.2.0",
+    "name": "Resilient Core",
+    "date": "2026-10-27",
+    "schema": 1,
+    "managedDeployment": true,
+    "highlights": [
+      "عزل أعطال الخدمات وقواطع الدائرة وحدود التزامن",
+      "إصدارات قابلة للتحقق وترقية ورجوع مشروطان بفحص الجاهزية",
+      "لوحة عربية لمراقبة الإصدار والمكوّنات",
+      "بديل محلي آمن عند تعطل مزودي الذكاء الاصطناعي"
+    ]
+  },
+  {
+    "version": "0.1.0",
+    "name": "Foundation",
+    "date": "2026-10-27",
+    "schema": 1,
+    "managedDeployment": false,
+    "sourceCommit": "9b5c0d6643f4b1ddcafb7aaa0b32e9bea756ea9f",
+    "highlights": ["واجهة سيليا و12 أداة MCP وتكاملات Google وWhatsApp"]
+  }
+]

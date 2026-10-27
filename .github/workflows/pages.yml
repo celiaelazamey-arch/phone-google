@@ -4,86 +4,101 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Optional published tag (v0.2.0, etc.) to restore that exact verified site bundle. Empty = current main.'
+        type: string
+        required: false
+        default: ''
 
 permissions:
   contents: read
   pages: write
   id-token: write
-
+  attestations: read
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
   build:
-    name: Build static site (dist)
+    if: github.ref == 'refs/heads/main'
+    name: Build or restore verified static site
     runs-on: ubuntu-latest
+    timeout-minutes: 12
     outputs:
       pages_ready: ${{ steps.configure.outcome == 'success' && steps.upload.outcome == 'success' }}
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: '22'
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
           cache: npm
-
-      - name: Install dependencies
-        run: npm ci --no-audit --no-fund
-
-      - name: Syntax check
-        run: npm run check
-
-      - name: Static shim tests
-        run: node --test test/static-shim.test.js
-
-      - name: Build static site
-        run: node scripts/build-pages.mjs
-
-      - name: Ensure no secrets leaked into dist
+      - run: npm ci --no-audit --no-fund
+      - name: Build current source
+        if: inputs.release_tag == ''
+        run: npm run check && npm run release:check && npm test && npm run build:pages
+      - name: Restore an existing, attested release (upgrade or rollback)
+        if: inputs.release_tag != ''
+        env:
+          TAG: ${{ inputs.release_tag }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          if grep -rEI "(MYSQL_PASSWORD|WHATSAPP_APP_SECRET|GOOGLE_CLIENT_SECRET|APP_API_TOKEN)=.+|AIza[0-9A-Za-z_-]{20,}" dist; then
-            echo "::error::Secret-like value found in dist"
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo '::error::Invalid release tag.'
             exit 1
           fi
-          echo "No secret-like values found in dist."
-
-      # يفعّل مصدر Pages تلقائيًا إن كان مفعّلًا مسبقًا (أو ينجح كقراءة فقط).
-      # التفعيل الأول لموقع Pages يحتاج صلاحية إدارية يملكها مالك المستودع فقط.
+          COMMIT="$(git rev-parse "$TAG^{commit}")"
+          git merge-base --is-ancestor "$COMMIT" origin/main
+          mkdir -p .release-artifacts
+          gh release download "$TAG" --dir .release-artifacts \
+            --pattern 'celia-*-site.tar.gz' --pattern 'celia-*-source.tar.gz' \
+            --pattern 'sbom.cdx.json' --pattern 'release.json' --pattern 'SHA256SUMS'
+          npm run release:verify
+          ARCHIVE=".release-artifacts/celia-$TAG-site.tar.gz"
+          gh attestation verify "$ARCHIVE" --repo "$GH_REPO" --signer-workflow "$GH_REPO/.github/workflows/release.yml"
+          gh attestation verify .release-artifacts/SHA256SUMS --repo "$GH_REPO" --signer-workflow "$GH_REPO/.github/workflows/release.yml"
+          EXPECTED_COMMIT="$COMMIT" node --input-type=module -e '
+            import fs from "node:fs";
+            const r = JSON.parse(fs.readFileSync(".release-artifacts/release.json"));
+            if (`v${r.version}` !== process.env.TAG || r.commit !== process.env.EXPECTED_COMMIT) process.exit(1);
+          '
+          mkdir -p dist
+          ARCHIVE="$ARCHIVE" python3 - <<'PY'
+          import os, pathlib, tarfile
+          with tarfile.open(os.environ['ARCHIVE']) as archive:
+              for member in archive.getmembers():
+                  p = pathlib.PurePosixPath(member.name)
+                  if p.is_absolute() or '..' in p.parts or not (member.isfile() or member.isdir()):
+                      raise ValueError('Unsafe release archive')
+              archive.extractall('dist', filter='data')
+          PY
+      - name: Ensure no obvious secret values leaked into dist
+        run: |
+          if grep -rEI '(MYSQL_PASSWORD|WHATSAPP_APP_SECRET|GOOGLE_CLIENT_SECRET|APP_API_TOKEN)=.+|AIza[0-9A-Za-z_-]{20,}' dist; then
+            echo '::error::Secret-like value found in dist'
+            exit 1
+          fi
       - name: Configure Pages
         id: configure
         continue-on-error: true
-        uses: actions/configure-pages@v6
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
         with:
           enablement: true
-
-      - name: Explain how to enable Pages (only if not enabled yet)
+      - name: First-time Pages setup note
         if: steps.configure.outcome != 'success'
-        env:
-          REPO: ${{ github.repository }}
-        run: |
-          OWNER_SLUG="$(printf '%s' "${REPO%%/*}" | tr '[:upper:]' '[:lower:]')"
-          REPO_NAME="${REPO##*/}"
-          echo "::warning::GitHub Pages غير مفعّلة بعد — التفعيل الأول يحتاج نقرة من مالك المستودع."
-          {
-            echo "### ⚠️ GitHub Pages غير مفعّلة بعد"
-            echo
-            echo "نجح البناء والاختبارات، وملف الموقع جاهز كـ artifact، لكن GitHub يمنع تفعيل Pages بواسطة التوكن الآلي (يتطلب صلاحية المالك)."
-            echo
-            echo "**خطوة واحدة (مرة واحدة):** Settings → Pages → Build and deployment → Source: **GitHub Actions**، ثم Actions → Deploy (GitHub Pages) → Run workflow."
-            echo
-            echo "الرابط بعد التفعيل: https://${OWNER_SLUG}.github.io/${REPO_NAME}/"
-          } >> "$GITHUB_STEP_SUMMARY"
-
+        run: echo '::warning::Enable Settings → Pages → Source → GitHub Actions once, then run this workflow again.'
       - name: Upload Pages artifact
         id: upload
         if: steps.configure.outcome == 'success'
-        uses: actions/upload-pages-artifact@v5
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: dist
-
   deploy:
-    name: Deploy to GitHub Pages
+    name: Deploy exact static artifact
     needs: build
     if: needs.build.outputs.pages_ready == 'true'
     runs-on: ubuntu-latest
@@ -91,6 +106,5 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy
-        id: deployment
-        uses: actions/deploy-pages@v5
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

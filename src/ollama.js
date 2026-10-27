@@ -1,4 +1,6 @@
 import { DEFAULT_POLICY, generateWhatsAppReply } from './gemini.js';
+import { generateLocalPolicyReply } from './policy.js';
+import { createServiceRegistry, safeError, UpstreamError } from './resilience.js';
 
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
 
@@ -15,6 +17,7 @@ export function normalizeOllamaBaseUrl(rawUrl = 'http://127.0.0.1:11434', allowR
   if (!allowRemote && !LOOPBACK_HOSTS.has(parsed.hostname.toLowerCase())) {
     throw new Error('OLLAMA_BASE_URL must point to localhost/127.0.0.1 unless OLLAMA_ALLOW_REMOTE=true');
   }
+  if (parsed.username || parsed.password) throw new Error('OLLAMA_BASE_URL must not contain credentials');
   return parsed.origin;
 }
 
@@ -44,7 +47,7 @@ export async function checkOllamaHealth({
     });
     return { reachable: true, model, modelAvailable, installedModels: models.slice(0, 20) };
   } catch (error) {
-    return { reachable: false, model, modelAvailable: false, reason: error.message || 'unreachable' };
+    return { reachable: false, model, modelAvailable: false, reason: 'unreachable' };
   }
 }
 
@@ -54,7 +57,8 @@ export async function generateOllamaReply({
   businessContext = '',
   customerMessage,
   allowRemote = false,
-  timeoutMs = 45_000
+  timeoutMs = 8000,
+  signal
 }) {
   if (typeof customerMessage !== 'string' || !customerMessage.trim()) {
     throw new Error('customerMessage is required');
@@ -64,7 +68,7 @@ export async function generateOllamaReply({
   const response = await fetch(`${origin}/api/chat`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    signal: AbortSignal.timeout(timeoutMs),
+    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs),
     body: JSON.stringify({
       model,
       stream: false,
@@ -77,64 +81,53 @@ export async function generateOllamaReply({
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(`Ollama rejected the request (${response.status})${result.error ? `: ${String(result.error).slice(0, 160)}` : ''}`);
+    throw new UpstreamError('ollama', response.status);
   }
   const text = String(result.message?.content || result.response || '').trim();
   if (!text) throw new Error('Ollama returned no usable reply');
   return text.slice(0, 1000);
 }
 
-export async function generateCeliaReply({ config, customerMessage, provider = 'auto', businessContext }) {
+export async function generateCeliaReply({ config, customerMessage, provider, businessContext, services = createServiceRegistry(config) }) {
   const requested = String(provider || config.celia?.aiProvider || 'auto').toLowerCase();
-  if (!['auto', 'gemini', 'ollama'].includes(requested)) {
-    throw new Error('provider must be auto, gemini, or ollama');
+  if (!['auto', 'gemini', 'ollama', 'local'].includes(requested)) {
+    throw new Error('provider must be auto, gemini, ollama, or local');
   }
+  if (typeof customerMessage !== 'string' || !customerMessage.trim()) throw new Error('customerMessage is required');
   const context = typeof businessContext === 'string' ? businessContext : (config.gemini?.businessContext || '');
-
-  if (requested === 'gemini' || (requested === 'auto' && config.gemini?.apiKey)) {
-    const primaryModel = config.gemini?.model || 'gemini-2.5-flash';
-    try {
-      const reply = await generateWhatsAppReply({
-        config: { gemini: { apiKey: config.gemini.apiKey, model: primaryModel, businessContext: context } },
-        customerMessage
-      });
-      return { reply, provider: 'gemini', model: primaryModel };
-    } catch (geminiError) {
-      if (/\((404|429|503)\)/.test(geminiError.message)) {
-        for (const fallbackModel of ['gemini-flash-latest', 'gemini-flash-lite-latest']) {
-          if (fallbackModel === primaryModel) continue;
-          try {
-            const reply = await generateWhatsAppReply({
-              config: { gemini: { apiKey: config.gemini.apiKey, model: fallbackModel, businessContext: context } },
-              customerMessage
-            });
-            return { reply, provider: 'gemini', model: fallbackModel };
-          } catch {
-            // Try next fallback model
-          }
-        }
-      }
-      if (requested === 'gemini') throw geminiError;
-      const ollamaStatus = await checkOllamaHealth({
-        baseUrl: config.ollama?.baseUrl,
-        model: config.ollama?.model,
-        allowRemote: config.ollama?.allowRemote
-      });
-      if (!ollamaStatus.reachable) throw geminiError;
+  const failures = [];
+  const callGemini = async () => {
+    if (!config.gemini?.apiKey) throw new Error('Gemini API is not configured');
+    const model = config.gemini.model || 'gemini-2.5-flash';
+    const reply = await services.run('gemini', (signal) => generateWhatsAppReply({
+      config: { gemini: { apiKey: config.gemini.apiKey, model, businessContext: context } },
+      customerMessage, signal
+    }));
+    return { reply, provider: 'gemini', model, degraded: false, policyEnforced: true };
+  };
+  const callOllama = async () => {
+    const model = config.ollama?.model || 'qwen2.5:7b';
+    const reply = await services.run('ollama', (signal) => generateOllamaReply({
+      baseUrl: config.ollama?.baseUrl, model, businessContext: context, customerMessage,
+      allowRemote: Boolean(config.ollama?.allowRemote), signal
+    }));
+    return { reply, provider: 'ollama', model, degraded: failures.length > 0, policyEnforced: true };
+  };
+  // Explicit providers are strict. Auto fails over only to local processing, never to a new cloud vendor.
+  if (requested === 'gemini') return callGemini();
+  if (requested === 'ollama') return callOllama();
+  if (requested === 'auto') {
+    if (config.gemini?.apiKey && config.features?.gemini !== false) {
+      try { return await callGemini(); } catch (error) { failures.push({ provider: 'gemini', reason: safeError(error) }); }
+    }
+    if (config.features?.ollama !== false) {
+      try { return await callOllama(); } catch (error) { failures.push({ provider: 'ollama', reason: safeError(error) }); }
     }
   }
-
-  if (requested === 'ollama' || requested === 'auto') {
-    const model = config.ollama?.model || 'qwen2.5:7b';
-    const reply = await generateOllamaReply({
-      baseUrl: config.ollama?.baseUrl || 'http://127.0.0.1:11434',
-      model,
-      businessContext: context,
-      customerMessage,
-      allowRemote: Boolean(config.ollama?.allowRemote)
-    });
-    return { reply, provider: 'ollama', model };
-  }
-
-  throw new Error('No AI provider configured');
+  return {
+    reply: generateLocalPolicyReply({ customerMessage, businessContext: context }),
+    provider: 'celia-local-policy-engine', model: 'celia-guard-ar-2026',
+    degraded: failures.length > 0, fallbackReasons: failures, policyEnforced: true,
+    notice: 'رد قواعد محلي محافظ، وليس نموذج ذكاء اصطناعي توليديًا. لا ينفذ أي إجراء خارجي.'
+  };
 }

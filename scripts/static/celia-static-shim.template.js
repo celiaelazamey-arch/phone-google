@@ -21,6 +21,8 @@
   const MCP_TOOLS = /*__CELIA_TOOLS_JSON__*/;
   const SERVER_INFO = /*__CELIA_SERVER_INFO__*/;
   const BUILD = /*__CELIA_BUILD_META__*/;
+  const RELEASE = /*__CELIA_RELEASE__*/;
+  const RELEASE_HISTORY = /*__CELIA_RELEASE_HISTORY__*/;
 
   const MCP_PROTOCOL_VERSION = '2024-11-05';
   const SUPPORTED_VERSIONS = ['2024-11-05', '2025-03-26'];
@@ -212,6 +214,7 @@
       status: 'ok',
       service: SERVER_INFO.name,
       version: SERVER_INFO.version,
+      release: { ...RELEASE, commit: BUILD.commit },
       protocolVersion: MCP_PROTOCOL_VERSION,
       storage: STORAGE,
       mode: 'static-preview',
@@ -860,7 +863,27 @@
   /* REST                                                               */
   /* ------------------------------------------------------------------ */
 
+  function systemSnapshot() {
+    return {
+      status: 'ok', ready: true, scope: 'browser-demo',
+      release: { ...RELEASE, commit: BUILD.commit },
+      storage: { mode: 'memory', durable: false, available: true, explicitDemo: true },
+      components: [
+        { id: 'core', state: 'demo', critical: true, detail: 'واجهة ثابتة في المتصفح؛ لا خادم إنتاجي' },
+        { id: 'storage', state: 'demo', critical: true, detail: 'ذاكرة التبويب فقط' },
+        { id: 'local-policy', state: 'healthy', critical: false, detail: 'محرك قواعد محلي، وليس نموذجًا توليديًا' },
+        ...['gemini', 'ollama', 'google', 'whatsapp'].map((id) => ({ id, state: 'unconfigured', critical: false, detail: 'لا اتصال خارجي في النسخة الثابتة' }))
+      ],
+      circuits: [], generatedAt: new Date().toISOString(), uptimeSeconds: Math.floor((Date.now() - state.startedAt) / 1000),
+      notice: 'معاينة متصفح فقط. قواطع الخادم والرجوع بين حاويات الإنتاج غير متاحين على GitHub Pages.'
+    };
+  }
+
   const ROUTES = {
+    'GET /version': true,
+    'GET /readyz': true,
+    'GET /api/system': true,
+    'GET /api/releases': true,
     'GET /health': true,
     'GET /healthz': true,
     'GET /api/live': true,
@@ -883,6 +906,10 @@
   async function handleRest(method, pathname, { body = null, search = null } = {}) {
     const route = normalizeRoutePath(pathname);
     const verb = String(method).toUpperCase();
+
+    if (verb === 'GET' && route === '/version') return { status: 200, payload: { ...RELEASE, commit: BUILD.commit } };
+    if (verb === 'GET' && (route === '/api/system' || route === '/readyz')) return { status: 200, payload: systemSnapshot() };
+    if (verb === 'GET' && route === '/api/releases') return { status: 200, payload: { current: { ...RELEASE, commit: BUILD.commit }, releases: RELEASE_HISTORY, publication: 'catalog-only', notice: 'سجل مصدر؛ ليس تأكيدًا على نشر كل إصدار.' } };
 
     if (verb === 'GET' && (route === '/health' || route === '/healthz')) {
       return { status: 200, payload: buildStatus({ probeOllama: route === '/healthz' }) };

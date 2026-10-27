@@ -1,6 +1,7 @@
 import express from 'express';
 import { requireApiToken } from './auth.js';
 import { generateWhatsAppReply } from './gemini.js';
+import { createServiceRegistry, safeError, ServiceUnavailableError, UpstreamError } from './resilience.js';
 import { isValidE164, isWithinCustomerWindow, safeEqual, verifyWhatsAppSignature } from './security.js';
 
 function extractInboundMessages(payload) {
@@ -20,22 +21,24 @@ function extractInboundMessages(payload) {
   return messages.filter((message) => message.id && isValidE164(message.from));
 }
 
-export async function sendWhatsAppText({ config, phone, text }) {
+export async function sendWhatsAppText({ config, phone, text, signal, timeoutMs = 8000 }) {
   const wa = config.whatsapp;
-  if (!wa.accessToken || !wa.phoneNumberId || !wa.apiVersion) throw new Error('WhatsApp sending is not configured');
+  if (config.features?.whatsapp === false) throw new ServiceUnavailableError('whatsapp', 'disabled');
+  if (!wa.accessToken || !wa.phoneNumberId || !wa.apiVersion) throw Object.assign(new Error('whatsapp_not_configured'), { status: 400 });
   if (!isValidE164(phone)) throw new Error('Recipient must be a valid E.164 phone number');
   if (typeof text !== 'string' || !text.trim() || text.length > 4096) throw new Error('Message must contain 1–4096 characters');
   const response = await fetch(`https://graph.facebook.com/${encodeURIComponent(wa.apiVersion)}/${encodeURIComponent(wa.phoneNumberId)}/messages`, {
     method: 'POST',
+    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs),
     headers: { authorization: `Bearer ${wa.accessToken}`, 'content-type': 'application/json' },
     body: JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to: phone.slice(1), type: 'text', text: { preview_url: false, body: text.trim() } })
   });
   const result = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(`WhatsApp API rejected the message (${response.status})`);
+  if (!response.ok) throw new UpstreamError('whatsapp', response.status);
   return result.messages?.[0]?.id || '';
 }
 
-export function createWhatsAppWebhookRouter({ pool, config }) {
+export function createWhatsAppWebhookRouter({ pool, config, services = createServiceRegistry(config) }) {
   const router = express.Router();
 
   router.get('/', (req, res) => {
@@ -70,21 +73,21 @@ export function createWhatsAppWebhookRouter({ pool, config }) {
           const contact = rows[0];
           if (contact?.opted_in && contact?.ai_opted_in && isWithinCustomerWindow(contact.last_inbound_at)) {
             try {
-              const reply = await generateWhatsAppReply({ config, customerMessage: message.body });
-              const providerId = await sendWhatsAppText({ config, phone: message.from, text: reply });
+              const reply = await services.run('gemini', (signal) => generateWhatsAppReply({ config, customerMessage: message.body, signal }));
+              const providerId = await services.run('whatsapp', (signal) => sendWhatsAppText({ config, phone: message.from, text: reply, signal }), { sideEffect: true });
               if (providerId) await pool.execute(
                 'INSERT IGNORE INTO whatsapp_messages (provider_message_id, phone_e164, direction, message_type, body, status) VALUES (?, ?, ?, ?, ?, ?)',
                 [providerId, message.from, 'outbound', 'text', reply.slice(0, 4000), 'sent']
               );
             } catch (error) {
-              console.error('WhatsApp auto-reply failed:', error.message);
+              console.error('WhatsApp auto-reply failed:', error.code || 'upstream_failed');
             }
           }
         }
       }
       return res.sendStatus(200);
     } catch (error) {
-      console.error('WhatsApp webhook processing failed:', error.message);
+      console.error('WhatsApp webhook processing failed:', error.code || 'storage_failed');
       return res.sendStatus(500);
     }
   });
@@ -92,7 +95,7 @@ export function createWhatsAppWebhookRouter({ pool, config }) {
   return router;
 }
 
-export function createWhatsAppApiRouter({ pool, config }) {
+export function createWhatsAppApiRouter({ pool, config, services = createServiceRegistry(config) }) {
   const router = express.Router();
   router.use('/api', requireApiToken(config));
 
@@ -111,7 +114,7 @@ export function createWhatsAppApiRouter({ pool, config }) {
       );
       return res.json({ phone, optedIn, aiOptedIn: optedIn && aiOptedIn });
     } catch (error) {
-      console.error('Could not update WhatsApp consent:', error.message);
+      console.error('Could not update WhatsApp consent:', error.code || 'storage_failed');
       return res.status(500).json({ error: 'consent_update_failed' });
     }
   });
@@ -125,14 +128,15 @@ export function createWhatsAppApiRouter({ pool, config }) {
       const contact = rows[0];
       if (!contact?.opted_in) return res.status(403).json({ error: 'recipient_has_not_opted_in' });
       if (!isWithinCustomerWindow(contact.last_inbound_at)) return res.status(403).json({ error: 'outside_customer_service_window_use_approved_template' });
-      const providerId = await sendWhatsAppText({ config, phone, text });
+      const providerId = await services.run('whatsapp', (signal) => sendWhatsAppText({ config, phone, text, signal }), { sideEffect: true });
       if (providerId) await pool.execute(
         'INSERT IGNORE INTO whatsapp_messages (provider_message_id, phone_e164, direction, message_type, body, status) VALUES (?, ?, ?, ?, ?, ?)',
         [providerId, phone, 'outbound', 'text', text.trim().slice(0, 4000), 'sent']
       );
       return res.status(202).json({ status: 'accepted', providerMessageId: providerId });
     } catch (error) {
-      console.error('WhatsApp send failed:', error.message);
+      console.error('WhatsApp send failed:', error.code || 'upstream_failed');
+      if (error instanceof ServiceUnavailableError) return res.status(503).json({ error: safeError(error), outcomeUnknown: error.outcomeUnknown });
       return res.status(502).json({ error: 'whatsapp_send_failed' });
     }
   });

@@ -5,19 +5,19 @@ import { pathToFileURL } from 'node:url';
 import express from 'express';
 import { google } from 'googleapis';
 import helmet from 'helmet';
-import mysql from 'mysql2/promise';
+import { createPool, ensureOwner } from './db.js';
+import { createServiceRegistry, isolatePool, loadFeatures, loadResilienceConfig, safeError } from './resilience.js';
+import { createOperations, mountOperations } from './operations.js';
+import { SERVER_INFO } from './version.js';
+import { installShutdown } from './lifecycle.js';
 import { DEFAULT_POLICY } from './gemini.js';
 import { createCeliaUiRouter } from './celia-ui.js';
 import { createMemoryPool } from './memory-pool.js';
-import { checkOllamaHealth, generateCeliaReply } from './ollama.js';
+import { checkOllamaHealth, generateCeliaReply, normalizeOllamaBaseUrl } from './ollama.js';
 import { decryptJson, encryptJson, isValidE164, isWithinCustomerWindow, safeEqual } from './security.js';
 import { sendWhatsAppText } from './whatsapp.js';
 
 const MCP_PROTOCOL_VERSION = '2024-11-05';
-const SERVER_INFO = Object.freeze({
-  name: 'celia-phone-google-mcp',
-  version: '0.1.0'
-});
 
 function isPlaceholder(value) {
   return !value || /^replace-with-/i.test(value);
@@ -48,6 +48,8 @@ export function loadCeliaMcpConfig(env = process.env, { requireToken = true } = 
 
   return Object.freeze({
     nodeEnv: env.NODE_ENV || 'development',
+    features: loadFeatures(env),
+    resilience: loadResilienceConfig(env),
     host: (env.CELIA_MCP_HOST || '0.0.0.0').trim() || '0.0.0.0',
     port,
     userId: (env.APP_USER_ID || 'owner').trim() || 'owner',
@@ -78,7 +80,7 @@ export function loadCeliaMcpConfig(env = process.env, { requireToken = true } = 
       businessContext: env.GEMINI_BUSINESS_CONTEXT || ''
     }),
     ollama: Object.freeze({
-      baseUrl: (env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434').trim(),
+      baseUrl: normalizeOllamaBaseUrl(env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434', env.OLLAMA_ALLOW_REMOTE === 'true'),
       model: (env.OLLAMA_MODEL || 'qwen2.5:7b').trim() || 'qwen2.5:7b',
       allowRemote: env.OLLAMA_ALLOW_REMOTE === 'true'
     }),
@@ -102,44 +104,26 @@ export async function connectPoolWithFallback(config) {
     );
     return memoryPool;
   }
-  try {
-    const pool = mysql.createPool({
-      ...config.mysql,
-      waitForConnections: true,
-      connectionLimit: 5,
-      connectTimeout: 1500,
-      charset: 'utf8mb4',
-      timezone: 'Z',
-      ssl: config.nodeEnv === 'production' ? { minVersion: 'TLSv1.2' } : undefined
-    });
-    await pool.query('SELECT 1');
-    await pool.execute(
-      'INSERT INTO app_users (id, email, phone_e164) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE email = VALUES(email), phone_e164 = VALUES(phone_e164)',
-      [config.userId, config.ownerEmail || null, config.ownerPhone]
-    );
-    return pool;
-  } catch {
-    const memoryPool = createMemoryPool();
-    await memoryPool.execute(
-      'INSERT INTO app_users (id, email, phone_e164) VALUES (?, ?, ?)',
-      [config.userId, config.ownerEmail || null, config.ownerPhone]
-    );
-    return memoryPool;
-  }
+  // A failed durable store is never silently replaced with an empty in-memory database.
+  // The core starts in degraded mode and the same pool can recover on a later request.
+  const pool = createPool(config);
+  try { await ensureOwner(pool, config); }
+  catch { console.error('Storage unavailable at startup; durable operations are suspended until recovery.'); }
+  return pool;
 }
 
 async function getGoogleClient(pool, config) {
   if (!config.google.clientId || !config.google.clientSecret) {
-    throw new Error('google_not_configured: اضبط GOOGLE_CLIENT_ID وGOOGLE_CLIENT_SECRET أولًا');
+    throw Object.assign(new Error('google_not_configured'), { status: 400 });
   }
   if (!config.encryptionKey) {
-    throw new Error('encryption_key_missing: اضبط TOKEN_ENCRYPTION_KEY صالحًا (32 بايت Base64)');
+    throw Object.assign(new Error('encryption_key_missing'), { status: 400 });
   }
   const [rows] = await pool.execute('SELECT encrypted_tokens FROM google_credentials WHERE user_id = ?', [config.userId]);
   if (!rows.length) {
-    throw new Error('google_not_connected: اربط حساب Google أولًا عبر /auth/google');
+    throw Object.assign(new Error('google_not_connected'), { status: 409 });
   }
-  const client = new google.auth.OAuth2(config.google.clientId, config.google.clientSecret, config.google.redirectUri);
+  const client = new google.auth.OAuth2({ clientId: config.google.clientId, clientSecret: config.google.clientSecret, redirectUri: config.google.redirectUri, transporterOptions: { timeout: config.resilience?.timeoutMs || 8000, retry: false } });
   const tokens = decryptJson(rows[0].encrypted_tokens, config.encryptionKey);
   client.setCredentials(tokens);
   client.on('tokens', (fresh) => {
@@ -172,7 +156,7 @@ export const MCP_TOOLS = Object.freeze([
       required: ['customerMessage'],
       properties: {
         customerMessage: { type: 'string', description: 'رسالة العميل المراد الرد عليها.' },
-        provider: { type: 'string', enum: ['auto', 'gemini', 'ollama'], description: 'اختيار المزود: auto (يفضّل Gemini ثم Ollama) أو gemini أو ollama.' },
+        provider: { type: 'string', enum: ['auto', 'gemini', 'ollama', 'local'], description: 'auto: Gemini ثم Ollama ثم قواعد محلية؛ أو gemini/ollama للفحص الصارم أو local.' },
         businessContext: { type: 'string', description: 'سياق نشاط معتمد اختياري يُمرر للنموذج.' }
       },
       additionalProperties: false
@@ -304,8 +288,8 @@ export const MCP_TOOLS = Object.freeze([
   }
 ]);
 
-export async function buildStatusSummary(pool, config, { probeOllama = false } = {}) {
-  const ollamaHealth = probeOllama
+export async function buildStatusSummary(pool, config, { probeOllama = false, services } = {}) {
+  const ollamaHealth = probeOllama && config.features?.ollama !== false
     ? await checkOllamaHealth({
         baseUrl: config.ollama.baseUrl,
         model: config.ollama.model,
@@ -328,6 +312,7 @@ export async function buildStatusSummary(pool, config, { probeOllama = false } =
     service: SERVER_INFO.name,
     version: SERVER_INFO.version,
     protocolVersion: MCP_PROTOCOL_VERSION,
+    circuits: services?.snapshot() || [],
     toolsCount: MCP_TOOLS.length,
     storage: pool.isMemory ? 'memory' : 'mysql',
     providers: {
@@ -355,18 +340,20 @@ export async function buildStatusSummary(pool, config, { probeOllama = false } =
   };
 }
 
-export function createCeliaMcpHandler({ pool, config }) {
-  async function callTool(name, args = {}) {
+export function createCeliaMcpHandler({ pool, config, services = createServiceRegistry(config) }) {
+  pool = isolatePool(pool, services);
+  async function runTool(name, args = {}, signal) {
     switch (name) {
       case 'celia_status': {
         const probeOllama = args?.probeOllama !== false;
-        return buildStatusSummary(pool, config, { probeOllama });
+        return buildStatusSummary(pool, config, { probeOllama, services });
       }
       case 'celia_ai_reply': {
         const customerMessage = String(args?.customerMessage || '').trim();
         if (!customerMessage) throw new Error('customerMessage is required');
         return generateCeliaReply({
           config,
+          services,
           customerMessage,
           provider: args?.provider || config.celia.aiProvider,
           businessContext: typeof args?.businessContext === 'string' ? args.businessContext : undefined
@@ -377,14 +364,14 @@ export function createCeliaMcpHandler({ pool, config }) {
         if (!q) throw new Error('q is required');
         const client = await getGoogleClient(pool, config);
         const gmail = google.gmail({ version: 'v1', auth: client });
-        const listed = await gmail.users.messages.list({ userId: 'me', q, maxResults: 10 });
+        const listed = await gmail.users.messages.list({ userId: 'me', q, maxResults: 10 }, { signal, retry: false, timeout: config.resilience?.timeoutMs || 8000 });
         const messages = await Promise.all((listed.data.messages || []).map(async ({ id }) => {
           const { data } = await gmail.users.messages.get({
             userId: 'me',
             id,
             format: 'metadata',
             metadataHeaders: ['From', 'To', 'Subject', 'Date']
-          });
+          }, { signal, retry: false, timeout: config.resilience?.timeoutMs || 8000 });
           const headers = Object.fromEntries((data.payload?.headers || []).map((h) => [h.name.toLowerCase(), h.value]));
           return { id, snippet: data.snippet || '', from: headers.from || '', to: headers.to || '', subject: headers.subject || '', date: headers.date || '' };
         }));
@@ -401,7 +388,7 @@ export function createCeliaMcpHandler({ pool, config }) {
           pageSize: 20,
           orderBy: 'modifiedTime desc',
           fields: 'files(id,name,mimeType,modifiedTime,webViewLink)'
-        });
+        }, { signal, retry: false, timeout: config.resilience?.timeoutMs || 8000 });
         return { files: data.files || [] };
       }
       case 'google_calendar_events_list': {
@@ -418,7 +405,7 @@ export function createCeliaMcpHandler({ pool, config }) {
           orderBy: 'startTime',
           maxResults: 50,
           fields: 'items(id,summary,start,end,htmlLink,status)'
-        });
+        }, { signal, retry: false, timeout: config.resilience?.timeoutMs || 8000 });
         return { events: data.items || [] };
       }
       case 'google_calendar_events_create': {
@@ -442,7 +429,7 @@ export function createCeliaMcpHandler({ pool, config }) {
             end: { dateTime: endDate.toISOString(), ...tz }
           },
           fields: 'id,summary,start,end,htmlLink,status'
-        });
+        }, { signal, retry: false, timeout: config.resilience?.timeoutMs || 8000 });
         return { event: data };
       }
       case 'google_contacts_search': {
@@ -454,7 +441,7 @@ export function createCeliaMcpHandler({ pool, config }) {
           resourceName: 'people/me',
           pageSize: 100,
           personFields: 'names,phoneNumbers,emailAddresses'
-        });
+        }, { signal, retry: false, timeout: config.resilience?.timeoutMs || 8000 });
         const contacts = (data.connections || []).map((person) => ({
           name: person.names?.[0]?.displayName || '',
           phones: (person.phoneNumbers || []).map((item) => item.value),
@@ -504,7 +491,7 @@ export function createCeliaMcpHandler({ pool, config }) {
         if (!isWithinCustomerWindow(contact.last_inbound_at)) {
           throw new Error('outside_customer_service_window_use_approved_template');
         }
-        const providerMessageId = await sendWhatsAppText({ config, phone, text });
+        const providerMessageId = await sendWhatsAppText({ config, phone, text, signal });
         if (providerMessageId) {
           await pool.execute(
             'INSERT IGNORE INTO whatsapp_messages (provider_message_id, phone_e164, direction, message_type, body, status) VALUES (?, ?, ?, ?, ?, ?)',
@@ -571,10 +558,10 @@ export function createCeliaMcpHandler({ pool, config }) {
       case 'system_live_view': {
         const includeTelemetry = args?.includeTelemetry !== false;
         const probeOllama = args?.probeOllama !== false;
-        const status = await buildStatusSummary(pool, config, { probeOllama });
+        const status = await buildStatusSummary(pool, config, { probeOllama, services });
         const now = new Date();
         const uptimeSec = Math.floor(process.uptime());
-        const demoPhone = config.ownerPhone || '+201065217834';
+        const demoPhone = '+201000000000';
         const telemetry = includeTelemetry ? {
           timestamp: now.toISOString(),
           uptime: `${Math.floor(uptimeSec / 3600)}h ${Math.floor((uptimeSec % 3600) / 60)}m ${uptimeSec % 60}s`,
@@ -614,6 +601,18 @@ export function createCeliaMcpHandler({ pool, config }) {
         throw error;
       }
     }
+  }
+
+  async function callTool(name, args = {}) {
+    const boundary = {
+      google_gmail_search: 'google.gmail', google_drive_search: 'google.drive',
+      google_calendar_events_list: 'google.calendar', google_calendar_events_create: 'google.calendar',
+      google_contacts_search: 'google.contacts', whatsapp_send_text: 'whatsapp'
+    }[name];
+    if (!boundary) return runTool(name, args);
+    return services.run(boundary, (signal) => runTool(name, args, signal), {
+      sideEffect: ['google_calendar_events_create', 'whatsapp_send_text'].includes(name)
+    });
   }
 
   async function handleRpcMessage(message) {
@@ -673,7 +672,7 @@ export function createCeliaMcpHandler({ pool, config }) {
             };
           } catch (toolError) {
             result = {
-              content: [{ type: 'text', text: JSON.stringify({ error: toolError.message }) }],
+              content: [{ type: 'text', text: JSON.stringify({ error: safeError(toolError), outcomeUnknown: Boolean(toolError.outcomeUnknown) }) }],
               isError: true
             };
           }
@@ -757,7 +756,7 @@ export function createCeliaMcpHandler({ pool, config }) {
       return {
         jsonrpc: '2.0',
         id: id ?? null,
-        error: { code: error.code || -32603, message: error.message || 'Internal MCP error' }
+        error: { code: error.code || -32603, message: safeError(error) }
       };
     }
   }
@@ -781,9 +780,12 @@ function requireMcpToken(config) {
   };
 }
 
-export function createCeliaMcpApp({ pool, config }) {
+export function createCeliaMcpApp({ pool, config, services = createServiceRegistry(config) }) {
   const app = express();
-  const { handleRpcMessage } = createCeliaMcpHandler({ pool, config });
+  const { handleRpcMessage } = createCeliaMcpHandler({ pool, config, services });
+  const operations = createOperations({ pool, config, services, toolsCount: MCP_TOOLS.length });
+  app.locals.services = services;
+  app.locals.operations = operations;
 
   app.disable('x-powered-by');
   app.use(
@@ -800,9 +802,7 @@ export function createCeliaMcpApp({ pool, config }) {
           'connect-src': [
             "'self'",
             'https://generativelanguage.googleapis.com',
-            'https://api.groq.com',
-            'http://127.0.0.1:11434',
-            'http://localhost:11434'
+            'https://api.groq.com'
           ],
           'frame-ancestors': ['*'],
           'upgrade-insecure-requests': null
@@ -811,10 +811,7 @@ export function createCeliaMcpApp({ pool, config }) {
     })
   );
 
-  app.get('/health', async (_req, res) => {
-    const summary = await buildStatusSummary(pool, config, { probeOllama: true });
-    res.json(summary);
-  });
+  mountOperations(app, { operations, authorize: requireMcpToken(config) });
   app.get('/api/skills/find', async (req, res) => {
     const q = String(req.query.q || req.query.query || '').trim();
     const category = String(req.query.category || 'all').trim();
@@ -828,6 +825,7 @@ export function createCeliaMcpApp({ pool, config }) {
     createCeliaUiRouter({
       createMcpHandler: createCeliaMcpHandler,
       buildStatusSummary,
+      operations,
       config
     })
   );
@@ -844,6 +842,7 @@ export function createCeliaMcpApp({ pool, config }) {
 
   app.post('/mcp', requireMcpToken(config), express.json({ limit: '256kb' }), async (req, res) => {
     if (Array.isArray(req.body)) {
+      if (req.body.length > 20) return res.status(413).json({ error: 'batch_limit_exceeded' });
       if (!req.body.length) {
         return res.status(400).json({ jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Empty batch' } });
       }
@@ -858,7 +857,7 @@ export function createCeliaMcpApp({ pool, config }) {
 
   app.use((_req, res) => res.status(404).json({ error: 'not_found' }));
   app.use((error, _req, res, _next) => {
-    console.error('Unhandled Celia MCP error:', error.message);
+    console.error('Unhandled Celia MCP error:', error.code || 'request_failed');
     res.status(error.status || 500).json({ error: 'internal_error' });
   });
 
@@ -988,15 +987,6 @@ if (isMain) {
         `Celia MCP server listening on http://${config.host}:${config.port} (storage=${pool.isMemory ? 'memory' : 'mysql'}, gemini=${config.gemini.apiKey ? 'configured' : 'not-set'}, ollama=${config.ollama.model})`
       );
     });
-    const shutdown = (signal) => {
-      console.log(`Received ${signal}; shutting down Celia MCP server.`);
-      server.close(async () => {
-        await pool.end();
-        process.exit(0);
-      });
-      setTimeout(() => process.exit(1), 10_000).unref();
-    };
-    process.on('SIGTERM', () => shutdown('SIGTERM'));
-    process.on('SIGINT', () => shutdown('SIGINT'));
+    installShutdown({ server, pool, operations: app.locals.operations });
   }
 }
