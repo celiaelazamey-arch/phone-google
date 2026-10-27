@@ -39,9 +39,19 @@
   - **معمارية Agent Harness الـ10 مكونات (`GET /api/agent/harness`)** وواجهة تعديل الخطة في `/agent`، وتشخيص
     Playwright Chromium الصريح (`e2e/diagnostics.js`، `e2e/agent.spec.js`، `playwright.config.js`)، وإصلاح
     الروابط النسبية وتباين WCAG 2.2 AA وعرض 320px في `/agent` و`/kb`.
-  - **الفحوص المحلية:** `npm test` **268/268** ناجحة (منها 7 اختبارات في `test/agent-document-automation.test.js` و10
-    اختبارات `CL-01..CL-10` في `test/agent-comprehension-gate.test.js`)، و`check` و`release:check` و`check:continuity`
-    و`check:secrets` و`build:pages` كلها خضراء.
+  - **الفحوص المحلية وفحوص GitHub Actions CI الفعلية (`Verification Closure`):**
+    - محليًا: `npm test` **268/268** ناجحة (منها 7 اختبارات في `test/agent-document-automation.test.js` و10 اختبارات
+      `CL-01..CL-10` في `test/agent-comprehension-gate.test.js`)، و`check` و`release:check` و`check:continuity`
+      و`check:secrets` و`build:pages` كلها خضراء.
+    - في GitHub Actions CI على الفرع `arena/5fccc4e6-phone-google`:
+      - التشغيلة الأولى `40592598360` (`6bf47b3`) كشفت تجاوز طول مخرج `data.report` لسقف `VARCHAR(4000)` في
+        `agent_tool_runs.outcome` تحت وضع `STRICT_TRANS_TABLES` في MySQL 8.4؛ عُولج بضبط حجم التقرير ليظل `< 4000`
+        حرف وتثبيت الحد `4000` في `src/agent/store.js`.
+      - التشغيلة الثانية **`40593284086`** (الـCommit `99b789582911043f6d1cd45aa9ca9f135cd380f0`) **نجحت بالكامل في جميع
+        الوظائف الست**: `Node 22` (`122502699179`)، `Node 24` (`122502699163`)، `Python 3.11 Spider` (`122502699173`)،
+        `Node 24 Container` (`122502699186`)، **`RTL dashboard · Playwright Chromium`** (`122502699198` في 48 ثانية)،
+        و**`MySQL 8.4 · persistence / N−1 / backup restore`** (`122502699207` في 45 ثانية شاملة `DEC-019` و`DEC-020` و`DEC-021`).
+    - **ما يظل مغلقًا (`not-verified`):** النشر الحي على Render وAiven MySQL وتشغيل `verify:live` على رابط عام.
 
 ## الطلب السابق — الخطوات التالية للتشغيل الحقيقي (DEC-018)
 

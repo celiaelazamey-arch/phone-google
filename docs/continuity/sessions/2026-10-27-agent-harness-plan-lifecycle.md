@@ -41,13 +41,24 @@
    - إضافة اختبارات `CL-01` إلى `CL-10` في `test/agent-comprehension-gate.test.js`، وتعزيز `integration/mysql.integration.mjs`
      بفحص تكاملي لـ`DEC-020` و`DEC-021` على MySQL 8.4 الحقيقية.
 
-## 2. نتائج الفحوص الفعلية
+## 2. نتائج الفحوص الفعلية (محليًا وفي GitHub Actions CI)
 
 - `npm run build:pages`: ناجح (8 صفحات ثابتة في `dist/`).
-- `npm run check`: ناجح.
+- `npm run check`: ناجح (`96` ملف JavaScript).
 - `npm run release:check`: ناجح (`0.2.1` / `schema: 1`).
 - `npm run check:continuity`: ناجح.
-- `npm run check:secrets`: ناجح.
+- `npm run check:secrets`: ناجح (`wiringVerified: true`، `zeroLeakVerified: true`).
 - `npm test`: **268/268** اختبارًا ناجحًا.
-- **الحدود المعلنة:** لا يوجد ثنائي متصفح Chromium مثبت محليًا داخل حاوية الساندبوكس؛ تُشغَّل `npm run test:browser`
-  و`integration/mysql.integration.mjs` في GitHub Actions CI على الفرع.
+- **إغلاق فجوة التحقق في GitHub Actions CI (`Phase 3 — Verification Closure`):**
+  - دُفع الفرع `arena/5fccc4e6-phone-google` إلى `origin` بعد موافقة المالك (`موافق على تنفيذ Verification Closure`).
+  - كشفت التشغيلة الأولى `40592598360` (`6bf47b3`) أن طول JSON لمخرج `data.report` (`4494` حرفًا) تجاوز حد عمود
+    `outcome VARCHAR(4000)` في `sql/migrations/0002_agent-runtime.sql` تحت `STRICT_TRANS_TABLES` في MySQL 8.4؛ عُولج
+    بضبط حجم التقرير ليظل `< 4000` حرف (`3688..3938` حرفًا في كل الحالات) وإعادة حد `4000` في `src/agent/store.js`.
+  - التشغيلة الثانية **`40593284086`** على الـCommit `99b789582911043f6d1cd45aa9ca9f135cd380f0` **نجحت في جميع الوظائف الست (6/6 PASS)**:
+    - `Node 24 · tests & failure recovery` (`122502699163` — 22s): **PASS**
+    - `Python 3.11 · Celia Google Spider tests` (`122502699173` — 20s): **PASS**
+    - `Node 22 · tests & failure recovery` (`122502699179` — 26s): **PASS**
+    - `Node 24 container smoke test` (`122502699186` — 23s): **PASS**
+    - `RTL dashboard · desktop / mobile / accessibility` (Playwright Chromium، `122502699198` — 48s): **PASS**
+    - `MySQL 8.4 · persistence / N−1 / backup restore` (`122502699207` — 45s، شاملة `DEC-019` و`DEC-020` و`DEC-021`): **PASS**
+- **الحدود المعلنة:** النشر الحي على Render وAiven MySQL وتشغيل `verify:live` على رابط عام ما زال مغلقًا وبحالة `not-verified`.
