@@ -118,8 +118,10 @@ Google** — لذلك لم تُجرَ مزامنة فعلية ضد Drive هنا�
 
 ## المراجع
 
-- [Google Drive API — Python quickstart](https://developers.google.com/drive/api/guides/manage-downloads)
-- [Google Drive API — quotas and limits](https://developers.google.com/drive/api/guides/limits)
+- [Google Drive API — Python quickstart](https://developers.google.com/workspace/drive/api/quickstart/python)
+- [Google Drive API — REST v3 reference (files)](https://developers.google.com/workspace/drive/api/reference/rest/v3/files)
+- [Google Drive API — download and export files](https://developers.google.com/workspace/drive/api/guides/manage-downloads)
+- [Google Drive API — quotas and limits](https://developers.google.com/workspace/drive/api/guides/limits)
 - [Model Context Protocol — Python SDK](https://github.com/modelcontextprotocol/python-sdk)
 - [OpenAI — Connect custom MCP in ChatGPT](https://help.openai.com/en/articles/11369540-connecting-to-remote-mcp-servers-in-chatgpt)
 
