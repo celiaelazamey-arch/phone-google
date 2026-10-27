@@ -79,7 +79,7 @@ openssl base64 -A -in ca.pem
 - Google: أنشئ OAuth client بحسابك، وفعّل APIs المطلوبة، واضبط callback مطابقًا؛ أدخل `GOOGLE_CLIENT_ID` و`GOOGLE_CLIENT_SECRET` و`APP_OWNER_EMAIL` لدى Render. اتبع README للاتصال المصادق عليه؛ لا توسيع scopes أو حسابات بلا موافقتك.
 - Meta/WhatsApp: يلزم تطبيقك ورقمك ومفتاح التوقيع ورمز الوصول والتحقق. عنوان Webhook الفعلي هو `https://<actual-host>/webhooks/whatsapp`. إرسال حقيقي يحتاج موافقات ونافذة الخدمة؛ لا broadcast أو replay.
 - إدارة REST تستخدم `APP_API_TOKEN` إن حددته، وإلا رمز MCP نفسه في **الوضع الكامل الاختياري فقط**. لا يُستخدم الرمز في query string أو رابط.
-- Gemini اختياري؛ ضع المفتاح في مخزن Render. البديل المحلي محافظ وليس نموذجًا توليديًا عامًا. Ollama المحلي غير متاح تلقائيًا على Render، فلا نحمّل نموذجًا كبيرًا ضمن ذاكرة الخطة المجانية.
+- Gemini وبقية مزودي الذكاء والأدوات المحمية (`GEMINI_API_KEY`، `AI_GATEWAY_API_KEY`، `DEEPSEEK_API_KEY`، `AGENETROUTERAPI_KEY`، `ELEVENLABS_API_KEY`، `CELIA_VOICE_ID`، `FIGMA_ACCESS_TOKEN`، `YOUR_CODATA_API_KEY`) اختياريون ومربوطون في `render.yaml` عبر `sync: false`؛ ضع المفاتيح في مخزن أسرار Render فقط عند الرغبة بتشغيلها على الخادم العام (أسرار GitHub Actions تعمل داخل مهام GitHub فقط ولا تنتقل تلقائيًا إلى Render). البديل المحلي محافظ وليس نموذجًا توليديًا عامًا، وOllama المحلي غير متاح تلقائيًا على Render.
 - مجانية الاستضافة لا تجعل APIs خارجية غير محدودة؛ حصص وتسعير Meta/Gemini وغيرهما تتبع حسابك. لا تفعّل فوترة أو مزوّدًا مدفوعًا ضمن هذا الطلب.
 - لا تفعل الردود التلقائية قبل الموافقتين. نطاق GitHub أو صفحة demo لا يثبت نجاح اتصال أي مزوّد.
 

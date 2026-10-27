@@ -1,4 +1,6 @@
 import crypto from "node:crypto";
+import { resolveEffectiveAiProvider } from "./ollama.js";
+import { buildSecretsReadiness } from "./secrets-hub.js";
 import { releaseInfo, RELEASE_HISTORY, SERVER_INFO } from "./version.js";
 import { isolatePool } from "./resilience.js";
 
@@ -29,6 +31,11 @@ export function createOperations({
   };
 
   function liveness() {
+    const readiness = buildSecretsReadiness(config, services);
+    const effective = resolveEffectiveAiProvider({
+      ...config,
+      features: { ollama: false, ...config.features },
+    });
     return {
       status: "ok",
       service: SERVER_INFO.name,
@@ -39,15 +46,39 @@ export function createOperations({
       draining,
       providers: {
         configuredMode: config.celia?.aiProvider || "auto",
-        effectiveDefault:
-          config.gemini?.apiKey && config.features?.gemini !== false
-            ? "gemini"
-            : "local",
+        effectiveDefault: effective,
         gemini: { configured: configured.gemini, model: config.gemini?.model },
+        aiGateway: {
+          configured: Boolean(config.aiGateway?.apiKey),
+          model: config.aiGateway?.model || "google/gemini-2.5-flash",
+        },
+        deepseek: {
+          configured: Boolean(config.deepseek?.apiKey),
+          model: config.deepseek?.model || "deepseek-chat",
+        },
+        agentrouter: {
+          configured: Boolean(config.agentrouter?.apiKey),
+          model: config.agentrouter?.model || "deepseek-chat",
+        },
         ollama: {
           model: config.ollama?.model,
           reachable: null,
           modelAvailable: null,
+        },
+        elevenlabs: {
+          configured: Boolean(
+            config.elevenlabs?.apiKey && config.elevenlabs?.voiceId,
+          ),
+          apiKeyConfigured: Boolean(config.elevenlabs?.apiKey),
+          voiceIdConfigured: Boolean(config.elevenlabs?.voiceId),
+          model: config.elevenlabs?.model || "eleven_multilingual_v2",
+        },
+        figma: {
+          configured: Boolean(config.figma?.accessToken),
+        },
+        codata: {
+          configured: Boolean(config.codata?.apiKey),
+          liveProbeConfigured: Boolean(config.codata?.baseUrl),
         },
         google: {
           oauthConfigured: Boolean(
@@ -62,6 +93,8 @@ export function createOperations({
           ),
           autoReplyEnabled: Boolean(config.whatsapp?.autoReplyEnabled),
         },
+        secretsConfiguredCount: readiness.configuredCount,
+        totalSecretsTracked: readiness.totalSecretsTracked,
       },
     };
   }

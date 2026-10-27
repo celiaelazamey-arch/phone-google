@@ -1,4 +1,5 @@
 import { DEFAULT_POLICY, generateWhatsAppReply } from './gemini.js';
+import { generateOpenAiCompatibleReply } from './ai-providers.js';
 import { generateLocalPolicyReply } from './policy.js';
 import { createServiceRegistry, safeError, UpstreamError } from './resilience.js';
 
@@ -88,10 +89,33 @@ export async function generateOllamaReply({
   return text.slice(0, 1000);
 }
 
+export const SUPPORTED_AI_PROVIDERS = Object.freeze([
+  'auto',
+  'gemini',
+  'ai_gateway',
+  'deepseek',
+  'agentrouter',
+  'ollama',
+  'local'
+]);
+
+export function resolveEffectiveAiProvider(config = {}) {
+  const configured = String(config.celia?.aiProvider || 'auto').toLowerCase();
+  if (configured !== 'auto' && SUPPORTED_AI_PROVIDERS.includes(configured)) {
+    return configured;
+  }
+  if (config.gemini?.apiKey && config.features?.gemini !== false) return 'gemini';
+  if (config.aiGateway?.apiKey && config.features?.ai_gateway !== false) return 'ai_gateway';
+  if (config.deepseek?.apiKey && config.features?.deepseek !== false) return 'deepseek';
+  if (config.agentrouter?.apiKey && config.features?.agentrouter !== false) return 'agentrouter';
+  if (config.features?.ollama !== false) return 'ollama';
+  return 'local';
+}
+
 export async function generateCeliaReply({ config, customerMessage, provider, businessContext, services = createServiceRegistry(config) }) {
   const requested = String(provider || config.celia?.aiProvider || 'auto').toLowerCase();
-  if (!['auto', 'gemini', 'ollama', 'local'].includes(requested)) {
-    throw new Error('provider must be auto, gemini, ollama, or local');
+  if (!SUPPORTED_AI_PROVIDERS.includes(requested)) {
+    throw new Error('provider must be auto, gemini, ai_gateway, deepseek, agentrouter, ollama, or local');
   }
   if (typeof customerMessage !== 'string' || !customerMessage.trim()) throw new Error('customerMessage is required');
   const context = typeof businessContext === 'string' ? businessContext : (config.gemini?.businessContext || '');
@@ -103,8 +127,25 @@ export async function generateCeliaReply({ config, customerMessage, provider, bu
       config: { gemini: { apiKey: config.gemini.apiKey, model, businessContext: context } },
       customerMessage, signal
     }));
-    return { reply, provider: 'gemini', model, degraded: false, policyEnforced: true };
+    return { reply, provider: 'gemini', model, degraded: failures.length > 0, policyEnforced: true };
   };
+  const callOpenAiProvider = async (serviceName, providerCfg, defaultModel) => {
+    if (!providerCfg?.apiKey) throw new Error(`${serviceName} API is not configured`);
+    const model = providerCfg.model || defaultModel;
+    const reply = await services.run(serviceName, (signal) => generateOpenAiCompatibleReply({
+      serviceName,
+      baseUrl: providerCfg.baseUrl,
+      apiKey: providerCfg.apiKey,
+      model,
+      businessContext: context,
+      customerMessage,
+      signal
+    }));
+    return { reply, provider: serviceName, model, degraded: failures.length > 0, policyEnforced: true };
+  };
+  const callAiGateway = () => callOpenAiProvider('ai_gateway', config.aiGateway, 'google/gemini-2.5-flash');
+  const callDeepseek = () => callOpenAiProvider('deepseek', config.deepseek, 'deepseek-chat');
+  const callAgentRouter = () => callOpenAiProvider('agentrouter', config.agentrouter, 'deepseek-chat');
   const callOllama = async () => {
     const model = config.ollama?.model || 'qwen2.5:7b';
     const reply = await services.run('ollama', (signal) => generateOllamaReply({
@@ -113,12 +154,28 @@ export async function generateCeliaReply({ config, customerMessage, provider, bu
     }));
     return { reply, provider: 'ollama', model, degraded: failures.length > 0, policyEnforced: true };
   };
-  // Explicit providers are strict. Auto fails over only to local processing, never to a new cloud vendor.
+  // Explicit providers are strict. By default auto calls at most one cloud provider and fails over only to local processing,
+  // unless CELIA_AI_ALLOW_CLOUD_FAILOVER=true explicitly authorizes cross-vendor cloud failover.
   if (requested === 'gemini') return callGemini();
+  if (requested === 'ai_gateway') return callAiGateway();
+  if (requested === 'deepseek') return callDeepseek();
+  if (requested === 'agentrouter') return callAgentRouter();
   if (requested === 'ollama') return callOllama();
   if (requested === 'auto') {
-    if (config.gemini?.apiKey && config.features?.gemini !== false) {
-      try { return await callGemini(); } catch (error) { failures.push({ provider: 'gemini', reason: safeError(error) }); }
+    const cloudCandidates = [
+      { id: 'gemini', configured: Boolean(config.gemini?.apiKey), enabled: config.features?.gemini !== false, run: callGemini },
+      { id: 'ai_gateway', configured: Boolean(config.aiGateway?.apiKey), enabled: config.features?.ai_gateway !== false, run: callAiGateway },
+      { id: 'deepseek', configured: Boolean(config.deepseek?.apiKey), enabled: config.features?.deepseek !== false, run: callDeepseek },
+      { id: 'agentrouter', configured: Boolean(config.agentrouter?.apiKey), enabled: config.features?.agentrouter !== false, run: callAgentRouter }
+    ].filter((item) => item.configured && item.enabled);
+
+    const allowedClouds = config.allowCloudFailover ? cloudCandidates : cloudCandidates.slice(0, 1);
+    for (const candidate of allowedClouds) {
+      try {
+        return await candidate.run();
+      } catch (error) {
+        failures.push({ provider: candidate.id, reason: safeError(error) });
+      }
     }
     if (config.features?.ollama !== false) {
       try { return await callOllama(); } catch (error) { failures.push({ provider: 'ollama', reason: safeError(error) }); }

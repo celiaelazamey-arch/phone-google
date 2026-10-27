@@ -15,9 +15,18 @@ import { createOperations, mountOperations } from './operations.js';
 import { SERVER_INFO } from './version.js';
 import { installShutdown } from './lifecycle.js';
 import { DEFAULT_POLICY } from './gemini.js';
+import { loadExtendedIntegrationsConfig } from './ai-providers.js';
 import { createCeliaUiRouter } from './celia-ui.js';
 import { createMemoryPool } from './memory-pool.js';
-import { checkOllamaHealth, generateCeliaReply, normalizeOllamaBaseUrl } from './ollama.js';
+import { checkOllamaHealth, generateCeliaReply, normalizeOllamaBaseUrl, resolveEffectiveAiProvider, SUPPORTED_AI_PROVIDERS } from './ollama.js';
+import {
+  buildSecretsReadiness,
+  createSecretsHubRouter,
+  fetchFigmaProfile,
+  getCodataStatus,
+  inspectFigmaFile,
+  synthesizeCeliaSpeech
+} from './secrets-hub.js';
 import { decryptJson, encryptJson, isValidE164, isWithinCustomerWindow, safeEqual } from './security.js';
 import { sendWhatsAppText } from './whatsapp.js';
 import { createIdempotencyStore, extractIdempotencyKey, isValidIdempotencyKey } from './idempotency.js';
@@ -52,12 +61,19 @@ export function loadCeliaMcpConfig(env = process.env, { requireToken = true } = 
     !isPlaceholder(rawEncryptionKey) &&
     Buffer.from(rawEncryptionKey, 'base64').length === 32;
 
+  const extended = loadExtendedIntegrationsConfig(env);
+  const requestedAiProvider = ((env.CELIA_AI_PROVIDER || 'auto').trim() || 'auto').toLowerCase();
+  if (!SUPPORTED_AI_PROVIDERS.includes(requestedAiProvider)) {
+    throw new Error('CELIA_AI_PROVIDER must be auto, gemini, ai_gateway, deepseek, agentrouter, ollama, or local');
+  }
+
   return Object.freeze({
     nodeEnv: env.NODE_ENV || 'development',
     hosting: loadHostingConfig(env, mcpToken),
     deploymentRoot: env.CELIA_DEPLOYMENT_ROOT === 'true',
     features: loadFeatures(env),
     resilience: loadResilienceConfig(env),
+    ...extended,
     host: (env.CELIA_MCP_HOST || '0.0.0.0').trim() || '0.0.0.0',
     port,
     userId: (env.APP_USER_ID || 'owner').trim() || 'owner',
@@ -68,7 +84,7 @@ export function loadCeliaMcpConfig(env = process.env, { requireToken = true } = 
     landingRoot: env.CELIA_LANDING_ROOT === 'true',
     celia: Object.freeze({
       apiToken: mcpToken,
-      aiProvider: ((env.CELIA_AI_PROVIDER || 'auto').trim() || 'auto').toLowerCase()
+      aiProvider: requestedAiProvider
     }),
     mysql: loadMysqlConfig(env),
     google: Object.freeze({
@@ -156,13 +172,17 @@ export const MCP_TOOLS = Object.freeze([
   },
   {
     name: 'celia_ai_reply',
-    description: 'توليد رد خدمة عملاء مهذب وآمن عبر Gemini (عند توفر GEMINI_API_KEY كما في GitHub Actions) أو عبر Ollama المحلي (qwen2.5:7b).',
+    description: 'توليد رد خدمة عملاء مهذب وآمن عبر مزودي السحابة (Gemini / AI Gateway / DeepSeek / AgentRouter) أو عبر Ollama المحلي (qwen2.5:7b) أو حارس القواعد المحلي.',
     inputSchema: {
       type: 'object',
       required: ['customerMessage'],
       properties: {
         customerMessage: { type: 'string', description: 'رسالة العميل المراد الرد عليها.' },
-        provider: { type: 'string', enum: ['auto', 'gemini', 'ollama', 'local'], description: 'auto: Gemini ثم Ollama ثم قواعد محلية؛ أو gemini/ollama للفحص الصارم أو local.' },
+        provider: {
+          type: 'string',
+          enum: ['auto', 'gemini', 'ai_gateway', 'deepseek', 'agentrouter', 'ollama', 'local'],
+          description: 'auto: يختار المزود المهيأ (Gemini / AI Gateway / DeepSeek / AgentRouter) ثم Ollama ثم قواعد محلية؛ أو تحديد المزود صراحة.'
+        },
         businessContext: { type: 'string', description: 'سياق نشاط معتمد اختياري يُمرر للنموذج.' }
       },
       additionalProperties: false
@@ -296,6 +316,61 @@ export const MCP_TOOLS = Object.freeze([
   }
 ]);
 
+export const EXTENDED_MCP_TOOLS = Object.freeze([
+  {
+    name: 'celia_voice_speak',
+    description: 'تحويل نص الرد العربي أو متعدد اللغات إلى صوت سيليا عبر ElevenLabs (ELEVENLABS_API_KEY + CELIA_VOICE_ID) مع دعم Idempotency-Key.',
+    inputSchema: {
+      type: 'object',
+      required: ['text'],
+      properties: {
+        text: { type: 'string', description: 'النص المراد تحويله إلى صوت (1–1000 حرف).' },
+        modelId: { type: 'string', description: 'معرف نموذج ElevenLabs الاختياري (الافتراضي eleven_multilingual_v2).' },
+        stability: { type: 'number', minimum: 0, maximum: 1, description: 'درجة ثبات الصوت (0–1).' },
+        similarityBoost: { type: 'number', minimum: 0, maximum: 1, description: 'درجة تطابق بصمة الصوت (0–1).' },
+        idempotencyKey: { type: 'string', description: 'مفتاح تفرد اختياري (8-64 حرفًا) لمنع تكرار التوليد الصوتي.' }
+      },
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'figma_file_inspect',
+    description: 'قراءة آمنة لملف تصميم Figma أو هوية الحساب عبر FIGMA_ACCESS_TOKEN (للقراءة فقط دون تعديل).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        fileKey: { type: 'string', description: 'معرف ملف Figma (اتركه فارغًا لفحص هوية الحساب فقط عبر /v1/me).' },
+        depth: { type: 'integer', minimum: 1, maximum: 3, description: 'عمق شجرة الصفحات (1–3، الافتراضي 1).' }
+      },
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'codata_status',
+    description: 'فحص جاهزية ربط مساحة Codata (YOUR_CODATA_API_KEY) للقراءة فقط دون ترحيل تلقائي للبيانات.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        probe: { type: 'boolean', description: 'إجراء فحص اتصال حي للقراءة فقط إذا ضُبط CODATA_BASE_URL (الافتراضي false).' }
+      },
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'celia_secrets_status',
+    description: 'تقرير منقّح لحالة جميع أسرار المستودع التسعة المهيأة وحالة القواطع دون كشف أي قيم سرية.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      additionalProperties: false
+    }
+  }
+]);
+
+export function getActiveMcpTools(config) {
+  return config?.extendedMcpTools ? [...MCP_TOOLS, ...EXTENDED_MCP_TOOLS] : MCP_TOOLS;
+}
+
 export async function buildStatusSummary(pool, config, { probeOllama = false, services } = {}) {
   const ollamaHealth = probeOllama && config.features?.ollama !== false
     ? await checkOllamaHealth({
@@ -306,14 +381,9 @@ export async function buildStatusSummary(pool, config, { probeOllama = false, se
     : { reachable: null, model: config.ollama.model, modelAvailable: null };
 
   const geminiConfigured = Boolean(config.gemini.apiKey);
-  const activeDefaultProvider =
-    config.celia.aiProvider === 'gemini'
-      ? 'gemini'
-      : config.celia.aiProvider === 'ollama'
-        ? 'ollama'
-        : geminiConfigured
-          ? 'gemini'
-          : 'ollama';
+  const activeDefaultProvider = resolveEffectiveAiProvider(config);
+  const activeTools = getActiveMcpTools(config);
+  const secretsReadiness = buildSecretsReadiness(config, services);
 
   return {
     status: 'ok',
@@ -321,7 +391,7 @@ export async function buildStatusSummary(pool, config, { probeOllama = false, se
     version: SERVER_INFO.version,
     protocolVersion: MCP_PROTOCOL_VERSION,
     circuits: services?.snapshot() || [],
-    toolsCount: MCP_TOOLS.length,
+    toolsCount: activeTools.length,
     storage: pool.isMemory ? 'memory' : 'mysql',
     providers: {
       configuredMode: config.celia.aiProvider,
@@ -330,10 +400,35 @@ export async function buildStatusSummary(pool, config, { probeOllama = false, se
         configured: geminiConfigured,
         model: config.gemini.model
       },
+      aiGateway: {
+        configured: Boolean(config.aiGateway?.apiKey),
+        model: config.aiGateway?.model || 'google/gemini-2.5-flash'
+      },
+      deepseek: {
+        configured: Boolean(config.deepseek?.apiKey),
+        model: config.deepseek?.model || 'deepseek-chat'
+      },
+      agentrouter: {
+        configured: Boolean(config.agentrouter?.apiKey),
+        model: config.agentrouter?.model || 'deepseek-chat'
+      },
       ollama: {
         baseUrl: config.ollama.baseUrl,
         model: config.ollama.model,
         ...ollamaHealth
+      },
+      elevenlabs: {
+        configured: Boolean(config.elevenlabs?.apiKey && config.elevenlabs?.voiceId),
+        apiKeyConfigured: Boolean(config.elevenlabs?.apiKey),
+        voiceIdConfigured: Boolean(config.elevenlabs?.voiceId),
+        model: config.elevenlabs?.model || 'eleven_multilingual_v2'
+      },
+      figma: {
+        configured: Boolean(config.figma?.accessToken)
+      },
+      codata: {
+        configured: Boolean(config.codata?.apiKey),
+        liveProbeConfigured: Boolean(config.codata?.baseUrl)
       },
       google: {
         oauthConfigured: Boolean(config.google.clientId && config.google.clientSecret),
@@ -343,7 +438,9 @@ export async function buildStatusSummary(pool, config, { probeOllama = false, se
         cloudApiConfigured: Boolean(config.whatsapp.accessToken && config.whatsapp.phoneNumberId),
         webhookConfigured: Boolean(config.whatsapp.verifyToken && config.whatsapp.appSecret),
         autoReplyEnabled: config.whatsapp.autoReplyEnabled
-      }
+      },
+      secretsConfiguredCount: secretsReadiness.configuredCount,
+      totalSecretsTracked: secretsReadiness.totalSecretsTracked
     }
   };
 }
@@ -574,7 +671,8 @@ export function createCeliaMcpHandler({ pool, config, services = createServiceRe
           ذكاء: ['ai', 'celia_ai_reply'],
           حالة: ['status', 'celia_status', 'system_live_view']
         };
-        const allToolsDetailed = MCP_TOOLS.map((t) => ({
+        const activeTools = getActiveMcpTools(config);
+        const allToolsDetailed = activeTools.map((t) => ({
           name: t.name,
           description: t.description,
           inputSchema: t.inputSchema,
@@ -584,7 +682,7 @@ export function createCeliaMcpHandler({ pool, config, services = createServiceRe
         }));
         let filtered = allToolsDetailed;
         if (category !== 'all' && categoryMap[category]) {
-          filtered = filtered.filter((t) => t.tags.includes(category) || (category === 'system' && ['find_skills','system_live_view','celia_status'].includes(t.name)));
+          filtered = filtered.filter((t) => t.tags.includes(category) || (category === 'system' && ['find_skills','system_live_view','celia_status','celia_secrets_status'].includes(t.name)));
         }
         if (query) {
           const terms = [query, ...(synonymExpansions[query] || [])];
@@ -600,7 +698,7 @@ export function createCeliaMcpHandler({ pool, config, services = createServiceRe
         return {
           query: args?.query || '',
           category,
-          totalSkills: MCP_TOOLS.length,
+          totalSkills: activeTools.length,
           matched: filtered.length,
           liveStatus,
           skills: filtered,
@@ -647,6 +745,47 @@ export function createCeliaMcpHandler({ pool, config, services = createServiceRe
           previewNote: 'هذا الرد مولّد لحظيًا من الخادم الحي — كل قيمة فيه مقاسة في زمن الطلب.'
         };
       }
+      case 'celia_voice_speak': {
+        const idempotencyKey = extractIdempotencyKey({ args });
+        if (idempotencyKey) {
+          const cached = idempotencyStore.get(idempotencyKey);
+          if (cached) {
+            if (cached._idempotencyStatus === 'in_progress') throw Object.assign(new Error('idempotency_conflict_in_progress'), { status: 409 });
+            return { ...cached, _idempotencyReplay: true };
+          }
+          if (!idempotencyStore.claim(idempotencyKey)) {
+            const again = idempotencyStore.get(idempotencyKey);
+            if (again?._idempotencyStatus === 'in_progress') throw Object.assign(new Error('idempotency_conflict_in_progress'), { status: 409 });
+            if (again) return { ...again, _idempotencyReplay: true };
+          }
+        }
+        try {
+          const synthesized = await synthesizeCeliaSpeech({
+            config,
+            text: args?.text,
+            modelId: args?.modelId,
+            stability: args?.stability,
+            similarityBoost: args?.similarityBoost,
+            signal
+          });
+          if (idempotencyKey) idempotencyStore.complete(idempotencyKey, synthesized);
+          return synthesized;
+        } catch (error) {
+          if (idempotencyKey) idempotencyStore.fail(idempotencyKey);
+          throw error;
+        }
+      }
+      case 'figma_file_inspect': {
+        const fileKey = String(args?.fileKey || '').trim();
+        if (!fileKey) return fetchFigmaProfile({ config, signal });
+        return inspectFigmaFile({ config, fileKey, depth: args?.depth, signal });
+      }
+      case 'codata_status': {
+        return getCodataStatus({ config, probe: args?.probe === true });
+      }
+      case 'celia_secrets_status': {
+        return buildSecretsReadiness(config, services);
+      }
       default: {
         const error = new Error(`Unknown MCP tool: ${name}`);
         error.code = -32602;
@@ -659,11 +798,13 @@ export function createCeliaMcpHandler({ pool, config, services = createServiceRe
     const boundary = {
       google_gmail_search: 'google.gmail', google_drive_search: 'google.drive',
       google_calendar_events_list: 'google.calendar', google_calendar_events_create: 'google.calendar',
-      google_contacts_search: 'google.contacts', whatsapp_send_text: 'whatsapp'
+      google_contacts_search: 'google.contacts', whatsapp_send_text: 'whatsapp',
+      celia_voice_speak: 'elevenlabs', figma_file_inspect: 'figma',
+      ...(args?.probe === true ? { codata_status: 'codata' } : {})
     }[name];
     if (!boundary) return runTool(name, args);
     return services.run(boundary, (signal) => runTool(name, args, signal), {
-      sideEffect: ['google_calendar_events_create', 'whatsapp_send_text'].includes(name)
+      sideEffect: ['google_calendar_events_create', 'whatsapp_send_text', 'celia_voice_speak'].includes(name)
     });
   }
 
@@ -704,14 +845,15 @@ export function createCeliaMcpHandler({ pool, config, services = createServiceRe
           result = {};
           break;
         case 'tools/list':
-          result = { tools: MCP_TOOLS };
+          result = { tools: getActiveMcpTools(config) };
           break;
         case 'tools/call': {
           const toolName = String(params?.name || '');
           if (!toolName) {
             return { jsonrpc: '2.0', id: id ?? null, error: { code: -32602, message: 'Tool name is required' } };
           }
-          const exists = MCP_TOOLS.some((tool) => tool.name === toolName);
+          const activeTools = getActiveMcpTools(config);
+          const exists = activeTools.some((tool) => tool.name === toolName);
           if (!exists) {
             return { jsonrpc: '2.0', id: id ?? null, error: { code: -32602, message: `Unknown tool: ${toolName}` } };
           }
@@ -736,13 +878,19 @@ export function createCeliaMcpHandler({ pool, config, services = createServiceRe
               {
                 uri: 'celia://status',
                 name: 'حالة خادم Celia MCP',
-                description: 'ملخص جاهزية Gemini وOllama وGoogle وWhatsApp',
+                description: 'ملخص جاهزية مزودي الذكاء والصوت والتصميم وGoogle وWhatsApp',
+                mimeType: 'application/json'
+              },
+              {
+                uri: 'celia://secrets/readiness',
+                name: 'جاهزية أسرار المستودع التسعة (منقحة)',
+                description: 'حالة تهيئة الأسرار التسعة وقواطع العزل دون كشف أي قيم سرية',
                 mimeType: 'application/json'
               },
               {
                 uri: 'celia://policy/customer-reply',
                 name: 'سياسة الرد الآمن على العملاء',
-                description: 'القواعد الإلزامية لتوليد الردود عبر Gemini أو Ollama',
+                description: 'القواعد الإلزامية لتوليد الردود عبر Gemini أو AI Gateway أو DeepSeek أو AgentRouter أو Ollama',
                 mimeType: 'text/plain'
               }
             ]
@@ -751,8 +899,11 @@ export function createCeliaMcpHandler({ pool, config, services = createServiceRe
         case 'resources/read': {
           const uri = String(params?.uri || '');
           if (uri === 'celia://status') {
-            const status = await buildStatusSummary(pool, config, { probeOllama: true });
+            const status = await buildStatusSummary(pool, config, { probeOllama: true, services });
             result = { contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(status, null, 2) }] };
+          } else if (uri === 'celia://secrets/readiness') {
+            const readiness = buildSecretsReadiness(config, services);
+            result = { contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(readiness, null, 2) }] };
           } else if (uri === 'celia://policy/customer-reply') {
             result = { contents: [{ uri, mimeType: 'text/plain', text: DEFAULT_POLICY }] };
           } else {
@@ -834,8 +985,11 @@ function requireMcpToken(config) {
 
 export function createCeliaMcpApp({ pool, config, services = createServiceRegistry(config) }) {
   const app = express();
-  const { handleRpcMessage } = createCeliaMcpHandler({ pool, config, services });
-  const operations = createOperations({ pool, config, services, toolsCount: MCP_TOOLS.length });
+  const idempotencyStore = createIdempotencyStore();
+  const activeTools = getActiveMcpTools(config);
+  const { handleRpcMessage } = createCeliaMcpHandler({ pool, config, services, idempotencyStore });
+  const operations = createOperations({ pool, config, services, toolsCount: activeTools.length });
+  const authorize = requireMcpToken(config);
   app.locals.services = services;
   app.locals.operations = operations;
 
@@ -852,6 +1006,7 @@ export function createCeliaMcpApp({ pool, config, services = createServiceRegist
           'style-src': ["'self'", "'unsafe-inline'"],
           'font-src': ["'self'", 'data:'],
           'img-src': ["'self'", 'data:'],
+          'media-src': ["'self'", 'data:', 'blob:'],
           'connect-src': [
             "'self'",
             'https://generativelanguage.googleapis.com',
@@ -864,12 +1019,13 @@ export function createCeliaMcpApp({ pool, config, services = createServiceRegist
     })
   );
 
-  mountOperations(app, { operations, authorize: requireMcpToken(config) });
+  mountOperations(app, { operations, authorize });
   app.get('/api/deployment', async (_req, res, next) => {
     try {
       res.set('Cache-Control', 'no-store').json(deploymentStatus({ config, snapshot: await operations.snapshot() }));
     } catch (error) { next(error); }
   });
+  app.use(createSecretsHubRouter({ config, services, idempotencyStore, authorize }));
   if (config.hosting?.integrationsEnabled) {
     app.use(createIntegratedApiRouter({ pool, config: config.hosting.integrationConfig, services }));
   }
@@ -891,17 +1047,17 @@ export function createCeliaMcpApp({ pool, config, services = createServiceRegist
     })
   );
 
-  app.get('/mcp', requireMcpToken(config), (_req, res) => {
+  app.get('/mcp', authorize, (_req, res) => {
     res.json({
       service: SERVER_INFO.name,
       version: SERVER_INFO.version,
       protocolVersion: MCP_PROTOCOL_VERSION,
       transport: 'streamable-http',
-      toolsCount: MCP_TOOLS.length
+      toolsCount: activeTools.length
     });
   });
 
-  app.post('/mcp', requireMcpToken(config), express.json({ limit: '256kb' }), async (req, res) => {
+  app.post('/mcp', authorize, express.json({ limit: '256kb' }), async (req, res) => {
     if (Array.isArray(req.body)) {
       if (req.body.length > 20) return res.status(413).json({ error: 'batch_limit_exceeded' });
       if (!req.body.length) {
@@ -983,13 +1139,28 @@ async function runSelfTest() {
       return res.json();
     };
 
+    const unauthSecrets = await fetch(`${baseUrl}/api/secrets/status`);
+    if (unauthSecrets.status !== 401) throw new Error(`Expected 401 on /api/secrets/status without token, got ${unauthSecrets.status}`);
+
+    const secretsRes = await fetch(`${baseUrl}/api/secrets/status`, {
+      headers: { authorization: `Bearer ${config.celia.apiToken}` }
+    });
+    if (secretsRes.status !== 200) throw new Error(`/api/secrets/status returned ${secretsRes.status}`);
+    const secretsReport = await secretsRes.json();
+
     const init = await rpc(1, 'initialize', { protocolVersion: MCP_PROTOCOL_VERSION });
     const list = await rpc(2, 'tools/list');
     const statusCall = await rpc(3, 'tools/call', { name: 'celia_status', arguments: { probeOllama: true } });
     const statusData = statusCall.result?.structuredContent;
 
-    let aiVerification = { tested: false, provider: null, note: 'لا يوجد مفتاح Gemini أو خادم Ollama نشط في هذه البيئة' };
-    if (config.gemini.apiKey || statusData?.providers?.ollama?.reachable) {
+    const anyCloudConfigured = Boolean(
+      config.gemini.apiKey ||
+      config.aiGateway?.apiKey ||
+      config.deepseek?.apiKey ||
+      config.agentrouter?.apiKey
+    );
+    let aiVerification = { tested: false, provider: null, note: 'لا يوجد مزود سحابي مفعّل للفحص الحي أو خادم Ollama نشط في هذه البيئة' };
+    if (process.env.CELIA_VERIFY_SKIP_CLOUD !== 'true' && (anyCloudConfigured || statusData?.providers?.ollama?.reachable)) {
       const replyCall = await rpc(4, 'tools/call', {
         name: 'celia_ai_reply',
         arguments: {
@@ -1004,8 +1175,7 @@ async function runSelfTest() {
       aiVerification = {
         tested: true,
         provider: replyData.provider,
-        model: replyData.model,
-        replyPreview: replyData.reply
+        model: replyData.model
       };
     }
 
@@ -1016,6 +1186,9 @@ async function runSelfTest() {
           serverInfo: init.result?.serverInfo,
           toolsCount: list.result?.tools?.length,
           storage: statusData?.storage,
+          effectiveAiProvider: statusData?.providers?.effectiveDefault,
+          secretsConfiguredCount: secretsReport?.configuredCount,
+          totalSecretsTracked: secretsReport?.totalSecretsTracked,
           geminiConfigured: statusData?.providers?.gemini?.configured,
           ollamaReachable: statusData?.providers?.ollama?.reachable,
           aiVerification
@@ -1043,9 +1216,10 @@ if (isMain) {
     const config = loadCeliaMcpConfig(process.env, { requireToken: true });
     const pool = await connectPoolWithFallback(config);
     const app = createCeliaMcpApp({ pool, config });
+    const readiness = buildSecretsReadiness(config);
     const server = app.listen(config.port, config.host, () => {
       console.log(
-        `Celia MCP server listening on http://${config.host}:${server.address().port} (storage=${pool.isMemory ? 'memory' : 'mysql'}, gemini=${config.gemini.apiKey ? 'configured' : 'not-set'}, ollama=${config.ollama.model})`
+        `Celia MCP server listening on http://${config.host}:${server.address().port} (storage=${pool.isMemory ? 'memory' : 'mysql'}, ai=${resolveEffectiveAiProvider(config)}, secrets=${readiness.configuredCount}/${readiness.totalSecretsTracked})`
       );
     });
     installShutdown({ server, pool, operations: app.locals.operations });
