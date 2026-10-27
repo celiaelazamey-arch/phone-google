@@ -395,6 +395,66 @@
   حزمة مرجعية ذهبية في `test/fixtures/documents/`، واختبارات `test/agent-document-automation.test.js`. **لا ترحيل SQL جديد
   ولا تغيير في `schema 1` أو الإصدار `0.2.1` أو أدوات MCP الـ12.**
 
+## DEC-024 — حزمة التدقيق الموقّعة (`Audit Bundle`)، واستئناف وحذف الخيوط (`UX-001`)، وضبط متغيرات البيئة
+
+- **التاريخ:** 27 أكتوبر 2026 (مساءً) · **الحالة:** منفذ ومختبر محليًا (3 اختبارات في `test/agent-audit-bundle.test.js`، إجمالي 280/280 في `npm test`) · **المهمة:** UX-001، DATA-002، DATA-004، SEC-001
+- **السياق:** استكمال المتطلبات البرمجية قبل إطلاق النسخة الأولى (`v0.2.1`): توفير تصدير تدقيق موقّع، واستئناف وحذف الخيوط
+  من واجهة `/agent`، ودعم `PHONE_NUMBER` كبديل توافقي لـ`APP_OWNER_PHONE_E164`.
+- **القرار:**
+  1. **تصدير حزمة التدقيق الموقّعة (`exportAuditBundle` و`GET /api/agent/runs/:id/audit-bundle`):**
+     - يُرجع حزمة JSON منقّحة تحتوي على `run`، `goalContract`، `plan`، `truthPartition`، `steps`، `toolRuns`،
+       `approvals`، `outbox`، `evidence`، `evidenceChain`، و`verification` مع بصمة شاملة `bundle_sha256` محسوبة بـ`hashOf`.
+  2. **حذف الخيوط المحكوم (`deleteThread` و`DELETE /api/agent/threads/:id`):**
+     - يحذف الخيط وجميع سجلاته التابعة في معاملة واحدة، ويرفض الحذف بـ`409 thread_has_active_or_uncertain_work` إذا كان
+       في الخيط تشغيل قيد التنفيذ (`running`) أو يحتاج إلى مصالحة (`needs_reconciliation`) أو نية `dispatching`/`unknown`.
+  3. **استئناف الخيوط في `/agent` (`public/agent.{html,css,js}`):**
+     - إضافة قائمة اختيار الخيوط السابقة (`#thread-select`)، وزر حذف الخيط (`#delete-thread`)، وزر تنزيل حزمة التدقيق (`#export-audit`).
+  4. **ضبط متغيرات البيئة (`src/config.js` و`src/secrets-hub.js`):**
+     - دعم `PHONE_NUMBER` كبديل توافقي احتياطي لـ`APP_OWNER_PHONE_E164`، وإضافة `inspectUnwiredEnvironmentVariables` لرصد
+       أسماء المتغيرات غير الموصولة (`CLOUDFLARE_R2_*`, `CELIAOS_CRONJOB_ORG_API_KEY`) دون كشف أي قيمة سرية.
+
+## DEC-023 — محرك التطبيق والقياس ذو الخطوات الست (`6-Step AI Application & Evaluation Engine` + `Product Catalog Audit` + `6-Stage Creative Workflow` + `3-Way Truth Partition`)
+
+- **التاريخ:** 27 أكتوبر 2026 (مساءً) · **الحالة:** منفذ ومختبر محليًا (4 اختبارات في `test/agent-evaluation.test.js`، إجمالي 277/277 في `npm test`) · **المهمة:** AGENT-001، AI-001، AI-002، OPS-001، UX-001
+- **السياق:** تحويل الدليل العملي ذي الخطوات الست (تحديد المهمة قبل اختيار النموذج، اختيار التقنية الأقل تكلفة، حساب تكلفة
+  الرموز وحماية الخطط المجانية، دمج التقنيات في دورة محكومة، الإنتاج المرحلي لكتالوج المنتجات والتصميم الإبداعي، وقياس
+  النتائج مع الفصل الثلاثي `Goal → Plan → Execute → Observe → Verify → Evidence → Improve`) إلى كود برمجي حتمي ومختبر.
+- **القرار:**
+  1. **وحدة [src/agent/evaluation.js](../../src/agent/evaluation.js):**
+     - `recommendTaskStrategy`: تصنيف المهام إلى الفئات الست وتحديد التقنية المناسبة (كود حتمي للحسابات والفواتير، استخراج
+       منظم للمستندات، نموذج سريع للتلخيص، نموذج استدلال للمشكلات المعقدة، سير عمل إبداعي للتصميم، ووكيل بـ`outbox` للأفعال الخارجية).
+     - `estimateTokenCost` و`evaluateProviderSafety`: تطبيق معادلة التكلفة التقديرية ومنع إرسال الأسرار أو بيانات العملاء
+       الخام إلى الخطط المجانية وإلزام المهلة وسلوك نفاد الحصة.
+     - `auditProductCatalog` (الأداة `product.catalog_audit`): فحص حتمي لملفات المنتجات واكتشاف الحقول الناقصة والأسعار
+       غير الصالحة وصياغة مسودة وصف للمراجعة البشرية (`waiting_for_owner_review`، `published_count = 0`).
+     - `buildCreativeWorkflowPlan` (الأداة `creative.workflow_plan`): تقسيم الإنتاج الإبداعي إلى 6 مراحل قابلة للمراجعة.
+     - `buildTruthPartition` و`computeAgentMetrics`: الفصل الثلاثي الصريح (`executed` / `verified` / `unverified`) وحساب
+       المؤشرات الستة للخطوة 6 وعرضها عبر `GET /api/agent/metrics` وفي واجهة `/agent` (`#truth-partition`).
+  2. **الوثيقة المرجعية:** [docs/ai-workflow-6-steps.md](../../docs/ai-workflow-6-steps.md).
+
+## DEC-022 — استكمال موصلات الأثر الخارجي في `agent_outbox` (`AGENT-002`: WhatsApp Cloud & Google Drive Report Export)
+
+- **التاريخ:** 27 أكتوبر 2026 (مساءً) · **الحالة:** منفذ ومختبر محليًا (13/13 اختبارًا في `test/agent-connectors.test.js`، إجمالي 273/273 في `npm test`) · **المهمة:** AGENT-002، SEC-001، DATA-003
+- **السياق:** كان `agent_outbox` يضم موصل `google.calendar` وموصل السجل المحلي `purchases.ledger`، بينما بقيت متطلبات
+  `AGENT-002` لموصلي WhatsApp وتصدير Google Drive قيد الاستكمال.
+- **القرار:**
+  1. **موصل WhatsApp (`whatsapp.cloud` / الأداة `whatsapp.send_text`):**
+     - مصنّف `RISK.externalEffect` مع `requiresApproval: true`.
+     - يتحقق حتميًا قبل أي اتصال من صيغة `E.164`، وحدود طول الرسالة ($1..4096$ حرفًا)، وكون المستلم هو رقم المالك
+       (`ownerPhone`) أو عميلًا موافقًا (`opted_in = 1`) داخل نافذة الـ24 ساعة (`isWithinCustomerWindow`).
+     - يستخدم `createWhatsAppCloudTransport` للتحقق من عدم وجود `provider_message_id` مطابق لبصمة `outbox_<digest>` في
+       جدول `whatsapp_messages` قبل استدعاء Graph API، فلا يُرسل رسالة مكررة عند الإعادة.
+  2. **موصل تصدير Google Drive (`google.drive` / الأداة `google.drive_export_report`):**
+     - مصنّف `RISK.externalEffect` مع `requiresApproval: true`.
+     - يتحقق حتميًا من العنوان والمحتوى ونوع MIME المسموح (`application/json`, `text/plain`, `text/markdown`, `text/csv`).
+     - يشتق بصمة حتمية `appProperties.celiaOutboxKey` من `idempotencyKey` ويبحث عنها أولًا عبر `findByOutboxKey` قبل
+       إنشاء الملف لمنع إنشاء ملفات مكررة عند الإعادة أو المصالحة.
+  3. **الإبقاء على `CELIA_AGENT_CONNECTORS=none` افتراضيًا:** وتوسيع القيم المسموحة إلى `none, calendar, whatsapp, drive`
+     مع رفض الإقلاع صراحةً (`agent_connector_unconfigured`) إذا طُلب موصل دون إعداداته أو دون قاعدة بيانات دائمة.
+- **الدليل:** [src/agent/connectors.js](../../src/agent/connectors.js)، [src/agent/tools.js](../../src/agent/tools.js)،
+  [src/agent/planner.js](../../src/agent/planner.js)، [src/agent/index.js](../../src/agent/index.js)،
+  [test/agent-connectors.test.js](../../test/agent-connectors.test.js)، و[integration/mysql.integration.mjs](../../integration/mysql.integration.mjs).
+
 ## DEC-021 — Phase 3 Comprehension Gate (`Explain to Understand`): بوابة الفهم والشرح المبسّط المدعوم بالأدلة
 
 - **التاريخ:** 27 أكتوبر 2026 (مساءً) · **الحالة:** منفذ ومتحقق محليًا (10 اختبارات `CL-01..CL-10`، إجمالي 268/268 في `npm test`) وفي GitHub Actions CI (التشغيلة `40593284086` على Commit `99b7895` شاملة Chromium وMySQL 8.4) · **المهمة:** AGENT-001، AGENT-002، SEC-003، DATA-003، QA-001، QA-003

@@ -76,6 +76,7 @@ function setRunState(status) {
   pill.textContent = label;
   pill.className = `pill ${kind}`;
   $('cancel').disabled = !['queued', 'running'].includes(status);
+  if ($('export-audit')) $('export-audit').disabled = !state.runId;
 }
 
 function setUsage(usage = {}) {
@@ -368,11 +369,65 @@ function escapeHtml(value) {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 }
 
+function renderTruthPartition(truthPartition, toolRuns = []) {
+  const root = $('truth-partition');
+  const compBadge = $('comprehension-badge');
+  if (!root) return;
+  if (!truthPartition) {
+    root.innerHTML = '<p class="empty">لا يظهر الفصل الثلاثي إلا بعد بدء تشغيل.</p>';
+    if (compBadge) {
+      compBadge.textContent = '—';
+      compBadge.className = 'pill idle';
+    }
+    return;
+  }
+  const reportRun = [...(toolRuns || [])].reverse().find((tr) => tr.toolName === 'data.report' && tr.outcome);
+  const explanation = reportRun?.outcome?.explanation || null;
+  const gateStatus = explanation?.comprehension_gate?.status || truthPartition.verified?.comprehensionGateStatus || null;
+  if (compBadge) {
+    if (gateStatus === 'PASS') {
+      compBadge.textContent = 'الفهم: PASS';
+      compBadge.className = 'pill ok';
+    } else if (gateStatus === 'BLOCK') {
+      compBadge.textContent = 'الفهم: BLOCK';
+      compBadge.className = 'pill bad';
+    } else {
+      compBadge.textContent = `المُتحقِّق: ${truthPartition.verified?.verdict || 'قيد الفحص'}`;
+      compBadge.className = 'pill idle';
+    }
+  }
+  const executedItems = [
+    ...(truthPartition.executed?.toolRuns || []).map((t) => `أداة: ${escapeHtml(t.toolName)}`),
+    ...(truthPartition.executed?.externalEffects || []).map(
+      (e) => `أثر مرسل: ${escapeHtml(e.toolName)} (${escapeHtml(e.externalRef || '—')})`
+    )
+  ];
+  const verifiedItems = (truthPartition.verified?.checks || []).map(
+    (c) => `${escapeHtml(c.check)}: ${escapeHtml(c.detailAr)}`
+  );
+  const unverifiedItems = (truthPartition.unverified?.items || []).map((u) => escapeHtml(u.detailAr));
+  const listHtml = (arr, emptyText) =>
+    arr.length ? `<ul>${arr.map((i) => `<li>${i}</li>`).join('')}</ul>` : `<p class="hint">${escapeHtml(emptyText)}</p>`;
+
+  root.innerHTML = `
+    <dl>
+      ${explanation?.simple_summary ? `<dt>الشرح المبسّط المدعوم بالأدلة</dt><dd>${escapeHtml(explanation.simple_summary)}</dd>` : ''}
+      <dt>1. ما نُفّذ فعلًا (${truthPartition.executed?.toolRunsCount ?? 0} أداة / ${truthPartition.executed?.externalEffectsSentCount ?? 0} أثر خارجي)</dt>
+      <dd>${listHtml(executedItems, 'لم يُنفَّذ أي استدعاء مؤكد بعد.')}</dd>
+      <dt>2. ما تحقّق منه النظام (${verifiedItems.length} فحص مستقل)</dt>
+      <dd>${listHtml(verifiedItems, 'لم تكتمل فحوص المُتحقِّق المستقل بعد.')}</dd>
+      <dt>3. ما لم يثبت بعد (${unverifiedItems.length} بند غير متحقق)</dt>
+      <dd>${listHtml(unverifiedItems, 'لا بنود معلقة أو غير محسومة.')}</dd>
+    </dl>
+  `;
+}
+
 function resetGovernancePanels() {
   renderContract(null);
   renderApprovals([], null);
   renderOutbox([]);
   renderReconcile(null, null);
+  renderTruthPartition(null, []);
   renderEvidence([], null, null);
 }
 
@@ -384,6 +439,7 @@ function handleEvent(event) {
     renderApprovals(event.approvals || [], event.run?.status, event.plan || null, event.outbox || []);
     renderOutbox(event.outbox || []);
     renderReconcile(event, event.run?.status);
+    renderTruthPartition(event.truthPartition || null, event.toolRuns || []);
     renderEvidence(event.evidence || [], event.evidenceChain || null, event.verification || null);
     $('steps').innerHTML = '';
     (event.steps || []).forEach(renderStep);
@@ -478,6 +534,7 @@ async function refreshDetail() {
     renderApprovals(detail.approvals || [], detail.run?.status, detail.plan || null, detail.outbox || []);
     renderOutbox(detail.outbox || []);
     renderReconcile(detail, detail.run?.status);
+    renderTruthPartition(detail.truthPartition || null, detail.toolRuns || []);
     renderEvidence(detail.evidence || [], detail.evidenceChain || null, detail.verification || null);
   } catch (error) {
     setAuthStatus(`تعذّر تحديث التفاصيل: ${error.message}`, 'bad');
@@ -569,11 +626,42 @@ $('approve').addEventListener('click', () => decide('approved'));
 if ($('edit-plan')) $('edit-plan').addEventListener('click', () => decide('edited'));
 $('reject').addEventListener('click', () => decide('rejected'));
 
+async function refreshThreadsList() {
+  const select = $('thread-select');
+  if (!select || !state.token) return;
+  try {
+    const res = await api('/api/agent/threads');
+    const threads = res.threads || [];
+    if (!threads.length) {
+      select.innerHTML = '<option value="">— لا خيوط محفوظة —</option>';
+      select.disabled = true;
+      if ($('delete-thread')) $('delete-thread').disabled = true;
+      return;
+    }
+    select.innerHTML = threads
+      .map(
+        (t) =>
+          `<option value="${escapeHtml(t.id)}"${t.id === state.threadId ? ' selected' : ''}>${escapeHtml(
+            t.title || 'مهمة'
+          )} (${escapeHtml(String(t.id).slice(0, 8))})</option>`
+      )
+      .join('');
+    select.disabled = false;
+    if (!state.threadId) {
+      state.threadId = threads[0].id;
+    }
+    if ($('delete-thread')) $('delete-thread').disabled = !state.threadId;
+  } catch {
+    /* ignore when agent runtime is disabled */
+  }
+}
+
 async function ensureThread() {
   if (state.threadId) return state.threadId;
   const threads = await api('/api/agent/threads');
   if (threads.threads?.length) {
     state.threadId = threads.threads[0].id;
+    await refreshThreadsList();
     return state.threadId;
   }
   const created = await api('/api/agent/threads', {
@@ -581,6 +669,7 @@ async function ensureThread() {
     body: JSON.stringify({ title: $('thread-title-input').value || 'مهمة جديدة' })
   });
   state.threadId = created.thread.id;
+  await refreshThreadsList();
   return state.threadId;
 }
 
@@ -595,6 +684,7 @@ async function connect() {
     setAuthStatus(status.enabled ? 'متصل — الوكيل جاهز' : 'متصل، لكن الوكيل متوقف', status.enabled ? 'ok' : 'bad');
     emptySteps();
     resetGovernancePanels();
+    if (status.enabled) await refreshThreadsList();
   } catch (error) {
     setAuthStatus(error.status === 401 ? 'رمز غير صحيح (401).' : `تعذّر الاتصال: ${error.message}`, 'bad');
   }
@@ -619,11 +709,76 @@ $('new-thread').addEventListener('click', async () => {
     $('delivery').hidden = true;
     setRunState('idle');
     $('cancel').disabled = true;
+    await refreshThreadsList();
     setAuthStatus('خيط جديد جاهز.', 'ok');
   } catch (error) {
     setAuthStatus(`تعذّر إنشاء الخيط: ${error.message}`, 'bad');
   }
 });
+
+if ($('thread-select')) {
+  $('thread-select').addEventListener('change', async (event) => {
+    const nextThreadId = event.target.value;
+    if (!nextThreadId) return;
+    state.threadId = nextThreadId;
+    if ($('delete-thread')) $('delete-thread').disabled = false;
+    try {
+      const detail = await api(`/api/agent/threads/${nextThreadId}`);
+      $('thread-title-input').value = detail.thread?.title || 'مهمة';
+      const latestRun = detail.runs?.[0] || null;
+      if (latestRun) {
+        state.runId = latestRun.id;
+        await refreshDetail();
+        setAuthStatus('تم استرجاع آخر تشغيل في الخيط.', 'ok');
+      } else {
+        state.runId = null;
+        emptySteps();
+        resetGovernancePanels();
+        setRunState('idle');
+      }
+    } catch (error) {
+      setAuthStatus(`تعذّر تحميل الخيط: ${error.message}`, 'bad');
+    }
+  });
+}
+
+if ($('delete-thread')) {
+  $('delete-thread').addEventListener('click', async () => {
+    if (!state.threadId) return;
+    try {
+      await api(`/api/agent/threads/${state.threadId}`, { method: 'DELETE' });
+      state.threadId = null;
+      state.runId = null;
+      emptySteps();
+      resetGovernancePanels();
+      $('delivery').hidden = true;
+      setRunState('idle');
+      await refreshThreadsList();
+      setAuthStatus('حُذف الخيط وجميع سجلاته التابعة.', 'ok');
+    } catch (error) {
+      setAuthStatus(`تعذّر حذف الخيط: ${error.message}`, 'bad');
+    }
+  });
+}
+
+if ($('export-audit')) {
+  $('export-audit').addEventListener('click', async () => {
+    if (!state.runId) return;
+    try {
+      const bundle = await api(`/api/agent/runs/${state.runId}/audit-bundle`);
+      const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `celia-audit-${state.runId}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setAuthStatus(`تم تصدير حزمة التدقيق الموقّعة (SHA-256: ${String(bundle.bundle_sha256).slice(0, 12)}…).`, 'ok');
+    } catch (error) {
+      setAuthStatus(`تعذّر تصدير حزمة التدقيق: ${error.message}`, 'bad');
+    }
+  });
+}
 
 $('run').addEventListener('click', async () => {
   const message = $('message').value.trim();

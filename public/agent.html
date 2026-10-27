@@ -62,8 +62,17 @@
     <section class="card thread" aria-labelledby="thread-title">
       <div class="row">
         <h2 id="thread-title">المهمة</h2>
-        <button id="new-thread" class="ghost" type="button">خيط جديد</button>
+        <div class="row">
+          <button id="new-thread" class="ghost" type="button">خيط جديد</button>
+          <button id="delete-thread" class="danger" type="button" disabled>حذف الخيط</button>
+        </div>
       </div>
+      <label class="field">
+        <span>سجل الخيوط السابقة (استئناف محادثة)</span>
+        <select id="thread-select" disabled>
+          <option value="">— لا خيوط محملة —</option>
+        </select>
+      </label>
       <label class="field">
         <span>عنوان الخيط</span>
         <input id="thread-title-input" type="text" maxlength="200" value="مهمة جديدة" autocomplete="off">
@@ -75,6 +84,7 @@
       <div class="row actions">
         <button id="run" class="primary" type="button" disabled>تشغيل المهمة</button>
         <button id="cancel" class="danger" type="button" disabled>إلغاء</button>
+        <button id="export-audit" class="ghost" type="button" disabled>تصدير حزمة التدقيق (SHA-256)</button>
       </div>
       <p class="hint">كل نقرة تُنشئ <code>client_message_id</code> واحدًا؛ النقر المكرر يعيد نفس التشغيل ولا يضاعفه.</p>
     </section>
@@ -141,6 +151,15 @@
         <span>المرجع الخارجي إن وُجد (اختياري)</span>
         <input id="reconcile-ref" type="text" maxlength="240" autocomplete="off" placeholder="مثال: event id من المزوّد">
       </label>
+
+      <div class="subhead">
+        <h3>بوابة الفهم والفصل الثلاثي (Executed / Verified / Unverified)</h3>
+        <span id="comprehension-badge" class="pill idle">—</span>
+      </div>
+      <p class="hint">فصل صريح بين: ما نُفّذ فعلًا في السجلات، وما تحقّق منه النظام بقواعد مستقلة، وما لم يثبت بعد (يبقى غير متحقق حتى لو بدا الناتج مقنعًا).</p>
+      <div id="truth-partition" class="contract" aria-live="polite">
+        <p class="empty">لا يظهر الفصل الثلاثي إلا بعد بدء تشغيل.</p>
+      </div>
 
       <div class="subhead">
         <h3>سجل الأدلة المسلسل</h3>

@@ -20,6 +20,12 @@ import {
   validatePlanEditPolicy,
   verifyApprovedEffectIntegrity
 } from './harness.js';
+import {
+  CELIA_SEVEN_STAGE_LOOP,
+  buildTruthPartition,
+  computeAgentMetrics,
+  recommendTaskStrategy
+} from './evaluation.js';
 
 export { PLAN_LIFECYCLE_STATE };
 
@@ -821,9 +827,18 @@ export function createAgentRuntime({
         toolRuns,
         verification
       });
+      const truthPartition = buildTruthPartition({
+        run,
+        toolRuns,
+        approvals,
+        outbox: outboxEntries,
+        verification,
+        evidenceChain
+      });
       return {
         run,
         plan,
+        truthPartition,
         steps,
         toolRuns,
         goalContract,
@@ -832,6 +847,29 @@ export function createAgentRuntime({
         evidence,
         evidenceChain,
         verification
+      };
+    },
+    async metrics(requesterId = ownerId, { limit = 20 } = {}) {
+      const threads = await store.listThreads(requesterId, { limit });
+      const runDetails = [];
+      for (const thread of threads) {
+        const runs = await store.listRuns(thread.id);
+        for (const r of runs.slice(0, 10)) {
+          const detail = await runtime.detail(r.id, requesterId);
+          runDetails.push(detail);
+        }
+      }
+      return {
+        loopStages: CELIA_SEVEN_STAGE_LOOP,
+        metrics: computeAgentMetrics(runDetails),
+        strategyExamples: [
+          recommendTaskStrategy({ taskType: 'pricing_and_invoices' }),
+          recommendTaskStrategy({ taskType: 'document_extraction' }),
+          recommendTaskStrategy({ taskType: 'text_summarization_classification' }),
+          recommendTaskStrategy({ taskType: 'complex_technical_analysis' }),
+          recommendTaskStrategy({ taskType: 'creative_design_and_ads' }),
+          recommendTaskStrategy({ taskType: 'external_site_or_tool_actions' })
+        ]
       };
     },
     harness() {
@@ -1347,6 +1385,39 @@ export function createAgentRuntime({
       if (!thread) throw httpError(404, 'thread_not_found', 'thread_not_found');
       const [messages, runs] = await Promise.all([store.listMessages(threadId), store.listRuns(threadId)]);
       return { thread, messages, runs };
+    },
+    async deleteThread(threadId, requesterId = ownerId) {
+      const result = await store.deleteThread(threadId, requesterId);
+      if (!result.deleted) {
+        if (result.reason === 'thread_not_found') {
+          throw httpError(404, 'thread_not_found', 'thread_not_found');
+        }
+        throw httpError(409, result.reason || 'thread_delete_blocked', result.reason || 'thread_delete_blocked');
+      }
+      return result;
+    },
+    async exportAuditBundle(runId, requesterId = ownerId) {
+      const detail = await runtime.detail(runId, requesterId);
+      const bundleBody = {
+        schema_version: '1.0',
+        capability: 'agent_audit_bundle',
+        run: detail.run,
+        goalContract: detail.goalContract,
+        plan: detail.plan,
+        truthPartition: detail.truthPartition,
+        steps: detail.steps,
+        toolRuns: detail.toolRuns,
+        approvals: detail.approvals,
+        outbox: detail.outbox,
+        evidence: detail.evidence,
+        evidenceChain: detail.evidenceChain,
+        verification: detail.verification
+      };
+      return {
+        ...bundleBody,
+        exported_at: new Date(clock()).toISOString(),
+        bundle_sha256: hashOf(bundleBody)
+      };
     },
     subscribe(runId, listener) {
       if (typeof listener !== 'function') throw new Error('listener is required');

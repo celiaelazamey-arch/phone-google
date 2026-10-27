@@ -39,6 +39,16 @@
   - **معمارية Agent Harness الـ10 مكونات (`GET /api/agent/harness`)** وواجهة تعديل الخطة في `/agent`، وتشخيص
     Playwright Chromium الصريح (`e2e/diagnostics.js`، `e2e/agent.spec.js`، `playwright.config.js`)، وإصلاح
     الروابط النسبية وتباين WCAG 2.2 AA وعرض 320px في `/agent` و`/kb`.
+  - **إضافة المرحلة 1 من خارطة التوسعة (`AGENT-002` — موصلا WhatsApp وGoogle Drive عبر `agent_outbox`، [DEC-022](DECISIONS.md#dec-022--استكمال-موصلات-الأثر-الخارجي-في-agent_outbox-agent-002-whatsapp-cloud--google-drive-report-export)):**
+    - إضافة موصل `whatsapp.cloud` (`whatsapp.send_text`) بفحص `E.164` و`opted_in` ونافذة 24 ساعة ومنع التكرار عبر `whatsapp_messages`، وموصل `google.drive` (`google.drive_export_report`) ببصمة `appProperties.celiaOutboxKey` وفحص `findByOutboxKey` قبل الإنشاء.
+    - توسيع `CELIA_AGENT_CONNECTORS` ليقبل `none, calendar, whatsapp, drive` مع بقاء `none` هو الوضع الافتراضي الآمن.
+    - نجاح جميع الاختبارات المحلية (**273/273** في `npm test` شاملة `WA-01..WA-04` و`DRV-01..DRV-04` في `test/agent-connectors.test.js`).
+  - **إضافة محرك التطبيق والقياس ذي الخطوات الست (`6-Step AI Application & Evaluation Engine`، [DEC-023](DECISIONS.md#dec-023--محرك-التطبيق-والقياس-ذو-الخطوات-الست-6-step-ai-application--evaluation-engine--product-catalog-audit--6-stage-creative-workflow--3-way-truth-partition)):**
+    - بناء [src/agent/evaluation.js](../../src/agent/evaluation.js) و[docs/ai-workflow-6-steps.md](../ai-workflow-6-steps.md) لتطبيق: توجيه المهام (`recommendTaskStrategy`)، معادلة التكلفة وحارس الخطط المجانية (`estimateTokenCost` و`evaluateProviderSafety`)، فاحص كتالوج المنتجات (`product.catalog_audit`)، سير العمل الإبداعي ذي الـ6 مراحل (`creative.workflow_plan`)، الفصل الثلاثي (`executed / verified / unverified` في `buildTruthPartition` وواجهة `/agent`)، ومؤشرات الأداء الستة (`computeAgentMetrics` ونقطة `GET /api/agent/metrics`).
+    - نجاح جميع الاختبارات المحلية (**280/280** في `npm test`).
+  - **إضافة حزمة التدقيق الموقّعة واستئناف وحذف الخيوط وضبط متغيرات البيئة ([DEC-024](DECISIONS.md#dec-024--حزمة-التدقيق-الموقعة-audit-bundle-واستئناف-وحذف-الخيوط-ux-001-وضبط-متغيرات-البيئة)):**
+    - إضافة `GET /api/agent/runs/:id/audit-bundle` (`bundle_sha256`) و`DELETE /api/agent/threads/:id` وقائمة اختيار الخيوط السابقة في `/agent`، ودعم `PHONE_NUMBER` كبديل توافقي لـ`APP_OWNER_PHONE_E164`.
+    - نجاح جميع الاختبارات المحلية (**280/280** في `npm test`) ونجاح تشغيلة GitHub Actions CI رقم **`40599659235`** (الـCommit `f0114b3bddca5605ea5d4c2c820b99c011aed400` على الفرع `arena/981ee27e-phone-google`) في جميع الوظائف الست: `MySQL 8.4` (`122524304770` في 43 ثانية)، `RTL dashboard · Playwright Chromium` (`122524304986` في 44 ثانية)، `Node 22` (`122524304995` في 25 ثانية)، `Node 24` (`122524305136` في 32 ثانية)، `Python 3.11 Spider` (`122524305019` في 20 ثانية)، و`Node 24 Container` (`122524305069` في 22 ثانية).
   - **الفحوص المحلية وفحوص GitHub Actions CI الفعلية (`Verification Closure`):**
     - محليًا: `npm test` **268/268** ناجحة (منها 7 اختبارات في `test/agent-document-automation.test.js` و10 اختبارات
       `CL-01..CL-10` في `test/agent-comprehension-gate.test.js`)، و`check` و`release:check` و`check:continuity`

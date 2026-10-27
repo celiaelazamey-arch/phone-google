@@ -19,6 +19,7 @@ export const RISK = Object.freeze({
 });
 
 import { documentAutomationToolDefinitions } from './automation/index.js';
+import { auditProductCatalog, buildCreativeWorkflowPlan } from './evaluation.js';
 
 const EXECUTABLE = new Set([RISK.read, RISK.internalWrite]);
 const FORBIDDEN_SECRET_KEYS = new Set([
@@ -78,6 +79,48 @@ export function validateToolInput(tool, args) {
           ok: false,
           code: 'policy_violation_invalid_time_range',
           message: 'Event start and end must be valid ISO timestamps with end > start'
+        };
+      }
+    }
+  }
+  if (tool.name === 'whatsapp.send_text') {
+    if ('phone' in args && (typeof args.phone !== 'string' || !/^\+[1-9]\d{6,14}$/.test(args.phone.trim()))) {
+      return {
+        ok: false,
+        code: 'policy_violation_invalid_phone',
+        message: 'Recipient phone must be a valid E.164 number'
+      };
+    }
+    if ('text' in args && (typeof args.text !== 'string' || !args.text.trim() || args.text.trim().length > 4096)) {
+      return {
+        ok: false,
+        code: 'policy_violation_invalid_text',
+        message: 'Message text must be 1..4096 non-empty characters'
+      };
+    }
+  }
+  if (tool.name === 'google.drive_export_report') {
+    if ('title' in args && (typeof args.title !== 'string' || !args.title.trim() || args.title.trim().length > 200)) {
+      return {
+        ok: false,
+        code: 'policy_violation_invalid_drive_title',
+        message: 'Drive file title must be 1..200 non-empty characters'
+      };
+    }
+    if ('content' in args && (typeof args.content !== 'string' || !args.content.trim() || args.content.length > 200_000)) {
+      return {
+        ok: false,
+        code: 'policy_violation_invalid_drive_content',
+        message: 'Drive file content must be 1..200000 characters'
+      };
+    }
+    if ('mimeType' in args && args.mimeType !== null && args.mimeType !== undefined) {
+      const normalizedMime = String(args.mimeType).trim().toLowerCase();
+      if (!['application/json', 'text/plain', 'text/markdown', 'text/csv'].includes(normalizedMime)) {
+        return {
+          ok: false,
+          code: 'policy_violation_unsupported_mime_type',
+          message: 'Unsupported Drive export MIME type'
         };
       }
     }
@@ -302,11 +345,54 @@ export function defaultToolDefinitions({
       arguments: { summary: 'string', start: 'string', end: 'string' }
     },
     {
+      name: 'whatsapp.send_text',
+      description: 'إرسال رسالة واتساب نصية عبر outbox بعد موافقة صريحة والتحقق من نافذة 24 ساعة',
+      risk: RISK.externalEffect,
+      requiresApproval: true,
+      connector: 'whatsapp.cloud',
+      arguments: { phone: 'string', text: 'string' }
+    },
+    {
+      name: 'google.drive_export_report',
+      description: 'تصدير تقرير موثّق إلى Google Drive عبر outbox بعد موافقة صريحة ومنع التكرار',
+      risk: RISK.externalEffect,
+      requiresApproval: true,
+      connector: 'google.drive',
+      arguments: { title: 'string', content: 'string', mimeType: 'string' }
+    },
+    {
       name: 'sandbox.exec',
       description: 'تنفيذ كود داخل حاوية معزولة — غير متاح قبل AGENT-003',
       risk: RISK.irreversible,
       requiresApproval: true,
       arguments: { code: 'string' }
+    },
+    {
+      name: 'product.catalog_audit',
+      description: 'تحليل ملف/قائمة المنتجات واكتشاف الحقول الناقصة وصياغة وصف أولي للمراجعة قبل النشر',
+      risk: RISK.read,
+      deterministic: true,
+      arguments: { products: 'object' },
+      async execute(args) {
+        const products = Array.isArray(args?.products) ? args.products : [];
+        return auditProductCatalog({ products });
+      }
+    },
+    {
+      name: 'creative.workflow_plan',
+      description: 'بناء سير عمل إبداعي من 6 مراحل (الملخص، الاتجاهات، المسودة، الفحص، التعديل، التسليم المنظم)',
+      risk: RISK.read,
+      deterministic: true,
+      arguments: {
+        brand: 'string',
+        audience: 'string',
+        message: 'string',
+        style: 'string',
+        dimensions: 'string'
+      },
+      async execute(args) {
+        return buildCreativeWorkflowPlan(args || {});
+      }
     },
     ...knowledgeToolDefinitions({ kb }),
     ...(documentAutomation

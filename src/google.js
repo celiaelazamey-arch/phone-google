@@ -62,6 +62,16 @@ export async function createGoogleCalendarClient({ pool, config, userId }) {
   return google.calendar({ version: 'v3', auth: client });
 }
 
+/**
+ * Drive client over the owner's already-stored Google grant. Exported for the
+ * agent Drive export connector (AGENT-002); without a connected account it throws
+ * the same 409 as the REST route.
+ */
+export async function createGoogleDriveClient({ pool, config, userId }) {
+  const client = await getAuthenticatedClient(pool, config, userId);
+  return google.drive({ version: 'v3', auth: client });
+}
+
 function handleError(res, error) {
   const status = Number.isInteger(error.status) ? error.status : 502;
   if (status >= 500) console.error('Google integration request failed:', error.code || 'upstream_failed');
