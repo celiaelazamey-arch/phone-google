@@ -6,3 +6,8 @@ coverage/
 .DS_Store
 npm-debug.log*
 dist/
+
+.celia-deploy/
+.release-artifacts/
+playwright-report/
+test-results/

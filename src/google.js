@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import express from 'express';
 import { google } from 'googleapis';
 import { requireApiToken } from './auth.js';
+import { createServiceRegistry, safeError, ServiceUnavailableError } from './resilience.js';
 import { decryptJson, encryptJson, hashOAuthState, safeEqual } from './security.js';
 
 const GOOGLE_SCOPES = [
@@ -25,7 +26,7 @@ function oauthClient(config) {
     error.status = 503;
     throw error;
   }
-  return new google.auth.OAuth2(config.google.clientId, config.google.clientSecret, config.google.redirectUri);
+  return new google.auth.OAuth2({ clientId: config.google.clientId, clientSecret: config.google.clientSecret, redirectUri: config.google.redirectUri, transporterOptions: { timeout: config.resilience?.timeoutMs || 8000, retry: false } });
 }
 
 async function getAuthenticatedClient(pool, config, userId) {
@@ -50,12 +51,21 @@ async function getAuthenticatedClient(pool, config, userId) {
 
 function handleError(res, error) {
   const status = Number.isInteger(error.status) ? error.status : 502;
-  if (status >= 500) console.error('Google integration request failed:', error.message);
+  if (status >= 500) console.error('Google integration request failed:', error.code || 'upstream_failed');
+  if (error instanceof ServiceUnavailableError) return res.status(503).json({ error: safeError(error), outcomeUnknown: error.outcomeUnknown });
   return res.status(status).json({ error: status === 503 ? 'google_not_configured' : status === 409 ? 'google_not_connected' : 'google_request_failed' });
 }
 
-export function createGoogleRouter({ pool, config }) {
+export function createGoogleRouter({ pool, config, services = createServiceRegistry(config) }) {
   const router = express.Router();
+  const guarded = (name, action, sideEffect = false) => services.run(name, (signal) =>
+    action({ signal, timeout: config.resilience?.timeoutMs || 8000, retry: false }), { sideEffect });
+  router.use((req, res, next) => {
+    if ((req.path.startsWith('/api/google') || req.path.startsWith('/auth/google')) && config.features?.google === false) {
+      return res.status(503).json({ error: 'google_disabled' });
+    }
+    next();
+  });
 
   router.get('/auth/google', requireApiToken(config), async (req, res, next) => {
     try {
@@ -104,10 +114,10 @@ export function createGoogleRouter({ pool, config }) {
       if (consume.affectedRows !== 1) return res.status(400).send('This authorization request was already used.');
 
       const client = oauthClient(config);
-      const { tokens } = await client.getToken(req.query.code);
+      const { tokens } = await guarded('google.oauth', () => client.getToken(req.query.code), true);
       if (config.google.allowedEmail) {
         if (!tokens.id_token) return res.status(403).send('Google account identity was not returned. Reconnect and try again.');
-        const ticket = await client.verifyIdToken({ idToken: tokens.id_token, audience: config.google.clientId });
+        const ticket = await guarded('google.oauth', () => client.verifyIdToken({ idToken: tokens.id_token, audience: config.google.clientId }));
         const identity = ticket.getPayload();
         if (!identity?.email_verified || identity.email?.toLowerCase() !== config.google.allowedEmail) {
           return res.status(403).send('The selected Google account does not match the configured owner email.');
@@ -135,9 +145,9 @@ export function createGoogleRouter({ pool, config }) {
       if (!q) return res.status(400).json({ error: 'query_required' });
       const client = await getAuthenticatedClient(pool, config, config.userId);
       const gmail = google.gmail({ version: 'v1', auth: client });
-      const listed = await gmail.users.messages.list({ userId: 'me', q, maxResults: 10 });
+      const listed = await guarded('google.gmail', (options) => gmail.users.messages.list({ userId: 'me', q, maxResults: 10 }, options));
       const messages = await Promise.all((listed.data.messages || []).map(async ({ id }) => {
-        const { data } = await gmail.users.messages.get({ userId: 'me', id, format: 'metadata', metadataHeaders: ['From', 'To', 'Subject', 'Date'] });
+        const { data } = await guarded('google.gmail', (options) => gmail.users.messages.get({ userId: 'me', id, format: 'metadata', metadataHeaders: ['From', 'To', 'Subject', 'Date'] }, options));
         const headers = Object.fromEntries((data.payload?.headers || []).map((header) => [header.name.toLowerCase(), header.value]));
         return { id, snippet: data.snippet || '', from: headers.from || '', to: headers.to || '', subject: headers.subject || '', date: headers.date || '' };
       }));
@@ -152,12 +162,12 @@ export function createGoogleRouter({ pool, config }) {
       const client = await getAuthenticatedClient(pool, config, config.userId);
       const drive = google.drive({ version: 'v3', auth: client });
       const escaped = q.replaceAll("'", "\\'");
-      const { data } = await drive.files.list({
+      const { data } = await guarded('google.drive', (options) => drive.files.list({
         q: `trashed = false and name contains '${escaped}'`,
         pageSize: 20,
         orderBy: 'modifiedTime desc',
         fields: 'files(id,name,mimeType,modifiedTime,webViewLink)'
-      });
+      }, options));
       return res.json({ files: data.files || [] });
     } catch (error) { return handleError(res, error); }
   });
@@ -169,11 +179,11 @@ export function createGoogleRouter({ pool, config }) {
       const calendar = google.calendar({ version: 'v3', auth: client });
       const now = new Date();
       const until = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
-      const { data } = await calendar.events.list({
+      const { data } = await guarded('google.calendar', (options) => calendar.events.list({
         calendarId: 'primary', timeMin: now.toISOString(), timeMax: until.toISOString(),
         singleEvents: true, orderBy: 'startTime', maxResults: 50,
         fields: 'items(id,summary,start,end,htmlLink,status)'
-      });
+      }, options));
       return res.json({ events: data.items || [] });
     } catch (error) { return handleError(res, error); }
   });
@@ -190,11 +200,11 @@ export function createGoogleRouter({ pool, config }) {
       }
       const client = await getAuthenticatedClient(pool, config, config.userId);
       const calendar = google.calendar({ version: 'v3', auth: client });
-      const { data } = await calendar.events.insert({
+      const { data } = await guarded('google.calendar', (options) => calendar.events.insert({
         calendarId: 'primary',
         requestBody: { summary: summary.trim().slice(0, 200), start: { dateTime: startDate.toISOString(), ...(timeZone ? { timeZone: String(timeZone).slice(0, 100) } : {}) }, end: { dateTime: endDate.toISOString(), ...(timeZone ? { timeZone: String(timeZone).slice(0, 100) } : {}) } },
         fields: 'id,summary,start,end,htmlLink,status'
-      });
+      }, options), true);
       return res.status(201).json({ event: data });
     } catch (error) { return handleError(res, error); }
   });
@@ -205,9 +215,9 @@ export function createGoogleRouter({ pool, config }) {
       if (!q) return res.status(400).json({ error: 'query_required' });
       const client = await getAuthenticatedClient(pool, config, config.userId);
       const people = google.people({ version: 'v1', auth: client });
-      const { data } = await people.people.connections.list({
+      const { data } = await guarded('google.contacts', (options) => people.people.connections.list({
         resourceName: 'people/me', pageSize: 100, personFields: 'names,phoneNumbers,emailAddresses'
-      });
+      }, options));
       const contacts = (data.connections || []).map((person) => ({
         name: person.names?.[0]?.displayName || '',
         phones: (person.phoneNumbers || []).map((item) => item.value),

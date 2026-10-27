@@ -1,3 +1,4 @@
+import { UpstreamError } from './resilience.js';
 export const DEFAULT_POLICY = [
   'أنت مساعد خدمة عملاء يكتب ردًا قصيرًا ومهذبًا بلغة العميل، وبحد أقصى جملتين.',
   'أجب فقط عن الأسئلة العامة اعتمادًا على سياق النشاط المقدم ورسالة العميل.',
@@ -9,14 +10,14 @@ export const DEFAULT_POLICY = [
 
 const DEFAULT_GEMINI_TIMEOUT_MS = 20_000;
 
-export async function generateWhatsAppReply({ config, customerMessage, timeoutMs = DEFAULT_GEMINI_TIMEOUT_MS }) {
+export async function generateWhatsAppReply({ config, customerMessage, timeoutMs = DEFAULT_GEMINI_TIMEOUT_MS, signal }) {
   const { apiKey, model, businessContext } = config.gemini;
   if (!apiKey) throw new Error('Gemini API is not configured');
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
-    signal: AbortSignal.timeout(timeoutMs),
+    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs),
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: `${DEFAULT_POLICY}${businessContext ? ` سياق النشاط المعتمد: ${businessContext.slice(0, 4000)}` : ''}` }] },
       contents: [{ role: 'user', parts: [{ text: String(customerMessage).slice(0, 4000) }] }],
@@ -24,7 +25,7 @@ export async function generateWhatsAppReply({ config, customerMessage, timeoutMs
     })
   });
   const result = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(`Gemini API rejected the request (${response.status})`);
+  if (!response.ok) throw new UpstreamError('gemini', response.status);
   const text = (result.candidates?.[0]?.content?.parts || []).map((part) => part.text || '').join('').trim();
   if (!text) throw new Error('Gemini returned no usable reply');
   return text.slice(0, 1000);

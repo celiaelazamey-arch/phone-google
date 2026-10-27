@@ -4,7 +4,7 @@ import { createPool, ensureOwner } from './db.js';
 import { loadConfig } from './config.js';
 
 const config = loadConfig();
-const pool = createPool(config);
+const pool = createPool(config, { prepareOwner: false });
 try {
   const schema = await readFile(new URL('../sql/schema.sql', import.meta.url), 'utf8');
   for (const statement of schema.split(';').map((part) => part.trim()).filter(Boolean)) {

@@ -1,0 +1,82 @@
+name: Publish verified release
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: celia-publish-release
+  cancel-in-progress: false
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 25
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run check && npm run release:check && npm test && npm audit --omit=dev --audit-level=moderate
+      - name: Resolve immutable identity; refuse to overwrite an existing version
+        id: identity
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          VERSION="$(node -p "JSON.parse(require('fs').readFileSync('package.json')).version")"
+          TAG="v$VERSION"
+          if git show-ref --verify --quiet "refs/tags/$TAG"; then
+            echo '::error::This release tag already exists. Bump the version; do not overwrite releases.'
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and publish versioned backend image
+        id: image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: Dockerfile.mcp
+          push: true
+          tags: ${{ steps.identity.outputs.image }}:${{ steps.identity.outputs.tag }}
+          build-args: |
+            CELIA_BUILD_SHA=${{ github.sha }}
+            CELIA_VERSION=${{ steps.identity.outputs.version }}
+          provenance: mode=max
+          sbom: true
+      - name: Create source/site bundles, SBOM, release manifest and checksums
+        env:
+          CELIA_RELEASE_IMAGE: ${{ steps.identity.outputs.image }}@${{ steps.image.outputs.digest }}
+        run: npm run release:bundle && npm run release:verify
+      - name: Attest release files with GitHub OIDC (no signing key in repository)
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: '.release-artifacts/*'
+      - name: Publish release once; no automatic production deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.identity.outputs.tag }}
+        run: |
+          gh release create "$TAG" .release-artifacts/* \
+            --target "$GITHUB_SHA" --title "Celia $TAG" \
+            --notes 'Verified source + static site + SBOM + SHA256SUMS. The immutable backend image is recorded in release.json. This publishes artifacts only: use the operator runbook to deploy or roll back.'

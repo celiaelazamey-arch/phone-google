@@ -348,3 +348,19 @@ test('نقاط REST الثابتة تُخدم من الطبقة المحلية �
   assert.equal(CeliaStatic.isKnownRoute('GET', '/health/'), true);
   assert.equal(CeliaStatic.isKnownRoute('GET', '/health.json'), false);
 });
+
+test('مركز النظام الثابت يعلن أنه معاينة ولا يدّعي تخزينًا دائمًا أو قواطع خادم حية', async () => {
+  const system = await CeliaStatic.handleRest('GET', '/api/system');
+  assert.equal(system.status, 200);
+  assert.equal(system.payload.scope, 'browser-demo');
+  assert.equal(system.payload.storage.durable, false);
+  assert.equal(system.payload.release.version, '0.2.0');
+  assert.deepEqual(system.payload.circuits, []);
+  const catalogue = await CeliaStatic.handleRest('GET', '/api/releases');
+  assert.equal(catalogue.payload.publication, 'catalog-only');
+  assert.equal(catalogue.payload.releases[1].managedDeployment, false);
+  const html = await readFile(path.join(DIST_DIR, 'system.html'), 'utf8');
+  assert.match(html, /celia-static-shim\.js/);
+  assert.match(html, /href="\.\/system\.html"/);
+  assert.match(html, /الرجوع يُبدّل كود التطبيق/);
+});

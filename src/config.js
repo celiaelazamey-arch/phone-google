@@ -1,3 +1,4 @@
+import { loadFeatures, loadResilienceConfig } from './resilience.js';
 export function loadConfig(env = process.env) {
   const required = (name) => {
     const value = env[name]?.trim();
@@ -6,6 +7,7 @@ export function loadConfig(env = process.env) {
   };
 
   const apiToken = required('APP_API_TOKEN');
+  if (/^replace-with-/i.test(apiToken)) throw new Error('APP_API_TOKEN must not be a placeholder');
   if (apiToken.length < 32) throw new Error('APP_API_TOKEN must be at least 32 characters');
   const encryptionKey = required('TOKEN_ENCRYPTION_KEY');
   const decodedKey = Buffer.from(encryptionKey, 'base64');
@@ -16,6 +18,8 @@ export function loadConfig(env = process.env) {
 
   return Object.freeze({
     nodeEnv: env.NODE_ENV || 'development',
+    features: loadFeatures(env),
+    resilience: loadResilienceConfig(env),
     port,
     baseUrl: env.APP_BASE_URL || `http://localhost:${port}`,
     apiToken,

@@ -1,0 +1,20 @@
+{
+  "version": "0.2.0",
+  "name": "Resilient Core",
+  "date": "2026-10-27",
+  "channel": "stable",
+  "previousVersion": "0.1.0",
+  "minimumNode": 22,
+  "database": {
+    "schema": 1,
+    "minReadable": 1,
+    "maxReadable": 1,
+    "destructiveMigration": false
+  },
+  "rollback": {
+    "supported": true,
+    "strategy": "health-gated-image-switch",
+    "baselineCommit": "9b5c0d6643f4b1ddcafb7aaa0b32e9bea756ea9f",
+    "note": "Managed rollback requires a previously healthy digest recorded by deploy:release. Version 0.1.0 is a source-only baseline."
+  }
+}

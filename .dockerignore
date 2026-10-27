@@ -3,3 +3,9 @@
 .git
 node_modules
 npm-debug.log*
+.celia-deploy
+.release-artifacts
+dist
+coverage
+test-results
+playwright-report

@@ -1,11 +1,11 @@
 {
   "name": "phone-google-assistant",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": false,
-  "description": "Secure starter API for Google OAuth and WhatsApp Cloud API assistant integrations",
+  "description": "Celia assistant with isolated integrations, health-gated releases and safe rollback",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "start": "node src/server.js",
@@ -15,9 +15,15 @@
     "celia:mcp:stdio": "node src/celia-mcp.js --stdio",
     "celia:mcp:verify": "node src/celia-mcp.js --self-test",
     "test": "node --test",
-    "check": "for file in src/*.js test/*.js public/*.js scripts/*.mjs; do node --check \"$file\" || exit 1; done",
+    "check": "node scripts/check.mjs",
     "build:pages": "node scripts/build-pages.mjs",
-    "preview:pages": "node scripts/build-pages.mjs && node -e \"console.log('افتح dist/index.html عبر أي خادم ثابت')\""
+    "preview:pages": "node scripts/build-pages.mjs && node scripts/serve-pages.mjs",
+    "deploy:release": "node scripts/deploy-release.mjs",
+    "release:check": "node scripts/release.mjs check",
+    "release:bundle": "node scripts/release.mjs bundle",
+    "release:verify": "node scripts/release.mjs verify",
+    "test:resilience": "node --test test/resilience.test.js test/operations.test.js test/deployment.test.js",
+    "test:browser": "playwright test"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
@@ -25,5 +31,9 @@
     "googleapis": "^150.0.1",
     "helmet": "^8.1.0",
     "mysql2": "^3.14.1"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.64.1"
   }
 }

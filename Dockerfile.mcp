@@ -1,14 +1,24 @@
-FROM node:22-alpine
+FROM node:24-alpine
+ARG CELIA_BUILD_SHA=unknown
+ARG CELIA_VERSION=0.2.0
+LABEL org.opencontainers.image.title="Celia Resilient Core" \
+      org.opencontainers.image.source="https://github.com/celiaelazamey-arch/phone-google" \
+      org.opencontainers.image.version=$CELIA_VERSION \
+      org.opencontainers.image.revision=$CELIA_BUILD_SHA
 ENV NODE_ENV=production \
+    CELIA_BUILD_SHA=$CELIA_BUILD_SHA \
     CELIA_MCP_HOST=0.0.0.0 \
     CELIA_MCP_PORT=3010 \
-    CELIA_MCP_DISABLE_MYSQL=true
+    CELIA_MCP_DISABLE_MYSQL=false
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --omit=dev --no-audit --no-fund
+RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 COPY src ./src
 COPY public ./public
 COPY sql ./sql
+COPY releases ./releases
 EXPOSE 3010
 USER node
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:3010/health',{signal:AbortSignal.timeout(4000)}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 CMD ["node", "src/celia-mcp.js"]

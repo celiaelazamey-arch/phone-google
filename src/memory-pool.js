@@ -1,10 +1,13 @@
-export function createMemoryPool() {
+export function createMemoryPool({ maxEntries = 500 } = {}) {
+  if (!Number.isInteger(maxEntries) || maxEntries < 1) throw new Error('Invalid memory store capacity');
   const users = new Map();
   const credentials = new Map();
   const contacts = new Map();
   const messages = new Map();
 
+  const bound = (map) => { while (map.size > maxEntries) map.delete(map.keys().next().value); };
   async function execute(sql, params = []) {
+    for (const map of [users, credentials, contacts, messages]) bound(map);
     const normalized = String(sql).replace(/\s+/g, ' ').trim();
 
     if (/^SELECT 1$/i.test(normalized)) {
@@ -32,6 +35,7 @@ export function createMemoryPool() {
     if (/^INSERT INTO whatsapp_contacts \(phone_e164, opted_in, ai_opted_in, consent_source, consented_at\)/i.test(normalized)) {
       const [phone, optedIn, aiOptedIn, consentSource, hasConsent] = params;
       const prev = contacts.get(phone) || { last_inbound_at: null };
+      if (!contacts.has(phone) && contacts.size >= maxEntries) contacts.delete(contacts.keys().next().value);
       contacts.set(phone, {
         phone_e164: phone,
         opted_in: Boolean(optedIn),
@@ -52,6 +56,7 @@ export function createMemoryPool() {
         consent_source: null,
         consented_at: null
       };
+      if (!contacts.has(phone) && contacts.size >= maxEntries) contacts.delete(contacts.keys().next().value);
       contacts.set(phone, { ...prev, last_inbound_at: new Date().toISOString() });
       return [{ affectedRows: 1 }, []];
     }
@@ -69,6 +74,7 @@ export function createMemoryPool() {
     if (/^INSERT IGNORE INTO whatsapp_messages/i.test(normalized)) {
       const [providerId, phone, direction, type, body, status] = params;
       if (messages.has(providerId)) return [{ affectedRows: 0 }, []];
+      if (messages.size >= maxEntries) messages.delete(messages.keys().next().value);
       messages.set(providerId, {
         provider_message_id: providerId,
         phone_e164: phone,

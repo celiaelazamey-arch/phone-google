@@ -9,7 +9,6 @@
     mcpToken: sessionStorage.getItem('celia_mcp_token') || '',
     geminiKey: sessionStorage.getItem('celia_gemini_key') || '',
     groqKey: sessionStorage.getItem('celia_groq_key') || '',
-    ollamaUrl: sessionStorage.getItem('celia_ollama_url') || 'http://127.0.0.1:11434',
     tools: [],
     traces: [],
     lastArtifactText: '',
@@ -76,7 +75,6 @@
     vaultMcpToken: document.getElementById('vault-mcp-token'),
     vaultGeminiKey: document.getElementById('vault-gemini-key'),
     vaultGroqKey: document.getElementById('vault-groq-key'),
-    vaultOllamaUrl: document.getElementById('vault-ollama-url'),
     btnVerifyVault: document.getElementById('btn-verify-vault'),
     vaultFeedback: document.getElementById('vault-feedback'),
     ollamaLiveBadge: document.getElementById('ollama-live-badge')
@@ -152,7 +150,8 @@
     const res = await fetch(endpoint, {
       method: 'POST',
       headers,
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(20000)
     });
     const data = await res.json().catch(() => ({ error: { message: `HTTP ${res.status}` } }));
     const elapsed = Math.max(1, Math.round(performance.now()) - start);
@@ -179,115 +178,64 @@
 
   async function generateFreeAiText(promptText) {
     const mode = el.studioProvider.value;
-
-    // 1. Browser Gemini Free Tier (if user entered AI Studio key or selected Gemini)
-    if ((mode === 'gemini-browser' || mode === 'auto') && state.geminiKey) {
+    let browserProviderFailed = false;
+    // User-supplied browser keys are never forwarded to the server or another vendor.
+    const useGemini = (mode === 'gemini-browser' || mode === 'auto') && state.geminiKey;
+    const useGroq = (mode === 'groq-free' || (mode === 'auto' && !state.geminiKey)) && state.groqKey;
+    if (mode === 'gemini-browser' && !state.geminiKey) throw new Error('أدخل مفتاح Gemini الخاص بك أولًا، أو اختر المحرك المحلي.');
+    if (mode === 'groq-free' && !state.groqKey) throw new Error('أدخل مفتاح Groq الخاص بك أولًا، أو اختر المحرك المحلي.');
+    if (useGemini || useGroq) {
       const start = Math.round(performance.now());
-      const res = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
-        {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            'x-goog-api-key': state.geminiKey
-          },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: DEFAULT_POLICY_AR }] },
-            contents: [{ role: 'user', parts: [{ text: promptText.slice(0, 3500) }] }],
-            generationConfig: { temperature: 0.25, maxOutputTokens: 280 }
-          })
-        }
-      );
-      if (res.ok) {
-        const json = await res.json();
-        const text = (json.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('').trim();
-        if (text) {
-          recordTrace('Gemini 2.5 Flash (Free AI Studio)', { model: 'gemini-2.5-flash', reply: text }, Math.round(performance.now()) - start);
-          return { reply: text, engineLabel: 'Gemini 2.5 Flash · مجاني' };
-        }
-      } else if (mode === 'gemini-browser') {
-        throw new Error(`رفض مفتاح Gemini الطلب (${res.status}) — تأكد من المفتاح في تبويب النماذج المجانية.`);
-      }
-    }
-
-    // 2. Groq Free Tier
-    if ((mode === 'groq-free' || mode === 'auto') && state.groqKey) {
-      const start = Math.round(performance.now());
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          authorization: `Bearer ${state.groqKey}`
-        },
-        body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          temperature: 0.25,
-          max_tokens: 280,
-          messages: [
-            { role: 'system', content: DEFAULT_POLICY_AR },
-            { role: 'user', content: promptText.slice(0, 3500) }
-          ]
-        })
-      });
-      if (res.ok) {
-        const json = await res.json();
-        const text = json.choices?.[0]?.message?.content?.trim();
-        if (text) {
-          recordTrace('Groq Free Cloud (Llama 3.3 70B)', { reply: text }, Math.round(performance.now()) - start);
-          return { reply: text, engineLabel: 'Groq Llama 3.3 · طبقة مجانية' };
-        }
-      } else if (mode === 'groq-free') {
-        throw new Error(`تعذر الاتصال بـ Groq (${res.status}) — راجع المفتاح في تبويب النماذج المجانية.`);
-      }
-    }
-
-    // 3. Browser-to-Local PC Ollama (127.0.0.1:11434)
-    if (mode === 'ollama-local') {
       try {
-        const base = state.ollamaUrl.replace(/\/$/, '');
-        const res = await fetch(`${base}/api/chat`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            model: 'qwen2.5:7b',
-            stream: false,
-            messages: [
-              { role: 'system', content: DEFAULT_POLICY_AR },
-              { role: 'user', content: promptText.slice(0, 3500) }
-            ]
-          })
-        });
-        if (res.ok) {
-          const json = await res.json();
-          const text = json.message?.content?.trim();
-          if (text) return { reply: text, engineLabel: 'Ollama qwen2.5:7b · محلي مجاني' };
-        }
-      } catch {
-        // Fallback to server MCP below
+        const url = useGemini
+          ? 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
+          : 'https://api.groq.com/openai/v1/chat/completions';
+        const headers = useGemini ? { 'content-type': 'application/json', 'x-goog-api-key': state.geminiKey }
+          : { 'content-type': 'application/json', authorization: `Bearer ${state.groqKey}` };
+        const body = useGemini ? {
+          systemInstruction: { parts: [{ text: DEFAULT_POLICY_AR }] },
+          contents: [{ role: 'user', parts: [{ text: promptText.slice(0, 3500) }] }],
+          generationConfig: { temperature: 0.25, maxOutputTokens: 280 }
+        } : {
+          model: 'llama-3.3-70b-versatile', temperature: 0.25, max_tokens: 280,
+          messages: [{ role: 'system', content: DEFAULT_POLICY_AR }, { role: 'user', content: promptText.slice(0, 3500) }]
+        };
+        const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(8000) });
+        if (!response.ok) throw new Error(`تعذر مزوّد المتصفح (${response.status}). راجع المفتاح أو اختر المحرك المحلي.`);
+        const json = await response.json();
+        const text = useGemini ? (json.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('').trim()
+          : json.choices?.[0]?.message?.content?.trim();
+        if (!text) throw new Error('لم يُرجع المزوّد ردًا صالحًا.');
+        const engineLabel = useGemini ? 'Gemini 2.5 Flash · مفتاح المتصفح' : 'Groq Llama 3.3 · مفتاح المتصفح';
+        recordTrace(engineLabel, { reply: text }, Math.round(performance.now()) - start);
+        return { reply: text, engineLabel };
+      } catch (error) {
+        if (mode !== 'auto') throw error;
+        browserProviderFailed = true;
+        recordTrace('تعطل مزوّد المتصفح → بديل محلي', { degraded: true }, Math.round(performance.now()) - start);
       }
     }
-
-    // 4. Server MCP celia_ai_reply (Server Gemini / Server Ollama / Celia Built-in Guard — 100% Free)
-    const providerArg = mode === 'celia-builtin' ? 'local' : 'auto';
+    if (mode === 'ollama-local' && (!state.mcpToken || window.CeliaStatic)) {
+      throw new Error('Ollama يعمل عبر خادم سيليا فقط. اضبطه على الخادم وأدخل رمز المالك؛ لا يتصل المتصفح بـ localhost.');
+    }
+    const providerArg = mode === 'ollama-local' ? 'ollama' : mode === 'celia-builtin' || browserProviderFailed ? 'local' : 'auto';
     const { data } = await callMcpRpc('tools/call', {
-      name: 'celia_ai_reply',
-      arguments: { customerMessage: promptText, provider: providerArg }
+      name: 'celia_ai_reply', arguments: { customerMessage: promptText, provider: providerArg }
     });
-    const out = data.result?.structuredContent || {};
+    if (data.result?.isError || data.error) throw new Error('تعذر تنفيذ الرد من المزوّد المختار. جرّب المحرك المحلي أو راجع مركز النظام.');
+    const out = data.result?.structuredContent;
+    if (!out?.reply) throw new Error('لم يرجع الخادم ردًا صالحًا؛ لا يُفترض نجاح المهمة.');
     return {
-      reply: out.reply || 'تم تنفيذ المهمة بنجاح عبر حاسوب سيليا.',
-      engineLabel:
-        out.provider === 'gemini'
-          ? `Gemini (${out.model}) · خادم MCP`
-          : out.provider === 'ollama'
-            ? `Ollama (${out.model}) · خادم MCP`
-            : 'وكيل سيليا المدمج · مجاني بدون مفتاح'
+      reply: out.reply,
+      engineLabel: out.provider === 'gemini' ? `Gemini (${out.model}) · خادم MCP`
+        : out.provider === 'ollama' ? `Ollama (${out.model}) · خادم MCP`
+          : `حارس سيليا المحلي${out.degraded || browserProviderFailed ? ' · وضع بديل' : ''}`
     };
   }
 
   function updateAuthUi() {
     const hasOwner = Boolean(state.mcpToken && state.mcpToken.length >= 32);
-    const hasCloudFree = Boolean(state.geminiKey || state.groqKey || state.serverHealth?.providers?.gemini?.configured);
+    const hasCloudFree = Boolean(state.geminiKey || state.groqKey || (hasOwner && state.serverHealth?.providers?.gemini?.configured));
     if (hasOwner) {
       el.authLabel.textContent = 'وضع المالك الموثّق (Bearer MCP)';
     } else if (hasCloudFree) {
@@ -299,7 +247,7 @@
       ? 'Gemini 2.5 Flash (متصفح)'
       : state.groqKey
         ? 'Groq Llama 3.3 (مجاني)'
-        : state.serverHealth?.providers?.gemini?.configured
+        : hasOwner && state.serverHealth?.providers?.gemini?.configured
           ? 'Gemini 2.5 Flash (خادم)'
           : 'وكيل سيليا المدمج (0$)';
   }
@@ -801,7 +749,6 @@
     el.vaultMcpToken.value = state.mcpToken;
     el.vaultGeminiKey.value = state.geminiKey;
     el.vaultGroqKey.value = state.groqKey;
-    el.vaultOllamaUrl.value = state.ollamaUrl;
 
     try {
       const healthRes = await fetch('./health');
@@ -981,12 +928,10 @@
     state.mcpToken = el.vaultMcpToken.value.trim();
     state.geminiKey = el.vaultGeminiKey.value.trim();
     state.groqKey = el.vaultGroqKey.value.trim();
-    state.ollamaUrl = el.vaultOllamaUrl.value.trim() || 'http://127.0.0.1:11434';
 
     sessionStorage.setItem('celia_mcp_token', state.mcpToken);
     sessionStorage.setItem('celia_gemini_key', state.geminiKey);
     sessionStorage.setItem('celia_groq_key', state.groqKey);
-    sessionStorage.setItem('celia_ollama_url', state.ollamaUrl);
 
     try {
       const res = await callMcpRpc('ping');

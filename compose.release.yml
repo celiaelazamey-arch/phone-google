@@ -1,0 +1,32 @@
+# Backend deployment only. MySQL is external and is NEVER removed by this stack.
+# Use scripts/deploy-release.mjs, not mutable tags or direct compose up in production.
+services:
+  celia:
+    image: ${CELIA_IMAGE:?An immutable image digest is required}
+    init: true
+    restart: unless-stopped
+    env_file:
+      - ${CELIA_ENV_FILE:?An absolute path to an operator-owned environment file is required}
+    environment:
+      NODE_ENV: production
+      CELIA_MCP_HOST: 0.0.0.0
+      CELIA_MCP_PORT: '3010'
+      PORT: '3010'
+    ports:
+      - '${CELIA_BIND_ADDRESS:-127.0.0.1}:${CELIA_HTTP_PORT:-3010}:3010'
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3010/readyz',{signal:AbortSignal.timeout(4000)}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    networks: [runtime]
+networks:
+  runtime:
+    external: true
+    name: ${CELIA_DOCKER_NETWORK:-bridge}

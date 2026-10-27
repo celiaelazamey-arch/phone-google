@@ -1,4 +1,4 @@
-name: Celia MCP & Gemini CI
+name: Celia quality & resilience
 
 on:
   push:
@@ -6,206 +6,119 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
-      customer_message:
-        description: 'رسالة عميل تجريبية لاختبار أداة celia_ai_reply عبر Gemini'
-        required: false
-        default: 'مرحبًا، ما هي الخدمات المتوفرة وكيف يمكنني التواصل مع فريقكم؟'
+      live_gemini:
+        description: 'Optional live Gemini probe (main only; never gates offline tests)'
+        type: boolean
+        default: false
 
 concurrency:
-  group: celia-mcp-${{ github.workflow }}-${{ github.ref }}
+  group: celia-quality-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
 permissions:
   contents: read
 
 jobs:
-  verify-celia-mcp:
-    name: Celia MCP + Gemini Verification
+  verify:
+    name: Node ${{ matrix.node }} · tests & failure recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - name: Refuse tracked credentials
+        run: |
+          if git ls-files | grep -Ev '(^|/)\.env\.example$' | grep -Eq '(^|/)\.env($|\.)'; then
+            echo '::error::A secret environment file is tracked.'
+            exit 1
+          fi
+      - run: npm ci --no-audit --no-fund
+      - run: npm run check && npm run release:check && npm test
+      - run: npm audit --omit=dev --audit-level=moderate
+      - name: Secret-free MCP smoke test
+        env:
+          CELIA_MCP_DISABLE_MYSQL: 'true'
+          CELIA_DISABLE_OLLAMA: 'true'
+        run: npm run celia:mcp:verify
+      - run: npm run build:pages
+
+  container:
+    name: Node 24 container smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build and verify actual container (no cloud keys)
+        run: |
+          docker build --file Dockerfile.mcp --build-arg CELIA_BUILD_SHA="$GITHUB_SHA" --tag celia:test .
+          TOKEN="$(openssl rand -hex 32)"
+          echo "::add-mask::$TOKEN"
+          docker run --detach --name celia-test --read-only --tmpfs /tmp --cap-drop ALL \
+            --publish 127.0.0.1:3010:3010 \
+            --env CELIA_MCP_API_TOKEN="$TOKEN" --env CELIA_MCP_DISABLE_MYSQL=true --env CELIA_DISABLE_OLLAMA=true celia:test
+          trap 'docker rm --force celia-test' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3010/readyz > /tmp/ready.json; then break; fi
+            sleep 1
+          done
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const result = JSON.parse(fs.readFileSync("/tmp/ready.json"));
+            const expected = JSON.parse(fs.readFileSync("package.json"));
+            if (!result.ready || result.release.version !== expected.version || result.storage.durable) process.exit(1);
+          '
+          curl --fail --silent http://127.0.0.1:3010/system > /dev/null
+
+  browser:
+    name: RTL dashboard · desktop / mobile / accessibility
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - name: Retain failure traces only
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: browser-failure-traces
+          path: test-results/
+          retention-days: 7
 
-      - name: Verify no .env file is tracked in Git
-        run: |
-          if git ls-files | grep -Ev '(^|/)\.env\.example$' | grep -Eq '(^|/)\.env($|\.)'; then
-            echo "::error::A .env file is tracked in Git. Remove it immediately."
-            exit 1
-          fi
-
-      - name: Install dependencies (npm ci)
-        run: npm ci --no-audit --no-fund
-
-      - name: Prepare .env using Repository Secret CELIA_MCP_API_TOKEN
-        env:
-          SECRET_CELIA_MCP_API_TOKEN: ${{ secrets.CELIA_MCP_API_TOKEN }}
-        run: |
-          cp .env.example .env
-          TRIMMED_SECRET="$(printf '%s' "${SECRET_CELIA_MCP_API_TOKEN:-}" | tr -d '\r\n')"
-          if [ -n "$TRIMMED_SECRET" ] && [ "${#TRIMMED_SECRET}" -ge 32 ]; then
-            CELIA_TOKEN="$TRIMMED_SECRET"
-            echo "CELIA_TOKEN_SOURCE=repository_secret" >> "$GITHUB_ENV"
-          else
-            CELIA_TOKEN="$(openssl rand -hex 32)"
-            echo "CELIA_TOKEN_SOURCE=generated_fallback" >> "$GITHUB_ENV"
-          fi
-          APP_TOKEN="$(openssl rand -hex 32)"
-          ENC_KEY="$(openssl rand -base64 32)"
-          node -e '
-            const fs = require("node:fs");
-            let content = fs.readFileSync(".env", "utf8");
-            content = content.replace(/^CELIA_MCP_API_TOKEN=.*$/m, "CELIA_MCP_API_TOKEN=" + process.argv[1]);
-            content = content.replace(/^APP_API_TOKEN=.*$/m, "APP_API_TOKEN=" + process.argv[2]);
-            content = content.replace(/^TOKEN_ENCRYPTION_KEY=.*$/m, "TOKEN_ENCRYPTION_KEY=" + process.argv[3]);
-            fs.writeFileSync(".env", content);
-          ' "$CELIA_TOKEN" "$APP_TOKEN" "$ENC_KEY"
-
-      - name: Confirm required Repository Secrets and optional live Gemini policy
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        env:
-          REQUIRE_GEMINI_LIVE: ${{ vars.REQUIRE_GEMINI_LIVE || 'false' }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY }}
-        run: |
-          if [ "${CELIA_TOKEN_SOURCE:-}" != "repository_secret" ]; then
-            echo "::error::CELIA_MCP_API_TOKEN secret is missing or shorter than 32 characters."
-            exit 1
-          fi
-          if [ -z "${GEMINI_API_KEY:-}" ]; then
-            if [ "${REQUIRE_GEMINI_LIVE,,}" = "true" ]; then
-              echo "::error::GEMINI_API_KEY secret is required because REQUIRE_GEMINI_LIVE=true."
-              exit 1
-            fi
-            echo "::warning::GEMINI_API_KEY is not configured; local MCP checks will still run."
-          else
-            echo "GEMINI_API_KEY is present in Repository Secrets."
-          fi
-
-      - name: Syntax check & automated test suite
-        run: |
-          npm run check
-          npm test
-
-      - name: Run npm run celia:mcp & verify live Repository Secrets (CELIA_MCP_API_TOKEN + GEMINI_API_KEY)
+  live-gemini:
+    name: Optional external Gemini availability
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.live_gemini
+    runs-on: ubuntu-latest
+    environment: integration-probes
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Probe only a synthetic message; never print key or generated content
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY }}
-          REQUIRE_GEMINI_LIVE: ${{ vars.REQUIRE_GEMINI_LIVE || 'false' }}
-          TEST_CUSTOMER_MESSAGE: ${{ inputs.customer_message || 'مرحبًا، ما هي الخدمات المتوفرة وكيف يمكنني التواصل مع فريقكم؟' }}
+          CELIA_MCP_DISABLE_MYSQL: 'true'
+          CELIA_DISABLE_OLLAMA: 'true'
         run: |
-          npm run celia:mcp > /tmp/celia-mcp.log 2>&1 &
-          MCP_PID=$!
-          trap 'kill "$MCP_PID" 2>/dev/null || true' EXIT
-
-          for i in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:3010/health > /tmp/health.json 2>/dev/null; then
-              break
-            fi
-            sleep 0.5
-          done
-
           node --input-type=module -e '
-            import fs from "node:fs";
-            import dotenv from "dotenv";
-
-            const parsed = dotenv.parse(fs.readFileSync(".env", "utf8"));
-            const token = parsed.CELIA_MCP_API_TOKEN;
-            const tokenSource = process.env.CELIA_TOKEN_SOURCE || "unknown";
-            const hasGeminiSecret = Boolean((process.env.GEMINI_API_KEY || "").trim());
-            const requireGeminiLive = /^(true|1|yes)$/i.test(process.env.REQUIRE_GEMINI_LIVE || "false");
-            const customerMessage = process.env.TEST_CUSTOMER_MESSAGE;
-
-            // Verify unauthorized call is rejected (401)
-            const badRes = await fetch("http://127.0.0.1:3010/mcp", {
-              method: "POST",
-              headers: { "content-type": "application/json", authorization: "Bearer invalid-token" },
-              body: JSON.stringify({ jsonrpc: "2.0", id: 0, method: "ping" }),
-              signal: AbortSignal.timeout(30_000)
-            });
-            if (badRes.status !== 401) throw new Error(`Expected 401 for invalid token, got ${badRes.status}`);
-
-            async function rpc(id, method, params = {}) {
-              const res = await fetch("http://127.0.0.1:3010/mcp", {
-                method: "POST",
-                headers: {
-                  "content-type": "application/json",
-                  authorization: `Bearer ${token}`
-                },
-                body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
-                signal: AbortSignal.timeout(30_000)
-              });
-              if (!res.ok) throw new Error(`HTTP ${res.status} on ${method}`);
-              return res.json();
-            }
-
-            const init = await rpc(1, "initialize", { protocolVersion: "2024-11-05" });
-            const tools = await rpc(2, "tools/list");
-            const status = await rpc(3, "tools/call", { name: "celia_status", arguments: { probeOllama: false } });
-            const statusObj = status.result?.structuredContent;
-            if (!Array.isArray(tools.result?.tools) || tools.result.tools.length !== 12) {
-              throw new Error(`Expected 12 registered MCP tools, got ${tools.result?.tools?.length ?? "none"}`);
-            }
-            if (status.result?.isError || !statusObj) {
-              throw new Error("celia_status did not return a valid structured status");
-            }
-
-            let geminiResult = { secretDetected: hasGeminiSecret, liveReplyVerified: false, model: null, reply: null };
-            if (hasGeminiSecret) {
-              try {
-                const replyRes = await rpc(4, "tools/call", {
-                  name: "celia_ai_reply",
-                  arguments: {
-                    customerMessage,
-                    provider: "gemini"
-                  }
-                });
-                if (replyRes.result?.isError) {
-                  throw new Error("Gemini MCP call returned an error");
-                }
-                const data = replyRes.result?.structuredContent;
-                if (!data?.reply) throw new Error("Gemini returned no usable reply");
-                geminiResult = {
-                  secretDetected: true,
-                  liveReplyVerified: true,
-                  model: data.model,
-                  reply: data.reply
-                };
-              } catch (error) {
-                if (requireGeminiLive) throw new Error(`Required live Gemini check failed: ${error.message}`);
-                geminiResult.error = error.message;
-                console.warn(`::warning::Live Gemini check failed; strict local MCP checks passed: ${error.message}`);
-              }
-            } else if (requireGeminiLive) {
-              throw new Error("REQUIRE_GEMINI_LIVE=true but no Gemini API key is configured");
-            }
-
-            const summary = {
-              server: init.result?.serverInfo?.name,
-              tokenSource,
-              toolsRegistered: tools.result?.tools?.length,
-              storage: statusObj?.storage,
-              geminiConfiguredInMcp: statusObj?.providers?.gemini?.configured,
-              geminiResult
-            };
-            console.log(JSON.stringify(summary, null, 2));
-
-            const md = [
-              "## تقرير تشغيل Celia MCP في GitHub Actions",
-              `- **الخادم:** \`${summary.server}\` (\`POST /mcp\`)`,
-              `- **مصدر \`CELIA_MCP_API_TOKEN\`:** ${tokenSource === "repository_secret" ? "✅ من Repository Secrets (`CELIA_MCP_API_TOKEN`)" : "⚠️ مولد تلقائيًا"}`,
-              `- **مصادقة Bearer وحجب الطلبات غير المصرحة (401):** ✅ تم التحقق`,
-              `- **عدد أدوات MCP المسجلة:** ${summary.toolsRegistered}`,
-              `- **مفتاح Gemini في Actions (\`GEMINI_API_KEY\`):** ${hasGeminiSecret ? "✅ متصل من Repository Secrets" : "⚠️ غير مضبوط"}`,
-              geminiResult.liveReplyVerified
-                ? `- **اختبار الرد الحي عبر Gemini (${geminiResult.model}):** ✅ نجح — \`${geminiResult.reply}\``
-                : hasGeminiSecret
-                  ? `- **اختبار Gemini الحي:** ${requireGeminiLive ? "❌ مطلوب وفشل" : "⚠️ تعذر؛ لا يمنع CI ما لم تضبط REQUIRE_GEMINI_LIVE=true"}`
-                  : `- **اختبار Gemini الحي:** ${requireGeminiLive ? "❌ مطلوب والمفتاح غير موجود" : "⚠️ تخطّي لعدم ضبط المفتاح"}`
-            ].join("\n");
-            if (process.env.GITHUB_STEP_SUMMARY) {
-              fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, md + "\n");
-            }
+            import { generateWhatsAppReply } from "./src/gemini.js";
+            if (!process.env.GEMINI_API_KEY) throw new Error("Configure GEMINI_API_KEY in environment secrets");
+            const reply = await generateWhatsAppReply({ config: { gemini: { apiKey: process.env.GEMINI_API_KEY, model: "gemini-2.5-flash" } }, customerMessage: "مرحبا، كيف أتواصل مع موظف؟" });
+            if (!reply) process.exit(1);
+            console.log("Gemini synthetic probe passed. No response content logged.");
           '

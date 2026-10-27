@@ -8,25 +8,10 @@ import { decryptJson, encryptJson, hashOAuthState, isValidE164, isWithinCustomer
 
 const PUBLIC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../public');
 
-export function generateLocalPolicyReply({ customerMessage, businessContext = '' }) {
-  const msg = String(customerMessage || '').trim();
-  const contextSnippet = String(businessContext || '').trim().slice(0, 240);
+export { generateLocalPolicyReply } from './policy.js';
+import { generateLocalPolicyReply } from './policy.js';
 
-  if (/(سعر|أسعار|تكلف|كم|خصم|عرض|شراء|طلب|دفع|بطاق|حساب|فاتور|استرجاع|شكو)/i.test(msg)) {
-    return 'شكرًا لتواصلك معنا؛ حفاظًا على دقة تفاصيل الأسعار والطلبات والمدفوعات سيقوم أحد ممثلي خدمة العملاء بمتابعة طلبك مباشرةً. هل تود ترك أي توضيح إضافي للموظف المختص؟';
-  }
-  if (/(موعد|مواعيد|ساعات|عمل|متى|حجز|اجتماع)/i.test(msg)) {
-    return contextSnippet
-      ? `أهلًا بك! وفق بيانات النشاط المعتمدة (${contextSnippet})، يسعدنا تنسيق الموعد المناسب لك عبر فريق الخدمة المختص.`
-      : 'أهلًا بك! يسعدنا مساعدتك في الاستفسارات العامة، ولتأكيد المواعيد المتاحة بدقة سيقوم موظف مختص بالمتابعة معك فورًا.';
-  }
-  if (contextSnippet) {
-    return `مرحبًا بك! يسعدنا خدمتك وفق سياق نشاطنا المعتمد: ${contextSnippet}. أخبرنا كيف يمكننا مساعدتك أو تحويلك لموظف مختص عند الحاجة.`;
-  }
-  return 'أهلًا وسهلًا بك! أنا مساعد خدمة العملاء الذكي لسيليا؛ يسعدني الإجابة عن استفساراتك العامة أو تحويل طلبك لموظف بشري مختص للتفاصيل الإجرائية.';
-}
-
-export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, config }) {
+export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, operations, config }) {
   const router = express.Router();
   const sandboxPool = createMemoryPool();
   const ephemeralLabKey = crypto.randomBytes(32).toString('base64');
@@ -35,6 +20,9 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, conf
   const sandboxConfig = Object.freeze({
     ...config,
     encryptionKey: '',
+    gemini: Object.freeze({ ...config.gemini, apiKey: '' }),
+    celia: Object.freeze({ ...config.celia, aiProvider: 'local' }),
+    features: Object.freeze({ ...config.features, gemini: false, ollama: false }),
     google: Object.freeze({ clientId: '', clientSecret: '', redirectUri: config.google.redirectUri }),
     whatsapp: Object.freeze({
       ...config.whatsapp,
@@ -53,6 +41,10 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, conf
     res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
   });
 
+  router.get(['/system', '/system.html'], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'system.html')));
+  router.get('/system.css', (_req, res) => res.type('text/css').sendFile(path.join(PUBLIC_DIR, 'system.css')));
+  router.get('/system.js', (_req, res) => res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'system.js')));
+
   router.get('/live', (_req, res) => {
     res.sendFile(path.join(PUBLIC_DIR, 'live.html'));
   });
@@ -65,7 +57,7 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, conf
   router.get('/skills.html', (_req, res) => {
     res.sendFile(path.join(PUBLIC_DIR, 'skills.html'));
   });
-  // صفحة الهبوط التسويقية الفاخرة (landing) — أصول خارجية فقط لتوافق CSP.
+  // صفحة الهبوط التسويقية الفاخرة (landing) — ملفات محلية منفصلة لتوافق CSP.
   router.get('/landing', (_req, res) => {
     res.sendFile(path.join(PUBLIC_DIR, 'landing.html'));
   });
@@ -124,7 +116,7 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, conf
     res.json({ ...summary, live: true, timestamp: new Date().toISOString() });
   });
   router.get('/api/live', async (_req, res) => {
-    const summary = await buildStatusSummary(sandboxPool, config, { probeOllama: true });
+    const summary = operations ? operations.liveness() : await buildStatusSummary(sandboxPool, config, { probeOllama: false });
     res.json({
       live: true,
       message: 'نظامك حي على أرض الواقع — Find Skills و System Live View يعملان الآن',
@@ -159,8 +151,11 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, conf
     }
 
     if (body.method === 'tools/call' && body.params?.name === 'celia_ai_reply') {
+      if (!['auto', 'local'].includes(String(body.params?.arguments?.provider || 'auto').toLowerCase())) {
+        return res.status(403).json({ error: 'owner_token_required_for_external_ai' });
+      }
       const requestedProvider = String(body.params?.arguments?.provider || 'auto').toLowerCase();
-      if (requestedProvider === 'local' || (requestedProvider === 'auto' && !config.gemini.apiKey)) {
+      if (requestedProvider === 'local' || requestedProvider === 'auto') {
         const response = await sandboxHandler.handleRpcMessage(body);
         if (!response?.result?.isError) {
           return res.json({ ...response, sandbox: true });
