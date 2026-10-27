@@ -54,13 +54,13 @@ function outcomeOf(toolRuns, name) {
 }
 
 function documentRequest(goal) {
-  const match = String(goal || '').match(/^(?:استخرج\\s+(?:بيانات\\s+)?الفاتورة|حلل\\s+الفاتورة|document_data_automation|extract\\s+(?:the\\s+)?invoice(?:\\s+data)?)\\s*[:：]\\s*/i);
+  const match = String(goal || '').match(/^(?:استخرج\s+(?:بيانات\s+)?الفاتورة|حلل\s+الفاتورة|document_data_automation|extract\s+(?:the\s+)?invoice(?:\s+data)?)\s*[:：]\s*/i);
   if (!match) return null;
   const content = String(goal).slice(match[0].length).trim();
   if (!content) return null;
-  const trimmed = content.replace(/^\\uFEFF/, '').trimStart();
+  const trimmed = content.replace(/^\uFEFF/, '').trimStart();
   const format = trimmed.startsWith('{') ? 'json'
-    : (trimmed.includes('\\n') && trimmed.split(/\\r?\\n/, 1)[0].includes(',')) ? 'csv'
+    : (trimmed.includes('\n') && trimmed.split(/\r?\n/, 1)[0].includes(',')) ? 'csv'
       : 'txt';
   return { content, format };
 }
@@ -80,7 +80,7 @@ function documentRunSummary(report) {
     'التنبيهات: ' + [...(validation.errors || []), ...(validation.review_items || [])].join(', ').slice(0, 500),
     'حالة الإجراء: ' + String(report.action?.status || 'not_committed') + '؛ لم يُكتب سجل مشتريات ولم تُعتمد الفاتورة تلقائيًا.',
     'قراءة CSV/JSON/TXT/Markdown فقط؛ OCR وPDF والكتابة إلى الخدمات الخارجية غير مفعلة في هذا الإصدار.'
-  ].join('\\n');
+  ].join('\n');
 }
 
 export function createDemoPlanner({ externalEffectTool = 'google.calendar_create_event', knowledge = false } = {}) {
