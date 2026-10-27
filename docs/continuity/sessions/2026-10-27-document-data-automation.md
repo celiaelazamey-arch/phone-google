@@ -3,7 +3,7 @@
 ## المهمة والتفويض
 
 - طلب المستخدم: **«موافق على تنفيذdocument_data_automation svgsvg canvas»**.
-- معرف BACKLOG: `DOC-AUTO-001`، ومعيار القبول في `docs/continuity/BACKLOG.md`.
+- معرف BACKLOG: `AUTO-001`، ومعيار القبول في `docs/continuity/BACKLOG.md`.
 - النطاق: قدرة محلية داخل حلقة الوكيل الحالية، وأصول SVG وCanvas توضيحية. لا نشر إنتاج، لا أسرار، لا ترحيل قاعدة بيانات.
 - القرار: `DEC-019`.
 
