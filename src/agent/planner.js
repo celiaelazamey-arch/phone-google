@@ -13,6 +13,20 @@ export const DECISION = Object.freeze({
 });
 
 const EXTERNAL_HINTS = /(تقويم|موعد|اجتماع|calendar|event|meeting)/i;
+const SLOT_DURATION_MS = 30 * 60 * 1000;
+
+/**
+ * Deterministic proposed slot for an external calendar effect: tomorrow at 10:00 UTC
+ * for 30 minutes. It is a *proposal* the owner sees in the outbox payload before
+ * approving — never a time the planner invents silently at send time.
+ */
+function proposedSlot(createdAt) {
+  const base = new Date(createdAt);
+  if (!Number.isFinite(base.getTime())) return null;
+  base.setUTCDate(base.getUTCDate() + 1);
+  base.setUTCHours(10, 0, 0, 0);
+  return { start: base.toISOString(), end: new Date(base.getTime() + SLOT_DURATION_MS).toISOString() };
+}
 
 function lastUserMessage(messages) {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -43,7 +57,7 @@ export function createDemoPlanner({ externalEffectTool = 'google.calendar_create
   return {
     name: 'demo-deterministic',
     knowledge,
-    async plan({ messages, toolRuns, approvals = [] }) {
+    async plan({ messages, toolRuns, approvals = [], outbox = [], run = null }) {
       const goal = lastUserMessage(messages);
       const externalApproval = approvals.find((approval) => approval.toolName === externalEffectTool);
 
@@ -74,25 +88,27 @@ export function createDemoPlanner({ externalEffectTool = 'google.calendar_create
               'توقفت المهمة دون أي اتصال خارجي أو أثر، وبقيت القراءات الداخلية فقط محفوظة.'
           };
         }
-        if (externalApproval?.decision === 'approved') {
-          return {
-            action: DECISION.finish,
-            summary:
-              `سُجلت موافقة المالك على ${externalEffectTool} بتاريخ ${externalApproval.decidedAt || '—'}، لكن منفذ الأثر ` +
-              'الخارجي (outbox AGENT-002) غير مبني بعد؛ لم يُجرَ أي اتصال خارجي ولم يُنشأ أي موعد. الموافقة محفوظة في ' +
-              'جدول agent_approvals وستستهلكها طبقة الإرسال المستقبلية مرة واحدة عبر مفتاح idempotency.'
-          };
-        }
+        // Approved for the first time: decide the call again so the runtime hands the
+        // intent to the outbox dispatcher. The planner never sends anything itself.
+        const slot = proposedSlot(run?.createdAt);
         return {
           action: DECISION.call,
           tool: externalEffectTool,
-          args: { summary: goal.slice(0, 180) },
-          reason: 'الطلب يشير إلى موعد؛ الأثر الخارجي يحتاج موافقة صريحة'
+          args: {
+            summary: goal.slice(0, 180),
+            ...(slot || {})
+          },
+          reason: externalApproval?.decision === 'approved'
+            ? 'موافقة مسجلة؛ ينفّذها outbox مرة واحدة عبر مفتاح idempotency'
+            : 'الطلب يشير إلى موعد؛ الأثر الخارجي يحتاج موافقة صريحة'
         };
       }
       const draft = outcomeOf(toolRuns, 'celia.draft_outline');
       const status = outcomeOf(toolRuns, 'celia.system_status');
       const evidence = knowledge ? outcomeOf(toolRuns, 'kb.search') : null;
+      const externalOutcome = outcomeOf(toolRuns, externalEffectTool);
+      const sentEffect = outbox.find((entry) => entry.status === 'sent') || null;
+      const failedEffect = outbox.find((entry) => entry.status === 'unknown') || null;
       const steps = draft?.steps || [];
       const citations = (evidence?.items || [])
         .slice(0, 3)
@@ -104,7 +120,11 @@ export function createDemoPlanner({ externalEffectTool = 'google.calendar_create
         evidence?.items?.length ? `أدلة من شبكة المعرفة (${evidence.items.length}، منها ${evidence.entities?.length || 0} كيان):\n${citations}` : null,
         evidence && !evidence.items?.length ? 'لم يجد البحث في شبكة المعرفة دليلًا مطابقًا؛ لم تُختلق مراجع.' : null,
         status ? `حالة النظام المقروءة: الإصدار ${status.version ?? 'غير متاح'}، التخزين ${status.storage ?? 'غير متاح'}.` : null,
-        'لم يُنفَّذ أي أثر خارجي؛ أي موعد أو إرسال ينتظر موافقة صريحة (AGENT-002).',
+        sentEffect
+          ? `أُرسل الأثر الخارجي مرة واحدة عبر outbox بعد موافقة مسجلة؛ المرجع ${sentEffect.externalRef || '—'}.`
+          : failedEffect
+            ? `لم يُحسم الأثر الخارجي (${failedEffect.lastError || 'outcome_unknown'})؛ لا ادعاء بإرسال ولا إعادة محاولة.`
+            : 'لم يُنفَّذ أي أثر خارجي؛ أي موعد أو إرسال ينتظر موافقة صريحة ويمرّ بـ outbox.',
         'المخطط تجريبي حتمي وليس استدلالًا عامًا من نموذج.'
       ]
         .filter(Boolean)

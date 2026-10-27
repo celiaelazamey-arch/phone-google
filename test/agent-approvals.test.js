@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   createTempStore,
   createRecordingTools,
+  createFakeCalendar,
   threeReadsThenFinish
 } from './support/agent-fixtures.js';
 import { createAgentRuntime } from '../src/agent/runtime.js';
@@ -10,7 +11,7 @@ import { createScriptedPlanner, createDemoPlanner } from '../src/agent/planner.j
 import { createDefaultTools } from '../src/agent/tools.js';
 import { RUN_STATUS, TOOL_RUN_STATUS, APPROVAL_DECISION } from '../src/agent/store.js';
 
-async function setup(t, { planner, tools, limits } = {}) {
+async function setup(t, { planner, tools, limits, connectors } = {}) {
   const fixture = await createTempStore();
   t.after(() => fixture.cleanup());
   const recorder = tools || createRecordingTools();
@@ -18,6 +19,7 @@ async function setup(t, { planner, tools, limits } = {}) {
     store: fixture.store,
     tools: recorder.tools,
     planner: planner || createScriptedPlanner(threeReadsThenFinish()),
+    ...(connectors ? { connectors } : {}),
     limits: { maxSteps: 12, maxCostMicros: 100_000, ...limits },
     workerId: 'test-worker',
     logger: { error() {} }
@@ -80,12 +82,21 @@ test('approval gate: a repeated request for the same tool reuses the approval ro
   assert.equal((await fixture.store.listApprovals(run.run.id)).length, 1);
 });
 
-test('approval gate: an approved run resumes and completes without replaying any unknown call', async (t) => {
-  const { runtime, recorder, submit } = await setup(t, {
-    planner: createScriptedPlanner([{ action: 'call', tool: 'calendar.create', args: { summary: 'اجتماع' } }])
+test('approval gate: an approved run resumes, sends exactly once through the outbox and completes', async (t) => {
+  const calendar = createFakeCalendar();
+  const { runtime, recorder, submit, fixture } = await setup(t, {
+    planner: createScriptedPlanner([
+      {
+        action: 'call',
+        tool: 'calendar.create',
+        args: { summary: 'اجتماع', start: '2026-11-01T10:00:00.000Z', end: '2026-11-01T10:30:00.000Z' }
+      }
+    ]),
+    connectors: calendar.connectors
   });
   const { run } = await submit('أنشئ موعدًا', 'approval-approve-01');
   await runtime.runToCompletion(run.id);
+  assert.equal(calendar.sends.length, 0, 'nothing leaves before the owner decides');
 
   const result = await runtime.approve(run.id, { decision: 'approved', note: 'موافقة اختبار' });
   assert.equal(result.resumed, true);
@@ -95,22 +106,33 @@ test('approval gate: an approved run resumes and completes without replaying any
 
   const completed = await runtime.runToCompletion(run.id);
   assert.equal(completed.status, RUN_STATUS.succeeded);
-  assert.equal(recorder.calls.length, 0, 'the external connector still does not exist; approval alone never executes');
+  assert.equal(recorder.calls.length, 0, 'in-loop tools still never execute an external effect directly');
+  assert.equal(calendar.sends.length, 1, 'the outbox dispatches exactly one request');
+
+  const outbox = await fixture.store.listOutbox(run.id);
+  assert.equal(outbox.length, 1);
+  assert.equal(outbox[0].status, 'sent');
+  assert.equal(outbox[0].attempts, 1);
+  assert.ok(outbox[0].externalRef);
 
   const detail = await runtime.detail(run.id);
   const approvalEvidence = detail.evidence.filter((entry) => entry.kind === 'approval');
   assert.equal(approvalEvidence.length, 1);
   assert.equal(approvalEvidence[0].verdict, 'PASS');
+  assert.equal(detail.evidence.filter((entry) => entry.kind === 'external_effect_enqueued').length, 1);
+  assert.equal(detail.evidence.filter((entry) => entry.kind === 'external_effect_settled').length, 1);
   assert.equal(detail.verification.verdict, 'PASS');
 });
 
-test('approval gate: the demo planner turns an approved external request into a bounded delivery naming AGENT-002', async (t) => {
+test('approval gate: the demo planner creates one calendar event through the outbox after approval', async (t) => {
   const fixture = await createTempStore();
   t.after(() => fixture.cleanup());
+  const calendar = createFakeCalendar();
   const runtime = createAgentRuntime({
     store: fixture.store,
     tools: createDefaultTools({ statusProvider: () => ({ version: '0.2.1', storage: 'test' }) }),
     planner: createDemoPlanner(),
+    connectors: calendar.connectors,
     logger: { error() {} }
   });
   const thread = await fixture.store.createThread({ ownerId: 'owner', title: 'تقويم' });
@@ -120,13 +142,23 @@ test('approval gate: the demo planner turns an approved external request into a 
     clientMessageId: 'demo-approval-001'
   });
   assert.equal((await runtime.runToCompletion(submitted.run.id)).status, RUN_STATUS.waitingApproval);
+  assert.equal(calendar.sends.length, 0, 'a parked run asks first and sends nothing');
+
+  const parked = await runtime.detail(submitted.run.id);
+  assert.equal(parked.outbox.length, 1);
+  assert.equal(parked.outbox[0].status, 'pending');
+  assert.ok(parked.outbox[0].payload.start && parked.outbox[0].payload.end, 'the owner sees the exact proposed slot');
+
   await runtime.approve(submitted.run.id, { decision: 'approved' });
   const finished = await runtime.runToCompletion(submitted.run.id);
   assert.equal(finished.status, RUN_STATUS.succeeded);
+  assert.equal(calendar.sends.length, 1);
+
   const detail = await runtime.detail(submitted.run.id);
-  assert.match(detail.steps.at(-1).summary, /AGENT-002/);
-  assert.match(detail.steps.at(-1).summary, /لم يُجرَ أي اتصال خارجي/);
+  assert.match(detail.steps.at(-1).summary, /outbox/);
+  assert.equal(detail.outbox[0].status, 'sent');
   assert.equal(detail.verification.verdict, 'PASS');
+  assert.equal(calendar.sends[0].event.iCalUID.includes('@celia.outbox'), true);
 });
 
 test('approval gate: rejection cancels the run and leaves no tool run or external trace', async (t) => {
@@ -249,5 +281,9 @@ test('approval gate: an approved tool that still lacks a connector fails honestl
   assert.equal(finished.status, RUN_STATUS.failed);
   assert.equal(finished.lastError, 'external_connector_unavailable');
   const detail = await runtime.detail(run.id);
-  assert.equal(detail.toolRuns.length, 0, 'still no fabricated external invocation');
+  assert.equal(detail.toolRuns.length, 1, 'the attempt is recorded, never faked as an invocation');
+  assert.equal(detail.toolRuns[0].status, 'failed');
+  assert.equal(detail.outbox.length, 1);
+  assert.equal(detail.outbox[0].status, 'failed');
+  assert.equal(detail.outbox[0].lastError, 'connector_unavailable');
 });
