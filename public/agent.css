@@ -181,6 +181,9 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .approvals, .evidence, .outbox { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; max-height: 260px; overflow-y: auto; }
 .approvals li, .evidence li, .outbox li { border: 1px solid var(--line); border-radius: 12px; padding: 0.55rem 0.7rem; background: rgba(14, 21, 48, 0.65); font-size: 0.82rem; }
 .approvals .head, .evidence .head, .outbox .head { display: flex; justify-content: space-between; gap: 0.5rem; align-items: baseline; }
+.outbox .warn { color: var(--warn); font-size: 0.75rem; }
+.outbox .row.actions { margin-top: 0.4rem; gap: 0.4rem; }
+.outbox .row.actions button { font-size: 0.78rem; padding: 0.3rem 0.55rem; }
 .approvals .meta, .evidence .meta, .outbox .meta { color: var(--muted); font-size: 0.75rem; margin-top: 0.25rem; word-break: break-all; }
 .hash { font-family: ui-monospace, "Cascadia Mono", monospace; font-size: 0.72rem; color: var(--muted); }
 .pill.verdict-PASS { color: var(--ok); border-color: rgba(61, 220, 151, 0.5); }

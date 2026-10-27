@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { RUN_STATUS, TOOL_RUN_STATUS, APPROVAL_DECISION, isTerminalStatus } from './store.js';
 import { RISK } from './tools.js';
 import { buildGoalContract } from './goal-contract.js';
-import { EVIDENCE_KIND } from './evidence.js';
+import { EVIDENCE_KIND, hashOf } from './evidence.js';
 import { createVerifier, VERDICT } from './verifier.js';
 import { createOutbox, OUTBOX_STATUS } from './outbox.js';
 import { createEmptyConnectorRegistry } from './connectors.js';
@@ -42,6 +42,17 @@ const parseOutcome = (value) => {
     return value;
   }
 };
+
+/**
+ * A `dispatching` intent is only reconcilable once its lease lapsed: while the lease
+ * is live another worker may still be inside the request, and settling it then would
+ * contradict a request that is still in flight.
+ */
+function leaseExpired(entry, now = Date.now()) {
+  if (!entry?.leaseUntil) return true;
+  const until = Date.parse(entry.leaseUntil);
+  return !Number.isFinite(until) || until <= now;
+}
 
 export function createAgentRuntime({
   store,
@@ -443,12 +454,15 @@ export function createAgentRuntime({
             toolName: tool.name
           });
           // Idempotent: a re-entered loop reuses the same pending/decided request instead of cloning it.
+          // An approval authorises an exact effect, not a tool name. Binding the key to
+          // the canonical payload hash means a retry that changes the payload can never
+          // ride on an earlier decision: it parks for a new one.
           const requested = await store.requestApproval({
             runId,
             stepId: gateStep.id,
             toolName: tool.name,
             risk: tool.risk,
-            idempotencyKey: `approval:${runId}:${tool.name}`
+            idempotencyKey: `approval:${runId}:${tool.name}:${hashOf(decision.args ?? null).slice(0, 12)}`
           });
           const approval = requested.approval;
           // The intent is durable before the decision exists: the owner approves an exact
@@ -764,6 +778,201 @@ export function createAgentRuntime({
         runtime.start(runId).catch((error) => logger.error?.('Approved run resume failed:', error?.code || 'resume_failed'));
       }
       return { run: updated, approvals: decided, resumed: requeued };
+    },
+    /**
+     * Everything in this run whose truth is still unknown. Reconciliation is complete
+     * only when both lists are empty — the same predicate the approval gate uses, so
+     * the two can never disagree.
+     */
+    async unresolvedFor(runId) {
+      const [toolRuns, outboxEntries] = await Promise.all([store.listToolRuns(runId), store.listOutbox(runId)]);
+      return {
+        toolRuns: toolRuns.filter(
+          (toolRun) => toolRun.status === TOOL_RUN_STATUS.unknown || toolRun.status === TOOL_RUN_STATUS.started
+        ),
+        outbox: outboxEntries.filter(
+          (entry) => entry.status === OUTBOX_STATUS.unknown || (entry.status === OUTBOX_STATUS.dispatching && leaseExpired(entry))
+        )
+      };
+    },
+    /**
+     * Owner resolution of an uncertain outcome — the missing exit from
+     * `needs_reconciliation`.
+     *
+     * This path is deliberately narrow: it changes bookkeeping only. It never calls a
+     * connector, never re-sends, and never rewrites a settled row. The owner states a
+     * finding (`applied` / `not_applied`), that finding is hashed into the evidence
+     * chain, and the run is requeued only when nothing uncertain is left.
+     */
+    async reconcile(
+      runId,
+      { target, targetId, outcome, externalRef = null, note = null, idempotencyKey = null, resume = false } = {},
+      requesterId = ownerId
+    ) {
+      const run = await store.getRunForOwner(runId, requesterId);
+      if (!run) throw httpError(404, 'run_not_found', 'run_not_found');
+      if (!['tool_run', 'outbox'].includes(target)) throw httpError(400, 'invalid_reconcile_target', 'invalid_reconcile_target');
+      if (!['applied', 'not_applied'].includes(outcome)) {
+        throw httpError(400, 'invalid_reconcile_outcome', 'invalid_reconcile_outcome');
+      }
+      if (typeof targetId !== 'string' || !targetId.trim()) {
+        throw httpError(400, 'reconcile_target_required', 'reconcile_target_required');
+      }
+      const reference = typeof externalRef === 'string' ? externalRef.trim().slice(0, 240) || null : null;
+      const memo = typeof note === 'string' ? note.trim().slice(0, 500) || null : null;
+      const at = new Date(clock()).toISOString();
+      const verdict = outcome === 'applied' ? VERDICT.pass : VERDICT.block;
+      // Deterministic by construction: `at` is deliberately excluded so the same
+      // decision replayed with the same idempotency key hashes identically, and the
+      // ledger — not process memory — decides whether it was already recorded.
+      const finding = {
+        target,
+        targetId,
+        outcome,
+        externalRef: reference,
+        note: memo,
+        actor: requesterId,
+        ...(idempotencyKey ? { idempotencyKey } : {})
+      };
+
+      // A retried POST carrying a key already recorded is an idempotent replay, never
+      // a second write to the chain.
+      if (idempotencyKey) {
+        const inputHash = hashOf(finding);
+        const existing = (await store.listEvidence(runId)).find(
+          (entry) => entry.kind === EVIDENCE_KIND.reconciliation && entry.inputHash === inputHash
+        );
+        if (existing) {
+          return {
+            run: await store.getRun(runId),
+            reconciliation: { outcome, target, targetId, sourceIds: existing.sourceIds, seq: existing.seq },
+            remaining: await runtime.unresolvedFor(runId),
+            idempotentReplay: true
+          };
+        }
+      }
+
+      const toolRuns = await store.listToolRuns(runId);
+      const outboxEntries = await store.listOutbox(runId);
+      const settledToolStatus = outcome === 'applied' ? TOOL_RUN_STATUS.succeeded : TOOL_RUN_STATUS.failed;
+      const settledOutboxStatus = outcome === 'applied' ? OUTBOX_STATUS.sent : OUTBOX_STATUS.failed;
+      const sourceIds = [];
+      let retryRequested = false;
+
+      const applyToolRun = async (toolRun) => {
+        const written = await store.reconcileToolRun(toolRun.id, {
+          status: settledToolStatus,
+          outcome: { ...finding, reconciled: true, at }
+        });
+        // Lost a race: another request already settled this row. Report the conflict,
+        // do not pretend the decision was applied.
+        if (!written.changed) throw httpError(409, 'target_not_reconcilable', 'target_not_reconcilable');
+        sourceIds.push(toolRun.id);
+        return written.toolRun;
+      };
+
+      const applyOutbox = async (entry) => {
+        const written = await store.reconcileOutboxEntry(entry.id, {
+          status: settledOutboxStatus,
+          externalRef: outcome === 'applied' ? reference : null,
+          result: { ...finding, reconciled: true, at },
+          lastError: outcome === 'applied' ? 'reconciled_by_owner' : 'reconciled_not_applied',
+          at
+        });
+        if (!written.changed) throw httpError(409, 'target_not_reconcilable', 'target_not_reconcilable');
+        sourceIds.push(entry.id);
+        return written.entry;
+      };
+
+      const isUncertainToolRun = (toolRun) =>
+        toolRun && (toolRun.status === TOOL_RUN_STATUS.unknown || toolRun.status === TOOL_RUN_STATUS.started);
+      const isUncertainOutbox = (entry) =>
+        entry && (entry.status === OUTBOX_STATUS.unknown || (entry.status === OUTBOX_STATUS.dispatching && leaseExpired(entry)));
+
+      if (target === 'tool_run') {
+        const toolRun = toolRuns.find((item) => item.id === targetId);
+        // A target from another run is not merely wrong, it must not be disclosed.
+        if (!toolRun) throw httpError(400, 'target_not_in_run', 'target_not_in_run');
+        if (!isUncertainToolRun(toolRun)) throw httpError(409, 'target_not_reconcilable', 'target_not_reconcilable');
+        await applyToolRun(toolRun);
+        // One decision, one truth: the intent that produced this call moves with it.
+        const paired = outboxEntries.find((entry) => entry.idempotencyKey === toolRun.idempotencyKey);
+        if (isUncertainOutbox(paired)) await applyOutbox(paired);
+      } else {
+        const entry = outboxEntries.find((item) => item.id === targetId);
+        if (!entry) throw httpError(400, 'target_not_in_run', 'target_not_in_run');
+        if (entry.status === OUTBOX_STATUS.failed) {
+          // A `failed` intent already proves nothing reached the provider, so there is
+          // nothing to decide: the owner is only authorising a retry. Re-confirming an
+          // effect that was never sent would be a fiction, so `applied` is refused.
+          if (outcome !== 'not_applied' || resume !== true) {
+            throw httpError(409, 'target_not_reconcilable', 'target_not_reconcilable');
+          }
+          retryRequested = true;
+          sourceIds.push(entry.id);
+        } else {
+          if (!isUncertainOutbox(entry)) throw httpError(409, 'target_not_reconcilable', 'target_not_reconcilable');
+          await applyOutbox(entry);
+          const paired = toolRuns.find((item) => item.idempotencyKey === entry.idempotencyKey);
+          if (isUncertainToolRun(paired)) await applyToolRun(paired);
+        }
+      }
+
+      await store.appendEvidence({
+        runId,
+        kind: EVIDENCE_KIND.reconciliation,
+        input: finding,
+        output: { outcome, settledStatus: target === 'tool_run' ? settledToolStatus : settledOutboxStatus, sourceIds, at },
+        sourceIds,
+        verdict
+      });
+      await addStep(runId, {
+        kind: 'decide',
+        title: retryRequested
+          ? 'إعادة محاولة مصرّح بها'
+          : outcome === 'applied'
+            ? 'مصالحة: الأثر موجود'
+            : 'مصالحة: الأثر غير موجود',
+        summary:
+          (retryRequested
+            ? `أذن المالك (${requesterId}) بإعادة محاولة نية فاشلة ثبت أنها لم تصل (${targetId})؛ ` +
+              'ستبقى في outbox بنفس المفتاح ولن تُرسل إلا بعد قرار مسجل.'
+            : `قرر المالك (${requesterId}) أن النتيجة «${outcome}» لـ${target === 'outbox' ? 'نية خارجية' : 'استدعاء أداة'} ` +
+              `${targetId}${reference ? `؛ المرجع ${reference}` : ''}. لم يُرسل أي طلب من هذا المسار.`) +
+          (memo ? ` ملاحظة: ${memo}` : '')
+      });
+      emit(runId, { type: 'reconciliation.recorded', runId, target, targetId, outcome, sourceIds });
+
+      const remaining = await runtime.unresolvedFor(runId);
+      const resolvedNothingLeft = remaining.toolRuns.length === 0 && remaining.outbox.length === 0;
+      let resumed = false;
+      if (retryRequested) {
+        if (!resolvedNothingLeft) {
+          await store.finishRun(runId, RUN_STATUS.needsReconciliation, { error: 'outcome_unknown' });
+        } else if ([RUN_STATUS.failed, RUN_STATUS.needsReconciliation].includes(run.status)) {
+          resumed = await store.requeueRun(runId, { from: [RUN_STATUS.failed, RUN_STATUS.needsReconciliation] });
+        }
+      } else if (!resolvedNothingLeft) {
+        if (run.status !== RUN_STATUS.needsReconciliation) {
+          await store.finishRun(runId, RUN_STATUS.needsReconciliation, { error: 'outcome_unknown' });
+        }
+      } else if (run.status === RUN_STATUS.needsReconciliation) {
+        resumed = await store.requeueRun(runId, { from: [RUN_STATUS.needsReconciliation] });
+      } else if (run.status === RUN_STATUS.failed && resume === true) {
+        // Explicit manual retry (AGENT-002). Safe only because nothing is uncertain:
+        // a `failed` intent proved nothing reached the provider and is reused by key.
+        resumed = await store.requeueRun(runId, { from: [RUN_STATUS.failed] });
+      }
+      if (resumed) {
+        emit(runId, { type: 'run.reconciled', runId, resumed: true });
+        runtime.start(runId).catch((error) => logger.error?.('Reconciled run resume failed:', error?.code || 'resume_failed'));
+      }
+      return {
+        run: await store.getRun(runId),
+        reconciliation: { outcome, target, targetId, sourceIds, resumed },
+        remaining,
+        idempotentReplay: false
+      };
     },
     async threadDetail(threadId, requesterId = ownerId) {
       const thread = await store.getThread(threadId, requesterId);

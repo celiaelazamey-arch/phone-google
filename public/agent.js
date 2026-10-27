@@ -220,6 +220,85 @@ function renderOutbox(outbox = []) {
   }
 }
 
+/**
+ * لوحة المصالحة: تعرض فقط ما هو غير محسوم فعلًا (استدعاء unknown/started، أو نية
+ * outbox غير محسومة/فاشلة). القرار يُرسل إلى المسار المالك-فقط ولا يرسل أي طلب خارجي.
+ */
+function renderReconcile(detail, runStatus) {
+  const list = $('reconcile');
+  const unresolvedToolRuns = (detail?.toolRuns || []).filter(
+    (toolRun) => toolRun.status === 'unknown' || toolRun.status === 'started'
+  );
+  const unsettledOutbox = (detail?.outbox || []).filter(
+    (entry) => entry.status === 'unknown' || entry.status === 'dispatching' || entry.status === 'failed'
+  );
+  const items = [
+    ...unresolvedToolRuns.map((toolRun) => ({
+      target: 'tool_run',
+      id: toolRun.id,
+      name: toolRun.toolName,
+      state: toolRun.status,
+      retry: false
+    })),
+    ...unsettledOutbox.map((entry) => ({
+      target: 'outbox',
+      id: entry.id,
+      name: entry.toolName,
+      state: entry.status,
+      retry: entry.status === 'failed'
+    }))
+  ];
+
+  if (!items.length) {
+    list.innerHTML = '<li class="empty">لا شيء يحتاج مصالحة.</li>';
+  } else {
+    list.innerHTML = '';
+    for (const item of items) {
+      const node = document.createElement('li');
+      const canReconcile = !item.retry;
+      node.innerHTML = `
+        <div class="head">
+          <b>${escapeHtml(item.name)}</b>
+          <span class="warn">${escapeHtml(item.state)}</span>
+        </div>
+        <div class="meta">${item.target === 'outbox' ? 'نية خارجية' : 'استدعاء أداة'} · ${escapeHtml(shortHash(item.id))}</div>
+        <div class="row actions">
+          ${
+            canReconcile
+              ? '<button type="button" data-outcome="applied">الأثر موجود</button>' +
+                '<button type="button" class="danger" data-outcome="not_applied">لم يصل</button>'
+              : '<button type="button" data-outcome="retry">إعادة محاولة بعد تأكيد عدم الوصول</button>'
+          }
+        </div>`;
+      for (const button of node.querySelectorAll('button[data-outcome]')) {
+        button.dataset.target = item.target;
+        button.dataset.targetId = item.id;
+        button.dataset.resume = item.retry ? '1' : '0';
+      }
+      list.append(node);
+    }
+  }
+
+  const badge = $('reconcile-badge');
+  const blocking = items.filter((item) => !item.retry).length;
+  if (blocking) {
+    badge.textContent = `${blocking} يحتاج قرارك`;
+    badge.className = 'pill warn';
+  } else if (items.length) {
+    badge.textContent = 'إعادة محاولة متاحة';
+    badge.className = 'pill idle';
+  } else if (runStatus === 'needs_reconciliation') {
+    badge.textContent = 'يحتاج مصالحة';
+    badge.className = 'pill warn';
+  } else {
+    badge.textContent = '—';
+    badge.className = 'pill idle';
+  }
+  const showFields = items.length > 0;
+  $('reconcile-note-field').hidden = !showFields;
+  $('reconcile-ref-field').hidden = !showFields;
+}
+
 function renderEvidence(evidence = [], chain, verification) {
   const list = $('evidence');
   if (!evidence.length) {
@@ -265,6 +344,7 @@ function resetGovernancePanels() {
   renderContract(null);
   renderApprovals([], null);
   renderOutbox([]);
+  renderReconcile(null, null);
   renderEvidence([], null, null);
 }
 
@@ -275,13 +355,20 @@ function handleEvent(event) {
     renderContract(event.goalContract || null);
     renderApprovals(event.approvals || [], event.run?.status);
     renderOutbox(event.outbox || []);
+    renderReconcile(event, event.run?.status);
     renderEvidence(event.evidence || [], event.evidenceChain || null, event.verification || null);
     $('steps').innerHTML = '';
     (event.steps || []).forEach(renderStep);
     if (!(event.steps || []).length) emptySteps();
     return;
   }
-  if (event.type === 'approval.requested' || event.type === 'approval.decided' || event.type === 'verification') {
+  if (
+    event.type === 'approval.requested' ||
+    event.type === 'approval.decided' ||
+    event.type === 'verification' ||
+    event.type === 'reconciliation.recorded' ||
+    event.type === 'run.reconciled'
+  ) {
     refreshDetail();
     return;
   }
@@ -360,6 +447,7 @@ async function refreshDetail() {
     renderContract(detail.goalContract || null);
     renderApprovals(detail.approvals || [], detail.run?.status);
     renderOutbox(detail.outbox || []);
+    renderReconcile(detail, detail.run?.status);
     renderEvidence(detail.evidence || [], detail.evidenceChain || null, detail.verification || null);
   } catch (error) {
     setAuthStatus(`تعذّر تحديث التفاصيل: ${error.message}`, 'bad');
@@ -386,6 +474,49 @@ async function decide(decision) {
     await refreshDetail();
   }
 }
+
+async function reconcile(target, targetId, outcome, resume) {
+  if (!state.runId) return;
+  const note = $('reconcile-note').value.trim() || null;
+  const externalRef = $('reconcile-ref').value.trim() || null;
+  const payload = {
+    target,
+    targetId,
+    outcome: resume ? 'not_applied' : outcome,
+    resume,
+    ...(note ? { note } : {}),
+    ...(externalRef ? { externalRef } : {})
+  };
+  try {
+    const result = await api(`/api/agent/runs/${state.runId}/reconcile`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    $('reconcile-note').value = '';
+    $('reconcile-ref').value = '';
+    const remaining = (result.remaining?.toolRuns?.length || 0) + (result.remaining?.outbox?.length || 0);
+    setAuthStatus(
+      remaining
+        ? `سُجل القرار؛ بقي ${remaining} بندًا غير محسوم قبل الاستئناف.`
+        : result.reconciliation?.resumed
+          ? 'سُجلت المصالحة واستؤنف التشغيل دون أي إرسال جديد.'
+          : 'سُجلت المصالحة في سلسلة الأدلة.',
+      'ok'
+    );
+    await refreshDetail();
+    if (result.reconciliation?.resumed) streamRun(state.runId);
+  } catch (error) {
+    setAuthStatus(`تعذّر تسجيل المصالحة: ${error.message}${error.payload?.error ? ` (${error.payload.error})` : ''}`, 'bad');
+    await refreshDetail();
+  }
+}
+
+$('reconcile').addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-outcome]');
+  if (!button) return;
+  const outcome = button.dataset.outcome;
+  reconcile(button.dataset.target, button.dataset.targetId, outcome, button.dataset.resume === '1');
+});
 
 $('approve').addEventListener('click', () => decide('approved'));
 $('reject').addEventListener('click', () => decide('rejected'));

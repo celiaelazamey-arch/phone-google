@@ -192,6 +192,61 @@ export function createVerifier({ tools, clock = Date.now } = {}) {
     );
   }
 
+  /**
+   * Reconciliation checks (G1). A row an owner marked `reconciled` is a claim about an
+   * event nobody in this process watched, so its only witness is the evidence chain.
+   * Without that entry the claim is unsupported and must block; a `sent` intent that
+   * the owner confirmed without naming any external reference is left UNKNOWN, because
+   * "it exists, I cannot name it" is a real state, not a pass and not a lie.
+   */
+  function reconciliationChecks({ toolRuns = [], outbox = [], evidence = [], checks } = {}) {
+    const evidenced = new Set();
+    let reconciliationEntries = 0;
+    for (const entry of evidence) {
+      const kind = entry.kind;
+      if (kind !== 'reconciliation') continue;
+      reconciliationEntries += 1;
+      for (const sourceId of parseIds(entry.source_ids ?? entry.sourceIds)) evidenced.add(sourceId);
+    }
+    const reconciledToolRuns = toolRuns.filter((item) => {
+      const outcome = parseOutcome(item);
+      return outcome && typeof outcome === 'object' && outcome.reconciled === true;
+    });
+    const reconciledOutbox = outbox.filter(
+      (entry) => entry.result && typeof entry.result === 'object' && entry.result.reconciled === true
+    );
+    const unsupported = [...reconciledToolRuns, ...reconciledOutbox].filter((item) => !evidenced.has(item.id));
+    const total = reconciledToolRuns.length + reconciledOutbox.length;
+    checks.push(
+      unsupported.length === 0
+        ? {
+            id: 'reconciliation_evidence',
+            status: CHECK.pass,
+            detail: `${total} reconciled row(s) backed by ${reconciliationEntries} ledger entry(ies)`
+          }
+        : {
+            id: 'reconciliation_evidence',
+            status: CHECK.block,
+            detail: `reconciled without a ledger entry: ${unsupported
+              .map((item) => item.toolName || item.id)
+              .join(', ')}`
+          }
+    );
+
+    const unnameable = reconciledOutbox.filter(
+      (entry) => entry.result?.outcome === 'applied' && !entry.externalRef && !entry.result?.note
+    );
+    checks.push(
+      unnameable.length === 0
+        ? { id: 'reconciliation_reference', status: CHECK.pass, detail: 'every confirmed effect names a reference or a note' }
+        : {
+            id: 'reconciliation_reference',
+            status: CHECK.unknown,
+            detail: `${unnameable.length} confirmed effect(s) carry neither an external reference nor an owner note`
+          }
+    );
+  }
+
   async function verifyRun({
     run,
     contract = null,
@@ -277,7 +332,14 @@ export function createVerifier({ tools, clock = Date.now } = {}) {
     } else {
       const budgetBreach =
         run.usage.steps > run.limits.maxSteps || run.usage.costMicros > run.limits.maxCostMicros;
-      const failedTools = toolRuns.filter((item) => item.status === 'failed').length;
+      // A failure the owner adjudicated as `not_applied` is a closed historical fact
+      // with a ledger entry; a later successful retry may still deliver. An
+      // unadjudicated failure keeps blocking, as before.
+      const adjudicated = (item) => {
+        const outcome = parseOutcome(item);
+        return outcome && typeof outcome === 'object' && outcome.reconciled === true && outcome.outcome === 'not_applied';
+      };
+      const failedTools = toolRuns.filter((item) => item.status === 'failed' && !adjudicated(item)).length;
       const hasSteps = steps.length > 0;
       const contractFailures = [
         !hasSteps ? 'no_step_recorded' : null,
@@ -297,6 +359,9 @@ export function createVerifier({ tools, clock = Date.now } = {}) {
 
     // 8. External effects: the outbox is the only exit, so judge it directly.
     outboxChecks({ outbox, approvals, evidence, toolRuns, checks });
+
+    // 9. Human reconciliation must be witnessed by the chain, never asserted alone.
+    reconciliationChecks({ toolRuns, outbox, evidence, checks });
 
     const verdict = checks.some((check) => check.status === CHECK.block)
       ? VERDICT.block

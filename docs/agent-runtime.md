@@ -63,6 +63,7 @@ npm run migrate -- --status
 | `GET /api/agent/runs/:id/approvals` | قرارات الموافقة المسجلة للتشغيل |
 | `GET /api/agent/runs/:id/outbox` | نوايا الأثر الخارجي: الحالة، المحاولات، المرجع الخارجي، رمز الخطأ الآمن |
 | `POST /api/agent/runs/:id/approval` | قرار المالك `{decision: approved\|rejected, note?}` مع `Idempotency-Key`؛ 409 إن كان التشغيل بلا بوابة أو وجد استدعاء `unknown` |
+| `POST /api/agent/runs/:id/reconcile` | مخرج `needs_reconciliation` (DEC-016): `{target: tool_run\|outbox, targetId, outcome: applied\|not_applied, externalRef?, note?, resume?}` مع `Idempotency-Key`؛ لا يستدعي أي موصل |
 
 `clientMessageId` يجب أن يطابق `^[A-Za-z0-9_-]{8,64}$`. خطأ الإدخال `400`، الملكية `404`، والحلقة غير المفعلة `503`.
 الواجهة: `/agent` (عربية RTL، أصول محلية، بلا أي مفتاح مزوّد).
@@ -76,7 +77,8 @@ npm run migrate -- --status
 | صندوق الأثر الخارجي | `src/agent/outbox.js` · `agent_outbox` | نية واحدة بمفتاح idempotency قبل القرار؛ ادعاء شرطي واحد؛ `dispatching` لا يُدعى ثانية ويُسوّى `unknown` عند انتهاء المهلة؛ لا إعادة إرسال تلقائية |
 | موصل التقويم | `src/agent/connectors.js` · `CELIA_AGENT_CONNECTORS` | الموصل الوحيد الذي يلمس طرفًا ثالثًا؛ `iCalUID` حتمي؛ `failed` فقط عند إثبات عدم الوصول |
 | سجل الأدلة | `src/agent/evidence.js` · `agent_evidence` | إضافي فقط، `prev_hash`+`hash` من SHA-256 وجذر genesis لكل تشغيل؛ العبث يُكشف عند `verifyEvidenceChain` |
-| المُتحقِّق المستقل | `src/agent/verifier.js` | منفصل عن المنتِج، بلا كتابة؛ أحكام `PASS`/`BLOCK`/`UNKNOWN`؛ لا خطوة `deliver` بلا `verify` |
+| المصالحة البشرية | `runtime.reconcile()` · `POST /runs/:id/reconcile` | تُحلّ فقط صفوف `unknown`/`started` (أو `dispatching` بlease منتهٍ) بقرار مالك مسجل في السلسلة؛ لا نوش على نتيجة محسومة، ولا إرسال من هذا المسار |
+| المُتحقِّق المستقل | `src/agent/verifier.js` | منفصل عن المنتِج، بلا كتابة؛ أحكام `PASS`/`BLOCK`/`UNKNOWN`؛ لا خطوة `deliver` بلا `verify`؛ فحص `reconciliation_evidence` يمنع تحصيل نتيجة بلا شاهد في السلسلة |
 
 تدفق الموافقة والأثر الخارجي (DEC-015): البوابة تُسجّل نية `pending` في `agent_outbox` **قبل** إنشاء طلب
 الموافقة (فيرى المالك الحمولة الدقيقة، بما فيها الوقت المقترح)، ثم يوقف التشغيل `waiting_approval` → المالك يقرر:
@@ -97,13 +99,29 @@ CELIA_AGENT_CALENDAR_TIMEZONE=Africa/Cairo   # اختياري
 يشترط `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` وحسابًا موصولًا بصلاحية `calendar.events`؛ إن غاب أي منها
 يفشل الإعداد برمز `agent_connector_unconfigured` بدل تدهور صامت. الموصل لا يضيف نطاقًا ولا سرًا جديدًا.
 
+### المصالحة والإعادة اليدوية (DEC-016)
+
+كان `409 reconciliation_required` طريقًا مسدودًا: لا قرار يُخرجه. الآن:
+
+- **قرار واحد = حقيقة واحدة:** مصالحة `tool_run` تُسوّي أيضًا نية الـoutbox ذات مفتاح الـidempotency نفسه (والعكس)،
+  فلا تبقى نية `sent` مع استدعاء `unknown`.
+- **لا نوش لنتيجة محسومة:** `sent`/`failed`/`succeeded` تُرفض بـ`409 target_not_reconcilable`؛ و`dispatching`
+  بlease حيّ يُرفض كذلك لأن عاملاً آخر قد يكون داخل الطلب.
+- **الاستئناف محكوم:** إن بقي أي صف غير محسوم يبقى التشغيل `needs_reconciliation`. وإن لم يبقَ شيء، يُعاد
+  التشغيل `queued` ويبدأ. `resume: true` لا يتجاوز قاعدة عدم اليقين أبدًا.
+- **إعادة المحاولة (AGENT-002):** نية `failed` تثبت أن شيئًا لم يصل، فتُقبل `not_applied` + `resume: true` فقط،
+  ثم تُعاد بنفس الصف والمفتاح؛ ولا تُرسل إلا بقرار مسجل. ومفتاح الموافقة صار مربوطًا بـ**بصمة الحمولة**
+  (`approval:<run>:<tool>:<hash12>`) فلا تركب حمولة مختلفة على موافقة سابقة.
+- **الإثبات:** كل قرار يُقيَّد كمدخل `reconciliation` بسلسلة SHA-256، ويظهر في `/agent` مع لوحة أزرار صريحة
+  («الأثر موجود» / «لم يصل» / «إعادة محاولة»).
+
 ## 4. ما لم يُنفَّذ — بصراحة
 
 1. **لا نموذج لغوي:** `planner` الحالي حتمي (خطوات ثابتة حسب الرسالة). واجهة `plan()` جاهزة، لكن ربط مزوّد
    (AI-002) لم يُنفَّذ ولم يُختبر؛ لذلك لا تخطيط حرّ ولا جودة استدلال.
-2. **الأثر الخارجي محدود بموصل واحد:** الـoutbox وموصل Google Calendar مبنيان، لكن WhatsApp وDrive لم يُبنَيا،
-   وإعادة المحاولة بعد `failed` ليست واجهة للمالك بعد (تتم بـ`enqueue` جديدة على الصف نفسه)، و`unknown` لا يُعاد
-   تلقائيًا أبدًا — المصالحة البشرية مطلوبة وغير معروضة كإجراء في الواجهة بعد.
+2. **الأثر الخارجي محدود بموصل واحد:** الـoutbox وموصل Google Calendar مبنيان، لكن WhatsApp وDrive لم يُبنَيا.
+   المصالحة وإعادة المحاولة اليدوية صارتا مسارًا وواجهة (DEC-016)، لكن `unknown` لا يُعاد تلقائيًا أبدًا ولا
+   يوجد حل تلقائي بالتصويت — القرار البشري شرط.
 3. **لا تنفيذ معزول:** `sandbox.exec` يُرفض دائمًا حتى AGENT-003؛ لا حاوية ولا مخرجات artifacts بعد.
 4. **لا تعدد مستخدمين:** الملكية مفروضة على كل صف، لكن الإعداد الحالي لمالك واحد (AGENT-004 لاحقًا).
 5. **MySQL:** لا خدمة MySQL في بيئة الجلسة، لذلك اختبارات التطوير على SQLite. اختبار القبول في
@@ -121,11 +139,13 @@ node --test test/agent-approvals.test.js           # 9/9 بوابة المواف
 node --test test/agent-evidence.test.js            # 6/6 سلسلة الأدلة
 node --test test/agent-verifier.test.js            # 8/8 المُتحقِّق المستقل
 node --test test/agent-approval-routes.test.js     # 4/4 مسارات HTTP
+node --test test/agent-reconciliation.test.js      # 14/14 مصالحة وإعادة وملكية
+node --test test/agent-reconcile-routes.test.js    # 4/4 مسار المصالحة عبر HTTP
 node --test test/agent-store.test.js               # 6/6
 node --test test/agent-runtime.test.js             # 16/16
 node --test test/agent-routes.test.js              # 3/3
-npm test                                            # 185 اختبارًا (184 أخضر محليًا)
-npm run check                                       # 83 ملف JS
+npm test                                            # 229 اختبارًا (228 أخضر محليًا؛ الإخفاق الوحيد بيئي: استنساخ ضحل)
+npm run check                                       # 87 ملف JS
 npm run release:check                               # 0.2.1 / previous 0.2.0 / schema 1
 npm run check:continuity                            # وثائق وروابط بلا دورات
 npm run check:secrets                               # ناجح

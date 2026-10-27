@@ -175,6 +175,40 @@ export function createAgentRouter({ agent, authorize, logger = console }) {
     }
   });
 
+  // Owner resolution of an `unknown` outcome — the exit from needs_reconciliation.
+  // Bookkeeping only: no connector is called and nothing is re-sent.
+  router.post('/runs/:id/reconcile', json, async (req, res) => {
+    const current = await runtime(res);
+    if (!current) return undefined;
+    const target = String(req.body?.target || '').trim();
+    if (!['tool_run', 'outbox'].includes(target)) {
+      return res.status(400).json({ error: 'invalid_reconcile_target' });
+    }
+    const outcome = String(req.body?.outcome || '').trim().toLowerCase();
+    if (!['applied', 'not_applied'].includes(outcome)) {
+      return res.status(400).json({ error: 'invalid_reconcile_outcome' });
+    }
+    const targetId = typeof req.body?.targetId === 'string' ? req.body.targetId.trim() : '';
+    if (!targetId) return res.status(400).json({ error: 'reconcile_target_required' });
+    const headerKey = req.get('idempotency-key');
+    const idempotencyKey = headerKey || req.body?.idempotencyKey || null;
+    if (idempotencyKey !== null && !CLIENT_ID.test(String(idempotencyKey))) {
+      return res.status(400).json({ error: 'invalid_client_message_id' });
+    }
+    const note = typeof req.body?.note === 'string' ? req.body.note.slice(0, 500) : null;
+    const externalRef = typeof req.body?.externalRef === 'string' ? req.body.externalRef : null;
+    try {
+      const result = await current.reconcile(
+        req.params.id,
+        { target, targetId, outcome, externalRef, note, idempotencyKey, resume: req.body?.resume === true },
+        current.status().ownerId
+      );
+      return res.json(result);
+    } catch (error) {
+      return fail(res, error);
+    }
+  });
+
   router.get('/runs/:id/approvals', async (req, res) => {
     const current = await runtime(res);
     if (!current) return undefined;
