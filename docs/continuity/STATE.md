@@ -13,9 +13,14 @@
   التخزين صريح: `CELIA_AGENT_RUNTIME=mysql|sqlite`، والافتراضي `off` — **لا ذاكرة ولا ارتداد صامت**.
 - **منفذ ومختبر (COMP-003 جزئيًا):** `scripts/migrate.mjs` + `sql/migrations/0002_agent-runtime.sql` مع سجل
   `schema_migrations` وبصمات SHA-256 ورفض drift وdry-run افتراضي؛ الجداول الخمسة الأساسية و`schema 1` بلا مساس.
-- **الفحوص:** `npm test` **124/124** (منها 25 اختبارًا جديدًا)، `npm run check` 68 ملفًا، `release:check` 0.2.1/schema 1،
-  `check:continuity` ناجح، `check:secrets` ناجح، `celia:mcp:verify` 12 أداة، `build:pages` 7 صفحات، `npm audit` 0 ثغرات.
-- **لم يُنفَّذ ويُصرَّح به:** MySQL حي و`npm run migrate -- --apply` (لا خدمة هنا)، اختبار متصفح (لا Chromium)،
+- **الفحوص المحلية:** `npm test` **124/124** (منها 25 اختبارًا جديدًا)، `npm run check` 69 ملفًا، `release:check`
+  0.2.1/schema 1، `check:continuity` ناجح، `check:secrets` ناجح، `celia:mcp:verify` 12 أداة، `build:pages` 7 صفحات،
+  `npm audit` 0 ثغرات.
+- **CI حقيقي أخضر على `5cfa05d` (run `40499146250`):** Node 22/24 و**MySQL 8.4** — والوظيفة الأخيرة شغّلت اختبار
+  الوكيل الجديد على MySQL حقيقي: الترحيل `0002_agent-runtime.sql` طُبق مرتين (idempotent)، وحلقة كاملة نُفذت
+  ودُهست، وتكرار `client_message_id` لم يُنفّذ ثانيًا، واستدعاء منقطع أصبح `unknown` بلا إعادة. **هذا دليل MySQL
+  الحقيقي الوحيد؛ لا يوجد اختبار على قاعدة إنتاج.**
+- **لم يُنفَّذ محليًا ويُصرَّح به:** MySQL محلي (لا خدمة هنا؛ غطّاه CI)، اختبار متصفح محلي (لا Chromium؛ غطّاه CI)،
   مخطط لغوي/مزوّد AI (AI-002)، أثر خارجي (AGENT-002)، عزل (AGENT-003)، استئناف تلقائي عند الإقلاع، وأي نشر دائم.
 - **النشر المجاني ما زال محجوبًا بصلاحية الحساب:** `gh api` يعيد `has_pages=false`، ومحاولة التفعيل من الجلسة ما زالت
   `403` — وأثبت تشغيل `Agent branch Pages preview` (`40497695505`) أن `configure-pages` مع `enablement: true`

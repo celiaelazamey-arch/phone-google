@@ -56,19 +56,26 @@
 | `npm test` | worktree | **124/124** (كان 98؛ +26 اختبارًا) |
 | `npm run check` | worktree | 68 ملف JS سليم (كان 62) |
 | `npm run release:check` | worktree | 0.2.1 / previous 0.2.0 / schema 1 |
-| `npm run check:continuity` | worktree | 23 وثيقة · 59 رابطًا · 47 مهمة بلا دورات |
+| `npm run check:continuity` | worktree | 24 وثيقة · 60 رابطًا · 47 مهمة بلا دورات (بوابة handoff ناجحة) |
 | `npm run check:secrets` | worktree | ناجح |
 | `npm run celia:mcp:verify` | ذاكرة صريحة | 12 أداة · `storage=memory` |
 | `npm run build:pages` | worktree | 7 صفحات في `dist/` (يشمل `agent.html`) |
 | `npm audit --omit=dev --audit-level=moderate` | worktree | 0 ثغرات |
-| MySQL حي / `npm run migrate -- --apply` | — | **لم يُنفَّذ محليًا**: لا MySQL في البيئة. أُضيف اختبار CI حقيقي (`integration/mysql.integration.mjs`) يشغّل الترحيل مرتين + حلقة كاملة + انقطاعًا وسط أداة؛ نتيجته من وظيفة `MySQL 8.4` فقط |
+| `npm run test:mysql` على MySQL 8.4 | CI run `40499146250` · commit `5cfa05d` | **ناجح**: الترحيل `0002_agent-runtime.sql` طُبق مرتين، حلقة كاملة دائمة، تكرار `client_message_id` مُنع، استدعاء منقطع → `unknown` بلا إعادة تنفيذ. **ليس قاعدة إنتاج** |
+| `npm run check:continuity` مع بوابة التغيير | worktree | ناجح — 24 وثيقة · 60 رابطًا · 47 مهمة |
+| CI كامل (Node 22/24، container، browser، Python، MySQL) | run `40499146250` | كل الوظائف خضراء؛ المزود الخارجي الاختياري متخطى بتصميمه |
 | `npm run test:browser` | — | لم يُنفَّذ (Chromium غير مثبت هنا) |
 | نشر Pages | run `40497695505` | فشل متوقع: `configure-pages` مع `enablement: true` أعاد `403 Resource not accessible by integration` — رمز GitHub App المتاح للجلسة لا يملك إنشاء Pages. حُوِّل السير عمل إلى تحذير/تخطٍّ صريح بدل فشل أحمر |
 | نشر Render | — | **لم يحدث** ولم يُطلب: يتطلب حساب المالك وبطاقة تحقق، وهو مرفوض بشرط المستخدم |
 
 ## الحفظ والتسليم
 
-- commit على `arena/bc862105-phone-google` ودفع إليها؛ PR من الفرع نفسه. CI هو المرجع الحي، لا هذا السجل.
+- commits `0c8ae69` ثم `d682362` ثم `87519ca` ثم `2caf96f` ثم `5cfa05d` على `arena/bc862105-phone-google`؛
+  PR **[#30](https://github.com/celiaelazamey-arch/phone-google/pull/30)**. CI أخضر على `5cfa05d`. المراجع الحية هي
+  GitHub، لا هذا السجل.
+- **درس تكلف جولتين من CI:** نمط أسماء ملفات الترحيل `^\d{4}_.+\.sql$` يشترط شرطة سفلية بعد الرقم؛ تسمية
+  `0002-agent-runtime.sql` جعلت CI يقول `No migration files found`. أُعيدت التسمية إلى `0002_agent-runtime.sql`.
+  وأصبح تشخيص وظيفة MySQL يطبع ذيل السجل في annotation لأن تحميل السجلات محجوب في بيئة العمل.
 - **لم يُنفَّذ:** أي نشر دائم، أي ترحيل قاعدة إنتاج، أي تفعيل Pages من حساب المالك، أي دفع أو release،
   أي كتابة في `main`، وأي طلب بطاقة أو دفع تكلفة.
 - لا بيانات عملاء ولا أسرار في هذا السجل أو في الكود الجديد.
