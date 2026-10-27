@@ -1,11 +1,14 @@
 name: Agent branch Pages preview
 
-# Publishes the *static* build to GitHub Pages so the owner gets a real, free HTTPS
-# URL without a payment card. It is a static snapshot: /api/agent is not available
+# Publishes the *static* build to GitHub Pages so the owner gets a free HTTPS URL
+# without a payment card. It is a static snapshot: /api/agent is not available
 # there, and the page says so instead of pretending to run the agent loop.
 #
-# Scope: only this working branch. `enablement: true` lets the workflow create the
-# Pages site (the API token used outside Actions lacks the `pages` permission).
+# Verified 2026-10-27: Pages is not enabled on this repository and the GitHub App
+# token available to this session cannot create it — `configure-pages` with
+# `enablement: true` also returned "Resource not accessible by integration".
+# The owner has to click once: Settings → Pages → Source: GitHub Actions.
+# Until then this job reports a clear skip instead of a red failure or a fake deploy.
 
 on:
   push:
@@ -45,11 +48,20 @@ jobs:
             echo '::error::A secret assignment was found in dist.'
             exit 1
           fi
-      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - name: Detect whether this token may configure Pages
+        id: pages
+        continue-on-error: true
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
         with:
           enablement: true
+      - name: Explain the skip (owner action required)
+        if: steps.pages.outcome == 'failure'
+        run: |
+          echo "::warning title=Pages not enabled::GitHub Pages must be enabled once by the repository owner (Settings → Pages → Source: GitHub Actions). This session's token cannot create it, and no payment card is involved."
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        if: steps.pages.outcome == 'success'
         with:
           path: dist
       - id: deployment
+        if: steps.pages.outcome == 'success'
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

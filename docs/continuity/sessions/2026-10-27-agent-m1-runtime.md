@@ -61,9 +61,10 @@
 | `npm run celia:mcp:verify` | ذاكرة صريحة | 12 أداة · `storage=memory` |
 | `npm run build:pages` | worktree | 7 صفحات في `dist/` (يشمل `agent.html`) |
 | `npm audit --omit=dev --audit-level=moderate` | worktree | 0 ثغرات |
-| MySQL حي / `npm run migrate -- --apply` | — | **لم يُنفَّذ**: لا MySQL في البيئة؛ المشغّل ينتظر CI |
+| MySQL حي / `npm run migrate -- --apply` | — | **لم يُنفَّذ محليًا**: لا MySQL في البيئة. أُضيف اختبار CI حقيقي (`integration/mysql.integration.mjs`) يشغّل الترحيل مرتين + حلقة كاملة + انقطاعًا وسط أداة؛ نتيجته من وظيفة `MySQL 8.4` فقط |
 | `npm run test:browser` | — | لم يُنفَّذ (Chromium غير مثبت هنا) |
-| نشر Pages / Render | — | **لم يحدث**: 403 لصلاحية Pages، ولا تفويض حساب للمالك |
+| نشر Pages | run `40497695505` | فشل متوقع: `configure-pages` مع `enablement: true` أعاد `403 Resource not accessible by integration` — رمز GitHub App المتاح للجلسة لا يملك إنشاء Pages. حُوِّل السير عمل إلى تحذير/تخطٍّ صريح بدل فشل أحمر |
+| نشر Render | — | **لم يحدث** ولم يُطلب: يتطلب حساب المالك وبطاقة تحقق، وهو مرفوض بشرط المستخدم |
 
 ## الحفظ والتسليم
 
