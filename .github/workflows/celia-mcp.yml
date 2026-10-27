@@ -171,9 +171,9 @@ jobs:
               for (const result of test.results || []) {
                 if (result.status === "failed" || result.status === "timedOut") {
                   failures += 1;
-                  const message = String(result.error?.message || "browser test failed").split("\n")[0].slice(0, 500);
-                  const title = String(test.title).replaceAll(":", " ").slice(0, 180);
-                  console.log(`::error file=${spec.file},title=${title}::${message}`);
+                  const detail = String(result.error?.message || "browser test failed").split("\n")[0].slice(0, 400);
+                  const message = `${spec.file} :: ${String(test.title).slice(0, 120)} :: ${detail}`;
+                  console.log(`::error file=${spec.file}::${message}`);
                 }
               }
             }
