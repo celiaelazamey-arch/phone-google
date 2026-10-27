@@ -467,3 +467,5 @@ await refresh();
 
 /* عدد الأدوات معرّف من المصدر الموثّق نفسه؛ لا نسخة ثابتة منفصلة. */
 document.documentElement.dataset.cronTools = String(CRON_TOOLS.length);
+/* علامة إقلاع للاختبارات: وجودها يثبت اكتمال تحميل الوحدة وتنفيذها. */
+window.__CRON_BOOTED = true;

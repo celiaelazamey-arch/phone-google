@@ -21,6 +21,22 @@ async function assertNoPageFaults(faults) {
     .toBe('clean');
 }
 
+async function assertBooted(page, marker) {
+  try {
+    await expect
+      .poll(async () => page.evaluate((name) => Boolean(window[name]), marker), { timeout: 4000 })
+      .toBe(true);
+  } catch {
+    const diag = await page.evaluate(() => ({
+      scripts: [...document.scripts].map((s) => `${s.type || 'classic'}:${s.src}`),
+      resources: performance.getEntriesByType('resource').map((r) => `${r.name} :: ${r.responseStatus || 'unknown'}`),
+      rows: document.querySelectorAll('#cr-tbody tr').length,
+      readyState: document.readyState
+    }));
+    throw new Error(`BOOT FAULT ${marker}: ${JSON.stringify(diag)}`);
+  }
+}
+
 test.describe('لوحة المهام المجدولة — الوضع الثابت والمحاكاة', () => {
   test('تعمل في وضع المحاكاة بلا أي طلب خارجي وبلا أخطاء', async ({ page }) => {
     const external = [];
@@ -31,6 +47,7 @@ test.describe('لوحة المهام المجدولة — الوضع الثاب�
 
     await page.goto(cronUrl);
     await assertNoPageFaults(faults);
+    await assertBooted(page, '__CRON_BOOTED');
     await expect(page.locator('h1')).toHaveText('إدارة المهام المجدولة');
     await expect(page.locator('#cr-mode-label')).toContainText('المحاكاة');
     await expect(page.locator('#cr-tbody tr')).toHaveCount(4);
@@ -48,6 +65,7 @@ test.describe('لوحة المهام المجدولة — الوضع الثاب�
     const faults = await collectPageFaults(page);
     await page.goto(cronUrl);
     await assertNoPageFaults(faults);
+    await assertBooted(page, '__CRON_BOOTED');
 
     await page.locator('#cr-btn-create').click();
     await expect(page.locator('#cr-job-dialog')).toBeVisible();
@@ -104,6 +122,7 @@ test.describe('لوحة المهام المجدولة — الوضع الثاب�
 
     await page.goto(cronUrl);
     await assertNoPageFaults(faults);
+    await assertBooted(page, '__CRON_BOOTED');
     await page.locator('#cr-btn-connect').click();
     await page.locator('[data-testid="bridge-url"]').fill('http://insecure.example.com');
     await page.locator('[data-testid="bridge-token"]').fill('short');
@@ -140,6 +159,7 @@ test.describe('لوحة المهام المجدولة — الوضع الثاب�
     await page.setViewportSize({ width: 360, height: 780 });
     await page.goto(cronUrl);
     await assertNoPageFaults(faults);
+    await assertBooted(page, '__CRON_BOOTED');
     await expect(page.locator('#cr-tbody tr')).toHaveCount(4);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
     expect(overflow).toBe(true);
@@ -157,6 +177,7 @@ test.describe('خريطة Google المجانية', () => {
     });
     await page.goto(mapUrl);
     await assertNoPageFaults(faults);
+    await assertBooted(page, '__GMAP_BOOTED');
     await expect(page.locator('h1')).toContainText('خريطة ربط CeliaOS');
     const allCards = page.locator('.gm-card');
     const total = await allCards.count();

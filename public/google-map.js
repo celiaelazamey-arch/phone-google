@@ -28,3 +28,4 @@ for (const chip of chips) {
 
 document.getElementById('gm-stamp').textContent =
   `CeliaOS free-tier map · ${new Date().toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}`;
+window.__GMAP_BOOTED = true;

@@ -172,7 +172,8 @@ jobs:
                 if (result.status === "failed" || result.status === "timedOut") {
                   failures += 1;
                   const detail = String(result.error?.message || "browser test failed").split("\n")[0].slice(0, 400);
-                  const message = `${spec.file} :: ${String(test.title).slice(0, 120)} :: ${detail}`;
+                  const name = String(test.title || spec.title || "unnamed").slice(0, 120);
+                  const message = `${spec.file} :: ${name} :: ${detail}`;
                   console.log(`::error file=${spec.file}::${message}`);
                 }
               }
