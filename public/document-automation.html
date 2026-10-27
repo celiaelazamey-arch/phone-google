@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>CeliaOS — خريطة أتمتة المستندات</title>
+<style>
+:root{color-scheme:light;--ink:#172b4d;--muted:#52647a;--line:#d4dce7;--paper:#f5f7fb;--card:#fff;--blue:#275dad;--green:#267849;--amber:#9a5b08}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font-family:Tahoma,Arial,sans-serif;line-height:1.65}
+main{max-width:1080px;margin:0 auto;padding:28px 18px 52px}
+header{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:20px}
+h1{font-size:clamp(1.4rem,3vw,2.2rem);line-height:1.35;margin:0 0 8px}
+p{margin:0;color:var(--muted)}.eyebrow{font-size:.8rem;letter-spacing:.04em;color:var(--blue);font-weight:700}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}
+button,.link{border:1px solid var(--line);border-radius:10px;padding:9px 13px;background:white;color:var(--ink);font:inherit;cursor:pointer}
+button[aria-pressed=true]{background:#eaf1ff;border-color:var(--blue);color:var(--blue);font-weight:700}
+.frame{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:12px;box-shadow:0 6px 22px rgba(23,43,77,.05)}
+canvas{display:block;width:100%;height:auto;min-height:420px}
+.fallback{padding:12px 16px;color:var(--muted);font-size:.92rem}
+.legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:16px}
+.legend article{background:white;border:1px solid var(--line);border-radius:12px;padding:13px}
+.legend h2{font-size:1rem;margin:0 0 5px}
+.notice{margin-top:16px;border-right:4px solid var(--amber);background:#fff6e7;padding:14px 16px;border-radius:8px;color:#6c450b}
+footer{display:flex;gap:14px;flex-wrap:wrap;margin-top:18px;font-size:.9rem}
+@media(max-width:600px){main{padding:18px 10px 36px}.frame{padding:4px}canvas{min-height:340px}.controls button{flex:1 1 40%}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div>
+    <div class="eyebrow">CELIAOS · DOCUMENT DATA AUTOMATION · SCHEMA 1.0</div>
+    <h1>خريطة أتمتة المستندات والبيانات</h1>
+    <p>تصوّر تفاعلي لمسار القراءة والاستخراج والتحقق وحفظ الأدلة داخل حلقة الوكيل.</p>
+  </div>
+  <a class="link" href="./document-data-automation.svg" download>فتح مخطط SVG</a>
+</header>
+<div class="controls" aria-label="تركيز الرسم">
+  <button type="button" data-focus="all" aria-pressed="true">المسار كاملًا</button>
+  <button type="button" data-focus="extract" aria-pressed="false">الاستخراج والتحقق</button>
+  <button type="button" data-focus="govern" aria-pressed="false">الحوكمة والأدلة</button>
+</div>
+<section class="frame" aria-label="رسم مسار أتمتة المستندات">
+  <canvas id="pipeline" width="1040" height="790" role="img" aria-label="من المستند غير الموثوق إلى الاستخراج ثم التحقق والمراجعة البشرية والأدلة والتحقق المستقل">
+    مخطط المسار: استقبال المستند، القراءة مع بصمة SHA-256، الاستخراج المنظم، التحقق الحتمي، المراجعة، التقرير، ثم التحقق المستقل.
+  </canvas>
+  <div class="fallback" id="canvas-fallback">إذا لم يظهر الرسم، اتبع التسلسل: مستند غير موثوق ← قراءة وبصمة ← استخراج منظم ← تحقق حتمي ← مراجعة عند الحاجة ← تقرير بلا اعتماد تجاري ← أدلة ومتحقق مستقل.</div>
+</section>
+<section class="legend" aria-label="حدود الإصدار">
+  <article><h2>مدخلات مدعومة حاليًا</h2><p>CSV وJSON وTXT وMarkdown، مع حد حجم صغير ومسارات محلية مسموحة.</p></article>
+  <article><h2>التحقق</h2><p>الحقول المطلوبة، العملة والتاريخ، الإجماليات، التكرارات، ونصوص حقن التعليمات.</p></article>
+  <article><h2>الأثر الخارجي</h2><p>مغلق افتراضيًا. التقرير لا يكتب سجل مشتريات، ولا يعتمد فاتورة، ولا يرسل بيانات.</p></article>
+  <article><h2>ما لم ينفذ بعد</h2><p>PDF، الصور، OCR، الاستخراج السحابي، والموصلات الخارجية الخاصة بهذه القدرة.</p></article>
+</section>
+<div class="notice"><strong>مهم:</strong> هذه صفحة تصور معماري فقط، وليست شاشة تنفيذ حي ولا دليلًا على نشر النظام. الحالة الصحيحة لا تُثبت إلا باختبارات CI والقبول في البيئة الفعلية.</div>
+<footer><a href="./agent.html">مساحة الوكيل</a><a href="../docs/document-data-automation.svg">مخطط SVG للمطورين</a><a href="https://github.com/celiaelazamey-arch/phone-google">مستودع المشروع</a></footer>
+</main>
+<script>
+(() => {
+  const canvas = document.getElementById('pipeline');
+  const ctx = canvas.getContext('2d');
+  const buttons = [...document.querySelectorAll('[data-focus]')];
+  let focus = 'all';
+  const stages = [
+    {title:'1. المستند غير الموثوق', detail:'CSV / JSON / TXT / Markdown · حد للحجم', group:'extract', color:'#eaf1ff', stroke:'#3766ad'},
+    {title:'2. قراءة + SHA-256', detail:'محتوى نصي أو ملف من جذر مسموح', group:'extract', color:'#eaf1ff', stroke:'#3766ad'},
+    {title:'3. استخراج منظّم', detail:'Schema 1.0 · مرجع مصدر لكل حقل', group:'extract', color:'#eaf1ff', stroke:'#3766ad'},
+    {title:'4. تحقق حتمي', detail:'حقول · تاريخ · عملة · إجماليات · تكرار', group:'extract', color:'#eaf1ff', stroke:'#3766ad'},
+    {title:'5. بوابة المراجعة', detail:'valid / review_required / invalid', group:'govern', color:'#fff2d9', stroke:'#a36717'},
+    {title:'6. تقرير داخلي', detail:'agent_tool_runs · action = not_committed', group:'govern', color:'#e9f7ed', stroke:'#2a7a4a'},
+    {title:'7. الأدلة والتحقق المستقل', detail:'سلسلة SHA-256 · PASS / BLOCK / UNKNOWN', group:'govern', color:'#e9f7ed', stroke:'#2a7a4a'}
+  ];
+  function roundRect(x,y,w,h,r) {
+    ctx.beginPath();
+    ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+  }
+  function drawArrow(x1,y1,x2,y2) {
+    ctx.strokeStyle='#718096';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+    const angle=Math.atan2(y2-y1,x2-x1), size=9;
+    ctx.fillStyle='#718096';ctx.beginPath();ctx.moveTo(x2,y2);
+    ctx.lineTo(x2-size*Math.cos(angle-.45),y2-size*Math.sin(angle-.45));
+    ctx.lineTo(x2-size*Math.cos(angle+.45),y2-size*Math.sin(angle+.45));ctx.closePath();ctx.fill();
+  }
+  function draw() {
+    const dpr=window.devicePixelRatio||1;
+    const width=Math.max(280,Math.floor(canvas.getBoundingClientRect().width));
+    const height=Math.round(width*790/1040);
+    canvas.width=width*dpr; canvas.height=height*dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,width,height);
+    const scale=width/1040;
+    ctx.save();ctx.scale(scale,scale);
+    ctx.fillStyle='#f7f9fc';ctx.fillRect(0,0,1040,790);
+    ctx.direction='rtl';ctx.textAlign='center';
+    ctx.fillStyle='#172b4d';ctx.font='bold 26px Tahoma,Arial';ctx.fillText('مسار أتمتة المستندات داخل CeliaOS',520,42);
+    ctx.fillStyle='#52647a';ctx.font='15px Tahoma,Arial';ctx.fillText('تنفيذ محلي حتمي · شبكة مغلقة افتراضيًا · لا اعتماد تجاري تلقائي',520,69);
+    const boxX=100, boxW=840, boxH=76, startY=94, gap=18;
+    stages.forEach((s,i)=>{
+      const y=startY+i*(boxH+gap);
+      const active=focus==='all'||focus===s.group;
+      if(i>0) drawArrow(520,y-12,520,y-3);
+      ctx.globalAlpha=active?1:.27;
+      ctx.fillStyle=s.color;ctx.strokeStyle=s.stroke;ctx.lineWidth=2;
+      roundRect(boxX,y,boxW,boxH,14);ctx.fill();ctx.stroke();
+      ctx.fillStyle='#172b4d';ctx.font='bold 19px Tahoma,Arial';ctx.fillText(s.title,520,y+30);
+      ctx.fillStyle='#42526b';ctx.font='14px Tahoma,Arial';ctx.fillText(s.detail,520,y+55);
+      ctx.globalAlpha=1;
+    });
+    ctx.fillStyle='#9a5b08';ctx.font='bold 14px Tahoma,Arial';ctx.fillText('أي بيانات ناقصة أو متناقضة تنتقل للمراجعة — لا تخمين ولا كتابة خارجية',520,770);
+    ctx.restore();
+  }
+  buttons.forEach(button=>button.addEventListener('click',()=>{
+    focus=button.dataset.focus;
+    buttons.forEach(b=>b.setAttribute('aria-pressed',String(b===button)));
+    draw();
+  }));
+  window.addEventListener('resize',draw);
+  draw();
+})();
+</script>
+</body>
+</html>
