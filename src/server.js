@@ -3,6 +3,7 @@ import { loadConfig } from './config.js';
 import { createPool, ensureOwner } from './db.js';
 import { createApp } from './app.js';
 import { installShutdown } from './lifecycle.js';
+import { scheduleBootRecovery } from './agent/index.js';
 
 const config = loadConfig();
 const pool = createPool(config);
@@ -12,3 +13,4 @@ const app = createApp({ pool, config });
 const server = app.listen(config.port, '0.0.0.0', () => console.log(`Assistant API listening on port ${config.port}`));
 
 installShutdown({ server, pool, operations: app.locals.operations });
+scheduleBootRecovery({ agentHost: app.locals.agentHost, logger: console });

@@ -17,7 +17,7 @@ import { installShutdown } from './lifecycle.js';
 import { DEFAULT_POLICY } from './gemini.js';
 import { loadExtendedIntegrationsConfig } from './ai-providers.js';
 import { createCeliaUiRouter } from './celia-ui.js';
-import { createAgentHost } from './agent/index.js';
+import { createAgentHost, scheduleBootRecovery } from './agent/index.js';
 import { createAgentRouter } from './agent-routes.js';
 import { createKnowledgeHost } from './knowledge/index.js';
 import { createKbRouter } from './kb-routes.js';
@@ -1235,5 +1235,8 @@ if (isMain) {
       );
     });
     installShutdown({ server, pool, operations: app.locals.operations });
+    // A waking or redeployed process settles abandoned dispatches and resumes parked
+    // runs only when CELIA_AGENT_RESUME_ON_BOOT=true; readiness is never delayed by it.
+    scheduleBootRecovery({ agentHost: app.locals.agentHost, logger: console });
   }
 }

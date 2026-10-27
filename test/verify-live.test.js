@@ -1,0 +1,181 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import http from 'node:http';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { createApp } from '../src/app.js';
+import { createAgentHost } from '../src/agent/index.js';
+import { verifyLive, runCli, MANUAL_CHECKS, describeTarget } from '../scripts/verify-live.mjs';
+
+/**
+ * The live acceptance script is only worth having if it cannot be fooled: a memory
+ * demo must fail it, an ideal durable service must pass it, and the owner token must
+ * never appear in what it writes.
+ */
+
+const TOKEN = 'owner-token-with-at-least-32-characters-xyz';
+const config = {
+  nodeEnv: 'test',
+  apiToken: TOKEN,
+  encryptionKey: Buffer.alloc(32, 7).toString('base64'),
+  userId: 'owner',
+  google: { clientId: '', clientSecret: '', redirectUri: 'http://localhost:3000/auth/google/callback' },
+  whatsapp: { verifyToken: '', appSecret: '', accessToken: '', phoneNumberId: '', apiVersion: '', autoReplyEnabled: false }
+};
+
+async function listen(server) {
+  server.listen(0, '127.0.0.1');
+  await new Promise((resolve) => server.once('listening', resolve));
+  return `http://127.0.0.1:${server.address().port}`;
+}
+
+test('verify:live — the real app on an explicit memory demo with the agent off never passes', async (t) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'celia-verify-live-'));
+  const pool = { isMemory: true, query: async () => [[{ 1: 1 }]], execute: async () => [[]] };
+  const agentHost = createAgentHost({
+    config,
+    env: { CELIA_AGENT_SQLITE_PATH: path.join(directory, 'agent.sqlite3') },
+    statusProvider: () => ({ version: '0.2.1' }),
+    logger: { error() {} }
+  });
+  const server = createApp({ pool, config, agentHost }).listen(0, '127.0.0.1');
+  const baseUrl = await new Promise((resolve) => server.once('listening', () => resolve(`http://127.0.0.1:${server.address().port}`)));
+  t.after(async () => {
+    await new Promise((resolve) => server.close(resolve));
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  const report = await verifyLive({ url: baseUrl, token: TOKEN, allowHttp: true, samples: 2, expectVersion: '0.2.1' });
+  const byId = Object.fromEntries(report.checks.map((check) => [check.id, check]));
+  assert.equal(report.verdict, 'fail');
+  assert.equal(byId.reachable.status, 'pass');
+  assert.equal(byId.version.status, 'pass', 'version parity holds even when storage does not');
+  assert.equal(byId.ready_durable.status, 'fail');
+  assert.equal(byId.ready_durable.detail.storage.mode, 'memory');
+  assert.equal(byId.agent_auth_gate.status, 'pass', 'the 401 gate is checked without any token');
+  assert.equal(byId.agent_status.status, 'fail');
+  assert.equal(byId.agent_status.detail.enabled, false);
+  assert.equal(JSON.stringify(report).includes(TOKEN), false, 'the owner token never enters the report');
+  assert.equal(report.target.origin, baseUrl);
+  assert.equal(report.manual.length, MANUAL_CHECKS.length);
+});
+
+test('verify:live — an ideal durable service passes, and the report says what stays manual', async (t) => {
+  let tokenSeen = null;
+  const server = http.createServer((req, res) => {
+    const send = (status, body) => {
+      res.writeHead(status, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(body));
+    };
+    if (req.url === '/healthz') return send(200, { status: 'ok' });
+    if (req.url === '/version') return send(200, { version: '0.2.1', commit: 'a'.repeat(40), database: { schema: 1 } });
+    if (req.url === '/readyz') return send(200, { ready: true, storage: { mode: 'mysql', durable: true, available: true, explicitDemo: false } });
+    if (req.url === '/api/agent/status') {
+      tokenSeen = req.headers.authorization || null;
+      if (tokenSeen !== `Bearer ${TOKEN}`) return send(401, { error: 'unauthorized' });
+      return send(200, {
+        enabled: true,
+        mode: 'mysql',
+        dialect: 'mysql',
+        durable: true,
+        planner: 'demo-deterministic',
+        connectors: [],
+        bootRecovery: { policy: 'resume', last: { performed: true, at: '2026-10-27T18:00:00.000Z' } }
+      });
+    }
+    return send(404, { error: 'not_found' });
+  });
+  const baseUrl = await listen(server);
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+
+  const report = await verifyLive({
+    url: `${baseUrl}/ignored/path?x=1`,
+    token: TOKEN,
+    allowHttp: true,
+    expectVersion: '0.2.1',
+    expectCommit: 'A'.repeat(40),
+    samples: 3
+  });
+  assert.equal(report.verdict, 'pass', JSON.stringify(report.checks.filter((check) => check.status !== 'pass')));
+  const byId = Object.fromEntries(report.checks.map((check) => [check.id, check]));
+  assert.equal(byId.wake_latency.detail.samples, 3);
+  assert.equal(byId.agent_status.detail.bootRecovery.policy, 'resume');
+  assert.equal(byId.agent_status.detail.dialect, 'mysql');
+  assert.equal(tokenSeen, `Bearer ${TOKEN}`, 'the token is used for the request itself');
+  assert.equal(JSON.stringify(report).includes(TOKEN), false);
+  assert.deepEqual(report.target, describeTarget(baseUrl), 'only the origin is recorded — no path or query');
+  assert.ok(report.manual.some((item) => item.id === 'restart_persistence'));
+  assert.ok(report.manual.some((item) => item.id === 'monthly_quota'));
+  assert.doesNotMatch(report.note, /24\/7/);
+
+  // Without a token the owner check is skipped, not faked.
+  const anonymous = await verifyLive({ url: baseUrl, allowHttp: true, expectVersion: '0.2.1' });
+  assert.equal(anonymous.verdict, 'pass');
+  assert.equal(anonymous.checks.find((check) => check.id === 'agent_status').status, 'skipped');
+
+  // A commit mismatch is a failure: the deployed thing is not the reviewed thing.
+  const wrongCommit = await verifyLive({ url: baseUrl, allowHttp: true, expectVersion: '0.2.1', expectCommit: 'b'.repeat(40) });
+  assert.equal(wrongCommit.checks.find((check) => check.id === 'version').status, 'fail');
+
+  // A slow first byte is reported as a sleeping service, not hidden.
+  const slow = await verifyLive({ url: baseUrl, allowHttp: true, expectVersion: '0.2.1', maxFirstMs: 0 });
+  assert.equal(slow.checks.find((check) => check.id === 'wake_latency').status, 'fail');
+});
+
+test('verify:live — https is required unless explicitly relaxed, and credentials in the URL are refused', async () => {
+  const insecure = await verifyLive({ url: 'http://example.invalid' });
+  assert.equal(insecure.verdict, 'fail');
+  assert.equal(insecure.checks[0].detail.reason, 'https_required');
+  const leaky = await verifyLive({ url: 'https://user:pass@example.invalid', allowHttp: true });
+  assert.equal(leaky.checks[0].detail.reason, 'credentials_in_url');
+  const garbage = await verifyLive({ url: 'not a url' });
+  assert.equal(garbage.checks[0].detail.reason, 'invalid_url');
+  assert.equal(garbage.target, null);
+});
+
+test('verify:live — an unreachable host fails fast with a reason, never with a stack trace in the report', async () => {
+  const unreachable = await verifyLive({ url: 'http://127.0.0.1:9', allowHttp: true, timeoutMs: 2000 });
+  assert.equal(unreachable.verdict, 'fail');
+  const reachable = unreachable.checks.find((check) => check.id === 'reachable');
+  assert.equal(reachable.status, 'fail');
+  assert.ok(['unreachable', 'timeout'].includes(reachable.detail.reason));
+  assert.equal(JSON.stringify(unreachable).includes('    at '), false);
+});
+
+test('verify:live CLI — writes a sanitized report, exits 1 on failure and refuses to run without a URL', async (t) => {
+  const server = http.createServer((req, res) => {
+    const send = (status, body) => {
+      res.writeHead(status, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(body));
+    };
+    if (req.url === '/readyz') return send(200, { ready: true, storage: { mode: 'memory', durable: false, available: true } });
+    if (req.url === '/version') return send(200, { version: '0.2.1', commit: null });
+    if (req.url === '/api/agent/status') return send(401, { error: 'unauthorized' });
+    return send(200, {});
+  });
+  const baseUrl = await listen(server);
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'celia-verify-live-cli-'));
+  t.after(async () => {
+    await new Promise((resolve) => server.close(resolve));
+    rmSync(directory, { recursive: true, force: true });
+  });
+  const out = path.join(directory, 'report.json');
+  const chunks = { stdout: '', stderr: '' };
+  const streams = { stdout: { write: (text) => (chunks.stdout += text) }, stderr: { write: (text) => (chunks.stderr += text) } };
+
+  const code = await runCli(['--url', baseUrl, '--allow-http', '--out', out, '--samples', '1'], { env: { CELIA_MCP_API_TOKEN: TOKEN }, ...streams });
+  assert.equal(code, 1, 'a memory store fails the acceptance');
+  const written = JSON.parse(await readFile(out, 'utf8'));
+  assert.equal(written.kind, 'celia-live-acceptance');
+  assert.equal(written.verdict, 'fail');
+  assert.equal(JSON.stringify(written).includes(TOKEN), false);
+  assert.match(chunks.stderr, /FAIL — \d+ pass, \d+ fail/);
+
+  const usage = await runCli([], { env: {}, ...streams });
+  assert.equal(usage, 2);
+  assert.match(chunks.stderr, /Usage: npm run verify:live/);
+  const unknown = await runCli(['--bogus'], { env: {}, ...streams });
+  assert.equal(unknown, 2);
+});

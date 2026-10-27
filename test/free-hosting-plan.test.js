@@ -55,7 +55,7 @@ test('خطة التشغيل المجاني تذكر كل متغيّر يحكم �
   }
   // Anything the document names must be a real key, so it cannot invent configuration.
   const mentioned = new Set(plan.match(/\b(?:CELIA|MYSQL|TOKEN|GOOGLE|WHATSAPP|APP)_[A-Z0-9_]+\b/g) || []);
-  const invented = [...mentioned].filter((name) => !keys.has(name) && !['CELIA_REAL_SERVICE_URL', 'CELIA_AGENT_RUNTIME', 'CELIA_AGENT_SQLITE_PATH'].includes(name));
+  const invented = [...mentioned].filter((name) => !keys.has(name) && !['CELIA_REAL_SERVICE_URL', 'CELIA_AGENT_RUNTIME', 'CELIA_AGENT_SQLITE_PATH', 'CELIA_AGENT_RESUME_ON_BOOT'].includes(name));
   assert.deepEqual(invented, [], 'المستند لا يخترع متغيّرات غير موجودة في التصميم');
 });
 

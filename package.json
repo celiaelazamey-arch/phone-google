@@ -31,7 +31,8 @@
     "test:mysql": "node --test integration/mysql.integration.mjs",
     "google:doctor": "node scripts/google-doctor.mjs",
     "check:continuity": "node scripts/check-continuity.mjs",
-    "check:secrets": "node scripts/check-secrets-wiring.mjs"
+    "check:secrets": "node scripts/check-secrets-wiring.mjs",
+    "verify:live": "node scripts/verify-live.mjs"
   },
   "dependencies": {
     "dotenv": "^18.0.9",
