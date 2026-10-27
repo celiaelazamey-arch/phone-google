@@ -13,6 +13,9 @@ export const DECISION = Object.freeze({
 });
 
 const EXTERNAL_HINTS = /(تقويم|موعد|اجتماع|calendar|event|meeting)/i;
+const WHATSAPP_HINTS = /(واتساب|رسالة\s*واتساب|whatsapp)/i;
+const E164_IN_TEXT_RE = /(\+[1-9]\d{6,14})\b/;
+const DRIVE_EXPORT_HINTS = /(صدّر|تصدير|احفظ\s*في\s*درايف|google\s*drive|drive\s*export)/i;
 const DOCUMENT_HINTS = /(فاتورة|فواتير|مستند|استخرج|invoice|receipt)/i;
 const DOCUMENT_FILE_RE = /\b([A-Za-z0-9._/-]+\.(?:csv|json|txt|md))\b/i;
 const COMMIT_LEDGER_HINTS = /(سجل\s*المشتريات|دفتر\s*المشتريات|purchase\s*ledger|commit\s*invoice)/i;
@@ -182,6 +185,62 @@ export function createDemoPlanner({ externalEffectTool = 'google.calendar_create
         if (failed(toolRuns, 'celia.draft_outline')) return this.giveUp(toolRuns, 'celia.draft_outline');
         return { action: DECISION.call, tool: 'celia.draft_outline', args: { goal } };
       }
+
+      const phoneMatch = E164_IN_TEXT_RE.exec(goal);
+      const whatsappAttempted = toolRuns.some((toolRun) => toolRun.toolName === 'whatsapp.send_text');
+      if (WHATSAPP_HINTS.test(goal) && phoneMatch && !whatsappAttempted) {
+        const waApproval = approvals.find((approval) => approval.toolName === 'whatsapp.send_text');
+        if (waApproval?.decision === 'rejected') {
+          return {
+            action: DECISION.finish,
+            failed: true,
+            summary:
+              `رُفضت الموافقة على الأثر الخارجي whatsapp.send_text (${waApproval.note || 'بلا ملاحظة'}). ` +
+              'توقفت المهمة دون أي إرسال على واتساب.'
+          };
+        }
+        return {
+          action: DECISION.call,
+          tool: 'whatsapp.send_text',
+          args: {
+            phone: phoneMatch[1],
+            text: goal.slice(0, 400)
+          },
+          reason:
+            waApproval?.decision === 'approved'
+              ? 'موافقة مسجلة؛ ينفّذها outbox مرة واحدة عبر مفتاح idempotency'
+              : 'الطلب يتضمن إرسال رسالة واتساب؛ الأثر الخارجي يحتاج موافقة صريحة والتحقق من نافذة 24 ساعة'
+        };
+      }
+
+      const driveAttempted = toolRuns.some((toolRun) => toolRun.toolName === 'google.drive_export_report');
+      if (DRIVE_EXPORT_HINTS.test(goal) && !driveAttempted) {
+        const driveApproval = approvals.find((approval) => approval.toolName === 'google.drive_export_report');
+        if (driveApproval?.decision === 'rejected') {
+          return {
+            action: DECISION.finish,
+            failed: true,
+            summary:
+              `رُفضت الموافقة على الأثر الخارجي google.drive_export_report (${driveApproval.note || 'بلا ملاحظة'}). ` +
+              'توقفت المهمة دون إنشاء أي ملف في Google Drive.'
+          };
+        }
+        const draftOut = outcomeOf(toolRuns, 'celia.draft_outline');
+        return {
+          action: DECISION.call,
+          tool: 'google.drive_export_report',
+          args: {
+            title: `تقرير سيليا — ${goal.slice(0, 60)}`,
+            content: JSON.stringify(draftOut || { goal }, null, 2),
+            mimeType: 'application/json'
+          },
+          reason:
+            driveApproval?.decision === 'approved'
+              ? 'موافقة مسجلة؛ ينفّذها outbox مرة واحدة عبر مفتاح idempotency'
+              : 'الطلب يتضمن تصدير تقرير إلى Google Drive؛ الأثر الخارجي يحتاج موافقة صريحة'
+        };
+      }
+
       const externalAttempted = toolRuns.some((toolRun) => toolRun.toolName === externalEffectTool);
       if (EXTERNAL_HINTS.test(goal) && !externalAttempted) {
         if (externalApproval?.decision === 'rejected') {

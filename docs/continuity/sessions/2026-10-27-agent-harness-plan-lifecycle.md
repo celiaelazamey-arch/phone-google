@@ -40,6 +40,9 @@
      وربط فحص `comprehension_gate_grounding` في `src/agent/verifier.js` و`src/agent/planner.js`.
    - إضافة اختبارات `CL-01` إلى `CL-10` في `test/agent-comprehension-gate.test.js`، وتعزيز `integration/mysql.integration.mjs`
      بفحص تكاملي لـ`DEC-020` و`DEC-021` على MySQL 8.4 الحقيقية.
+8. **استكمال موصلات `AGENT-002` عبر `agent_outbox` (`DEC-022`):**
+   - إضافة موصل `whatsapp.cloud` (`whatsapp.send_text`) بفحص `E.164` و`opted_in` ونافذة 24 ساعة ومنع التكرار عبر `whatsapp_messages`، وموصل `google.drive` (`google.drive_export_report`) ببصمة `appProperties.celiaOutboxKey` وفحص `findByOutboxKey` قبل الإنشاء في `src/agent/connectors.js` و`src/agent/tools.js` و`src/agent/planner.js` و`src/agent/index.js` و`src/google.js`.
+   - إضافة اختبارات `WA-01..WA-04` و`DRV-01..DRV-04` في `test/agent-connectors.test.js` وتعزيز `integration/mysql.integration.mjs` (إجمالي `273/273` اختبارًا في `npm test`).
 
 ## 2. نتائج الفحوص الفعلية (محليًا وفي GitHub Actions CI)
 
@@ -48,7 +51,7 @@
 - `npm run release:check`: ناجح (`0.2.1` / `schema: 1`).
 - `npm run check:continuity`: ناجح.
 - `npm run check:secrets`: ناجح (`wiringVerified: true`، `zeroLeakVerified: true`).
-- `npm test`: **268/268** اختبارًا ناجحًا.
+- `npm test`: **273/273** اختبارًا ناجحًا (منها 13 في `test/agent-connectors.test.js`، و10 في `test/agent-comprehension-gate.test.js`، و7 في `test/agent-document-automation.test.js`).
 - **إغلاق فجوة التحقق في GitHub Actions CI (`Phase 3 — Verification Closure`):**
   - دُفع الفرع `arena/5fccc4e6-phone-google` إلى `origin` بعد موافقة المالك (`موافق على تنفيذ Verification Closure`).
   - كشفت التشغيلة الأولى `40592598360` (`6bf47b3`) أن طول JSON لمخرج `data.report` (`4494` حرفًا) تجاوز حد عمود

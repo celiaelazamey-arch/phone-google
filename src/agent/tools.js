@@ -82,6 +82,48 @@ export function validateToolInput(tool, args) {
       }
     }
   }
+  if (tool.name === 'whatsapp.send_text') {
+    if ('phone' in args && (typeof args.phone !== 'string' || !/^\+[1-9]\d{6,14}$/.test(args.phone.trim()))) {
+      return {
+        ok: false,
+        code: 'policy_violation_invalid_phone',
+        message: 'Recipient phone must be a valid E.164 number'
+      };
+    }
+    if ('text' in args && (typeof args.text !== 'string' || !args.text.trim() || args.text.trim().length > 4096)) {
+      return {
+        ok: false,
+        code: 'policy_violation_invalid_text',
+        message: 'Message text must be 1..4096 non-empty characters'
+      };
+    }
+  }
+  if (tool.name === 'google.drive_export_report') {
+    if ('title' in args && (typeof args.title !== 'string' || !args.title.trim() || args.title.trim().length > 200)) {
+      return {
+        ok: false,
+        code: 'policy_violation_invalid_drive_title',
+        message: 'Drive file title must be 1..200 non-empty characters'
+      };
+    }
+    if ('content' in args && (typeof args.content !== 'string' || !args.content.trim() || args.content.length > 200_000)) {
+      return {
+        ok: false,
+        code: 'policy_violation_invalid_drive_content',
+        message: 'Drive file content must be 1..200000 characters'
+      };
+    }
+    if ('mimeType' in args && args.mimeType !== null && args.mimeType !== undefined) {
+      const normalizedMime = String(args.mimeType).trim().toLowerCase();
+      if (!['application/json', 'text/plain', 'text/markdown', 'text/csv'].includes(normalizedMime)) {
+        return {
+          ok: false,
+          code: 'policy_violation_unsupported_mime_type',
+          message: 'Unsupported Drive export MIME type'
+        };
+      }
+    }
+  }
   if (typeof tool.validate === 'function') {
     const custom = tool.validate(args);
     if (custom && custom.ok === false) {
@@ -300,6 +342,22 @@ export function defaultToolDefinitions({
       requiresApproval: true,
       connector: 'google.calendar',
       arguments: { summary: 'string', start: 'string', end: 'string' }
+    },
+    {
+      name: 'whatsapp.send_text',
+      description: 'إرسال رسالة واتساب نصية عبر outbox بعد موافقة صريحة والتحقق من نافذة 24 ساعة',
+      risk: RISK.externalEffect,
+      requiresApproval: true,
+      connector: 'whatsapp.cloud',
+      arguments: { phone: 'string', text: 'string' }
+    },
+    {
+      name: 'google.drive_export_report',
+      description: 'تصدير تقرير موثّق إلى Google Drive عبر outbox بعد موافقة صريحة ومنع التكرار',
+      risk: RISK.externalEffect,
+      requiresApproval: true,
+      connector: 'google.drive',
+      arguments: { title: 'string', content: 'string', mimeType: 'string' }
     },
     {
       name: 'sandbox.exec',

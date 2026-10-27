@@ -39,6 +39,10 @@
   - **معمارية Agent Harness الـ10 مكونات (`GET /api/agent/harness`)** وواجهة تعديل الخطة في `/agent`، وتشخيص
     Playwright Chromium الصريح (`e2e/diagnostics.js`، `e2e/agent.spec.js`، `playwright.config.js`)، وإصلاح
     الروابط النسبية وتباين WCAG 2.2 AA وعرض 320px في `/agent` و`/kb`.
+  - **إضافة المرحلة 1 من خارطة التوسعة (`AGENT-002` — موصلا WhatsApp وGoogle Drive عبر `agent_outbox`، [DEC-022](DECISIONS.md#dec-022--استكمال-موصلات-الأثر-الخارجي-في-agent_outbox-agent-002-whatsapp-cloud--google-drive-report-export)):**
+    - إضافة موصل `whatsapp.cloud` (`whatsapp.send_text`) بفحص `E.164` و`opted_in` ونافذة 24 ساعة ومنع التكرار عبر `whatsapp_messages`، وموصل `google.drive` (`google.drive_export_report`) ببصمة `appProperties.celiaOutboxKey` وفحص `findByOutboxKey` قبل الإنشاء.
+    - توسيع `CELIA_AGENT_CONNECTORS` ليقبل `none, calendar, whatsapp, drive` مع بقاء `none` هو الوضع الافتراضي الآمن.
+    - نجاح جميع الاختبارات المحلية (**273/273** في `npm test` شاملة `WA-01..WA-04` و`DRV-01..DRV-04` في `test/agent-connectors.test.js`).
   - **الفحوص المحلية وفحوص GitHub Actions CI الفعلية (`Verification Closure`):**
     - محليًا: `npm test` **268/268** ناجحة (منها 7 اختبارات في `test/agent-document-automation.test.js` و10 اختبارات
       `CL-01..CL-10` في `test/agent-comprehension-gate.test.js`)، و`check` و`release:check` و`check:continuity`

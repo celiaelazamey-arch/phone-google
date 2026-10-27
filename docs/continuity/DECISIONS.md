@@ -395,6 +395,29 @@
   حزمة مرجعية ذهبية في `test/fixtures/documents/`، واختبارات `test/agent-document-automation.test.js`. **لا ترحيل SQL جديد
   ولا تغيير في `schema 1` أو الإصدار `0.2.1` أو أدوات MCP الـ12.**
 
+## DEC-022 — استكمال موصلات الأثر الخارجي في `agent_outbox` (`AGENT-002`: WhatsApp Cloud & Google Drive Report Export)
+
+- **التاريخ:** 27 أكتوبر 2026 (مساءً) · **الحالة:** منفذ ومختبر محليًا (13/13 اختبارًا في `test/agent-connectors.test.js`، إجمالي 273/273 في `npm test`) · **المهمة:** AGENT-002، SEC-001، DATA-003
+- **السياق:** كان `agent_outbox` يضم موصل `google.calendar` وموصل السجل المحلي `purchases.ledger`، بينما بقيت متطلبات
+  `AGENT-002` لموصلي WhatsApp وتصدير Google Drive قيد الاستكمال.
+- **القرار:**
+  1. **موصل WhatsApp (`whatsapp.cloud` / الأداة `whatsapp.send_text`):**
+     - مصنّف `RISK.externalEffect` مع `requiresApproval: true`.
+     - يتحقق حتميًا قبل أي اتصال من صيغة `E.164`، وحدود طول الرسالة ($1..4096$ حرفًا)، وكون المستلم هو رقم المالك
+       (`ownerPhone`) أو عميلًا موافقًا (`opted_in = 1`) داخل نافذة الـ24 ساعة (`isWithinCustomerWindow`).
+     - يستخدم `createWhatsAppCloudTransport` للتحقق من عدم وجود `provider_message_id` مطابق لبصمة `outbox_<digest>` في
+       جدول `whatsapp_messages` قبل استدعاء Graph API، فلا يُرسل رسالة مكررة عند الإعادة.
+  2. **موصل تصدير Google Drive (`google.drive` / الأداة `google.drive_export_report`):**
+     - مصنّف `RISK.externalEffect` مع `requiresApproval: true`.
+     - يتحقق حتميًا من العنوان والمحتوى ونوع MIME المسموح (`application/json`, `text/plain`, `text/markdown`, `text/csv`).
+     - يشتق بصمة حتمية `appProperties.celiaOutboxKey` من `idempotencyKey` ويبحث عنها أولًا عبر `findByOutboxKey` قبل
+       إنشاء الملف لمنع إنشاء ملفات مكررة عند الإعادة أو المصالحة.
+  3. **الإبقاء على `CELIA_AGENT_CONNECTORS=none` افتراضيًا:** وتوسيع القيم المسموحة إلى `none, calendar, whatsapp, drive`
+     مع رفض الإقلاع صراحةً (`agent_connector_unconfigured`) إذا طُلب موصل دون إعداداته أو دون قاعدة بيانات دائمة.
+- **الدليل:** [src/agent/connectors.js](../../src/agent/connectors.js)، [src/agent/tools.js](../../src/agent/tools.js)،
+  [src/agent/planner.js](../../src/agent/planner.js)، [src/agent/index.js](../../src/agent/index.js)،
+  [test/agent-connectors.test.js](../../test/agent-connectors.test.js)، و[integration/mysql.integration.mjs](../../integration/mysql.integration.mjs).
+
 ## DEC-021 — Phase 3 Comprehension Gate (`Explain to Understand`): بوابة الفهم والشرح المبسّط المدعوم بالأدلة
 
 - **التاريخ:** 27 أكتوبر 2026 (مساءً) · **الحالة:** منفذ ومتحقق محليًا (10 اختبارات `CL-01..CL-10`، إجمالي 268/268 في `npm test`) وفي GitHub Actions CI (التشغيلة `40593284086` على Commit `99b7895` شاملة Chromium وMySQL 8.4) · **المهمة:** AGENT-001، AGENT-002، SEC-003، DATA-003، QA-001، QA-003

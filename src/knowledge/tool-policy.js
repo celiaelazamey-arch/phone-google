@@ -26,11 +26,13 @@ export const CANONICAL_TOOLS = Object.freeze({
   codata_status: { risk: 'read', requiresApproval: false, surface: 'mcp-extended' },
   celia_secrets_status: { risk: 'read', requiresApproval: false, surface: 'mcp-extended' },
 
-  // Agent runtime tools (M1).
+  // Agent runtime tools (M1 + AGENT-002).
   'celia.system_status': { risk: 'read', requiresApproval: false, surface: 'agent' },
   'celia.thread_context': { risk: 'read', requiresApproval: false, surface: 'agent' },
   'celia.draft_outline': { risk: 'read', requiresApproval: false, surface: 'agent' },
   'google.calendar_create_event': { risk: 'external_effect', requiresApproval: true, surface: 'agent', dataEgress: true },
+  'whatsapp.send_text': { risk: 'external_effect', requiresApproval: true, surface: 'agent', dataEgress: true },
+  'google.drive_export_report': { risk: 'external_effect', requiresApproval: true, surface: 'agent', dataEgress: true },
   'sandbox.exec': { risk: 'irreversible', requiresApproval: true, surface: 'agent' },
 
   // Knowledge network tools (M1.1) — read-only by construction.

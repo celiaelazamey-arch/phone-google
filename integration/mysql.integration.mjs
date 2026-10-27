@@ -290,9 +290,17 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
   const store = createAgentStore({ driver: createMysqlDriver(pool) });
   // Real MySQL connector seam: a fake transport, so the outbox path is exercised
   // against InnoDB without touching a real Google account.
-  const { createConnectorRegistry, createCalendarConnector } = await import('../src/agent/connectors.js');
+  const {
+    createConnectorRegistry,
+    createCalendarConnector,
+    createWhatsAppConnector,
+    createWhatsAppCloudTransport,
+    createDriveExportConnector
+  } = await import('../src/agent/connectors.js');
   const { createPurchaseLedgerStore, createPurchaseLedgerConnector } = await import('../src/agent/automation/index.js');
   const calendarSends = [];
+  const whatsappSends = [];
+  const driveExports = [];
   const ledgerStore = createPurchaseLedgerStore();
   const connectors = createConnectorRegistry([
     createCalendarConnector({
@@ -300,6 +308,35 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
         async insertEvent({ calendarId, event }) {
           calendarSends.push({ calendarId, event });
           return { id: `mysql-evt-${calendarSends.length}`, htmlLink: null, iCalUID: event.iCalUID };
+        }
+      }
+    }),
+    createWhatsAppConnector({
+      ownerPhone: '+201012345678',
+      transport: createWhatsAppCloudTransport({
+        pool,
+        sendText: async ({ phone, text }) => {
+          whatsappSends.push({ phone, text });
+          return '';
+        }
+      })
+    }),
+    createDriveExportConnector({
+      transport: {
+        async findByOutboxKey({ outboxDigest }) {
+          return driveExports.find((item) => item.appProperties?.celiaOutboxKey === outboxDigest) || null;
+        },
+        async createFile({ name, mimeType, content, appProperties }) {
+          const created = {
+            id: `mysql-drv-${driveExports.length + 1}`,
+            name,
+            mimeType,
+            content,
+            webViewLink: `https://drive.example/mysql/${driveExports.length + 1}`,
+            appProperties
+          };
+          driveExports.push(created);
+          return created;
         }
       }
     }),
@@ -431,6 +468,39 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
   assert.equal(ledgerStore.list()[0].invoice_number, 'INV-1042');
   const validFinalDetail = await runtime.detail(validInvoiceRun.run.id);
   assert.equal(validFinalDetail.verification.verdict, 'PASS');
+
+  // 3) AGENT-002 WhatsApp & Google Drive outbox connectors on real MySQL 8.4:
+  const waRun = await runtime.submit({
+    threadId: docThread.id,
+    message: 'أرسل رسالة واتساب إلى +201012345678 لتأكيد اعتماد الفاتورة',
+    clientMessageId: 'mysql-wa-send-0003'
+  });
+  assert.equal((await runtime.runToCompletion(waRun.run.id)).status, 'waiting_approval');
+  assert.equal(whatsappSends.length, 0);
+  await runtime.approve(waRun.run.id, {
+    decision: 'approved',
+    note: 'MySQL 8.4 WhatsApp approval',
+    idempotencyKey: 'mysql-approve-wa-0003'
+  });
+  assert.equal((await runtime.runToCompletion(waRun.run.id)).status, 'succeeded');
+  assert.equal(whatsappSends.length, 1);
+  assert.equal((await runtime.detail(waRun.run.id)).verification.verdict, 'PASS');
+
+  const driveRun = await runtime.submit({
+    threadId: docThread.id,
+    message: 'صدّر التقرير إلى Google Drive للأرشفة المالية',
+    clientMessageId: 'mysql-drive-export-0004'
+  });
+  assert.equal((await runtime.runToCompletion(driveRun.run.id)).status, 'waiting_approval');
+  assert.equal(driveExports.length, 0);
+  await runtime.approve(driveRun.run.id, {
+    decision: 'approved',
+    note: 'MySQL 8.4 Drive export approval',
+    idempotencyKey: 'mysql-approve-drive-0004'
+  });
+  assert.equal((await runtime.runToCompletion(driveRun.run.id)).status, 'succeeded');
+  assert.equal(driveExports.length, 1);
+  assert.equal((await runtime.detail(driveRun.run.id)).verification.verdict, 'PASS');
 
   // The five core tables are untouched by the additive migration.
   const [tables] = await pool.execute('SELECT TABLE_NAME AS name FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()');

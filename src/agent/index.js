@@ -36,10 +36,16 @@ import {
   documentAutomationToolDefinitions
 } from './automation/index.js';
 import {
+  CONNECTOR,
+  ALLOWED_DRIVE_MIME_TYPES,
   createCalendarConnector,
   createConnectorRegistry,
   createEmptyConnectorRegistry,
-  createGoogleCalendarTransport
+  createGoogleCalendarTransport,
+  createWhatsAppConnector,
+  createWhatsAppCloudTransport,
+  createDriveExportConnector,
+  createGoogleDriveTransport
 } from './connectors.js';
 
 export {
@@ -71,7 +77,17 @@ export {
   buildAutomationReport,
   createPurchaseLedgerStore,
   createPurchaseLedgerConnector,
-  documentAutomationToolDefinitions
+  documentAutomationToolDefinitions,
+  CONNECTOR,
+  ALLOWED_DRIVE_MIME_TYPES,
+  createCalendarConnector,
+  createConnectorRegistry,
+  createEmptyConnectorRegistry,
+  createGoogleCalendarTransport,
+  createWhatsAppConnector,
+  createWhatsAppCloudTransport,
+  createDriveExportConnector,
+  createGoogleDriveTransport
 };
 
 /**
@@ -128,11 +144,13 @@ export function readAgentLimits(env = process.env) {
 export function readAgentConnectors(env = process.env) {
   const raw = String(env.CELIA_AGENT_CONNECTORS || 'none').trim().toLowerCase();
   const names = raw === '' ? [] : raw.split(',').map((name) => name.trim()).filter(Boolean);
-  const allowed = new Set(['none', 'calendar']);
+  const allowed = new Set(['none', 'calendar', 'whatsapp', 'drive']);
   for (const name of names) {
-    if (!allowed.has(name)) throw new Error('CELIA_AGENT_CONNECTORS must be one of: none, calendar');
+    if (!allowed.has(name)) {
+      throw new Error('CELIA_AGENT_CONNECTORS must be one of: none, calendar, whatsapp, drive');
+    }
   }
-  return names.filter((name) => name !== 'none');
+  return [...new Set(names.filter((name) => name !== 'none'))];
 }
 
 function buildConnectors({ env, pool, config, logger }) {
@@ -143,29 +161,87 @@ function buildConnectors({ env, pool, config, logger }) {
     throw Object.assign(new Error(error.message), { code: 'invalid_agent_connectors' });
   }
   if (!requested.length) return createEmptyConnectorRegistry();
-  if (!config.google?.clientId || !config.google?.clientSecret) {
-    throw Object.assign(new Error('CELIA_AGENT_CONNECTORS=calendar requires Google OAuth configuration'), {
-      code: 'agent_connector_unconfigured'
-    });
+
+  const needsGoogle = requested.includes('calendar') || requested.includes('drive');
+  if (needsGoogle) {
+    if (!config.google?.clientId || !config.google?.clientSecret) {
+      throw Object.assign(new Error('CELIA_AGENT_CONNECTORS=calendar|drive requires Google OAuth configuration'), {
+        code: 'agent_connector_unconfigured'
+      });
+    }
+    if (!pool || pool.isMemory) {
+      throw Object.assign(new Error('CELIA_AGENT_CONNECTORS=calendar|drive requires a durable pool for stored grants'), {
+        code: 'agent_connector_unconfigured'
+      });
+    }
   }
-  if (!pool || pool.isMemory) {
-    throw Object.assign(new Error('CELIA_AGENT_CONNECTORS=calendar requires a durable pool for stored grants'), {
-      code: 'agent_connector_unconfigured'
-    });
+
+  if (requested.includes('whatsapp')) {
+    const wa = config.whatsapp || {};
+    if (!wa.accessToken || !wa.phoneNumberId || !wa.apiVersion) {
+      throw Object.assign(new Error('CELIA_AGENT_CONNECTORS=whatsapp requires WhatsApp Cloud API configuration'), {
+        code: 'agent_connector_unconfigured'
+      });
+    }
+    if (!pool || pool.isMemory) {
+      throw Object.assign(new Error('CELIA_AGENT_CONNECTORS=whatsapp requires a durable pool for contact window and message idempotency'), {
+        code: 'agent_connector_unconfigured'
+      });
+    }
   }
+
   const userId = config.userId || env.APP_USER_ID || 'owner';
   const definitions = requested.map((name) => {
-    if (name !== 'calendar') throw new Error(`Unknown connector ${name}`);
-    const transport = createGoogleCalendarTransport({
-      getCalendar: async () => {
-        const { createGoogleCalendarClient } = await import('../google.js');
-        return createGoogleCalendarClient({ pool, config, userId });
-      }
-    });
-    return createCalendarConnector({
-      transport,
-      timeZone: env.CELIA_AGENT_CALENDAR_TIMEZONE || null
-    });
+    if (name === 'calendar') {
+      const transport = createGoogleCalendarTransport({
+        getCalendar: async () => {
+          const { createGoogleCalendarClient } = await import('../google.js');
+          return createGoogleCalendarClient({ pool, config, userId });
+        }
+      });
+      return createCalendarConnector({
+        transport,
+        timeZone: env.CELIA_AGENT_CALENDAR_TIMEZONE || null
+      });
+    }
+    if (name === 'drive') {
+      const transport = createGoogleDriveTransport({
+        getDrive: async () => {
+          const { createGoogleDriveClient } = await import('../google.js');
+          return createGoogleDriveClient({ pool, config, userId });
+        }
+      });
+      return createDriveExportConnector({
+        transport,
+        folderId: env.CELIA_AGENT_DRIVE_FOLDER_ID || null
+      });
+    }
+    if (name === 'whatsapp') {
+      const transport = createWhatsAppCloudTransport({
+        pool,
+        sendText: async ({ phone, text, signal }) => {
+          const { sendWhatsAppText } = await import('../whatsapp.js');
+          return sendWhatsAppText({ config, phone, text, signal });
+        }
+      });
+      return createWhatsAppConnector({
+        transport,
+        ownerPhone: config.ownerPhone || env.APP_OWNER_PHONE_E164 || null,
+        checkContactWindow: async ({ phone }) => {
+          const { isWithinCustomerWindow } = await import('../security.js');
+          const [rows] = await pool.execute(
+            'SELECT opted_in, last_inbound_at FROM whatsapp_contacts WHERE phone_e164 = ? LIMIT 1',
+            [phone]
+          );
+          const contact = rows?.[0];
+          return {
+            optedIn: Boolean(contact?.opted_in),
+            withinWindow: Boolean(contact?.last_inbound_at && isWithinCustomerWindow(contact.last_inbound_at))
+          };
+        }
+      });
+    }
+    throw new Error(`Unknown connector ${name}`);
   });
   logger.info?.(`Agent connectors enabled: ${definitions.map((entry) => entry.name).join(', ')}`);
   return createConnectorRegistry(definitions);
