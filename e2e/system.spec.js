@@ -1,3 +1,4 @@
+import { RELEASE, RELEASE_HISTORY } from '../src/version.js';
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
@@ -10,11 +11,11 @@ test("server dashboard is real, responsive, navigable and exports a JSON report"
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(server);
-  await expect(page.locator("#metric-version")).toHaveText("v0.2.0");
+  await expect(page.locator("#metric-version")).toHaveText(`v${RELEASE.version}`);
   await expect(page.locator(".component-card")).toHaveCount(7);
   await expect(page.locator("#metric-storage")).toHaveText("ذاكرة مؤقتة");
   await expect(page.locator("#notice")).toContainText("ليست نسخة احتياطية");
-  await expect(page.locator("#release-list .release-card")).toHaveCount(2);
+  await expect(page.locator("#release-list .release-card")).toHaveCount(RELEASE_HISTORY.length);
   await page.locator(".hero-actions a").click();
   await expect(page).toHaveURL(/#releases$/);
   expect(
@@ -25,7 +26,7 @@ test("server dashboard is real, responsive, navigable and exports a JSON report"
   const downloadEvent = page.waitForEvent("download");
   await page.locator("#download").click();
   expect((await downloadEvent).suggestedFilename()).toBe(
-    "celia-system-0.2.0.json",
+    `celia-system-${RELEASE.version}.json`,
   );
   expect(errors).toEqual([]);
 });
@@ -34,13 +35,13 @@ test("failed status panel retains the release panel and explicitly marks stale d
   page,
 }) => {
   await page.goto(server);
-  await expect(page.locator("#metric-version")).toHaveText("v0.2.0");
+  await expect(page.locator("#metric-version")).toHaveText(`v${RELEASE.version}`);
   await page.route("**/api/system", (route) => route.abort("failed"));
   await page.locator("#refresh").click();
   await expect(page.locator("#connection")).toHaveText("تعذر التحديث");
   await expect(page.locator("#notice")).toContainText("آخر فحص ناجح");
-  await expect(page.locator("#release-list .release-card")).toHaveCount(2);
-  await expect(page.locator("#metric-version")).toHaveText("v0.2.0");
+  await expect(page.locator("#release-list .release-card")).toHaveCount(RELEASE_HISTORY.length);
+  await expect(page.locator("#metric-version")).toHaveText(`v${RELEASE.version}`);
 });
 
 test("an isolated provider does not hide healthy core or release information", async ({
@@ -78,7 +79,7 @@ test("Pages works under the repository subpath and never claims production resil
     if (response.status() >= 400) failed.push(response.url());
   });
   await page.goto(staticSite);
-  await expect(page.locator("#metric-version")).toHaveText("v0.2.0");
+  await expect(page.locator("#metric-version")).toHaveText(`v${RELEASE.version}`);
   await expect(page.locator("#connection")).toHaveText("معاينة متصفح");
   await expect(page.locator("#notice")).toContainText("قواطع الخادم");
   await expect(page.locator("#metric-circuits")).toHaveText("—");
@@ -93,7 +94,7 @@ test("Pages works under the repository subpath and never claims production resil
 
 test("system dashboard meets WCAG 2 AA automated checks", async ({ page }) => {
   await page.goto(server);
-  await expect(page.locator("#metric-version")).toHaveText("v0.2.0");
+  await expect(page.locator("#metric-version")).toHaveText(`v${RELEASE.version}`);
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
@@ -105,7 +106,7 @@ test("narrow phones and existing studio navigation stay usable", async ({
 }) => {
   await page.setViewportSize({ width: 320, height: 780 });
   await page.goto(server);
-  await expect(page.locator("#metric-version")).toHaveText("v0.2.0");
+  await expect(page.locator("#metric-version")).toHaveText(`v${RELEASE.version}`);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

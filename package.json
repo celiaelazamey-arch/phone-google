@@ -1,6 +1,6 @@
 {
   "name": "phone-google-assistant",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": false,
   "description": "Celia assistant with isolated integrations, health-gated releases and safe rollback",
   "type": "module",
@@ -23,7 +23,9 @@
     "release:bundle": "node scripts/release.mjs bundle",
     "release:verify": "node scripts/release.mjs verify",
     "test:resilience": "node --test test/resilience.test.js test/operations.test.js test/deployment.test.js",
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "test:mysql": "node --test integration/mysql.integration.mjs",
+    "check:continuity": "node scripts/check-continuity.mjs"
   },
   "dependencies": {
     "dotenv": "^16.4.7",

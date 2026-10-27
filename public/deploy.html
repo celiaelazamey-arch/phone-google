@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#091512" />
+  <meta name="description" content="مركز نشر سيليا: مسار مجاني، فحوص تشغيل فعلية، وخطوات واضحة دون مشاركة الأسرار." />
+  <title>سيليا — من المستودع إلى التشغيل</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="./fonts.css" />
+  <link rel="stylesheet" href="./deploy.css" />
+  <script src="./deploy.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">تخطّ إلى المحتوى</a>
+  <header class="topbar wrap">
+    <a href="./deploy" class="brand"><span class="brand-icon" aria-hidden="true">c<span>·</span></span><span>سيليا<small>مساحة التشغيل</small></span></a>
+    <nav aria-label="التنقل الرئيسي"><a href="./studio">الاستوديو</a><a href="./system">مركز النظام</a><a href="./deploy" aria-current="page">النشر</a></nav>
+    <span class="version" id="version">جارٍ التحقق</span>
+  </header>
+  <main id="main" class="wrap">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="dot"></span> LAUNCH CONTROL / 2026</div>
+        <h1 id="hero-title">من المستودع<br />إلى <em>نظام يعمل.</em></h1>
+        <p class="intro">واجهة، أدوات MCP، وواجهات Google وWhatsApp على خادم واحد. اخترنا مسارًا مجانيًا يحافظ على MySQL، ويُظهر ما يعمل فعلًا وما ينتظر الإعداد.</p>
+        <div class="hero-actions"><a id="deploy-link" class="button primary" href="https://render.com/deploy?repo=https%3A%2F%2Fgithub.com%2Fceliaelazamey-arch%2Fphone-google" target="_blank" rel="noopener noreferrer">ابدأ النشر على Render <span aria-hidden="true">↗</span></a><a class="button secondary" href="#checks">شاهد الفحص الفعلي <span aria-hidden="true">↓</span></a></div>
+        <p class="micro">تسجيل الدخول والموافقة لدى المزوّد مطلوبان. لا نطلب كلمة مرورك أو بيانات بطاقة، ولا ننشئ خدمة مدفوعة.</p>
+      </div>
+      <aside class="runtime-card" aria-labelledby="runtime-title">
+        <div class="card-top"><span class="mono">LIVE ENVIRONMENT</span><span class="live-light"><span class="dot"></span> مباشر</span></div>
+        <div class="orb" aria-hidden="true"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="orb-core">c<span>·</span></div><span class="node node-top">MCP</span><span class="node node-right">API</span><span class="node node-bottom">SQL</span></div>
+        <h2 id="runtime-title">نفحص الواقع، لا نفترضه.</h2>
+        <p id="environment-label" role="status">جارٍ تحديد بيئة التشغيل…</p>
+        <div class="runtime-foot"><span>هوية المصدر</span><code id="commit">غير متحققة</code></div>
+      </aside>
+    </section>
+    <section class="limits" aria-label="حدود المسار المجاني"><div><strong>خطة مجانية</strong><span>بحدود موارد المزوّد</span></div><div><strong>HTTPS + رابط فرعي</strong><span>يعينه المزوّد بعد الإنشاء</span></div><div><strong>MySQL دائم</strong><span>خارج قرص الاستضافة المؤقت</span></div><div><strong>لا وعود 24/7</strong><span>الخادم المجاني قد ينام</span></div></section>
+    <section id="checks" class="section" aria-labelledby="checks-title">
+      <div class="section-heading"><div><div class="eyebrow">EVIDENCE, NOT ASSUMPTIONS</div><h2 id="checks-title">ماذا يعمل الآن؟</h2></div><button id="run-checks" class="button secondary" type="button">أعد الفحص الآمن</button></div>
+      <p class="section-description">النتائج تخص الخادم الذي تزوره الآن. الفحص للقراءة فقط؛ لا يرسل رسائل، ولا يغيّر قاعدة بيانات، ولا يختبر مزوّدًا خارجيًا على حسابك.</p>
+      <div class="checks-grid" id="checks-grid" aria-live="polite"><p>جارٍ قراءة حالة التشغيل…</p></div>
+      <div class="report-row"><span id="checked-at" role="status">لم يكتمل الفحص بعد</span><button id="export-report" class="text-button" type="button" disabled>تنزيل تقرير JSON <span aria-hidden="true">↙</span></button></div>
+      <div class="notice" id="readiness-notice" role="status">لم نتحقق من نشر عام أو ربط الخدمات بعد.</div>
+    </section>
+    <section class="section" aria-labelledby="steps-title">
+      <div class="section-heading"><div><div class="eyebrow">THE ZERO-PURCHASE PATH</div><h2 id="steps-title">أربع خطوات. بلا أسرار في المحادثة.</h2></div><span class="tag">إعداد أول مرة</span></div>
+      <div class="steps-grid">
+        <article class="step"><span class="step-number">01</span><span class="step-label">التخزين أولًا</span><h3>قاعدة MySQL مستقلة</h3><p>أنشئ خدمة <b>Free</b> على Aiven وقاعدة جديدة مخصصة لسيليا. احتفظ ببيانات الاتصال وشهادة CA في لوحة المزوّد؛ لا ترسلها إلى المحادثة.</p><a href="https://aiven.io/free-mysql-database" target="_blank" rel="noopener noreferrer">إنشاء قاعدة مجانية <span aria-hidden="true">↗</span></a></article>
+        <article class="step"><span class="step-number">02</span><span class="step-label">خادم واحد، لا اثنان</span><h3>انشر النسخة الكاملة</h3><p>زر Render يفتح ملف نشر لخدمة واحدة بخطة Free، بلا قرص مدفوع أو قاعدة تنتهي بعد 30 يومًا. أدخل بيانات MySQL وشهادة CA في Dashboard فقط. Render يولّد مفاتيح التطبيق.</p><a id="steps-deploy-link" href="https://render.com/deploy?repo=https%3A%2F%2Fgithub.com%2Fceliaelazamey-arch%2Fphone-google" target="_blank" rel="noopener noreferrer">افتح إعداد النشر <span aria-hidden="true">↗</span></a></article>
+        <article class="step"><span class="step-number">03</span><span class="step-label">صلاحياتك تظل لك</span><h3>اربط Google وWhatsApp</h3><p>أضف مفاتيح OAuth وMeta اختيارياً في مخزن أسرار Render. الإرسال الحقيقي يظل مشروطًا بالموافقات ونافذة الخدمة. Gemini اختياري؛ البديل المحلي يعمل بلا مفتاح.</p><a href="https://github.com/celiaelazamey-arch/phone-google/blob/main/docs/free-hosting.md" target="_blank" rel="noopener noreferrer" id="runbook-link">دليل الإعداد والتحقق <span aria-hidden="true">↗</span></a></article>
+        <article class="step"><span class="step-number">04</span><span class="step-label">لا نغلق المهمة بالكود</span><h3>تحقّق ثم اعتمد التشغيل</h3><p>بعد ظهور رابطك الفعلي، افتح هذه الصفحة عليه. يلزم جاهزية MySQL ومسارات التكامل واختبار الحسابات الحقيقية. تنزيل التقرير ليس بديلًا عن اختبار الاستعادة.</p><a href="#checks">راجع النتائج الفعلية <span aria-hidden="true">↑</span></a></article>
+      </div>
+    </section>
+    <section class="guardrails section" aria-labelledby="safety-title">
+      <div><div class="eyebrow">SAFE BY DESIGN</div><h2 id="safety-title">المجاني لا يعني إخفاء الحدود.</h2><p>إذا طلب المزوّد بطاقة للتحقق، توقف؛ لا تتجاوز التحقق ولا تختَر ترقية مدفوعة. الرابط المجاني نطاق فرعي، وليس ملكية نطاق مدفوع مثل ‎.com.</p></div>
+      <ul><li>لا نخزّن بيانات عملاء في ذاكرة العرض على أنها دائمة.</li><li>تهيئة البداية اختيارية لقاعدة فارغة فقط؛ لا إصلاح أو ترحيل صامت لقاعدة قائمة.</li><li>الخطة المجانية ليست ضمان توافر عالٍ أو قدرة غير محدودة.</li><li>توليد مفاتيح أو وجود إعداد OAuth لا يعني نجاح اتصال حقيقي.</li></ul>
+    </section>
+    <footer><span>سيليا <span class="mono">/ BUILD WITH PROOF</span></span><div><a href="https://render.com/docs/free" target="_blank" rel="noopener noreferrer">حدود Render</a><a href="https://aiven.io/docs/products/mysql/concepts/mysql-free-tier" target="_blank" rel="noopener noreferrer">حدود MySQL المجاني</a><a href="./system">مركز النظام</a></div></footer>
+  </main>
+</body>
+</html>

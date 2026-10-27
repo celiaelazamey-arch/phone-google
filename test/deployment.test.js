@@ -78,8 +78,8 @@ function adapter(overrides = {}) {
 
 test("release manifest, lockfile and history use a single compatible release identity", async () => {
   assert.deepEqual(await checkRelease(), {
-    version: "0.2.0",
-    previousVersion: "0.1.0",
+    version: "0.2.1",
+    previousVersion: "0.2.0",
     databaseSchema: 1,
   });
 });

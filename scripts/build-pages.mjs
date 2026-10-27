@@ -89,6 +89,7 @@ function injectShimScript(html) {
 
 function rewriteStaticHostLinks(html) {
   return html
+    .replace(/href="\.\/deploy\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./deploy.html${suffix}"`)
     .replace(/href="\.\/system\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./system.html${suffix}"`)
     .replace(/href="\.\/live\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./live.html${suffix}"`)
     .replace(/href="\.\/skills\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./skills.html${suffix}"`)
@@ -110,6 +111,7 @@ export async function build() {
     commit,
     mode: 'static-preview',
     host: 'github-pages',
+    sourceRef: process.env.CELIA_SOURCE_REF || process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME || 'main',
     toolsCount: tools.length
   };
 

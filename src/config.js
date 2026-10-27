@@ -1,3 +1,4 @@
+import { loadMysqlConfig } from './mysql-config.js';
 import { loadFeatures, loadResilienceConfig } from './resilience.js';
 export function loadConfig(env = process.env) {
   const required = (name) => {
@@ -27,13 +28,7 @@ export function loadConfig(env = process.env) {
     ownerEmail: env.APP_OWNER_EMAIL || '',
     ownerPhone: env.APP_OWNER_PHONE_E164 || null,
     encryptionKey,
-    mysql: {
-      host: env.MYSQL_HOST || '127.0.0.1',
-      port: Number(env.MYSQL_PORT || 3306),
-      database: env.MYSQL_DATABASE || 'phone_google',
-      user: env.MYSQL_USER || 'phone_google',
-      password: env.MYSQL_PASSWORD || ''
-    },
+    mysql: loadMysqlConfig(env),
     google: {
       clientId: env.GOOGLE_CLIENT_ID || '',
       clientSecret: env.GOOGLE_CLIENT_SECRET || '',

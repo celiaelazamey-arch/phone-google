@@ -11,3 +11,5 @@ dist/
 .release-artifacts/
 playwright-report/
 test-results/
+
+.validation-artifacts/

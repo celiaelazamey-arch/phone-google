@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const files = ["playwright.config.js"];
-for (const directory of ["src", "test", "public", "scripts", "e2e"]) {
+for (const directory of ["src", "test", "public", "scripts", "e2e", "integration"]) {
   for (const entry of await readdir(path.join(root, directory), {
     withFileTypes: true,
   })) {
