@@ -19,6 +19,8 @@ import { loadExtendedIntegrationsConfig } from './ai-providers.js';
 import { createCeliaUiRouter } from './celia-ui.js';
 import { createAgentHost } from './agent/index.js';
 import { createAgentRouter } from './agent-routes.js';
+import { createKnowledgeHost } from './knowledge/index.js';
+import { createKbRouter } from './kb-routes.js';
 import { createMemoryPool } from './memory-pool.js';
 import { checkOllamaHealth, generateCeliaReply, normalizeOllamaBaseUrl, resolveEffectiveAiProvider, SUPPORTED_AI_PROVIDERS } from './ollama.js';
 import {
@@ -985,7 +987,7 @@ function requireMcpToken(config) {
   };
 }
 
-export function createCeliaMcpApp({ pool, config, services = createServiceRegistry(config), agentHost }) {
+export function createCeliaMcpApp({ pool, config, services = createServiceRegistry(config), agentHost, kbHost }) {
   const app = express();
   const idempotencyStore = createIdempotencyStore();
   const activeTools = getActiveMcpTools(config);
@@ -1028,8 +1030,13 @@ export function createCeliaMcpApp({ pool, config, services = createServiceRegist
     } catch (error) { next(error); }
   });
   app.use(createSecretsHubRouter({ config, services, idempotencyStore, authorize }));
-  const agents = agentHost || createAgentHost({ config, pool, statusProvider: () => operations.liveness() });
+  const knowledge = kbHost || createKnowledgeHost({ nodeEnv: config.nodeEnv });
+  const agents =
+    agentHost ||
+    createAgentHost({ config, pool, statusProvider: () => operations.liveness(), kbHost: knowledge });
+  app.locals.kbHost = knowledge;
   app.locals.agentHost = agents;
+  app.use('/api/kb', createKbRouter({ kb: knowledge, authorize }));
   app.use('/api/agent', createAgentRouter({ agent: agents, authorize }));
   if (config.hosting?.integrationsEnabled) {
     app.use(createIntegratedApiRouter({ pool, config: config.hosting.integrationConfig, services }));

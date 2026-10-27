@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>شبكة المعرفة — سيليا</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/fonts.css">
+  <link rel="stylesheet" href="/agent.css">
+  <link rel="stylesheet" href="/kb.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="dot kb" aria-hidden="true"></span>
+      <div>
+        <h1>شبكة المعرفة</h1>
+        <p class="sub">CSV ← تحقق وترخيص ← SQLite/FTS5 ← أدلة مع المصدر</p>
+      </div>
+    </div>
+    <nav aria-label="روابط">
+      <a href="/agent">مساحة الوكيل</a>
+      <a href="/studio">الاستوديو</a>
+      <a href="/system">حالة النظام</a>
+    </nav>
+  </header>
+
+  <main class="layout">
+    <section class="card auth" aria-labelledby="auth-title">
+      <h2 id="auth-title">دخول المالك</h2>
+      <p class="hint">الرمز يبقى في هذا التبويب فقط. الصفحة قراءة فقط: لا استيراد ولا كتابة من المتصفح.</p>
+      <label class="field">
+        <span>رمز الوصول (Bearer)</span>
+        <input id="token" type="password" autocomplete="off" spellcheck="false" placeholder="APP_API_TOKEN / CELIA_MCP_API_TOKEN">
+      </label>
+      <button id="connect" class="primary" type="button">اتصال</button>
+      <p id="auth-status" class="status" role="status">غير متصل</p>
+    </section>
+
+    <section class="card" aria-labelledby="status-title">
+      <h2 id="status-title">حالة الفهرس</h2>
+      <p class="badge" id="kb-badge">جارٍ الفحص…</p>
+      <ul class="facts">
+        <li><span>العناصر</span><b id="fact-items">—</b></li>
+        <li><span>الكيانات</span><b id="fact-entities">—</b></li>
+        <li><span>الحواف</span><b id="fact-edges">—</b></li>
+        <li><span>المصادر</span><b id="fact-sources">—</b></li>
+        <li><span>غائب عن المصدر</span><b id="fact-absent">—</b></li>
+        <li><span>متقادم</span><b id="fact-stale">—</b></li>
+      </ul>
+      <p class="hint" id="kb-note"></p>
+      <p class="hint" id="kb-runs"></p>
+    </section>
+
+    <section class="card search-card" aria-labelledby="search-title">
+      <div class="row">
+        <h2 id="search-title">بحث</h2>
+        <button id="stale-btn" class="ghost" type="button">تقرير التقادم</button>
+      </div>
+      <label class="field">
+        <span>سؤالك</span>
+        <input id="query" type="search" maxlength="500" placeholder="مثال: كيف أربط جوجل؟ / إنشاء موعد في التقويم" autocomplete="off">
+      </label>
+      <div class="row actions">
+        <label class="inline"><input id="min-trust" type="checkbox"> نتائج T3 فقط</label>
+        <button id="search" class="primary" type="button" disabled>ابحث</button>
+      </div>
+      <p class="hint" id="search-meta"></p>
+      <ol id="results" class="results" aria-live="polite"></ol>
+      <div id="stale-report" class="stale" hidden></div>
+    </section>
+
+    <section class="card graph-card" aria-labelledby="graph-title">
+      <h2 id="graph-title">الكيانات والحواف</h2>
+      <div class="row actions">
+        <select id="entity-type" aria-label="نوع الكيان">
+          <option value="tool">أدوات</option>
+          <option value="skill">مهارات</option>
+          <option value="project">مشاريع</option>
+          <option value="concept">مفاهيم</option>
+          <option value="source">مصادر</option>
+        </select>
+        <button id="load-entities" class="ghost" type="button" disabled>تحميل</button>
+      </div>
+      <ul id="entities" class="entities" aria-live="polite"></ul>
+      <div id="entity-detail" class="detail" hidden></div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p>كل نتيجة تحمل مصدرها وترخيصها ومستوى ثقتها. لا نتيجة بلا دليل، ولا كيان بلا سجل، ولا حذف تلقائي عند غياب الصف — يُعلَّم «غائب» فقط. المخطط الحالي حتمي، والأدوات الخارجية تُعلن مخاطرها ولا تُنفّذ من هنا.</p>
+  </footer>
+
+  <script src="/kb.js" type="module"></script>
+</body>
+</html>

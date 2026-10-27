@@ -39,12 +39,17 @@ function outcomeOf(toolRuns, name) {
   }
 }
 
-export function createDemoPlanner({ externalEffectTool = 'google.calendar_create_event' } = {}) {
+export function createDemoPlanner({ externalEffectTool = 'google.calendar_create_event', knowledge = false } = {}) {
   return {
     name: 'demo-deterministic',
+    knowledge,
     async plan({ messages, toolRuns }) {
       const goal = lastUserMessage(messages);
 
+      if (knowledge && !succeeded(toolRuns, 'kb.search')) {
+        if (failed(toolRuns, 'kb.search')) return this.giveUp(toolRuns, 'kb.search');
+        return { action: DECISION.call, tool: 'kb.search', args: { query: goal, limit: 4 } };
+      }
       if (!succeeded(toolRuns, 'celia.thread_context')) {
         if (failed(toolRuns, 'celia.thread_context')) return this.giveUp(toolRuns, 'celia.thread_context');
         return { action: DECISION.call, tool: 'celia.thread_context', args: {} };
@@ -68,10 +73,17 @@ export function createDemoPlanner({ externalEffectTool = 'google.calendar_create
       }
       const draft = outcomeOf(toolRuns, 'celia.draft_outline');
       const status = outcomeOf(toolRuns, 'celia.system_status');
+      const evidence = knowledge ? outcomeOf(toolRuns, 'kb.search') : null;
       const steps = draft?.steps || [];
+      const citations = (evidence?.items || [])
+        .slice(0, 3)
+        .map((item) => `- ${item.title} (${item.trust}، ${item.licence}) ${item.uri}`)
+        .join('\n');
       const summary = [
         `المخرج: مسودة مخطط من ${steps.length} خطوات لهدف «${(draft?.goal || goal).slice(0, 120)}».`,
         draft?.sentences?.length ? `جمل مفتاحية: ${draft.sentences.slice(0, 3).join(' · ')}` : null,
+        evidence?.items?.length ? `أدلة من شبكة المعرفة (${evidence.items.length}، منها ${evidence.entities?.length || 0} كيان):\n${citations}` : null,
+        evidence && !evidence.items?.length ? 'لم يجد البحث في شبكة المعرفة دليلًا مطابقًا؛ لم تُختلق مراجع.' : null,
         status ? `حالة النظام المقروءة: الإصدار ${status.version ?? 'غير متاح'}، التخزين ${status.storage ?? 'غير متاح'}.` : null,
         'لم يُنفَّذ أي أثر خارجي؛ أي موعد أو إرسال ينتظر موافقة صريحة (AGENT-002).',
         'المخطط تجريبي حتمي وليس استدلالًا عامًا من نموذج.'

@@ -52,6 +52,23 @@ jobs:
           CELIA_CONTINUITY_BASE: ${{ github.event.pull_request.base.sha }}
         run: npm run check:continuity
       - run: npm audit --omit=dev --audit-level=moderate
+      - name: Knowledge registries are verified (manifest, licences, risk policy)
+        env:
+          CELIA_KB_PATH: ${{ runner.temp }}/knowledge-verify.sqlite3
+        run: |
+          npm run kb -- verify
+          npm run kb -- import --apply
+          npm run kb -- search "كيف أربط جوجل" --limit 3
+          npm run kb -- entity tool google_calendar_events_create
+          npm run kb -- stale --days 1
+      - name: Knowledge export and restore reproduce the same index
+        env:
+          CELIA_KB_PATH: ${{ runner.temp }}/knowledge-ci.sqlite3
+        run: |
+          npm run kb -- import --apply
+          npm run kb -- export --out "$RUNNER_TEMP/knowledge.jsonl"
+          CELIA_KB_PATH="$RUNNER_TEMP/knowledge-restored.sqlite3" npm run kb -- restore --file "$RUNNER_TEMP/knowledge.jsonl"
+          CELIA_KB_PATH="$RUNNER_TEMP/knowledge-restored.sqlite3" npm run kb -- status
       - name: Secret-free MCP smoke test
         env:
           CELIA_MCP_DISABLE_MYSQL: 'true'

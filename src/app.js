@@ -8,8 +8,10 @@ import { createSecretsHubRouter } from './secrets-hub.js';
 import { createWhatsAppApiRouter, createWhatsAppWebhookRouter } from './whatsapp.js';
 import { createAgentHost } from './agent/index.js';
 import { createAgentRouter } from './agent-routes.js';
+import { createKnowledgeHost } from './knowledge/index.js';
+import { createKbRouter } from './kb-routes.js';
 
-export function createApp({ pool, config, services = createServiceRegistry(config), agentHost }) {
+export function createApp({ pool, config, services = createServiceRegistry(config), agentHost, kbHost }) {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', config.nodeEnv === 'production' ? 1 : false);
@@ -21,14 +23,18 @@ export function createApp({ pool, config, services = createServiceRegistry(confi
   mountOperations(app, { operations, authorize });
   pool = isolatePool(pool, services);
 
+  const knowledge = kbHost || createKnowledgeHost({ nodeEnv: config.nodeEnv });
   const agents =
     agentHost ||
     createAgentHost({
       config,
       pool,
-      statusProvider: () => operations.liveness()
+      statusProvider: () => operations.liveness(),
+      kbHost: knowledge
     });
+  app.locals.kbHost = knowledge;
   app.locals.agentHost = agents;
+  app.use('/api/kb', createKbRouter({ kb: knowledge, authorize }));
   app.use('/api/agent', createAgentRouter({ agent: agents, authorize }));
 
   // WhatsApp signature validation needs the exact raw request bytes.

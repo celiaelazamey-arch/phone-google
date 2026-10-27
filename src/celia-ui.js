@@ -63,6 +63,9 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, oper
   router.get('/deploy.css', (_req, res) => res.type('text/css').sendFile(path.join(PUBLIC_DIR, 'deploy.css')));
   router.get('/deploy.js', (_req, res) => res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'deploy.js')));
 
+  router.get(['/kb', '/kb.html'], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'kb.html')));
+  router.get('/kb.css', (_req, res) => res.type('text/css').sendFile(path.join(PUBLIC_DIR, 'kb.css')));
+  router.get('/kb.js', (_req, res) => res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'kb.js')));
   router.get(['/agent', '/agent.html'], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'agent.html')));
   router.get('/agent.css', (_req, res) => res.type('text/css').sendFile(path.join(PUBLIC_DIR, 'agent.css')));
   router.get('/agent.js', (_req, res) => res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'agent.js')));
