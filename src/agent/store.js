@@ -438,6 +438,38 @@ export function createAgentStore({ driver, clock = Date.now, idFactory = crypto.
       return rows.map(mapToolRun);
     },
     /**
+     * Search already completed document reports in the durable agent ledger.
+     * This deliberately reuses agent_tool_runs: no parallel document database or
+     * schema migration is introduced. It is a historical duplicate check; concurrent
+     * executions still require the normal single-worker/lease controls.
+     */
+    async findExistingDocumentReport({ documentHash = null, invoiceFingerprint = null } = {}) {
+      if (!documentHash && !invoiceFingerprint) return null;
+      const rows = await driver.all(
+        "SELECT run_id AS runId, outcome FROM agent_tool_runs WHERE tool_name = ? AND status = ? ORDER BY created_at DESC LIMIT 2000",
+        ['data.report', TOOL_RUN_STATUS.succeeded]
+      );
+      for (const row of rows) {
+        let report;
+        try {
+          report = typeof row.outcome === 'string' ? JSON.parse(row.outcome) : row.outcome;
+        } catch {
+          continue;
+        }
+        if (
+          (documentHash && report?.document_hash === documentHash) ||
+          (invoiceFingerprint && report?.invoice_fingerprint === invoiceFingerprint)
+        ) {
+          return {
+            run_id: row.runId,
+            document_hash: report.document_hash || null,
+            invoice_fingerprint: report.invoice_fingerprint || null
+          };
+        }
+      }
+      return null;
+    },
+    /**
      * A tool run another process may have started and never settled. Matched by its
      * idempotency key so a reconciled outbox intent and its tool run stay one truth.
      */
