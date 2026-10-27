@@ -99,7 +99,7 @@ export function createDefaultTools({ statusProvider } = {}) {
       description: 'قراءة عدد رسائل الخيط الحالية وآخر رسالة فيه',
       risk: RISK.read,
       arguments: {},
-      async execute({ context } = {}) {
+      async execute(_args, { context } = {}) {
         const messages = context?.messages || [];
         const last = messages[messages.length - 1];
         return {
