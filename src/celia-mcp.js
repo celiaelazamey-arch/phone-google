@@ -17,6 +17,8 @@ import { installShutdown } from './lifecycle.js';
 import { DEFAULT_POLICY } from './gemini.js';
 import { loadExtendedIntegrationsConfig } from './ai-providers.js';
 import { createCeliaUiRouter } from './celia-ui.js';
+import { createAgentHost } from './agent/index.js';
+import { createAgentRouter } from './agent-routes.js';
 import { createMemoryPool } from './memory-pool.js';
 import { checkOllamaHealth, generateCeliaReply, normalizeOllamaBaseUrl, resolveEffectiveAiProvider, SUPPORTED_AI_PROVIDERS } from './ollama.js';
 import {
@@ -983,7 +985,7 @@ function requireMcpToken(config) {
   };
 }
 
-export function createCeliaMcpApp({ pool, config, services = createServiceRegistry(config) }) {
+export function createCeliaMcpApp({ pool, config, services = createServiceRegistry(config), agentHost }) {
   const app = express();
   const idempotencyStore = createIdempotencyStore();
   const activeTools = getActiveMcpTools(config);
@@ -1026,6 +1028,9 @@ export function createCeliaMcpApp({ pool, config, services = createServiceRegist
     } catch (error) { next(error); }
   });
   app.use(createSecretsHubRouter({ config, services, idempotencyStore, authorize }));
+  const agents = agentHost || createAgentHost({ config, pool, statusProvider: () => operations.liveness() });
+  app.locals.agentHost = agents;
+  app.use('/api/agent', createAgentRouter({ agent: agents, authorize }));
   if (config.hosting?.integrationsEnabled) {
     app.use(createIntegratedApiRouter({ pool, config: config.hosting.integrationConfig, services }));
   }

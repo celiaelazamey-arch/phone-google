@@ -1,0 +1,55 @@
+name: Agent branch Pages preview
+
+# Publishes the *static* build to GitHub Pages so the owner gets a real, free HTTPS
+# URL without a payment card. It is a static snapshot: /api/agent is not available
+# there, and the page says so instead of pretending to run the agent loop.
+#
+# Scope: only this working branch. `enablement: true` lets the workflow create the
+# Pages site (the API token used outside Actions lacks the `pages` permission).
+
+on:
+  push:
+    branches: [arena/bc862105-phone-google]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-agent-preview
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/arena/bc862105-phone-google'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build:pages
+      - name: Ensure no obvious secret values leaked into dist
+        run: |
+          if grep -RInE "(APP_API_TOKEN|TOKEN_ENCRYPTION_KEY|GEMINI_API_KEY|MYSQL_PASSWORD)=" dist; then
+            echo '::error::A secret assignment was found in dist.'
+            exit 1
+          fi
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

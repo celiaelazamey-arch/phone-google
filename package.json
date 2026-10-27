@@ -11,6 +11,7 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "db:init": "node src/init-db.js",
+    "migrate": "node scripts/migrate.mjs",
     "celia:mcp": "node src/celia-mcp.js",
     "celia:mcp:stdio": "node src/celia-mcp.js --stdio",
     "celia:mcp:verify": "node src/celia-mcp.js --self-test",

@@ -6,8 +6,10 @@ import { createOperations, mountOperations } from './operations.js';
 import { createGoogleRouter } from './google.js';
 import { createSecretsHubRouter } from './secrets-hub.js';
 import { createWhatsAppApiRouter, createWhatsAppWebhookRouter } from './whatsapp.js';
+import { createAgentHost } from './agent/index.js';
+import { createAgentRouter } from './agent-routes.js';
 
-export function createApp({ pool, config, services = createServiceRegistry(config) }) {
+export function createApp({ pool, config, services = createServiceRegistry(config), agentHost }) {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', config.nodeEnv === 'production' ? 1 : false);
@@ -18,6 +20,16 @@ export function createApp({ pool, config, services = createServiceRegistry(confi
   app.locals.operations = operations;
   mountOperations(app, { operations, authorize });
   pool = isolatePool(pool, services);
+
+  const agents =
+    agentHost ||
+    createAgentHost({
+      config,
+      pool,
+      statusProvider: () => operations.liveness()
+    });
+  app.locals.agentHost = agents;
+  app.use('/api/agent', createAgentRouter({ agent: agents, authorize }));
 
   // WhatsApp signature validation needs the exact raw request bytes.
   app.use('/webhooks/whatsapp', createWhatsAppWebhookRouter({ pool, config, services }));

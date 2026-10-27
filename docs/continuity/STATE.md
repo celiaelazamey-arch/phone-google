@@ -1,8 +1,28 @@
 # الحالة الحالية — ابدأ من هنا
 
-**آخر مراجعة:** 27 أكتوبر 2026 · **نوع الجلسة الحالية:** تثبيت **GOOG-002** بعد دمج PR #28 — جعل مخرجات `google:doctor --json` JSON نقيًا واختبار CLI · سجل الجلسة: [2026-10-27-goog002-doctor-json](sessions/2026-10-27-goog002-doctor-json.md)
+**آخر مراجعة:** 27 أكتوبر 2026 · **نوع الجلسة الحالية:** تنفيذ **AGENT-001/M1 + COMP-003** — حلقة وكيل دائمة وسجل ترحيل، بلا نشر وبلا ادعاء Manus · سجل الجلسة: [2026-10-27-agent-m1-runtime](sessions/2026-10-27-agent-m1-runtime.md)
 
-## الطلب الحالي (أعلى أولوية)
+## الطلب الحالي (أعلى أولوية) — تنفيذ لا إرشاد، وبلا بطاقة
+
+طلب المالك: **«بقدر ما تستطيع»** — تنفيذ فعلي لا خطوات، وتوقف صريح عند أي بطاقة/تكلفة. في هذه الجلسة نُفِّذ
+المسار الوحيد القابل للإثبات بلا حساب خارجي: **حلقة الوكيل M1** ومعه **سجل الترحيل**.
+
+- **منفذ ومختبر (AGENT-001 جزئيًا):** `src/agent/{drivers,store,runtime,tools,planner,index}.js` + `src/agent-routes.js`
+  + `public/agent.{html,css,js}`: خيوط/رسائل/تشغيلات/خطوات/استدعاءات دائمة، قفل lease، استئناف من آخر خطوة مؤكدة،
+  `needs_reconciliation` لأي استدعاء غير محسوم، إلغاء، ميزانيات خطوة/تكلفة/زمن، بوابة مخاطر، SSE، وملكية على كل صف.
+  التخزين صريح: `CELIA_AGENT_RUNTIME=mysql|sqlite`، والافتراضي `off` — **لا ذاكرة ولا ارتداد صامت**.
+- **منفذ ومختبر (COMP-003 جزئيًا):** `scripts/migrate.mjs` + `sql/migrations/0002-agent-runtime.sql` مع سجل
+  `schema_migrations` وبصمات SHA-256 ورفض drift وdry-run افتراضي؛ الجداول الخمسة الأساسية و`schema 1` بلا مساس.
+- **الفحوص:** `npm test` **124/124** (منها 25 اختبارًا جديدًا)، `npm run check` 68 ملفًا، `release:check` 0.2.1/schema 1،
+  `check:continuity` ناجح، `check:secrets` ناجح، `celia:mcp:verify` 12 أداة، `build:pages` 7 صفحات، `npm audit` 0 ثغرات.
+- **لم يُنفَّذ ويُصرَّح به:** MySQL حي و`npm run migrate -- --apply` (لا خدمة هنا)، اختبار متصفح (لا Chromium)،
+  مخطط لغوي/مزوّد AI (AI-002)، أثر خارجي (AGENT-002)، عزل (AGENT-003)، استئناف تلقائي عند الإقلاع، وأي نشر دائم.
+- **النشر المجاني ما زال محجوبًا بصلاحية الحساب:** `gh api` يعيد `has_pages=false`، ومحاولة التفعيل من الجلسة ما زالت
+  `403 Resource not accessible by integration`؛ والتفويض الفعلي يبقى للمالك (HOST-003). لا Render/Aiven بلا بطاقة/تفويض.
+- **الحد المعلن:** لا يُوصف النظام بأنه «مثل Manus». الحلقة حقيقية ودائمة، لكن التخطيط حتمي تجريبي والتنفيذ
+  خارجيًا مرفوض بالتصميم حتى المراحل التالية.
+
+## الطلب السابق — GOOG-002 (مكتمل ومدموج)
 
 قال المالك: **«الغرض نظام متكامل مثل مانوس»** — أي أن الهدف المنتجي هو وكيل ينفّذ مهمة كاملة لا مساعد
 يستدعي أداة واحدة. الاستجابة المنتجية الموثقة هي [خطة الوكيل](../agent-runtime-plan.md)
@@ -41,9 +61,9 @@ pass/warn/fail، بلا شبكة وبلا طباعة أي سر) · `npm run goog
 ## الواقع والهوية
 
 - المستودع: `celiaelazamey-arch/phone-google`؛ خط الأساس لهذه الجلسة `10b9b5dd4ca81e7b53541819b795d369fd859120` (دمج PR #28 على `main`). طلبات PR #17 و#21 و#22 و#23 و#24 و#25 و#26 و#27 و#28 مدموجة.
-- الفرع المعطى لهذه الجلسة: `arena/69d96c03-phone-google` على خط أساس `10b9b5d` (دمج PR #28). تحقّق دائمًا من الفرع النشط ولا تنشئ أو تنتقل لفرع آخر. (`arena/64505100-…` و`arena/20079390-…` و`arena/051ed103-…` و`arena/24d51c71-…` انتهت بعد الدمج ولا يُعدّل منها شيء.)
-- الكود الحالي `0.2.1` / السابق `0.2.0` / `schema: 1` كما هي دون أي تعديل؛ تثبيت CLI لا يغير الإصدار أو عقود Google/MCP أو المخطط.
-- كان المستودع مقتطاعًا (shallow) بعمق 1؛ اختبار توافق 0.2.0 يحتاج commit قاعدة `2508893bd7e6d447b2e19374933556322cc9cdb7` محليًا. نُفذ `git fetch --unshallow origin` في هذه الجلسة قبل الاختبار، فنجح اختبار N/N−1 ضمن 98/98.
+- الفرع المعطى لهذه الجلسة: `arena/bc862105-phone-google` على خط أساس `c3c42e2` (دمج PR #29). تحقّق دائمًا من الفرع النشط ولا تنشئ أو تنتقل لفرع آخر. (`arena/69d96c03-…` و`arena/24d51c71-…` و`arena/051ed103-…` و`arena/20079390-…` و`arena/64505100-…` انتهت بعد الدمج ولا يُعدّل منها شيء.)
+- الكود الحالي `0.2.1` / السابق `0.2.0` / `schema: 1` كما هي دون أي تعديل. جداول الوكيل `agent_*` إضافية عبر سجل ترحيل مستقل (DEC-013) ولا تغيّر مخطط الجداول الخمسة.
+- كان المستودع مقتطاعًا (shallow) بعمق 1؛ نجح `git fetch --unshallow origin` في هذه الجلسة، فصار commit قاعدة 0.2.0 متاحًا وعمل اختبار N/N−1. أي استنساخ جديد يحتاج الخطوة نفسها قبل `npm test`.
 - لا رابط Render/Aiven دائم منشأ (HOST-003 بانتظار تفويض المالك).
 
 ## سجل العمل السابق (مكتمل) — حزمة السبّابة SPDR-001
@@ -67,41 +87,38 @@ pass/warn/fail، بلا شبكة وبلا طباعة أي سر) · `npm run goog
 
 ## التحقق الحالي
 
-بيئة محلية Python 3.11.2 / Node 22.22.3 / npm 10.9.8:
+بيئة محلية Node 22.22.3 / npm 10.9.8، بلا MySQL أو Docker أو Chromium:
 
-- `python -m unittest discover -s tests -v` (داخل `celia-google-spider/`): **10/10 ناجحة** (شاملة مصافحة MCP stdio).
-- `python -m pytest -q`: **10 passed**. و`python -m compileall -q celia_spider tests` سليم.
-- `zip -T dist/celia-google-spider-v0.1.0.zip`: سليم (19 ملفًا، بلا اعتمادات أو فهارس).
-- `npm run check`: ناجح — فحص syntax لـ **62 ملف JavaScript**.
+- `npm test`: **124/124** ناجحة بعد `git fetch --unshallow`. الجديد: `test/agent-store.test.js` 6/6،
+  `test/agent-runtime.test.js` 16/16، `test/agent-routes.test.js` 3/3.
+- `npm run check`: ناجح — 68 ملف JavaScript (كان 62).
 - `npm run release:check`: ناجح — `0.2.1` / السابق `0.2.0` / `databaseSchema: 1`.
-- `npm test`: **98/98 ناجحة** (95 بعد GOOG-002 + 3 لاختبارات CLI) بعد `git fetch --unshallow` لجلب commit قاعدة 0.2.0 (انظر «الواقع والهوية»).
-- `node --test test/google-doctor.test.js test/google-preflight.test.js test/google-preflight-route.test.js`: **15/15**؛ وتحقق فعلي أن `npm run --silent google:doctor -- --json` يُحلَّل بـ`JSON.parse` ويعطي 10 pass / 0 fail في بيئة اصطناعية مكتملة.
-- `npm run check:secrets`: ناجح — تتبع 9/9 أسرار (قيم غير مضيئة محليًا بمفردها؛ التحقق الحي 401/200 يشغّله CI).
-- `npm run celia:mcp:verify`: ناجح — مصافحة وفحص جاهزية، 12 أداة.
-- `npm run build:pages`: ناجح — 6 صفحات ثابتة (`dist/`).
-- `CELIA_CONTINUITY_BASE=10b9b5dd4ca81e7b53541819b795d369fd859120 npm run check:continuity`: ناجح — 23 وثيقة و59 رابطًا و47 معرفًا بلا دورات، وبوابة handoff مفعلة (STATE وسجل الجلسة ضمن نطاق التغيير).
-- اختبارات المتصفح وMySQL 8.4 لا تُشغَّل محليًا (ثنائيات/خدمة غير متاحة)؛ فحصهما آلي في CI.
-- **CI الفعلي على PR #25 (run `40486458531` على `eac8eec`): كل الوظائف خضراء** — `Python 3.11 · Celia Google Spider tests` (جديد) و`verify` على Node 22/24 (شامل بوابة الاستمرارية و`check:secrets` و`celia:mcp:verify` و`build:pages`) و`container` و`browser` و`mysql`، و`live-gemini` مُتخطّاة بتصميمها.
-- **CI الفعلي على PR #28 المدموج:** Node 22/24 وcontainer وMySQL 8.4 والمتصفح وPython خضراء؛ فحص المزود الخارجي الاختياري متخطى. نتائج تعديل CLI أعلاه محلية، و[PR #29](https://github.com/celiaelazamey-arch/phone-google/pull/29) هو المرجع الحي لحالة CI الخاصة به.
+- `npm run check:continuity`: ناجح — 23 وثيقة و59 رابطًا و47 معرفًا بلا دورات.
+- `npm run check:secrets`: ناجح · `npm run celia:mcp:verify`: ناجح — 12 أداة، `storage=memory` صريح.
+- `npm run build:pages`: ناجح — 7 صفحات (`agent.html` ضمنها) · `npm audit --omit=dev --audit-level=moderate`: 0 ثغرات.
+- `npm run migrate` (dry-run) و`-- --apply` **لم يُنفَّذا**: لا MySQL في البيئة؛ الكود يرفض الذاكرة ويطلب قاعدة حقيقية.
+- اختبارات المتصفح وMySQL 8.4 تُشغَّل في CI فقط. **لا نتيجة CI لهذه الجلسة بعد الدفع** — المرجع الحي هو PR الفرع.
 
 ## حدود لا يجوز نسيانها
 
 - أسرار المستودع التسعة لا تُقرأ ولا تُطبع ولا تُضاف لملفات الحزمة؛ و`credentials.json` و`token.json` ممنوعان من Git مهما طُلب من التوثيق.
 - الحزمة ليست موصلة ChatGPT (خارج النطاق صراحةً) ولا تدّعي بحثًا دلاليًا ولا حذفًا تلقائيًا، ولا يُعلن نشرها كمكوّن من النظام قبل قبول المالك (SPDR-002).
-- لا مستودع GitHub جديد ولا دفع خارج `arena/69d96c03-phone-google`؛ لا releases ولا دمج PR من هذه الجلسة دون طلب صريح.
+- لا مستودع GitHub جديد ولا دفع خارج `arena/bc862105-phone-google`؛ لا releases ولا دمج PR من هذه الجلسة دون طلب صريح.
 - إن زوّد المالك `RULE.MD`: حفظ حرفي في الجذر وتوثيق الفروق في `DECISIONS.md` دون اختلاق.
 - مهام الخطة الأخرى تبقى كما هي في `BACKLOG.md` (COMP-001/DATA-001/SEC-001… ) دون ادعاء إغلاقها.
 
 ## الخطوة التالية بالضبط
 
-1. **اختبار الربط الحي:** ضع `GOOGLE_CLIENT_ID/SECRET` و`APP_OWNER_EMAIL` و`APP_OWNER_PHONE_E164` و`APP_BASE_URL`
-   على نطاق HTTPS (HOST-003) ⇒ شغّل `npm run google:doctor` (أو `GET /api/google/preflight`) حتى تختفي كل
-   `fail` ⇒ اطلب `POST /api/google/consent-link` وافتح الرابط ⇒ ثم `200` من
-   `/api/google/calendar/events?maxResults=1`. لا تدّعِ نجاحًا قبل رؤية هذا الـ200.
-2. **أربعة قرارات المالك أعلاه** — بدونها لا يبدأ AGENT-001؛ الافتراض الافتراضي عند غياب القرار مذكور في DEC-012.
-3. **إن أراد المالك الخيار 2** (ربط `GOOGLE_CLIENT_ID/SECRET` بخطوة CI): يحدد الاستخدام المقصود — لا ربط بلا غرض معلن.
-4. **إن رغب المالك في مزامنة حية (SPDR-002):** OAuth client من نوع Desktop في Google Cloud، ثم `credentials.json` محليًا (خارج Git)، ثم `python -m celia_spider.auth`، ثم المزامنة والتحقق من حدود عدم الحذف — لا موافقة تفاعلية داخل CI.
-5. **متابعة باقي الخطة** من [BACKLOG](BACKLOG.md) (COMP-001/DATA-001/SEC-001/HOST-003…) دون ادعاء إغلاقها بهذا التسليم.
+1. **CI الفرع:** بعد الدفع، تأكد من خضرة `verify` (Node 22/24) و`mysql` — ثم أضف إلى وظيفة MySQL تشغيل
+   `npm run migrate` (dry-run) و`-- --apply` على خدمة MySQL 8.4، وإعادة قراءة `-- --status` للتأكد من عدم drift.
+   لا تعلن دعم MySQL الدائم قبل رؤية ذلك.
+2. **PLANNER-الحقيقي (AI-002):** واجهة `plan()` جاهزة؛ يلزم مزوّد + تحقق JSON صارم + ميزانية + مجموعة تقييم
+   عربية قبل أي وصف للوكيل بالذكاء. لا مفاتيح في المتصفح ولا سجلات.
+3. **AGENT-002:** outbox وموافقات مصنّفة قبل تشغيل أي أداة `external_effect`؛ اختبار «انقطاع بعد الإرسال» يجب
+   أن ينتج `unknown` ومصالحة لا إرسالًا ثانيًا.
+4. **HOST-003 (للمالك):** نقرة تفعيل Pages (Settings → Pages → Source: GitHub Actions) و/أو تفويض Render+Aiven.
+   من هذه الجلسة: التفعيل عبر API ما زال 403؛ لا بطاقة ولا تجاوز تحقق.
+5. **بقية الخطة** كما هي في BACKLOG (COMP-001/DATA-001/SEC-001/QA-004…) دون ادعاء إغلاقها بهذا التسليم.
 
 ## التحقق من الحفظ في الجلسة التالية
 
