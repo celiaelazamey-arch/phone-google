@@ -247,24 +247,37 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
     await admin.end().catch(() => {});
   });
 
-  const runMigrate = async (args = []) => {
-    const { stdout } = await exec(process.execPath, ['scripts/migrate.mjs', ...args], { cwd: root, env: { ...process.env, ...mysqlEnv } });
-    return JSON.parse(stdout);
-  };
-
   await bootstrapEmptySchema({ ...config, mysql: { ...config.mysql, database: schema } });
 
-  const before = await runMigrate([]);
-  assert.equal(before.ledger, 'missing', 'dry run reports the missing ledger and writes nothing');
+  const { runMigrations } = await import('../src/schema-migrations.js');
+  const directory = path.join(root, 'sql', 'migrations');
+  const migrationConnection = await mysql.createConnection({ ...config.mysql, database: schema, charset: 'utf8mb4', timezone: 'Z' });
+  try {
+    const before = await runMigrations({ connection: migrationConnection, directory });
+    assert.equal(before.ledger, 'missing', 'dry run reports the missing ledger and writes nothing');
 
-  const applied = await runMigrate(['--apply']);
-  assert.deepEqual(applied.appliedNow, ['0002-agent-runtime.sql']);
+    const applied = await runMigrations({ connection: migrationConnection, directory, apply: true });
+    assert.deepEqual(applied.appliedNow, ['0002-agent-runtime.sql']);
 
-  const second = await runMigrate(['--apply']);
-  assert.deepEqual(second.pending, [], 'a second apply is a no-op');
-  const status = await runMigrate(['--status']);
-  assert.equal(status.applied.length, 1);
-  assert.equal(status.applied[0].version, 2);
+    const second = await runMigrations({ connection: migrationConnection, directory, apply: true });
+    assert.deepEqual(second.pending, [], 'a second apply is a no-op');
+    const status = await runMigrations({ connection: migrationConnection, directory, statusOnly: true });
+    assert.equal(status.applied.length, 1);
+    assert.equal(status.applied[0].version, 2);
+  } finally {
+    await migrationConnection.end();
+  }
+
+  // The CLI is the documented entry point; keep a smoke check with a readable error.
+  try {
+    const { stdout } = await exec(process.execPath, ['scripts/migrate.mjs', '--status'], {
+      cwd: root,
+      env: { ...process.env, ...mysqlEnv }
+    });
+    assert.equal(JSON.parse(stdout).applied.length, 1);
+  } catch (error) {
+    throw new Error(`migrate CLI failed: ${String(error?.stderr || error?.message || '').slice(0, 600)}`);
+  }
 
   pool = mysql.createPool({ ...config.mysql, database: schema, charset: 'utf8mb4', timezone: 'Z', connectionLimit: 4 });
   await pool.execute('INSERT INTO app_users (id) VALUES (?) ON DUPLICATE KEY UPDATE id = VALUES(id)', [config.userId]);

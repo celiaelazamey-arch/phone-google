@@ -179,8 +179,8 @@ jobs:
       - name: Surface failure details as a readable annotation
         if: failure()
         run: |
-          DETAIL="$(grep -aE 'not ok|AssertionError|error:|expected:|actual:|# fail|failed' /tmp/mysql-suite.log 2>/dev/null | head -8 | tr '\n' ' ' | tr -d '\r' | sed 's/%/%25/g' | cut -c1-900)"
-          echo "::error title=mysql-suite::${DETAIL:-suite failed without a matching log line}"
+          DETAIL="$(tail -12 /tmp/mysql-suite.log 2>/dev/null | tr '\n' ' ' | tr -d '\r' | sed 's/%/%25/g' | cut -c1-900)"
+          echo "::error title=mysql-suite::${DETAIL:-suite failed without a log tail}"
       - name: Retain sanitized acceptance evidence, never SQL dumps or credentials
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
