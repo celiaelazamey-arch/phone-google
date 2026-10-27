@@ -1,7 +1,8 @@
 import { createAgentRuntime } from './runtime.js';
 import { createAgentStore } from './store.js';
 import { createMysqlDriver, createSqliteDriver } from './drivers.js';
-import { createToolRegistry, defaultToolDefinitions } from './tools.js';
+import { createToolRegistry, defaultToolDefinitions, RISK } from './tools.js';
+import { documentToolDefinitions } from './automation/tools.js';
 import { createDemoPlanner } from './planner.js';
 import {
   createCalendarConnector,
@@ -170,7 +171,10 @@ export function createAgentHost({
     const connectors = injectedConnectors || buildConnectors({ env, pool, config, logger });
     const runtime = createAgentRuntime({
       store,
-      tools: createToolRegistry(defaultToolDefinitions({ statusProvider, kb })),
+      tools: createToolRegistry([
+        ...defaultToolDefinitions({ statusProvider, kb }),
+        ...documentToolDefinitions({ risk: RISK, documentRoot: env.CELIA_DOCUMENT_ROOT || null, documentStore: store })
+      ]),
       planner: createDemoPlanner({ knowledge: Boolean(kb) }),
       connectors,
       ownerId: config.userId || env.APP_USER_ID || 'owner',
