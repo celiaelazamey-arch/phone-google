@@ -11,7 +11,7 @@
   + `public/agent.{html,css,js}`: خيوط/رسائل/تشغيلات/خطوات/استدعاءات دائمة، قفل lease، استئناف من آخر خطوة مؤكدة،
   `needs_reconciliation` لأي استدعاء غير محسوم، إلغاء، ميزانيات خطوة/تكلفة/زمن، بوابة مخاطر، SSE، وملكية على كل صف.
   التخزين صريح: `CELIA_AGENT_RUNTIME=mysql|sqlite`، والافتراضي `off` — **لا ذاكرة ولا ارتداد صامت**.
-- **منفذ ومختبر (COMP-003 جزئيًا):** `scripts/migrate.mjs` + `sql/migrations/0002-agent-runtime.sql` مع سجل
+- **منفذ ومختبر (COMP-003 جزئيًا):** `scripts/migrate.mjs` + `sql/migrations/0002_agent-runtime.sql` مع سجل
   `schema_migrations` وبصمات SHA-256 ورفض drift وdry-run افتراضي؛ الجداول الخمسة الأساسية و`schema 1` بلا مساس.
 - **الفحوص:** `npm test` **124/124** (منها 25 اختبارًا جديدًا)، `npm run check` 68 ملفًا، `release:check` 0.2.1/schema 1،
   `check:continuity` ناجح، `check:secrets` ناجح، `celia:mcp:verify` 12 أداة، `build:pages` 7 صفحات، `npm audit` 0 ثغرات.

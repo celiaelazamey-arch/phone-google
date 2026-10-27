@@ -30,7 +30,7 @@
 - `src/agent/tools.js` و`src/agent/planner.js`: تصنيف مخاطر إلزامي، أدوات قراءة داخلية، مخططان حتميان
   (تجريبي وللاختبارات) — **لا نموذج لغوي**.
 - `src/agent/index.js`: تفعيل صريح `off|mysql|sqlite` بلا ارتداد صامت إلى الذاكرة.
-- `scripts/migrate.mjs` + `sql/migrations/0002-agent-runtime.sql`: سجل `schema_migrations` ببصمات SHA-256،
+- `scripts/migrate.mjs` + `sql/migrations/0002_agent-runtime.sql`: سجل `schema_migrations` ببصمات SHA-256،
   dry-run افتراضي، رفض drift، وجداول وكيل إضافية لا تمس الخمسة الأساسية.
 
 **الأسطح**

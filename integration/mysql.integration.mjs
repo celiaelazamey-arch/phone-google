@@ -257,7 +257,7 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
     assert.equal(before.ledger, 'missing', 'dry run reports the missing ledger and writes nothing');
 
     const applied = await runMigrations({ connection: migrationConnection, directory, apply: true });
-    assert.deepEqual(applied.appliedNow, ['0002-agent-runtime.sql']);
+    assert.deepEqual(applied.appliedNow, ['0002_agent-runtime.sql']);
 
     const second = await runMigrations({ connection: migrationConnection, directory, apply: true });
     assert.deepEqual(second.pending, [], 'a second apply is a no-op');
