@@ -1,6 +1,9 @@
 import crypto from 'node:crypto';
-import { RUN_STATUS, TOOL_RUN_STATUS, isTerminalStatus } from './store.js';
+import { RUN_STATUS, TOOL_RUN_STATUS, APPROVAL_DECISION, isTerminalStatus } from './store.js';
 import { RISK } from './tools.js';
+import { buildGoalContract } from './goal-contract.js';
+import { EVIDENCE_KIND } from './evidence.js';
+import { createVerifier, VERDICT } from './verifier.js';
 
 /**
  * Agent runtime — the M1 loop (AGENT-001).
@@ -52,6 +55,7 @@ export function createAgentRuntime({
   if (!tools) throw new Error('Agent runtime requires a tool registry');
   if (!planner?.plan) throw new Error('Agent runtime requires a planner');
   const config = Object.freeze({ ...DEFAULT_LIMITS, ...limits });
+  const verifier = createVerifier({ tools, clock });
   const listeners = new Map();
   const controllers = new Map();
   const active = new Map();
@@ -69,12 +73,17 @@ export function createAgentRuntime({
   }
 
   async function contextFor(run, signal) {
-    const [messages, steps] = await Promise.all([store.listMessages(run.threadId), store.listSteps(run.id)]);
+    const [messages, steps, approvals, goalContract] = await Promise.all([
+      store.listMessages(run.threadId),
+      store.listSteps(run.id),
+      store.listApprovals(run.id),
+      store.getGoalContract(run.id)
+    ]);
     const toolRuns = (await store.listToolRuns(run.id)).map((toolRun) => ({
       ...toolRun,
       parsedOutcome: parseOutcome(toolRun.outcome)
     }));
-    return { run, messages, steps, toolRuns, signal, limits: config };
+    return { run, messages, steps, toolRuns, approvals, goalContract, signal, limits: config };
   }
 
   function withTimeout(promise, controller, timeoutMs, signal) {
@@ -105,6 +114,36 @@ export function createAgentRuntime({
     const stored = await store.appendStep({ runId, ...step });
     emit(runId, { type: 'step', step: stored });
     return stored;
+  }
+
+  /**
+   * Reconstruct ledger coverage for tool runs a crashed process durably recorded but
+   * never evidenced. The entry is labelled `tool_call_reconciled` and hashes the stored
+   * outcome: it attests to the durable row, never to a call this process witnessed.
+   */
+  async function backfillToolEvidence(runId, toolRuns, evidenceRows) {
+    const covered = new Set();
+    for (const entry of evidenceRows) for (const sourceId of entry.sourceIds) covered.add(sourceId);
+    let changed = false;
+    for (const toolRun of toolRuns) {
+      if (covered.has(toolRun.id)) continue;
+      await store.appendEvidence({
+        runId,
+        stepId: toolRun.stepId,
+        kind: EVIDENCE_KIND.toolCallReconciled,
+        input: { reconstructed: true, reason: 'ledger_write_interrupted' },
+        output: parseOutcome(toolRun.outcome),
+        sourceIds: [toolRun.id],
+        verdict:
+          toolRun.status === TOOL_RUN_STATUS.succeeded
+            ? VERDICT.pass
+            : toolRun.status === TOOL_RUN_STATUS.unknown
+              ? VERDICT.unknown
+              : VERDICT.block
+      });
+      changed = true;
+    }
+    return changed;
   }
 
   async function finish(runId, status, { error = null } = {}) {
@@ -176,12 +215,58 @@ export function createAgentRuntime({
         }
 
         if (decision?.action === 'finish') {
+          // No deliver without an independent verification step (roadmap rule, unit 7).
+          const verifyContext = await contextFor(run, controller.signal);
+          let priorEvidence = await store.listEvidence(runId);
+          if (await backfillToolEvidence(runId, verifyContext.toolRuns, priorEvidence)) {
+            priorEvidence = await store.listEvidence(runId);
+          }
+          const verification = await verifier.verifyRun({
+            run: verifyContext.run,
+            contract: verifyContext.goalContract,
+            steps: verifyContext.steps,
+            toolRuns: verifyContext.toolRuns,
+            evidence: priorEvidence,
+            approvals: verifyContext.approvals,
+            messages: verifyContext.messages
+          });
+          const verifyStep = await addStep(runId, {
+            kind: 'verify',
+            title: `تحقق مستقل: ${verification.verdict}`,
+            summary: verification.checks.map((check) => `${check.id}=${check.status}`).join(' · ').slice(0, 900)
+          });
+          const verificationEvidence = await store.appendEvidence({
+            runId,
+            stepId: verifyStep.id,
+            kind: EVIDENCE_KIND.verification,
+            input: { objective: verification.objective, verifier: verification.version },
+            output: verification,
+            sourceIds: priorEvidence.map((entry) => entry.id),
+            verdict: verification.verdict
+          });
+          emit(runId, { type: 'verification', verification });
           await addStep(runId, {
             kind: 'deliver',
             title: decision.failed ? 'تسليم بحدود' : 'تسليم',
             summary: String(decision.summary || '')
           });
-          return { run: await finish(runId, decision.failed ? RUN_STATUS.failed : RUN_STATUS.succeeded), claimed: true };
+          await store.appendEvidence({
+            runId,
+            kind: EVIDENCE_KIND.delivery,
+            input: { summary: String(decision.summary || ''), bounded: Boolean(decision.failed) },
+            output: { verdict: verification.verdict },
+            sourceIds: [verificationEvidence.id]
+          });
+          if (verification.verdict === VERDICT.block) {
+            return { run: await finish(runId, RUN_STATUS.failed, { error: 'verification_blocked' }), claimed: true };
+          }
+          if (verification.verdict === VERDICT.unknown) {
+            return { run: await finish(runId, RUN_STATUS.needsReconciliation, { error: 'verification_unknown' }), claimed: true };
+          }
+          return {
+            run: await finish(runId, decision.failed ? RUN_STATUS.failed : RUN_STATUS.succeeded, decision.failed ? { error: 'bounded_delivery' } : {}),
+            claimed: true
+          };
         }
 
         if (decision?.action !== 'call' || typeof decision.tool !== 'string') {
@@ -195,12 +280,41 @@ export function createAgentRuntime({
           return { run: await finish(runId, RUN_STATUS.failed, { error: 'unknown_tool' }), claimed: true };
         }
         if (!tools.executable(tool.name)) {
-          await addStep(runId, {
+          const gateStep = await addStep(runId, {
             kind: 'decide',
             title: 'موافقة مطلوبة',
-            summary: `الأداة ${tool.name} مصنفة ${tool.risk}؛ M1 لا ينفذ أثرًا خارجيًا بلا outbox وموافقة (AGENT-002/AGENT-003).`,
+            summary: `الأداة ${tool.name} مصنفة ${tool.risk}؛ لا ينفَّذ أثر خارجي بلا outbox وموافقة مالك مسجلة (AGENT-002/AGENT-003).`,
             toolName: tool.name
           });
+          // Idempotent: a re-entered loop reuses the same pending/decided request instead of cloning it.
+          const requested = await store.requestApproval({
+            runId,
+            stepId: gateStep.id,
+            toolName: tool.name,
+            risk: tool.risk,
+            idempotencyKey: `approval:${runId}:${tool.name}`
+          });
+          const approval = requested.approval;
+          if (approval.decision === APPROVAL_DECISION.rejected) {
+            await addStep(runId, {
+              kind: 'decide',
+              title: 'موافقة مرفوضة',
+              summary: `المالك رفض الموافقة على ${tool.name}؛ أُوقف التشغيل دون أي أثر خارجي.`,
+              toolName: tool.name
+            });
+            return { run: await finish(runId, RUN_STATUS.cancelled, { error: 'approval_rejected' }), claimed: true };
+          }
+          if (approval.decision === APPROVAL_DECISION.approved) {
+            // Safety net: an approval without the AGENT-002 outbox connector must never fake execution.
+            await addStep(runId, {
+              kind: 'decide',
+              title: 'موافقة بلا منفذ تنفيذ',
+              summary: `الموافقة على ${tool.name} مسجلة، لكن منفذ الأثر الخارجي (outbox AGENT-002) غير مبني بعد؛ لا تنفيذ وهمي ولا إعادة محاولة.`,
+              toolName: tool.name
+            });
+            return { run: await finish(runId, RUN_STATUS.failed, { error: 'external_connector_unavailable' }), claimed: true };
+          }
+          emit(runId, { type: 'approval.requested', approval });
           return { run: await finish(runId, RUN_STATUS.waitingApproval, { error: 'approval_required' }), claimed: true };
         }
 
@@ -243,12 +357,30 @@ export function createAgentRuntime({
             controller.signal
           );
           await store.finishToolRun(toolRun.id, TOOL_RUN_STATUS.succeeded, JSON.stringify(outcome ?? null));
+          await store.appendEvidence({
+            runId,
+            stepId: step.id,
+            kind: EVIDENCE_KIND.toolCall,
+            input: { tool: tool.name, args: decision.args || null },
+            output: outcome ?? null,
+            sourceIds: [toolRun.id],
+            verdict: VERDICT.pass
+          });
           const preview = JSON.stringify(outcome ?? null).slice(0, 300);
           await addStep(runId, { kind: 'observe', title: `${tool.name} ✓`, summary: preview, toolName: tool.name });
         } catch (error) {
           const cancelled = error?.code === 'cancelled' || controller.signal.aborted;
           const status = tool.risk === RISK.read ? TOOL_RUN_STATUS.failed : TOOL_RUN_STATUS.unknown;
           await store.finishToolRun(toolRun.id, status, JSON.stringify({ error: error?.code || 'tool_failed' }));
+          await store.appendEvidence({
+            runId,
+            stepId: step.id,
+            kind: EVIDENCE_KIND.toolCall,
+            input: { tool: tool.name, args: decision.args || null },
+            output: { error: error?.code || 'tool_failed', status },
+            sourceIds: [toolRun.id],
+            verdict: status === TOOL_RUN_STATUS.unknown ? VERDICT.unknown : VERDICT.block
+          });
           await addStep(runId, {
             kind: 'observe',
             title: `${tool.name} ✗`,
@@ -282,13 +414,16 @@ export function createAgentRuntime({
         enabled: true,
         dialect: store.dialect,
         planner: planner.name,
+        verifier: verifier.name,
+        approvalGate: true,
+        evidenceLedger: 'sha256-hash-chain-v1',
         ownerId,
         limits: config,
         tools: tools.list(),
         durable: true,
         note:
           store.dialect === 'mysql'
-            ? 'الحالة في MySQL؛ الاستئناف والإلغاء يعملان بين العمليات.'
+            ? 'الحالة في MySQL؛ الاستئناف والإلغاء وبوابة الموافقات وسجل الأدلة تعمل بين العمليات.'
             : 'مخزن SQLite محلي/تجريبي صريح — ليس إنتاجًا وليس بديلًا صامتًا عن MySQL.'
       };
     },
@@ -312,7 +447,20 @@ export function createAgentRuntime({
         maxSteps: config.maxSteps,
         maxCostMicros: config.maxCostMicros
       });
-      if (created.created) emit(created.run.id, { type: 'run.created', run: created.run });
+      if (created.created) {
+        // Every run carries an inspectable goal contract; its hash anchors the evidence chain.
+        const contract = buildGoalContract({ objective: content, limits: config, createdAt: clock() });
+        await store.saveGoalContract(created.run.id, contract);
+        await store.appendEvidence({
+          runId: created.run.id,
+          kind: EVIDENCE_KIND.goalContract,
+          input: contract,
+          output: null,
+          sourceIds: [appended.message.id],
+          verdict: null
+        });
+        emit(created.run.id, { type: 'run.created', run: created.run, goalContract: contract });
+      }
       return { run: created.run, created: created.created, duplicate: !created.created };
     },
     async start(runId) {
@@ -345,8 +493,99 @@ export function createAgentRuntime({
     async detail(runId, requesterId = ownerId) {
       const run = await store.getRunForOwner(runId, requesterId);
       if (!run) throw httpError(404, 'run_not_found', 'run_not_found');
-      const [steps, toolRuns] = await Promise.all([store.listSteps(runId), store.listToolRuns(runId)]);
-      return { run, steps, toolRuns: toolRuns.map((toolRun) => ({ ...toolRun, outcome: parseOutcome(toolRun.outcome) })) };
+      const [steps, rawToolRuns, goalContract, approvals, evidence, evidenceChain] = await Promise.all([
+        store.listSteps(runId),
+        store.listToolRuns(runId),
+        store.getGoalContract(runId),
+        store.listApprovals(runId),
+        store.listEvidence(runId),
+        store.verifyEvidenceChain(runId)
+      ]);
+      const toolRuns = rawToolRuns.map((toolRun) => ({ ...toolRun, outcome: parseOutcome(toolRun.outcome) }));
+      const verificationEntry = [...evidence].reverse().find((entry) => entry.kind === EVIDENCE_KIND.verification) || null;
+      return {
+        run,
+        steps,
+        toolRuns,
+        goalContract,
+        approvals,
+        evidence,
+        evidenceChain,
+        verification: verificationEntry
+          ? { seq: verificationEntry.seq, verdict: verificationEntry.verdict, at: verificationEntry.createdAt, hash: verificationEntry.hash }
+          : null
+      };
+    },
+    /**
+     * Owner decision on a parked run. The strict rule: an approval never resumes a
+     * call whose outcome is `unknown`/`started` — reconciliation comes first.
+     */
+    async approve(runId, { decision, note = null, idempotencyKey = null } = {}, requesterId = ownerId) {
+      const run = await store.getRunForOwner(runId, requesterId);
+      if (!run) throw httpError(404, 'run_not_found', 'run_not_found');
+      if (![APPROVAL_DECISION.approved, APPROVAL_DECISION.rejected].includes(decision)) {
+        throw httpError(400, 'invalid_approval_decision', 'invalid_approval_decision');
+      }
+      if (run.status !== RUN_STATUS.waitingApproval) {
+        // A retried POST carrying the key of a decision already recorded is an idempotent replay.
+        if (idempotencyKey) {
+          const replay = (await store.listApprovals(runId)).filter((approval) => approval.decisionKey === idempotencyKey);
+          if (replay.length) {
+            return { run: await store.getRun(runId), approvals: replay, resumed: false, idempotentReplay: true };
+          }
+        }
+        throw httpError(409, 'run_not_waiting_approval', 'run_not_waiting_approval');
+      }
+      const unresolved = (await store.listToolRuns(runId)).filter(
+        (toolRun) => toolRun.status === TOOL_RUN_STATUS.unknown || toolRun.status === TOOL_RUN_STATUS.started
+      );
+      if (unresolved.length) {
+        await store.finishRun(runId, RUN_STATUS.needsReconciliation, { error: 'outcome_unknown' });
+        throw httpError(409, 'reconciliation_required', 'reconciliation_required');
+      }
+      const pending = (await store.listApprovals(runId)).filter(
+        (approval) => approval.decision === APPROVAL_DECISION.pending
+      );
+      if (!pending.length) throw httpError(409, 'approval_request_missing', 'approval_request_missing');
+      const decisionKey = idempotencyKey || `decision:${runId}:${pending[0].id}:${decision}`;
+      const decided = [];
+      for (const approval of pending) {
+        const result = await store.decideApproval({
+          approvalId: approval.id,
+          decision,
+          actor: requesterId,
+          note,
+          decisionKey
+        });
+        if (!result.approval) continue;
+        decided.push(result.approval);
+        await store.appendEvidence({
+          runId,
+          stepId: approval.stepId,
+          kind: EVIDENCE_KIND.approval,
+          input: { tool: approval.toolName, risk: approval.risk, decision, actor: requesterId, note },
+          output: null,
+          sourceIds: [approval.id],
+          verdict: decision === APPROVAL_DECISION.approved ? VERDICT.pass : VERDICT.block
+        });
+      }
+      emit(runId, { type: 'approval.decided', decision, approvals: decided });
+      if (decision === APPROVAL_DECISION.rejected) {
+        await addStep(runId, {
+          kind: 'decide',
+          title: 'موافقة مرفوضة',
+          summary: `رفض المالك الأثر الخارجي (${decided.map((approval) => approval.toolName).join('، ')}؛ أُوقف التشغيل دون أي أثر.`
+        });
+        const cancelled = await finish(runId, RUN_STATUS.cancelled, { error: 'approval_rejected' });
+        return { run: cancelled, approvals: decided, resumed: false };
+      }
+      const requeued = await store.requeueRun(runId);
+      const updated = await store.getRun(runId);
+      emit(runId, { type: 'run.approved', run: updated });
+      if (requeued) {
+        runtime.start(runId).catch((error) => logger.error?.('Approved run resume failed:', error?.code || 'resume_failed'));
+      }
+      return { run: updated, approvals: decided, resumed: requeued };
     },
     async threadDetail(threadId, requesterId = ownerId) {
       const thread = await store.getThread(threadId, requesterId);

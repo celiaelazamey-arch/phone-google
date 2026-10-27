@@ -43,8 +43,9 @@ export function createDemoPlanner({ externalEffectTool = 'google.calendar_create
   return {
     name: 'demo-deterministic',
     knowledge,
-    async plan({ messages, toolRuns }) {
+    async plan({ messages, toolRuns, approvals = [] }) {
       const goal = lastUserMessage(messages);
+      const externalApproval = approvals.find((approval) => approval.toolName === externalEffectTool);
 
       if (knowledge && !succeeded(toolRuns, 'kb.search')) {
         if (failed(toolRuns, 'kb.search')) return this.giveUp(toolRuns, 'kb.search');
@@ -64,6 +65,24 @@ export function createDemoPlanner({ externalEffectTool = 'google.calendar_create
       }
       const externalAttempted = toolRuns.some((toolRun) => toolRun.toolName === externalEffectTool);
       if (EXTERNAL_HINTS.test(goal) && !externalAttempted) {
+        if (externalApproval?.decision === 'rejected') {
+          return {
+            action: DECISION.finish,
+            failed: true,
+            summary:
+              `رُفضت الموافقة على الأثر الخارجي ${externalEffectTool} (${externalApproval.note || 'بلا ملاحظة'}). ` +
+              'توقفت المهمة دون أي اتصال خارجي أو أثر، وبقيت القراءات الداخلية فقط محفوظة.'
+          };
+        }
+        if (externalApproval?.decision === 'approved') {
+          return {
+            action: DECISION.finish,
+            summary:
+              `سُجلت موافقة المالك على ${externalEffectTool} بتاريخ ${externalApproval.decidedAt || '—'}، لكن منفذ الأثر ` +
+              'الخارجي (outbox AGENT-002) غير مبني بعد؛ لم يُجرَ أي اتصال خارجي ولم يُنشأ أي موعد. الموافقة محفوظة في ' +
+              'جدول agent_approvals وستستهلكها طبقة الإرسال المستقبلية مرة واحدة عبر مفتاح idempotency.'
+          };
+        }
         return {
           action: DECISION.call,
           tool: externalEffectTool,
