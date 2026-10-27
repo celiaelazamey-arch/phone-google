@@ -65,6 +65,10 @@ CELIA_MCP_HOST=0.0.0.0 CELIA_MCP_PORT=3010 node src/celia-mcp.js
 - الرد الذكي عبر Gemini معطّل افتراضيًا. لا تُرسل الرسالة الواردة إلى Gemini إلا عند وجود موافقة منفصلة مسجلة على معالجة الذكاء الاصطناعي، إضافة إلى موافقة WhatsApp ونافذة خدمة العملاء البالغة 24 ساعة. لا توجد نقطة إرسال جماعي.
 - واجهة إرسال فردي تفرض الموافقة المسجلة ونافذة الخدمة. الرسائل خارج النافذة تحتاج قالب WhatsApp معتمد؛ إرسال القوالب غير مفعّل في هذا الإصدار.
 
+## Celia Google Spider v0.1.0 — موصل Drive إلى شبكة معرفة محلية
+
+حزمة Python مستقلة في [`celia-google-spider/README.md`](celia-google-spider/README.md) تبني فهرسًا محليًا من ملفات Google Drive (قراءة فقط، نطاق `drive.readonly`) وتقدّمه كست أدوات MCP عبر stdio: `spider_sync_google_drive` و`spider_search_knowledge` و`spider_read_document` و`spider_explore_network` و`spider_list_sources` و`spider_graph_stats` — بحث معجمي عربي/إنجليزي مع مقتطفات، وشبكة مستند↔مصطلح↔مستند، بلا حذف تلقائي للعناصر المحلية الغائبة، ولا embeddings، ولا أي منفذ شبكة. الإصدار 0.1.0 بتاريخ 2026-10-27؛ الاختبارات محلية: `python -m unittest discover -s tests -v` و`pytest -q` (10/10). راجع [README الحزمة](celia-google-spider/README.md) لخطوات الإعداد على Windows وحدودها؛ ملفا `credentials.json` و`token.json` ممنوعان من Git. ليست موصلة داخل ChatGPT (يتطلب ذلك موصلاً بعيداً/خدمة مدفوعة). القرار: [DEC-011](docs/continuity/DECISIONS.md).
+
 ## المتطلبات
 
 Node.js 22+ (24 LTS موصى به)، MySQL 8+، وبيانات اعتماد OAuth من Google وبيانات WhatsApp Cloud API من Meta. مفتاح Gemini مطلوب فقط للردود الذكية الآلية.
