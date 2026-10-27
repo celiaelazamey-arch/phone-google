@@ -163,10 +163,12 @@ node --test test/agent-verifier.test.js            # 8/8 المُتحقِّق ا
 node --test test/agent-approval-routes.test.js     # 4/4 مسارات HTTP
 node --test test/agent-reconciliation.test.js      # 14/14 مصالحة وإعادة وملكية
 node --test test/agent-reconcile-routes.test.js    # 4/4 مسار المصالحة عبر HTTP
+node --test test/agent-harness.test.js             # 5/5 دورة الخطة ومعمارية Agent Harness
+node --test test/agent-document-automation.test.js # 7/7 أتمتة المستندات والبيانات (8 حالات فشل/هجوم)
 node --test test/agent-store.test.js               # 6/6
 node --test test/agent-runtime.test.js             # 16/16
 node --test test/agent-routes.test.js              # 3/3
-npm test                                            # 229 اختبارًا (228 أخضر محليًا؛ الإخفاق الوحيد بيئي: استنساخ ضحل)
+npm test                                            # 258/258 اختبارًا ناجحًا محليًا
 npm run check                                       # 87 ملف JS
 npm run release:check                               # 0.2.1 / previous 0.2.0 / schema 1
 npm run check:continuity                            # وثائق وروابط بلا دورات

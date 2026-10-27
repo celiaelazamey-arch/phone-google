@@ -1,0 +1,2 @@
+invoice_number,supplier_name,supplier_tax_id,issue_date,currency,subtotal,tax,total,item_description,quantity,unit_price,line_amount
+INV-1099,شركة الدلتا للأجهزة,TAX-EG-771099,2026-10-23,EGP,1000.00,140.00,1999.00,شاشة عرض مكتبية,2,500.00,1000.00

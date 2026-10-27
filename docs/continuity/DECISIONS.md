@@ -355,6 +355,46 @@
   و`src/agent-routes.js` و`public/agent.{html,css,js}` و`public/kb.{html,js}` و`e2e/{diagnostics,agent.spec,system.spec,deploy.spec}.js`
   و`test/agent-harness.test.js`. **لا ترحيل SQL جديد ولا تغيير في `schema 1` أو الإصدار `0.2.1` أو أدوات MCP الـ12.**
 
+## DEC-020 — القدرة الأصيلة `document_data_automation`: استخراج وتطبيع وتحقق حتمي وموافقة وبصمات أدلة دون محرك موازٍ
+
+- **التاريخ:** 27 أكتوبر 2026 (مساءً) · **الحالة:** منفذ ومختبر محليًا (7 اختبارات شاملة لـ8 حالات فشل/هجوم، إجمالي 258/258 في `npm test`) · **المهمة:** AGENT-001، AGENT-002، SEC-003، DATA-003
+- **السياق:** طلب المالك إضافة القدرة الأصيلة `document_data_automation` داخل CeliaOS بحيث تمر كل مهمة عبر سلسلة
+  واضحة وقابلة للتدقيق: استلام المستند أو الجدول ← استخراج الحقول ← تحويلها إلى مخرجات JSON منظمة وفق مخطط معلوم
+  الإصدار (`1.0`) ← التحقق الحتمي من صحة البيانات ومنع التكرار ← تطبيق قواعد السياسات والموافقات عند الحاجة ← تنفيذ
+  الإجراء المصرح به مرة واحدة فقط ← حفظ المخرجات وبصمات الأدلة ← التحقق النهائي عبر المُتحقِّق المستقل، مع إبقاء
+  الشبكة والبوابات الخارجية مغلقة افتراضيًا (`NETWORK = DENY`، `EXTERNAL GATES = CLOSED`).
+- **القرار:**
+  1. **الدمج داخل البنية القائمة لا كنظام منفصل:** أُنشئت وحدة `src/agent/automation/{schema,reader,extractor,validator,index}.js`
+     تُركَّب فوق `Tool Registry` و`Evidence Chain` و`Approval Gate` و`Outbox` و`Independent Verifier` دون جداول موازية أو
+     محرك سير عمل منفصل.
+  2. **الأدوات الأربع الأساسية + أداة الاعتماد المحكومة:**
+     - `document.read` (`RISK.read`، حتمية): قراءة ملفات محلية ضمن الجذور المسموحة فقط (`CSV` عبر `parseCsv`، `JSON`، `TXT`)
+       وحساب `file_sha256` ومواضع الحقول والأسطر (`row:X,col:Y` أو `line:N`).
+     - `document.extract` (`RISK.read`): استخراج حقول الفاتورة/المستند مع مرجع المصدر لكل حقل ودعم موجه نماذج اختياري
+       (`modelRouter`) يتحقق من مطابقة JSON الصارمة للمخطط ويرفض أي نص غير مطابق دون كتابة بيانات فاسدة، مع دالة قياس
+       الدقة `measureExtractionAccuracy` على حزمة مرجعية ذهبية (`test/fixtures/documents/`).
+     - `data.validate` (`RISK.read`، حتمية): فحص الحقول الإلزامية، صلاحية التاريخ والعملة، مطابقة مجموع البنود والضريبة
+       للإجمالي (`total_mismatch`)، كشف الفواتير المكررة (`duplicate_invoice`) عبر بصمة حتمية `invoice_fingerprint`،
+       وفحص حقن التعليمات داخل المستند (`scanUntrustedDocumentInjection` → `prompt_injection_detected`)، وتصنيف النتيجة
+       إلى `valid` أو `review_required` أو `invalid`.
+     - `data.report` (`RISK.internalWrite`): بناء التقرير الموحد (`schema_version: "1.0"`) وحفظه في `agent_tool_runs`
+       وربط بصمته في `agent_evidence`.
+     - `document.commit_purchase_ledger` (`RISK.externalWrite`، موصل `purchases.ledger`): يرفض في `inputSchema` أي مستند
+       حالته غير `valid` (`policy_violation_unvalidated_document`)، ويوقف التشغيل في `WAITING_FOR_APPROVAL` قبل أي كتابة،
+       وينفذ الإدراج مرة واحدة فقط بعد موافقة المالك وبمفتاح تفرد يمنع التكرار.
+  3. **فحوص المُتحقِّق المستقل (`documentAutomationChecks` في `src/agent/verifier.js`):** يتحقق من مطابقة `data.report`
+     للنسخة `1.0` (`document_automation_schema`)، ومن بقاء أي مستند غير صالح في حالة `not_committed` دون محاولة إرسال
+     (`document_automation_policy`)، ومن تطابق السجل المعتمد في سجل المشتريات مع الحمولة الموافق عليها
+     (`document_automation_commit_parity`).
+- **السبب:** توفير أتمتة مستندات وبيانات قابلة للتدقيق الكامل تعمل محليًا بنسبة 100% دون الحاجة إلى مزود خارجي، مع
+  تجهيز نقطة ربط محكومة لموجه النماذج عندما يُفعَّل لاحقًا.
+- **البدائل المرفوضة:** (أ) بناء خدمة أو قاعدة بيانات موازية للأتمتة خارج `agent_*` — يكسر وحدة سجل الأدلة والـoutbox؛
+  (ب) السماح للنموذج اللغوي بتحديد صحة الإجمالي الحسابي أو تمرير كتابة دون `data.validate` حتمي — يخالف فصل الاستخراج
+  عن التحقق؛ (ج) تمرير محتوى المستند كتعليمات للوكيل — يفتح ثغرة حقن المطالبات غير المباشر.
+- **الأثر:** `src/agent/automation/{schema,reader,extractor,validator,index}.js`، تحديث `src/agent/{tools,verifier,planner,index}.js`،
+  حزمة مرجعية ذهبية في `test/fixtures/documents/`، واختبارات `test/agent-document-automation.test.js`. **لا ترحيل SQL جديد
+  ولا تغيير في `schema 1` أو الإصدار `0.2.1` أو أدوات MCP الـ12.**
+
 ## إضافة قرار لاحق
 
 استخدم معرفًا جديدًا، والتاريخ والحالة والسياق والبدائل والقرار والسبب والأثر ومرجع المهمة، واذكر صراحة القرار المستبدل إن وجد. لا تنسخ أسرارًا أو مخطط إنتاج يحوي بيانات شخصية إلى سجل القرار.

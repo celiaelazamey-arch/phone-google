@@ -1,0 +1,52 @@
+{
+  "invoice-valid-1042.csv": {
+    "invoice_number": "INV-1042",
+    "supplier_name": "شركة النور للتوريدات",
+    "supplier_tax_id": "TAX-EG-9001042",
+    "issue_date": "2026-10-20",
+    "currency": "EGP",
+    "subtotal": 1000.00,
+    "tax": 250.00,
+    "total": 1250.00
+  },
+  "invoice-valid-2088.txt": {
+    "invoice_number": "INV-2088",
+    "supplier_name": "Cloud Hosting Services LLC",
+    "supplier_tax_id": "TAX-US-442088",
+    "issue_date": "2026-10-22",
+    "currency": "USD",
+    "subtotal": 400.00,
+    "tax": 60.00,
+    "total": 460.00
+  },
+  "invoice-missing-supplier.csv": {
+    "invoice_number": "INV-1043",
+    "supplier_name": "مؤسسة الأفق التجاري",
+    "supplier_tax_id": null,
+    "issue_date": "2026-10-21",
+    "currency": "EGP",
+    "subtotal": 1000.00,
+    "tax": 250.00,
+    "total": 1250.00
+  },
+  "invoice-bad-total.csv": {
+    "invoice_number": "INV-1099",
+    "supplier_name": "شركة الدلتا للأجهزة",
+    "supplier_tax_id": "TAX-EG-771099",
+    "issue_date": "2026-10-23",
+    "currency": "EGP",
+    "subtotal": 1000.00,
+    "tax": 140.00,
+    "total": 1999.00
+  },
+  "invoice-prompt-injection.txt": {
+    "invoice_number": "INV-6600",
+    "supplier_name": "المورد التجريبي المحدود",
+    "supplier_tax_id": "TAX-EG-660011",
+    "issue_date": "2026-10-25",
+    "currency": "EGP",
+    "subtotal": 500.00,
+    "tax": 70.00,
+    "total": 570.00
+  }
+}

@@ -2,12 +2,13 @@
 
 **آخر مراجعة:** 27 أكتوبر 2026 (مساءً) · **نوع الجلسة الحالية:** تنفيذ **دورة «خطّط، اعرض، انتظر، ثم نفّذ»
 (`PLAN_READY → WAITING_FOR_APPROVAL → EDITED | APPROVED | REJECTED → EXECUTING`) ومعمارية Agent Harness الـ10 مكونات
-وتشخيص Playwright Chromium** (DEC-019) على الفرع `arena/5fccc4e6-phone-google` · سجل الجلسة:
+وتشخيص Playwright Chromium (DEC-019) والقدرة الأصيلة `document_data_automation` (DEC-020)** على الفرع
+`arena/5fccc4e6-phone-google` · سجل الجلسة:
 [2026-10-27-agent-harness-plan-lifecycle](sessions/2026-10-27-agent-harness-plan-lifecycle.md) · سجل الجلسة السابقة:
 [2026-10-27-go-live-steps](sessions/2026-10-27-go-live-steps.md) ·
 الخطة: [docs/go-live-plan.md](../go-live-plan.md) · المرجع التشغيلي: [deploy/free-always-on/README.md](../../deploy/free-always-on/README.md)
 
-## الطلب الحالي (أعلى أولوية) — دورة الخطة والـAgent Harness وتشخيص Chromium (DEC-019)
+## الطلب الحالي (أعلى أولوية) — دورة الخطة والـAgent Harness وقدرة `document_data_automation` (DEC-019، DEC-020)
 
 - **ما نُفِّذ في هذه الجلسة (`arena/5fccc4e6-phone-google`):**
   - **آلة حالات الخطة (`src/agent/harness.js` + `src/agent/runtime.js`):** انتقالات صريحة
@@ -19,10 +20,20 @@
     سلسلة SHA-256، ويبقي التشغيل في `waiting_approval` دون أي تنفيذ خارجي حتى موافقة المالك.
   - **حارس النزاهة بعد الموافقة (`verifyApprovedEffectIntegrity` + `verifier.js`):** يمنع أي تلاعب صامت بحمولة
     الـoutbox بعد صدور الموافقة قبل استدعاء أي موصل خارجي.
+  - **القدرة الأصيلة `document_data_automation` (`src/agent/automation/{schema,reader,extractor,validator,index}.js`، DEC-020):**
+    تعمل محليًا بالكامل (`NETWORK = DENY`، `EXTERNAL GATES = CLOSED` افتراضيًا) فوق بنية CeliaOS القائمة:
+    قراءة مستندات محلية معروفة النوع (`CSV`/`JSON`/`TXT`) ببصمة `SHA-256` ومراجع الحقول/الأسطر (`document.read`)،
+    واستخراج منظم وفق مخطط معلوم الإصدار `schema_version: "1.0"` مع عزل محتوى المستند كبيانات غير موثوقة وقياس الدقة
+    على حزمة مرجعية ذهبية (`document.extract` + `measureExtractionAccuracy`)، وفحص حتمي للقيم والتواريخ والعملات
+    ومطابقة الإجماليات والتكرارات ومؤشرات حقن التعليمات (`data.validate`)، وتوليد تقرير موحد مع ربط البصمات بسلسلة
+    الأدلة (`data.report`)، وإدراج محكوم اختياري في سجل المشتريات بعد موافقة المالك عبر `agent_outbox`
+    (`document.commit_purchase_ledger`) مع فحوص المُتحقِّق المستقل (`document_automation_schema`،
+    `document_automation_policy`، `document_automation_commit_parity`).
   - **معمارية Agent Harness الـ10 مكونات (`GET /api/agent/harness`)** وواجهة تعديل الخطة في `/agent`، وتشخيص
     Playwright Chromium الصريح (`e2e/diagnostics.js`، `e2e/agent.spec.js`، `playwright.config.js`)، وإصلاح
     الروابط النسبية وتباين WCAG 2.2 AA وعرض 320px في `/agent` و`/kb`.
-  - **الفحوص المحلية:** `npm test` **251/251** ناجحة، و`check` و`release:check` و`check:continuity` و`check:secrets`
+  - **الفحوص المحلية:** `npm test` **258/258** ناجحة (منها 7 اختبارات شاملة لـ8 حالات فشل/هجوم في
+    `test/agent-document-automation.test.js`)، و`check` و`release:check` و`check:continuity` و`check:secrets`
     و`build:pages` كلها خضراء.
 
 ## الطلب السابق — الخطوات التالية للتشغيل الحقيقي (DEC-018)

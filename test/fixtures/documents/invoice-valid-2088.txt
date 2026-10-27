@@ -1,0 +1,10 @@
+invoice_number: INV-2088
+supplier_name: Cloud Hosting Services LLC
+supplier_tax_id: TAX-US-442088
+issue_date: 2026-10-22
+currency: USD
+item: خوادم سحابية شهرية | qty: 2 | unit_price: 150.00 | amount: 300.00
+item: نسخ احتياطي مدار | qty: 1 | unit_price: 100.00 | amount: 100.00
+subtotal: 400.00
+tax: 60.00
+total: 460.00

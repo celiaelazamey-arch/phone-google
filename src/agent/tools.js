@@ -18,6 +18,8 @@ export const RISK = Object.freeze({
   irreversible: 'irreversible'
 });
 
+import { documentAutomationToolDefinitions } from './automation/index.js';
+
 const EXECUTABLE = new Set([RISK.read, RISK.internalWrite]);
 const FORBIDDEN_SECRET_KEYS = new Set([
   'apiKey',
@@ -233,7 +235,14 @@ export function knowledgeToolDefinitions({ kb } = {}) {
   ];
 }
 
-export function defaultToolDefinitions({ statusProvider, kb } = {}) {
+export function defaultToolDefinitions({
+  statusProvider,
+  kb,
+  documentAutomation = true,
+  allowedDocumentRoots,
+  modelRouter = null,
+  ledgerStore = null
+} = {}) {
   return [
     {
       name: 'celia.system_status',
@@ -299,6 +308,13 @@ export function defaultToolDefinitions({ statusProvider, kb } = {}) {
       requiresApproval: true,
       arguments: { code: 'string' }
     },
-    ...knowledgeToolDefinitions({ kb })
+    ...knowledgeToolDefinitions({ kb }),
+    ...(documentAutomation
+      ? documentAutomationToolDefinitions({
+          allowedRoots: allowedDocumentRoots,
+          modelRouter,
+          ledgerStore
+        })
+      : [])
   ];
 }

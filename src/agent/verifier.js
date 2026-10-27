@@ -1,6 +1,7 @@
 import { RISK } from './tools.js';
 import { validateGoalContract } from './goal-contract.js';
 import { hashOf, verifyChain } from './evidence.js';
+import { validateAutomationSchema, VALIDATION_STATUS, ACTION_STATUS } from './automation/schema.js';
 
 /**
  * Independent verifier (roadmap unit 7).
@@ -76,13 +77,13 @@ export function createVerifier({ tools, clock = Date.now } = {}) {
       const id = `deterministic_reexecution:${toolRun.toolName}`;
       let args;
       try {
-        args = tool.replayArgs({ messages, toolRun });
+        args = tool.replayArgs({ messages, toolRun, context: { messages, toolRuns } });
       } catch (error) {
         checks.push({ id, status: CHECK.unknown, detail: `replay_args_failed:${error?.code || 'error'}` });
         continue;
       }
       try {
-        const fresh = await tool.execute(args, { context: { messages } });
+        const fresh = await tool.execute(args, { context: { messages, toolRuns } });
         const recorded = parseOutcome(toolRun);
         if (hashOf(fresh) === hashOf(recorded)) {
           checks.push({ id, status: CHECK.pass, detail: 'output_hash_matches_recorded_outcome' });
@@ -110,6 +111,75 @@ export function createVerifier({ tools, clock = Date.now } = {}) {
         missing === 0
           ? { id: 'kb_source_licence_trust', status: CHECK.pass, detail: `all ${items.length} items carry uri+licence+trust` }
           : { id: 'kb_source_licence_trust', status: CHECK.block, detail: `${missing} kb item(s) missing uri/licence/trust` }
+      );
+    }
+  }
+
+  function documentAutomationChecks({ toolRuns = [], outbox = [], checks } = {}) {
+    const reports = toolRuns.filter((item) => item.toolName === 'data.report' && item.status === 'succeeded');
+    for (const reportRun of reports) {
+      const outcome = parseOutcome(reportRun);
+      const schemaCheck = validateAutomationSchema(outcome);
+      if (!schemaCheck.ok) {
+        checks.push({
+          id: 'document_automation_schema',
+          status: CHECK.block,
+          detail: `data.report violated schema 1.0: ${schemaCheck.errors.join(', ')}`
+        });
+        continue;
+      }
+      checks.push({
+        id: 'document_automation_schema',
+        status: CHECK.pass,
+        detail: `data.report conforms to schema ${outcome.schema_version} (${outcome.validation?.status})`
+      });
+
+      if (outcome.validation?.status !== VALIDATION_STATUS.valid) {
+        const illegalCommitAttempt = outbox.some(
+          (entry) =>
+            entry.toolName === 'document.commit_purchase_ledger' &&
+            ['dispatching', 'sent'].includes(entry.status)
+        );
+        if (outcome.action?.status !== ACTION_STATUS.notCommitted || illegalCommitAttempt) {
+          checks.push({
+            id: 'document_automation_policy',
+            status: CHECK.block,
+            detail: `non-valid document (${outcome.validation?.status}) attempted or claimed commitment`
+          });
+        } else {
+          checks.push({
+            id: 'document_automation_policy',
+            status: CHECK.pass,
+            detail: `non-valid document (${outcome.validation?.status}) remained not_committed`
+          });
+        }
+      }
+    }
+
+    const ledgerCommits = outbox.filter(
+      (entry) => entry.toolName === 'document.commit_purchase_ledger' && entry.status === 'sent'
+    );
+    for (const commitEntry of ledgerCommits) {
+      const payload = commitEntry.payload || {};
+      const savedRecord = commitEntry.result?.record || null;
+      const parityOk =
+        payload.validation_status === VALIDATION_STATUS.valid &&
+        savedRecord &&
+        savedRecord.invoice_fingerprint === payload.invoice_fingerprint &&
+        savedRecord.invoice_number === payload.invoice_number &&
+        savedRecord.total === payload.total;
+      checks.push(
+        parityOk
+          ? {
+              id: 'document_automation_commit_parity',
+              status: CHECK.pass,
+              detail: `committed purchase ledger record ${savedRecord.id} matches approved invoice ${payload.invoice_number}`
+            }
+          : {
+              id: 'document_automation_commit_parity',
+              status: CHECK.block,
+              detail: 'committed purchase ledger record does not match approved invoice payload'
+            }
       );
     }
   }
@@ -401,6 +471,9 @@ export function createVerifier({ tools, clock = Date.now } = {}) {
 
     // 9. Human reconciliation must be witnessed by the chain, never asserted alone.
     reconciliationChecks({ toolRuns, outbox, evidence, checks });
+
+    // 10. Document & Data Automation schema, policy, and ledger parity checks.
+    documentAutomationChecks({ toolRuns, outbox, checks });
 
     const verdict = checks.some((check) => check.status === CHECK.block)
       ? VERDICT.block

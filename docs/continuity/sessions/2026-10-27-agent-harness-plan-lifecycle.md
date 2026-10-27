@@ -27,6 +27,12 @@
      `playwright.config.js`.
    - إصلاح المسارات النسبية في `public/agent.html` و`public/kb.html` و`scripts/build-pages.mjs` واعتراض المسارات في
      `scripts/static/celia-static-shim.template.js` وتباين ألوان زر `.primary` (6.92:1) والتجاوب عند عرض `320px`.
+4. **القدرة الأصيلة `document_data_automation` (DEC-020):**
+   - تنفيذ المرحلة الأولى (الفحص وبناء الخطة) ثم المرحلة الثانية بعد موافقة المالك (`موافق على تنفيذdocument_data_automation`).
+   - إضافة `src/agent/automation/{schema,reader,extractor,validator,index}.js` وتسجيل الأدوات `document.read` و`document.extract`
+     و`data.validate` و`data.report` و`document.commit_purchase_ledger` في `Tool Registry`، وربط فحوص
+     `documentAutomationChecks` في `src/agent/verifier.js`، وإنشاء الحزمة المرجعية الذهبية في `test/fixtures/documents/`
+     واختبارات الحالات الثماني الإلزامية في `test/agent-document-automation.test.js`.
 
 ## 2. نتائج الفحوص الفعلية
 
@@ -35,6 +41,6 @@
 - `npm run release:check`: ناجح (`0.2.1` / `schema: 1`).
 - `npm run check:continuity`: ناجح.
 - `npm run check:secrets`: ناجح.
-- `npm test`: **251/251** اختبارًا ناجحًا.
+- `npm test`: **258/258** اختبارًا ناجحًا.
 - **الحدود المعلنة:** لا يوجد ثنائي متصفح Chromium مثبت محليًا داخل حاوية الساندبوكس؛ تُشغَّل `npm run test:browser`
   و`integration/mysql.integration.mjs` في GitHub Actions CI على الفرع.

@@ -12,6 +12,21 @@ import {
   verifyApprovedEffectIntegrity
 } from './harness.js';
 import {
+  CAPABILITY_NAME,
+  AUTOMATION_SCHEMA_VERSION,
+  DOCUMENT_TYPES,
+  VALIDATION_STATUS,
+  ACTION_STATUS,
+  readLocalDocument,
+  extractStructuredDocument,
+  measureExtractionAccuracy,
+  validateExtractedData,
+  buildAutomationReport,
+  createPurchaseLedgerStore,
+  createPurchaseLedgerConnector,
+  documentAutomationToolDefinitions
+} from './automation/index.js';
+import {
   createCalendarConnector,
   createConnectorRegistry,
   createEmptyConnectorRegistry,
@@ -25,7 +40,20 @@ export {
   inspectAgentHarness,
   derivePlanView,
   validatePlanEditPolicy,
-  verifyApprovedEffectIntegrity
+  verifyApprovedEffectIntegrity,
+  CAPABILITY_NAME,
+  AUTOMATION_SCHEMA_VERSION,
+  DOCUMENT_TYPES,
+  VALIDATION_STATUS,
+  ACTION_STATUS,
+  readLocalDocument,
+  extractStructuredDocument,
+  measureExtractionAccuracy,
+  validateExtractedData,
+  buildAutomationReport,
+  createPurchaseLedgerStore,
+  createPurchaseLedgerConnector,
+  documentAutomationToolDefinitions
 };
 
 /**

@@ -1,0 +1,3 @@
+invoice_number,supplier_name,supplier_tax_id,issue_date,currency,subtotal,tax,total,item_description,quantity,unit_price,line_amount
+INV-1042,شركة النور للتوريدات,TAX-EG-9001042,2026-10-20,EGP,1000.00,250.00,1250.00,ورق طباعة A4 مكتبي,10,60.00,600.00
+INV-1042,شركة النور للتوريدات,TAX-EG-9001042,2026-10-20,EGP,1000.00,250.00,1250.00,أحبار طابعة ليزر,4,100.00,400.00
