@@ -1,6 +1,8 @@
+import crypto from 'node:crypto';
 import { RISK } from './tools.js';
 import { validateGoalContract } from './goal-contract.js';
 import { hashOf, verifyChain } from './evidence.js';
+import { DOCUMENT_CAPABILITY, DOCUMENT_SCHEMA_VERSION, isSha256 } from './automation/schema.js';
 
 /**
  * Independent verifier (roadmap unit 7).
@@ -93,6 +95,83 @@ export function createVerifier({ tools, clock = Date.now } = {}) {
         checks.push({ id, status: CHECK.unknown, detail: `reexecution_failed:${error?.code || 'error'}` });
       }
     }
+  }
+
+  function documentAutomationChecks(toolRuns, checks) {
+    const reports = toolRuns.filter((item) => item.toolName === 'data.report' && item.status === 'succeeded');
+    const extractions = toolRuns.filter((item) => item.toolName === 'document.extract' && item.status === 'succeeded');
+    const reads = toolRuns.filter((item) => item.toolName === 'document.read' && item.status === 'succeeded');
+    if (!reports.length && !extractions.length) return;
+
+    const parsedReads = reads.map((item) => ({ item, outcome: parseOutcome(item) }));
+    const parsedExtractions = extractions.map((item) => ({ item, outcome: parseOutcome(item) }));
+    let issues = 0;
+    for (const { outcome } of parsedExtractions) {
+      const hash = outcome?.source?.file_sha256;
+      const source = parsedReads.find(({ outcome: read }) => read?.source?.file_sha256 === hash);
+      const actualHash = source && typeof source.outcome.raw_text === 'string'
+        ? requireHash(source.outcome.raw_text)
+        : null;
+      if (
+        outcome?.capability !== DOCUMENT_CAPABILITY ||
+        outcome?.schema_version !== DOCUMENT_SCHEMA_VERSION ||
+        !isSha256(hash) ||
+        !source ||
+        actualHash !== hash ||
+        outcome.source.untrusted_content !== true ||
+        !outcome.fields || typeof outcome.fields !== 'object' ||
+        !outcome.security || typeof outcome.security.prompt_injection_attempted !== 'boolean'
+      ) issues += 1;
+    }
+    const successfulReportForHash = new Set();
+    for (const { outcome } of reports.map((item) => ({ item, outcome: parseOutcome(item) }))) {
+      const fields = outcome?.fields;
+      const validation = outcome?.validation;
+      const sourceHash = outcome?.source?.file_sha256;
+      const validStatus = ['valid', 'review_required', 'invalid'].includes(validation?.status);
+      const moneyFields = ['subtotal', 'tax', 'total'];
+      const money = moneyFields.every((key) => typeof fields?.[key] === 'number' && Number.isFinite(fields[key]));
+      const sumMatches = !money || Math.abs(Math.round((fields.subtotal + fields.tax) * 100) - Math.round(fields.total * 100)) <= 1;
+      const items = Array.isArray(fields?.line_items) ? fields.line_items : [];
+      const itemsComplete = items.every((item) => typeof item?.amount === 'number' && Number.isFinite(item.amount));
+      const itemsMatch = !items.length || !itemsComplete || typeof fields.subtotal !== 'number' ||
+        Math.abs(Math.round(items.reduce((sum, item) => sum + item.amount, 0) * 100) - Math.round(fields.subtotal * 100)) <= 1;
+      const reportStatus = validation?.status === 'valid' ? 'valid_pending_review' : validation?.status;
+      const injectionReviewed = outcome?.security?.prompt_injection_attempted !== true ||
+        (Array.isArray(validation?.review_items) && validation.review_items.includes('prompt_injection_detected'));
+      const matchesExtraction = parsedExtractions.some(({ outcome: extraction }) =>
+        extraction?.source?.file_sha256 === sourceHash &&
+        extraction?.schema_version === outcome?.schema_version
+      );
+      if (
+        outcome?.capability !== DOCUMENT_CAPABILITY ||
+        outcome?.schema_version !== DOCUMENT_SCHEMA_VERSION ||
+        !isSha256(outcome?.document_hash) ||
+        outcome.document_hash !== sourceHash ||
+        outcome?.source?.untrusted_content !== true ||
+        !fields || !outcome.provenance || !validStatus ||
+        !sumMatches || !itemsMatch || !injectionReviewed ||
+        outcome?.action?.status !== 'not_committed' ||
+        outcome.report_status !== reportStatus ||
+        !matchesExtraction
+      ) {
+        issues += 1;
+      } else {
+        successfulReportForHash.add(sourceHash);
+      }
+    }
+    const orphaned = parsedExtractions.filter(({ outcome }) =>
+      !successfulReportForHash.has(outcome?.source?.file_sha256)
+    ).length;
+    checks.push(
+      issues === 0 && orphaned === 0
+        ? { id: 'document_automation_integrity', status: CHECK.pass, detail: String(reports.length) + ' report(s), ' + String(extractions.length) + ' extraction(s) have matching source hashes and safe non-commit results' }
+        : { id: 'document_automation_integrity', status: CHECK.block, detail: String(issues) + ' malformed document result(s); ' + String(orphaned) + ' extraction(s) without a verified report' }
+    );
+  }
+
+  function requireHash(text) {
+    return crypto.createHash('sha256').update(String(text), 'utf8').digest('hex');
   }
 
   function knowledgeLicenceChecks(toolRuns, checks) {
@@ -324,6 +403,7 @@ export function createVerifier({ tools, clock = Date.now } = {}) {
         : { id: 'outcome_schema', status: CHECK.block, detail: `unparseable outcome(s): ${unparseable.map((item) => item.toolName).join(', ')}` }
     );
     knowledgeLicenceChecks(toolRuns, checks);
+    documentAutomationChecks(toolRuns, checks);
 
     // 7. Goal contract: structural validity plus the machine-checkable criteria.
     const contractCheck = validateGoalContract(contract);
