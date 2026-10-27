@@ -59,7 +59,7 @@
 أُضيفت قدرة اختيارية محلية `document_data_automation` إلى حلقة الوكيل: أدوات `document.read` و`document.extract` و`data.validate` و`data.report`، مع مخطط `1.0`، SHA-256، مصادر لكل حقل، كشف تاريخي للتكرار، تحقق حسابي مستقل، وعدم اعتماد أي سجل مشتريات.
 - يدعم الإصدار الأول المستندات النصية الصغيرة وCSV وJSON وMarkdown فقط. **PDF والصور وOCR غير منفذة**، ولا يوجد استخراج سحابي أو موصل خارجي ضمن هذه القدرة.
 - استخدم معالجًا واحدًا محليًا عند طلب `استخرج الفاتورة:` ثم ألحق محتوى المستند. لا يُقبل التقرير كمعاملة أعمال؛ `action.status=not_committed` دائمًا في هذا الإصدار.
-- الرسم المعماري: [SVG](document-data-automation.svg) · [عرض Canvas تفاعلي](document-automation.html). الاختبارات الجديدة في `test/agent-document-automation.test.js`.
+- الرسم المعماري: [SVG](public/document-data-automation.svg) · [عرض Canvas تفاعلي](public/document-automation.html). الاختبارات الجديدة في `test/agent-document-automation.test.js`.
 - هذا التغيير على فرع `feature/document-data-automation` للمراجعة؛ لا يعني دمجًا أو نشرًا أو نجاح CI. مرجع المتابعة في [الحالة](docs/continuity/STATE.md).
 
 ## الجديد في 0.2.1 — Free Launch Runtime
