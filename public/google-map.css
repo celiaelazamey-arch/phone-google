@@ -59,7 +59,7 @@
   cursor: pointer;
 }
 .gm-chip:hover { background: var(--bg-hover); color: var(--text-primary); }
-.gm-chip.active { background: var(--accent); border-color: transparent; color: #fff; }
+.gm-chip.active { background: #b55434; border-color: transparent; color: #fff; }
 .gm-chip-decision.active { background: var(--amber); }
 
 /* ───────────────────────── الممرات والبطاقات ───────────────────────── */
@@ -115,10 +115,10 @@
   white-space: nowrap;
 }
 .gm-badge-ok { background: var(--emerald-soft); color: var(--emerald); }
-.gm-badge-plan { background: var(--violet-soft); color: var(--violet); }
+.gm-badge-plan { background: var(--violet-soft); color: #a78bfa; }
 .gm-badge-decision { background: var(--amber-soft); color: var(--amber); }
 .gm-meta { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
-.gm-meta li { font-size: .8rem; color: var(--text-muted); display: flex; gap: 6px; flex-wrap: wrap; }
+.gm-meta li { font-size: .8rem; color: var(--text-secondary); display: flex; gap: 6px; flex-wrap: wrap; }
 .gm-meta span { color: var(--text-secondary); font-weight: 600; }
 .gm-meta code {
   direction: ltr;
@@ -168,8 +168,8 @@
   gap: 4px;
   text-align: center;
 }
-.gm-flow-track span { color: var(--text-muted); font-size: .78rem; }
-.gm-flow-arrow { align-self: center; color: var(--text-muted); }
+.gm-flow-track span { color: var(--text-secondary); font-size: .78rem; }
+.gm-flow-arrow { align-self: center; color: var(--text-secondary); }
 
 .gm-steps { margin: 0; padding-inline-start: 0; list-style: none; counter-reset: gmstep; display: grid; gap: 10px; }
 .gm-steps li {
@@ -220,7 +220,7 @@
   gap: 10px;
   flex-wrap: wrap;
   align-items: center;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: .82rem;
 }
 .gm-foot a { color: var(--accent); text-decoration: none; }

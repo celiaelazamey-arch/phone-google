@@ -151,7 +151,38 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:browser
+      - name: Run browser tests (JSON report)
+        id: browser
+        continue-on-error: true
+        run: npx playwright test --reporter=json > /tmp/pw-report.json
+      - name: Emit browser failures as annotations
+        if: always()
+        env:
+          BROWSER_OUTCOME: ${{ steps.browser.outcome }}
+        run: |
+          node --input-type=module -e '
+          import { readFileSync } from "node:fs";
+          const report = JSON.parse(readFileSync("/tmp/pw-report.json", "utf8"));
+          const walk = (suite) => [...(suite.specs || []), ...(suite.suites || []).flatMap(walk)];
+          const specs = report.suites.flatMap(walk);
+          let failures = 0;
+          for (const spec of specs) {
+            for (const test of spec.tests || []) {
+              for (const result of test.results || []) {
+                if (result.status === "failed" || result.status === "timedOut") {
+                  failures += 1;
+                  const message = String(result.error?.message || "browser test failed").split("\n")[0].slice(0, 500);
+                  const title = String(test.title).replaceAll(":", " ").slice(0, 180);
+                  console.log(`::error file=${spec.file},title=${title}::${message}`);
+                }
+              }
+            }
+          }
+          if (process.env.BROWSER_OUTCOME === "failure" && failures === 0) {
+            console.log("::error::Browser job failed without a reported test failure (webServer or harness issue).");
+          }
+          if (failures) process.exit(1);
+          '
       - name: Retain failure traces only
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
