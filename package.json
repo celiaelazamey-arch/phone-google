@@ -26,7 +26,7 @@
     "test:browser": "playwright test"
   },
   "dependencies": {
-    "dotenv": "^16.4.7",
+    "dotenv": "^18.0.9",
     "express": "^5.1.0",
     "googleapis": "^150.0.1",
     "helmet": "^8.1.0",
