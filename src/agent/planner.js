@@ -87,6 +87,7 @@ export function createDemoPlanner({ externalEffectTool = 'google.calendar_create
           return { action: DECISION.call, tool: 'data.validate', args: { extracted: extractedOut } };
         }
         const validationOut = outcomeOf(toolRuns, 'data.validate');
+        const commitRequested = COMMIT_LEDGER_HINTS.test(goal);
         if (!succeeded(toolRuns, 'data.report')) {
           if (failed(toolRuns, 'data.report')) return this.giveUp(toolRuns, 'data.report');
           return {
@@ -94,6 +95,9 @@ export function createDemoPlanner({ externalEffectTool = 'google.calendar_create
             tool: 'data.report',
             args: {
               taskId: run?.id || 'task-doc',
+              goal,
+              docPath,
+              commitRequested,
               extracted: extractedOut,
               validation: validationOut,
               actionStatus: 'not_committed'
@@ -101,15 +105,20 @@ export function createDemoPlanner({ externalEffectTool = 'google.calendar_create
           };
         }
         const reportOut = outcomeOf(toolRuns, 'data.report');
+        const comprehensionGateStatus = reportOut?.explanation?.comprehension_gate?.status || 'PASS';
+        const simpleSummary = reportOut?.explanation?.simple_summary || '';
         const commitAttempted = toolRuns.some((tr) => tr.toolName === 'document.commit_purchase_ledger');
-        if (COMMIT_LEDGER_HINTS.test(goal) && !commitAttempted) {
-          if (validationOut?.status !== 'valid') {
+        if (commitRequested && !commitAttempted) {
+          if (validationOut?.status !== 'valid' || comprehensionGateStatus !== 'PASS') {
             return {
               action: DECISION.finish,
-              summary:
-                `اكتمل استخراج المستند (${docPath}) وفحصه عبر document_data_automation: الحالة «${validationOut?.status || 'review_required'}» ` +
-                `(${(validationOut?.errors || []).join('، ') || 'يتطلب مراجعة'}). ` +
+              summary: [
+                `اكتمل استخراج المستند (${docPath}) وفحصه عبر document_data_automation: الحالة «${validationOut?.status || 'review_required'}» (${(validationOut?.errors || []).join('، ') || 'يتطلب مراجعة'}).`,
+                simpleSummary ? `الشرح المبسّط: ${simpleSummary}` : null,
                 'لم يُنفَّذ أي إدراج في سجل المشتريات (action.status = not_committed).'
+              ]
+                .filter(Boolean)
+                .join('\n')
             };
           }
           const commitApproval = approvals.find((a) => a.toolName === 'document.commit_purchase_ledger');
@@ -137,7 +146,9 @@ export function createDemoPlanner({ externalEffectTool = 'google.calendar_create
               file_sha256: extractedOut?.source?.file_sha256 || '',
               validation_status: validationOut.status
             },
-            reason: 'الفاتورة اجتازت التحقق الحتمي؛ إدراجها في سجل المشتريات يتطلب موافقة المالك عبر outbox'
+            reason:
+              simpleSummary ||
+              'الفاتورة اجتازت التحقق الحتمي وبوابة الفهم؛ إدراجها في سجل المشتريات يتطلب موافقة المالك عبر outbox'
           };
         }
         const committedOutbox = outbox.find(
@@ -149,10 +160,13 @@ export function createDemoPlanner({ externalEffectTool = 'google.calendar_create
             `تمت معالجة المستند «${docPath}» عبر قدرة document_data_automation (schema ${reportOut?.schema_version || '1.0'}).`,
             `رقم الفاتورة: ${reportOut?.fields?.invoice_number || '—'} · الإجمالي: ${reportOut?.fields?.total ?? '—'} ${reportOut?.fields?.currency || ''}.`,
             `حالة التحقق: ${reportOut?.validation?.status || '—'}${reportOut?.validation?.errors?.length ? ` (${reportOut.validation.errors.join('، ')})` : ''}.`,
+            simpleSummary ? `الشرح المبسّط: ${simpleSummary}` : null,
             committedOutbox
               ? `تم اعتماد السجل في سجل المشتريات بعد موافقة المالك (المرجع: ${committedOutbox.externalRef}).`
               : `حالة الإجراء: ${reportOut?.action?.status || 'not_committed'}.`
-          ].join('\n')
+          ]
+            .filter(Boolean)
+            .join('\n')
         };
       }
 

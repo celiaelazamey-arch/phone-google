@@ -2,13 +2,14 @@
 
 **آخر مراجعة:** 27 أكتوبر 2026 (مساءً) · **نوع الجلسة الحالية:** تنفيذ **دورة «خطّط، اعرض، انتظر، ثم نفّذ»
 (`PLAN_READY → WAITING_FOR_APPROVAL → EDITED | APPROVED | REJECTED → EXECUTING`) ومعمارية Agent Harness الـ10 مكونات
-وتشخيص Playwright Chromium (DEC-019) والقدرة الأصيلة `document_data_automation` (DEC-020)** على الفرع
+وتشخيص Playwright Chromium (DEC-019) والقدرة الأصيلة `document_data_automation` (DEC-020) وبوابة الفهم والشرح المبسّط
+المدعوم بالأدلة `Comprehension Gate` (DEC-021)** على الفرع
 `arena/5fccc4e6-phone-google` · سجل الجلسة:
 [2026-10-27-agent-harness-plan-lifecycle](sessions/2026-10-27-agent-harness-plan-lifecycle.md) · سجل الجلسة السابقة:
 [2026-10-27-go-live-steps](sessions/2026-10-27-go-live-steps.md) ·
 الخطة: [docs/go-live-plan.md](../go-live-plan.md) · المرجع التشغيلي: [deploy/free-always-on/README.md](../../deploy/free-always-on/README.md)
 
-## الطلب الحالي (أعلى أولوية) — دورة الخطة والـAgent Harness وقدرة `document_data_automation` (DEC-019، DEC-020)
+## الطلب الحالي (أعلى أولوية) — دورة الخطة والـAgent Harness وقدرة `document_data_automation` وبوابة `Comprehension Gate` (DEC-019، DEC-020، DEC-021)
 
 - **ما نُفِّذ في هذه الجلسة (`arena/5fccc4e6-phone-google`):**
   - **آلة حالات الخطة (`src/agent/harness.js` + `src/agent/runtime.js`):** انتقالات صريحة
@@ -29,12 +30,18 @@
     الأدلة (`data.report`)، وإدراج محكوم اختياري في سجل المشتريات بعد موافقة المالك عبر `agent_outbox`
     (`document.commit_purchase_ledger`) مع فحوص المُتحقِّق المستقل (`document_automation_schema`،
     `document_automation_policy`، `document_automation_commit_parity`).
+  - **بوابة الفهم والشرح المبسّط المدعوم بالأدلة (`Comprehension Gate — Explain to Understand`، DEC-021):**
+    إضافة القاعدة إلى `AGENTS.md`، وعقد الشرح المتوافق عكسيًا مع `schema_version: "1.0"` (`validateExplanationContract`)،
+    وشرح الحقول بالرجوع إلى مواضعها (`explainExtractedFields`) مع فصل الحقائق المثبتة (`verified_facts`) عن الافتراضات
+    (`assumptions`) والحقول الغائبة/غير المحسومة (`unknowns`)، وتفسير نتائج التحقق بلغة بسيطة (`explainValidationOutcome`)،
+    وفاحص البوابة (`evaluateComprehensionGate`) وربطه في `src/agent/verifier.js` (`comprehension_gate_grounding`) و`src/agent/planner.js`،
+    واختبارات `CL-01` إلى `CL-10` في `test/agent-comprehension-gate.test.js`.
   - **معمارية Agent Harness الـ10 مكونات (`GET /api/agent/harness`)** وواجهة تعديل الخطة في `/agent`، وتشخيص
     Playwright Chromium الصريح (`e2e/diagnostics.js`، `e2e/agent.spec.js`، `playwright.config.js`)، وإصلاح
     الروابط النسبية وتباين WCAG 2.2 AA وعرض 320px في `/agent` و`/kb`.
-  - **الفحوص المحلية:** `npm test` **258/258** ناجحة (منها 7 اختبارات شاملة لـ8 حالات فشل/هجوم في
-    `test/agent-document-automation.test.js`)، و`check` و`release:check` و`check:continuity` و`check:secrets`
-    و`build:pages` كلها خضراء.
+  - **الفحوص المحلية:** `npm test` **268/268** ناجحة (منها 7 اختبارات في `test/agent-document-automation.test.js` و10
+    اختبارات `CL-01..CL-10` في `test/agent-comprehension-gate.test.js`)، و`check` و`release:check` و`check:continuity`
+    و`check:secrets` و`build:pages` كلها خضراء.
 
 ## الطلب السابق — الخطوات التالية للتشغيل الحقيقي (DEC-018)
 

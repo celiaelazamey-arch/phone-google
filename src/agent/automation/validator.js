@@ -5,9 +5,14 @@ import {
   DOCUMENT_TYPES,
   VALIDATION_STATUS,
   ACTION_STATUS,
+  COMPREHENSION_GATE_STATUS,
+  EXPLANATION_VERIFICATION_STATUS,
+  NEXT_PERMITTED_ACTION,
   ALLOWED_CURRENCIES,
-  validateAutomationSchema
+  validateAutomationSchema,
+  validateExplanationContract
 } from './schema.js';
+import { explainExtractedFields } from './extractor.js';
 
 export function computeInvoiceFingerprint(fields = {}) {
   const norm = [
@@ -166,7 +171,7 @@ export function validateExtractedData(
     status = VALIDATION_STATUS.reviewRequired;
   }
 
-  return {
+  const baseResult = {
     status,
     errors: allErrors,
     warnings,
@@ -174,6 +179,363 @@ export function validateExtractedData(
     file_sha256: fileSha256,
     duplicate_of: duplicateOf
   };
+
+  const validationExplanation = explainValidationOutcome({
+    extracted,
+    validation: baseResult
+  });
+
+  return {
+    ...baseResult,
+    explanation_summary: validationExplanation.simple_summary,
+    reason_explanations: validationExplanation.reason_explanations,
+    math_check: validationExplanation.math_check
+  };
+}
+
+/**
+ * Translate deterministic validation findings into plain language understandable
+ * by a beginner, strictly derived from the extracted numbers and rule codes.
+ */
+export function explainValidationOutcome({
+  extracted = null,
+  validation = null,
+  executionState = null
+} = {}) {
+  const fields = extracted?.fields || {};
+  const errors = Array.isArray(validation?.errors) ? validation.errors : [];
+  const status =
+    executionState === 'unknown'
+      ? EXPLANATION_VERIFICATION_STATUS.unknown
+      : validation?.status || VALIDATION_STATUS.invalid;
+
+  const lineItems = Array.isArray(fields.line_items) ? fields.line_items : [];
+  const computedLineSum =
+    lineItems.length > 0
+      ? Math.round(lineItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0) * 100) / 100
+      : null;
+  const baseAmount =
+    typeof fields.subtotal === 'number' && Number.isFinite(fields.subtotal)
+      ? fields.subtotal
+      : computedLineSum;
+  const taxAmount = typeof fields.tax === 'number' && Number.isFinite(fields.tax) ? fields.tax : 0;
+  const expectedTotal =
+    typeof baseAmount === 'number' && Number.isFinite(baseAmount)
+      ? Math.round((baseAmount + taxAmount) * 100) / 100
+      : null;
+
+  const reason_explanations = [];
+
+  if (executionState === 'unknown') {
+    reason_explanations.push(
+      'توقف التنفيذ أو انقطع قبل التأكد من النتيجة النهائية (الحالة unknown). لا يدّعي النظام نجاح العملية، ويجب إجراء مصالحة بشرية قبل أي خطوة تالية.'
+    );
+  }
+
+  for (const err of errors) {
+    if (err === 'total_mismatch') {
+      const subText = baseAmount !== null ? String(baseAmount) : 'غير محدد';
+      const taxText = String(taxAmount);
+      const expText = expectedTotal !== null ? String(expectedTotal) : 'غير محدد';
+      const actText = fields.total !== null && fields.total !== undefined ? String(fields.total) : 'غير محدد';
+      reason_explanations.push(
+        `الفاتورة تحتاج إلى تصحيح. مجموع ${subText} و${taxText} يساوي ${expText}، وليس ${actText}. لذلك لا يمكن اعتماد الفاتورة حتى يُحلّ الاختلاف.`
+      );
+    } else if (err === 'subtotal_mismatch') {
+      reason_explanations.push(
+        `مجموع البنود (${computedLineSum}) لا يطابق المجموع الفرعي المسجل (${fields.subtotal}). لا يمكن اعتماد الفاتورة قبل تصحيح الأرقام.`
+      );
+    } else if (err === 'line_item_math_mismatch') {
+      reason_explanations.push(
+        'أحد بنود الفاتورة يحتوي على حاصل ضرب (الكمية × سعر الوحدة) لا يطابق مبلغ البند المسجل.'
+      );
+    } else if (err === 'supplier_identity_not_verified') {
+      const missingPart = !fields.supplier_name
+        ? 'اسم المورد غير مذكور'
+        : !fields.supplier_tax_id
+          ? 'الرقم الضريبي للمورد غير مذكور'
+          : 'بيانات المورد غير مكتملة';
+      reason_explanations.push(
+        `الفاتورة تحتاج إلى مراجعة بشرية قبل أي اعتماد؛ بيانات هوية المورد ناقصة (${missingPart})، ولم يخترع النظام بيانات بديلة.`
+      );
+    } else if (err === 'untrusted_instruction_in_document') {
+      reason_explanations.push(
+        'اكتشف النظام داخل نص المستند عبارة تحاول إصدار أوامر أو تجاوز السياسات. تعامل النظام مع محتوى المستند كبيانات غير موثوقة فقط وليس كأوامر، وأوقف اعتماد الفاتورة للمراجعة البشرية.'
+      );
+    } else if (err === 'duplicate_invoice' || err === 'duplicate_document_fingerprint') {
+      reason_explanations.push(
+        'الفاتورة مكررة؛ بصمتها الرقمية مسجلة مسبقًا، لذلك رُفضت لمنع تسجيل نفس الفاتورة مرتين.'
+      );
+    } else if (err === 'missing_invoice_number') {
+      reason_explanations.push('رقم الفاتورة مفقود في المستند، ولا يمكن قبول فاتورة بلا رقم تعريفي.');
+    } else if (err === 'missing_issue_date' || err === 'invalid_issue_date') {
+      reason_explanations.push('تاريخ إصدار الفاتورة مفقود أو بصيغة غير صحيحة.');
+    } else if (err === 'missing_currency' || err === 'unsupported_currency') {
+      reason_explanations.push('عملة الفاتورة مفقودة أو غير مدعومة في السياسة الحالية.');
+    } else if (err === 'missing_total' || err === 'invalid_total_amount') {
+      reason_explanations.push('المبلغ الإجمالي مفقود أو غير صالح.');
+    } else {
+      reason_explanations.push(`تعذر تمرير الفاتورة بسبب مخالفة قاعدة التحقق: ${err}.`);
+    }
+  }
+
+  if (status === EXPLANATION_VERIFICATION_STATUS.valid && reason_explanations.length === 0) {
+    reason_explanations.push(
+      `الفاتورة صحيحة ومكتملة؛ مجموع ${baseAmount ?? fields.total} والضريبة ${taxAmount} يساوي الإجمالي المسجل ${fields.total} ${fields.currency || ''}، وكل الحقول الأساسية موثقة بمواضعها في المستند.`
+    );
+  }
+
+  const simple_summary = reason_explanations.join(' ');
+
+  return {
+    status,
+    simple_summary,
+    reason_explanations,
+    math_check: {
+      subtotal: baseAmount,
+      tax: taxAmount,
+      expected_total: expectedTotal,
+      recorded_total: fields.total ?? null,
+      matches:
+        expectedTotal !== null &&
+        typeof fields.total === 'number' &&
+        Math.abs(expectedTotal - fields.total) <= 0.01
+    }
+  };
+}
+
+/**
+ * Evaluate the Comprehension Gate (`evaluateComprehensionGate`) against deterministic
+ * extraction, provenance, validation, and execution state.
+ *
+ * A persuasive explanation that contradicts the numbers, invents ungrounded facts,
+ * claims success on an invalid/unknown run, or tries to bypass approval is BLOCKED.
+ */
+export function evaluateComprehensionGate({
+  explanation,
+  extracted = null,
+  validation = null,
+  action = null,
+  executionState = null
+} = {}) {
+  const contractCheck = validateExplanationContract(explanation);
+  const contradictions = [];
+  const ungrounded_claims = [];
+
+  if (!contractCheck.ok) {
+    return {
+      status: COMPREHENSION_GATE_STATUS.block,
+      contradictions: contractCheck.errors,
+      ungrounded_claims
+    };
+  }
+
+  const actualStatus =
+    executionState === 'unknown'
+      ? EXPLANATION_VERIFICATION_STATUS.unknown
+      : validation?.status || VALIDATION_STATUS.invalid;
+
+  if (explanation.verification_status !== actualStatus) {
+    contradictions.push(
+      `verification_status_mismatch:explanation=${explanation.verification_status},actual=${actualStatus}`
+    );
+  }
+
+  // Verify every claimed verified_fact against extracted fields and source provenance.
+  const fields = extracted?.fields || {};
+  const provenance = extracted?.provenance || {};
+  const fallbackRef = provenance?.json_root?.ref || null;
+
+  for (const fact of explanation.verified_facts || []) {
+    const fieldName = fact.field;
+    const actualVal = fields[fieldName];
+    const provRef = provenance[fieldName]?.ref || fallbackRef;
+
+    if (actualVal === undefined || actualVal === null || actualVal === '') {
+      ungrounded_claims.push(`fact_field_missing_in_extraction:${fieldName}`);
+      continue;
+    }
+    if (fact.value !== actualVal) {
+      contradictions.push(`fact_value_mismatch:${fieldName}:claimed=${fact.value},actual=${actualVal}`);
+    }
+    if (!provRef || fact.source_ref !== provRef) {
+      ungrounded_claims.push(`fact_source_ref_unverified:${fieldName}:claimed=${fact.source_ref},actual=${provRef || 'none'}`);
+    }
+  }
+
+  // Detect persuasive text in simple_summary that contradicts non-valid or unknown status.
+  const summaryText = String(explanation.simple_summary || '');
+  const claimsValidOrApproved =
+    /(?:الفاتورة\s+صحيحة\s+ومكتملة|المجموع\s+يطابق\s+الإجمالي|تم\s+اعتماد\s+الفاتورة\s+بنجاح|العملية\s+مكتملة\s+وصحيحة\s+تمامًا|invoice\s+is\s+valid\s+and\s+approved)/i.test(
+      summaryText
+    );
+  if (actualStatus !== EXPLANATION_VERIFICATION_STATUS.valid && claimsValidOrApproved) {
+    contradictions.push('persuasive_summary_contradicts_non_valid_status');
+  }
+
+  if (
+    actualStatus === EXPLANATION_VERIFICATION_STATUS.unknown &&
+    (!Array.isArray(explanation.unknowns) || explanation.unknowns.length === 0)
+  ) {
+    contradictions.push('unknown_execution_state_omitted_from_unknowns');
+  }
+
+  // Check next_permitted_action discipline: non-valid runs can NEVER permit commit/approval for commit.
+  if (
+    actualStatus !== EXPLANATION_VERIFICATION_STATUS.valid &&
+    explanation.next_permitted_action === NEXT_PERMITTED_ACTION.awaitOwnerApproval
+  ) {
+    contradictions.push('invalid_or_review_document_cannot_advance_to_commit_approval');
+  }
+
+  if (
+    action?.status === ACTION_STATUS.notCommitted &&
+    /(?:أُدرجت\s+في\s+سجل\s+المشتريات\s+فعليًا|تم\s+الحفظ\s+النهائي\s+في\s+سجل\s+المشتريات)/i.test(summaryText)
+  ) {
+    contradictions.push('summary_claims_committed_when_action_is_not_committed');
+  }
+
+  const gateStatus =
+    contradictions.length > 0 || ungrounded_claims.length > 0
+      ? COMPREHENSION_GATE_STATUS.block
+      : actualStatus === EXPLANATION_VERIFICATION_STATUS.unknown
+        ? COMPREHENSION_GATE_STATUS.unknown
+        : COMPREHENSION_GATE_STATUS.pass;
+
+  return {
+    status: gateStatus,
+    contradictions,
+    ungrounded_claims
+  };
+}
+
+/**
+ * Build the complete Phase 3 Comprehension Gate explanation object (`explanation`)
+ * grounded in the extraction provenance, deterministic validation, and run policy.
+ */
+export function buildComprehensionExplanation({
+  goal = '',
+  docPath = null,
+  commitRequested = false,
+  extracted = null,
+  validation = null,
+  actionStatus = ACTION_STATUS.notCommitted,
+  executionState = null,
+  evidenceRefs = []
+} = {}) {
+  const docLabel = docPath || extracted?.source?.source_id || 'المستند';
+  const fieldExp = extracted?.field_explanations || explainExtractedFields(extracted || {});
+  const valExp = explainValidationOutcome({ extracted, validation, executionState });
+
+  const goal_plain = commitRequested
+    ? `نريد قراءة الفاتورة (${docLabel}) واستخراج أرقامها والتحقق من صحتها، ثم عرضها على المالك للموافقة قبل إضافتها إلى سجل المشتريات.`
+    : `نريد قراءة الفاتورة (${docLabel}) واستخراج بياناتها والتحقق حسابيًا من صحتها، ثم تقديم تقرير موثق بالأدلة دون أي كتابة خارجية.`;
+
+  const success_criteria = [
+    'قراءة المستند وحساب بصمة SHA-256 ومواضع الحقول',
+    'استخراج الحقول وفق المخطط (1.0) وربط كل حقل بموضعه',
+    'تطابق المجموع والضريبة مع الإجمالي وعدم التكرار أو الحقن',
+    'لا كتابة في سجل المشتريات إلا لفاتورة صالحة وبعد موافقة المالك'
+  ];
+
+  const plan_steps = [
+    {
+      step: 1,
+      tool: 'document.read',
+      why_plain: 'فتح الملف المحلي وحساب بصمة SHA-256 وتحديد موضع كل سطر أو عمود.'
+    },
+    {
+      step: 2,
+      tool: 'document.extract',
+      why_plain: 'استخراج رقم الفاتورة والمورد والتاريخ والمبالغ وربطها بمواضعها.'
+    },
+    {
+      step: 3,
+      tool: 'data.validate',
+      why_plain: 'مراجعة الحسابات والتواريخ والتكرارات وفحص خلو النص من حقن الأوامر.'
+    },
+    {
+      step: 4,
+      tool: 'data.report',
+      why_plain: 'إعداد تقرير مبسّط يوضح ما ثبت بالدليل وما يحتاج إلى مراجعة أو تصحيح.'
+    }
+  ];
+
+  if (commitRequested) {
+    plan_steps.push({
+      step: 5,
+      tool: 'document.commit_purchase_ledger',
+      why_plain: 'طلب موافقة المالك أولًا ثم إدراج الفاتورة الصالحة مرة واحدة في سجل المشتريات.'
+    });
+  }
+
+  const verified_facts = fieldExp.verified_facts;
+
+  const assumptions = [
+    ...fieldExp.assumptions.map((item) => item.plain_statement || String(item)),
+    'نفترض أن الملف المحلي يمثل النسخة المقدمة للفحص حتى يراجعه المالك.'
+  ];
+
+  const unknowns = [
+    ...fieldExp.unknown_fields.map((item) => item.plain_statement || String(item))
+  ];
+  if (executionState === 'unknown') {
+    unknowns.push(
+      'حالة التنفيذ غير محسومة (unknown) بسبب انقطاع العملية قبل اكتمالها؛ تلزم المصالحة البشرية.'
+    );
+  }
+
+  const risks_and_side_effects = [
+    'يُعامل محتوى المستند كبيانات غير موثوقة ولا يُنفَّذ أبدًا كأوامر.',
+    'لا كتابة خارجية قبل موافقة المالك (WAITING_FOR_APPROVAL).'
+  ];
+  if (extracted?.security?.promptInjectionDetected) {
+    risks_and_side_effects.push(
+      'تحذير أمني: عُزلت نصوص تحاول تجاوز السياسات كمحتوى غير موثوق.'
+    );
+  }
+
+  let next_permitted_action = NEXT_PERMITTED_ACTION.reportOnlyNoCommit;
+  if (executionState === 'unknown') {
+    next_permitted_action = NEXT_PERMITTED_ACTION.reconcileUnknownOutcome;
+  } else if (valExp.status === EXPLANATION_VERIFICATION_STATUS.invalid) {
+    next_permitted_action = NEXT_PERMITTED_ACTION.fixSourceDocument;
+  } else if (valExp.status === EXPLANATION_VERIFICATION_STATUS.reviewRequired) {
+    next_permitted_action = NEXT_PERMITTED_ACTION.requestHumanReview;
+  } else if (valExp.status === EXPLANATION_VERIFICATION_STATUS.valid && commitRequested) {
+    next_permitted_action = NEXT_PERMITTED_ACTION.awaitOwnerApproval;
+  }
+
+  const draftExplanation = {
+    goal_plain,
+    success_criteria,
+    plan_steps,
+    verified_facts,
+    evidence_refs: Array.isArray(evidenceRefs) ? evidenceRefs : [],
+    source_sha256: extracted?.source?.file_sha256 || null,
+    assumptions,
+    unknowns,
+    risks_and_side_effects,
+    simple_summary: valExp.simple_summary,
+    verification_status: valExp.status,
+    next_permitted_action,
+    comprehension_gate: {
+      status: COMPREHENSION_GATE_STATUS.pass,
+      contradictions: [],
+      ungrounded_claims: []
+    }
+  };
+
+  const gateEval = evaluateComprehensionGate({
+    explanation: draftExplanation,
+    extracted,
+    validation,
+    action: { status: actionStatus },
+    executionState
+  });
+
+  draftExplanation.comprehension_gate = gateEval;
+  return draftExplanation;
 }
 
 /**
@@ -183,15 +545,47 @@ export function validateExtractedData(
  */
 export function buildAutomationReport({
   taskId = 'task-unknown',
+  goal = '',
+  docPath = null,
+  commitRequested = false,
   extracted,
   validation,
   actionStatus = ACTION_STATUS.notCommitted,
-  committedRef = null
+  committedRef = null,
+  executionState = null,
+  evidenceRefs = [],
+  explanationOverride = null
 } = {}) {
   const safeActionStatus =
     validation?.status === VALIDATION_STATUS.valid && Object.values(ACTION_STATUS).includes(actionStatus)
       ? actionStatus
       : ACTION_STATUS.notCommitted;
+
+  let explanation;
+  if (explanationOverride && typeof explanationOverride === 'object') {
+    const gateEval = evaluateComprehensionGate({
+      explanation: explanationOverride,
+      extracted,
+      validation,
+      action: { status: safeActionStatus },
+      executionState
+    });
+    explanation = {
+      ...explanationOverride,
+      comprehension_gate: gateEval
+    };
+  } else {
+    explanation = buildComprehensionExplanation({
+      goal,
+      docPath,
+      commitRequested,
+      extracted,
+      validation,
+      actionStatus: safeActionStatus,
+      executionState,
+      evidenceRefs
+    });
+  }
 
   const report = {
     task_id: String(taskId || 'task-unknown'),
@@ -210,7 +604,8 @@ export function buildAutomationReport({
     action: {
       status: safeActionStatus,
       ...(committedRef ? { external_ref: committedRef } : {})
-    }
+    },
+    explanation
   };
 
   const schemaCheck = validateAutomationSchema(report);

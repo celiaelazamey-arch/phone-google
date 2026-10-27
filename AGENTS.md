@@ -19,6 +19,10 @@ These instructions preserve project context between coding sessions. They do not
 - Do not delete/reinitialize user databases, remove volumes, rewrite Git history, publish releases, merge PRs, change sharing/security settings, or incur infrastructure/provider costs as a side effect of planning.
 - Never commit `.env`, credentials, database dumps, customer conversations, browser traces containing private data, or raw SDK error content. Record secret names and provisioning steps only.
 - For proposals, label future behavior clearly. Do not add suggested flags to `.env.example` or change release metadata until their implementation exists.
+- **Comprehension Gate — Explain to Understand (`قاعدة الفهم القابل للشرح`):**
+  - Before executing any compound task, CeliaOS must be able to explain what it wants to achieve, why it chose its plan, and how it will know it succeeded, in plain language understandable by a beginner or child without altering the task's meaning.
+  - After execution, CeliaOS must explain what actually happened, what is backed by recorded evidence (`verified_facts` + `source_ref`/`evidence_ref`), what remains unverified (`unknowns`), and any material assumptions or risks (`assumptions`, `risks_and_side_effects`).
+  - If the system cannot explain the task or detects a contradiction between its explanation and deterministic validation or recorded evidence, it must gather missing information, revise the plan, or halt the path under existing policies. Clarity or persuasiveness of an explanation is never sufficient proof of correctness and must never bypass deterministic validation, tool permissions, owner approvals (`WAITING_FOR_APPROVAL`), or security boundaries.
 
 ## Verify and hand off
 

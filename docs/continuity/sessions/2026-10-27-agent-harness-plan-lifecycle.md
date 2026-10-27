@@ -33,6 +33,12 @@
      و`data.validate` و`data.report` و`document.commit_purchase_ledger` في `Tool Registry`، وربط فحوص
      `documentAutomationChecks` في `src/agent/verifier.js`، وإنشاء الحزمة المرجعية الذهبية في `test/fixtures/documents/`
      واختبارات الحالات الثماني الإلزامية في `test/agent-document-automation.test.js`.
+5. **المرحلة الثالثة — بوابة الفهم والشرح المبسّط المدعوم بالأدلة (`Comprehension Gate — Explain to Understand`، DEC-021):**
+   - تثبيت قاعدة `Explain to Understand` في `AGENTS.md`، وإضافة عقد الشرح `validateExplanationContract` في
+     `src/agent/automation/schema.js` مع الحفاظ على التوافق الخلفي لـ`schema_version: "1.0"`.
+   - تنفيذ `explainExtractedFields` و`explainValidationOutcome` و`evaluateComprehensionGate` و`buildComprehensionExplanation`
+     وربط فحص `comprehension_gate_grounding` في `src/agent/verifier.js` و`src/agent/planner.js`.
+   - إضافة اختبارات `CL-01` إلى `CL-10` في `test/agent-comprehension-gate.test.js`.
 
 ## 2. نتائج الفحوص الفعلية
 
@@ -41,6 +47,6 @@
 - `npm run release:check`: ناجح (`0.2.1` / `schema: 1`).
 - `npm run check:continuity`: ناجح.
 - `npm run check:secrets`: ناجح.
-- `npm test`: **258/258** اختبارًا ناجحًا.
+- `npm test`: **268/268** اختبارًا ناجحًا.
 - **الحدود المعلنة:** لا يوجد ثنائي متصفح Chromium مثبت محليًا داخل حاوية الساندبوكس؛ تُشغَّل `npm run test:browser`
   و`integration/mysql.integration.mjs` في GitHub Actions CI على الفرع.

@@ -395,6 +395,37 @@
   حزمة مرجعية ذهبية في `test/fixtures/documents/`، واختبارات `test/agent-document-automation.test.js`. **لا ترحيل SQL جديد
   ولا تغيير في `schema 1` أو الإصدار `0.2.1` أو أدوات MCP الـ12.**
 
+## DEC-021 — Phase 3 Comprehension Gate (`Explain to Understand`): بوابة الفهم والشرح المبسّط المدعوم بالأدلة
+
+- **التاريخ:** 27 أكتوبر 2026 (مساءً) · **الحالة:** منفذ ومختبر محليًا (10 اختبارات `CL-01..CL-10` في `test/agent-comprehension-gate.test.js`، إجمالي 268/268 في `npm test`) · **المهمة:** AGENT-001، AGENT-002، SEC-003، DATA-003
+- **السياق:** بعد إتمام المرحلة الثانية (`document_data_automation`، DEC-020)، طُلب إضافة المرحلة الثالثة
+  **`Comprehension Gate — Explain to Understand`** فوق المكونات المنفذة بالفعل دون بناء محرك موازٍ: أن يشرح النظام
+  الهدف والخطة والنتيجة بلغة بسيطة، مع التمييز الصارم بين الحقائق المثبتة بمواضعها (`verified_facts`) والافتراضات
+  (`assumptions`) وما لم يُتحقق منه (`unknowns`)، وكشف أي شرح مقنع لغويًا لكنه يناقض الأدلة أو التحقق الحتمي، وعدم
+  السماح لأي شرح بتجاوز فشل التحقق أو غياب الموافقة.
+- **القرار:**
+  1. **تثبيت القاعدة في `AGENTS.md` وعقد الشرح المتوافق عكسيًا في `src/agent/automation/schema.js`:** أُضيف حقل
+     `explanation` الاختياري المتوافق عكسيًا مع `schema_version: "1.0"`، ويُفحص عبر `validateExplanationContract`
+     (`goal_plain`، `success_criteria`، `plan_steps`، `verified_facts`، `assumptions`، `unknowns`،
+     `risks_and_side_effects`، `simple_summary`، `verification_status`، `next_permitted_action`، `comprehension_gate`).
+  2. **شرح الاستخراج والتحقق بالرجوع إلى الأدلة (`extractor.js` + `validator.js`):**
+     - `explainExtractedFields`: يربط كل حقل مستخرج بموضعه (`row:X,col:Y` أو `line:N`) في `verified_facts`، ويفصل
+       القيم المشتقة/الافتراضية (مثل المجموع الفرعي المشتق من جمع البنود أو الضريبة 0 عند عدم ذكرها) في `assumptions`،
+       ويسرد الحقول الغائبة في `unknown_fields` دون اختلاق.
+     - `explainValidationOutcome`: يترجم أخطاء التحقق الحتمية إلى لغة مبسطة، مثل شرح عدم تطابق الإجمالي:
+       «الفاتورة تحتاج إلى تصحيح. مجموع 1000 و140 يساوي 1140، وليس 1500. لذلك لا يمكن اعتماد الفاتورة حتى يُحلّ الاختلاف.».
+  3. **بوابة التقييم وفحص المُتحقِّق المستقل (`evaluateComprehensionGate` + `verifier.js`):**
+     - يقارن `evaluateComprehensionGate` ادعاءات الشرح مع القيم الفعلية في `fields` ومواضع `provenance` وحالة `validation.status`
+       وحالة `action.status`. أي ادعاء غير مدعوم أو متناقض (مثل وصف فاتورة فاشلة بأنها صحيحة أو تزوير رقم/موضع) يُسجَّل
+       `BLOCK`، ويُفحص في `verifier.js` عبر `comprehension_gate_grounding`.
+     - لا يغيّر الشرح أبدًا قرار `validation.status` ولا يتجاوز `WAITING_FOR_APPROVAL`.
+- **السبب:** جعل قرارات الأتمتة مفهومة للمستخدم وقابلة للتدقيق مقابل نفس سلسلة الأدلة دون منح النص اللغوي سلطة تجاوز
+  الفحص البرمجي الحتمي.
+- **البدائل المرفوضة:** (أ) تغيير `schema_version` بصورة تكسر التقارير السابقة — استُخدم امتداد متوافق عكسيًا على `1.0`؛
+  (ب) الوثوق بالنص التفسيري لتحديد صلاحية الفاتورة — مرفوض؛ (ج) خلط القيم الافتراضية مع الحقائق المثبتة من المصدر — مرفوض.
+- **الأثر:** تحديث `AGENTS.md` و`src/agent/automation/{schema,extractor,validator,index}.js` و`src/agent/{planner,verifier,store,index}.js`
+  وإضافة `test/agent-comprehension-gate.test.js` (`CL-01..CL-10`). **لا ترحيل SQL جديد ولا تغيير في `schema 1` أو الإصدار `0.2.1`.**
+
 ## إضافة قرار لاحق
 
 استخدم معرفًا جديدًا، والتاريخ والحالة والسياق والبدائل والقرار والسبب والأثر ومرجع المهمة، واذكر صراحة القرار المستبدل إن وجد. لا تنسخ أسرارًا أو مخطط إنتاج يحوي بيانات شخصية إلى سجل القرار.

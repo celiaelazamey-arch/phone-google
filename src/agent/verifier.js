@@ -1,7 +1,13 @@
 import { RISK } from './tools.js';
 import { validateGoalContract } from './goal-contract.js';
 import { hashOf, verifyChain } from './evidence.js';
-import { validateAutomationSchema, VALIDATION_STATUS, ACTION_STATUS } from './automation/schema.js';
+import {
+  validateAutomationSchema,
+  VALIDATION_STATUS,
+  ACTION_STATUS,
+  COMPREHENSION_GATE_STATUS
+} from './automation/schema.js';
+import { evaluateComprehensionGate } from './automation/validator.js';
 
 /**
  * Independent verifier (roadmap unit 7).
@@ -133,6 +139,35 @@ export function createVerifier({ tools, clock = Date.now } = {}) {
         status: CHECK.pass,
         detail: `data.report conforms to schema ${outcome.schema_version} (${outcome.validation?.status})`
       });
+
+      if (outcome.explanation) {
+        const gateEval = evaluateComprehensionGate({
+          explanation: outcome.explanation,
+          extracted: outcome,
+          validation: outcome.validation,
+          action: outcome.action
+        });
+        const issues = [...gateEval.contradictions, ...gateEval.ungrounded_claims];
+        checks.push(
+          gateEval.status === COMPREHENSION_GATE_STATUS.pass
+            ? {
+                id: 'comprehension_gate_grounding',
+                status: CHECK.pass,
+                detail: `explanation grounded (${outcome.explanation.verified_facts?.length || 0} verified facts, status=${outcome.explanation.verification_status})`
+              }
+            : gateEval.status === COMPREHENSION_GATE_STATUS.unknown
+              ? {
+                  id: 'comprehension_gate_grounding',
+                  status: CHECK.unknown,
+                  detail: 'explanation reflects unresolved (unknown) execution state'
+                }
+              : {
+                  id: 'comprehension_gate_grounding',
+                  status: CHECK.block,
+                  detail: `explanation contradicts evidence or lacks provenance: ${issues.join(', ')}`
+                }
+        );
+      }
 
       if (outcome.validation?.status !== VALIDATION_STATUS.valid) {
         const illegalCommitAttempt = outbox.some(

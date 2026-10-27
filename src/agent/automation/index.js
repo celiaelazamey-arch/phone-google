@@ -5,15 +5,26 @@ import {
   DOCUMENT_TYPES,
   VALIDATION_STATUS,
   ACTION_STATUS,
+  COMPREHENSION_GATE_STATUS,
+  EXPLANATION_VERIFICATION_STATUS,
+  NEXT_PERMITTED_ACTION,
   ALLOWED_CURRENCIES,
   scanUntrustedDocumentContent,
-  validateAutomationSchema
+  validateAutomationSchema,
+  validateExplanationContract
 } from './schema.js';
 import { readLocalDocument, resolveSafeDocumentPath } from './reader.js';
-import { extractStructuredDocument, measureExtractionAccuracy } from './extractor.js';
+import {
+  extractStructuredDocument,
+  explainExtractedFields,
+  measureExtractionAccuracy
+} from './extractor.js';
 import {
   computeInvoiceFingerprint,
   validateExtractedData,
+  explainValidationOutcome,
+  evaluateComprehensionGate,
+  buildComprehensionExplanation,
   buildAutomationReport
 } from './validator.js';
 
@@ -23,15 +34,23 @@ export {
   DOCUMENT_TYPES,
   VALIDATION_STATUS,
   ACTION_STATUS,
+  COMPREHENSION_GATE_STATUS,
+  EXPLANATION_VERIFICATION_STATUS,
+  NEXT_PERMITTED_ACTION,
   ALLOWED_CURRENCIES,
   scanUntrustedDocumentContent,
   validateAutomationSchema,
+  validateExplanationContract,
   readLocalDocument,
   resolveSafeDocumentPath,
   extractStructuredDocument,
+  explainExtractedFields,
   measureExtractionAccuracy,
   computeInvoiceFingerprint,
   validateExtractedData,
+  explainValidationOutcome,
+  evaluateComprehensionGate,
+  buildComprehensionExplanation,
   buildAutomationReport
 };
 
@@ -256,20 +275,35 @@ export function documentAutomationToolDefinitions({
     },
     {
       name: 'data.report',
-      description: 'إنشاء تقرير موحد بالنتائج والأخطاء وحالة الاعتماد (schema 1.0) دون تنفيذ كتابة خارجية',
+      description: 'إنشاء تقرير موحد بالنتائج والأخطاء والشرح المبسّط المدعوم بالأدلة (schema 1.0) دون تنفيذ كتابة خارجية',
       risk: RISK.internalWrite,
       arguments: {
         taskId: 'string',
+        goal: 'string',
+        docPath: 'string',
+        commitRequested: 'boolean',
         extracted: 'object',
         validation: 'object',
-        actionStatus: 'string'
+        actionStatus: 'string',
+        executionState: 'string',
+        evidenceRefs: 'object',
+        explanationOverride: 'object'
       },
-      async execute(args, { runId } = {}) {
+      async execute(args, { run, context } = {}) {
+        const priorToolRunIds = (context?.toolRuns || [])
+          .filter((tr) => tr.status === 'succeeded' && tr.id)
+          .map((tr) => tr.id);
         return buildAutomationReport({
-          taskId: args?.taskId || runId || 'task-local',
+          taskId: args?.taskId || run?.id || 'task-local',
+          goal: args?.goal || run?.goal || '',
+          docPath: args?.docPath || null,
+          commitRequested: Boolean(args?.commitRequested),
           extracted: args?.extracted,
           validation: args?.validation,
-          actionStatus: args?.actionStatus || ACTION_STATUS.notCommitted
+          actionStatus: args?.actionStatus || ACTION_STATUS.notCommitted,
+          executionState: args?.executionState || null,
+          evidenceRefs: Array.isArray(args?.evidenceRefs) ? args.evidenceRefs : priorToolRunIds,
+          explanationOverride: args?.explanationOverride || null
         });
       }
     },

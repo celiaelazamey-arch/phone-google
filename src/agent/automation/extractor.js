@@ -21,6 +21,93 @@ function cleanString(raw) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+const FIELD_LABELS_AR = Object.freeze({
+  invoice_number: 'رقم الفاتورة',
+  supplier_name: 'اسم المورد',
+  supplier_tax_id: 'الرقم الضريبي للمورد',
+  issue_date: 'تاريخ الإصدار',
+  currency: 'العملة',
+  subtotal: 'المجموع الفرعي',
+  tax: 'الضريبة',
+  total: 'الإجمالي المسجل'
+});
+
+/**
+ * Explain extracted fields strictly by referencing their source provenance coordinates.
+ * Distinguishes verified source facts from derived/default assumptions and missing unknowns.
+ */
+export function explainExtractedFields(extracted = {}) {
+  const fields = extracted?.fields || {};
+  const provenance = extracted?.provenance || {};
+  const sourceId = extracted?.source?.source_id || 'unknown_source';
+  const fileSha256 = extracted?.source?.file_sha256 || null;
+  const fallbackRef = provenance?.json_root?.ref || null;
+
+  const verified_facts = [];
+  const assumptions = [];
+  const unknown_fields = [];
+
+  const tracked = [
+    'invoice_number',
+    'supplier_name',
+    'supplier_tax_id',
+    'issue_date',
+    'currency',
+    'subtotal',
+    'tax',
+    'total'
+  ];
+
+  for (const field of tracked) {
+    const label = FIELD_LABELS_AR[field] || field;
+    const value = fields[field];
+    const prov = provenance[field] || (fallbackRef ? { ref: fallbackRef, confidence: 'deterministic' } : null);
+
+    if (value !== null && value !== undefined && value !== '') {
+      if (prov?.ref) {
+        verified_facts.push({
+          field,
+          value,
+          source_ref: prov.ref,
+          plain_statement: `${label} هو «${value}» (${prov.ref}).`
+        });
+      } else if (field === 'tax' && value === 0) {
+        assumptions.push({
+          id: 'default_zero_tax',
+          field: 'tax',
+          assumed_value: 0,
+          plain_statement: 'لم يرد حقل ضريبة صريح في المستند، فافترض النظام أن الضريبة 0.'
+        });
+      } else if (field === 'subtotal') {
+        assumptions.push({
+          id: 'derived_subtotal_from_lines',
+          field: 'subtotal',
+          assumed_value: value,
+          plain_statement: `حُسب المجموع الفرعي (${value}) من جمع مبالغ البنود المستخرجة.`
+        });
+      } else {
+        unknown_fields.push({
+          field,
+          plain_statement: `${label} (${value}) يفتقر إلى موضع مصدر صريح.`
+        });
+      }
+    } else {
+      unknown_fields.push({
+        field,
+        plain_statement: `${label} غير مذكور في المستند، ولم يخترع النظام قيمة له.`
+      });
+    }
+  }
+
+  return {
+    source_id: sourceId,
+    file_sha256: fileSha256,
+    verified_facts,
+    assumptions,
+    unknown_fields
+  };
+}
+
 function extractFromCsvRows(rows = []) {
   const first = rows[0]?.values || {};
   const firstRefs = rows[0]?.refs || {};
