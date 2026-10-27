@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="740" viewBox="0 0 1120 740" role="img" aria-labelledby="title desc">
+  <title id="title">CeliaOS document data automation pipeline</title>
+  <desc id="desc">A governed, local-first sequence from untrusted input through extraction, deterministic validation, policy review, evidence, and independent verification.</desc>
+  <defs>
+    <style>
+      .bg{fill:#f7f8fa}.panel{fill:#fff;stroke:#b8c3d1;stroke-width:2}.core{fill:#edf4ff;stroke:#4263a3;stroke-width:2}.safe{fill:#eef9f0;stroke:#348455;stroke-width:2}.warn{fill:#fff7e8;stroke:#b7791f;stroke-width:2}.title{font:700 25px Arial,sans-serif;fill:#172b4d}.label{font:700 17px Arial,sans-serif;fill:#172b4d}.small{font:14px Arial,sans-serif;fill:#42526b}.arrow{stroke:#52657a;stroke-width:2.5;fill:none;stroke-linecap:round;stroke-linejoin:round}.sub{font:15px Arial,sans-serif;fill:#42526b}
+    </style>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#52657a"/></marker>
+  </defs>
+  <rect class="bg" width="1120" height="740" rx="18"/>
+  <text class="title" x="560" y="45" text-anchor="middle">CeliaOS — Document &amp; Data Automation</text>
+  <text class="sub" x="560" y="72" text-anchor="middle">Local-first • deterministic checks • evidence-backed • no external side effects by default</text>
+
+  <rect class="panel" x="60" y="105" width="310" height="84" rx="12"/>
+  <text class="label" x="215" y="137" text-anchor="middle">1. Untrusted document input</text>
+  <text class="small" x="215" y="162" text-anchor="middle">CSV / JSON / TXT / Markdown • size-limited</text>
+
+  <rect class="core" x="405" y="105" width="310" height="84" rx="12"/>
+  <text class="label" x="560" y="137" text-anchor="middle">2. Read + SHA-256</text>
+  <text class="small" x="560" y="162" text-anchor="middle">Allowlisted local path or supplied text</text>
+
+  <rect class="core" x="750" y="105" width="310" height="84" rx="12"/>
+  <text class="label" x="905" y="137" text-anchor="middle">3. Structured extraction</text>
+  <text class="small" x="905" y="162" text-anchor="middle">Schema 1.0 + field provenance</text>
+
+  <path class="arrow" marker-end="url(#arrow)" d="M370 147 H400"/>
+  <path class="arrow" marker-end="url(#arrow)" d="M715 147 H745"/>
+  <path class="arrow" marker-end="url(#arrow)" d="M905 189 V230"/>
+
+  <rect class="core" x="750" y="232" width="310" height="86" rx="12"/>
+  <text class="label" x="905" y="265" text-anchor="middle">4. Deterministic validation</text>
+  <text class="small" x="905" y="290" text-anchor="middle">Required fields • totals • duplicates</text>
+
+  <path class="arrow" marker-end="url(#arrow)" d="M750 275 H715"/>
+  <rect class="warn" x="405" y="232" width="310" height="86" rx="12"/>
+  <text class="label" x="560" y="265" text-anchor="middle">5. Review gate</text>
+  <text class="small" x="560" y="290" text-anchor="middle">valid / review_required / invalid</text>
+
+  <path class="arrow" marker-end="url(#arrow)" d="M405 275 H370"/>
+  <rect class="panel" x="60" y="232" width="310" height="86" rx="12"/>
+  <text class="label" x="215" y="265" text-anchor="middle">6. Report in agent ledger</text>
+  <text class="small" x="215" y="290" text-anchor="middle">Action remains not_committed in v1</text>
+
+  <path class="arrow" marker-end="url(#arrow)" d="M215 318 V365"/>
+  <rect class="safe" x="60" y="368" width="465" height="92" rx="12"/>
+  <text class="label" x="292" y="402" text-anchor="middle">7. Evidence chain</text>
+  <text class="small" x="292" y="428" text-anchor="middle">Tool outcome + source hash + durable agent_evidence</text>
+
+  <path class="arrow" marker-end="url(#arrow)" d="M525 414 H590"/>
+  <rect class="safe" x="595" y="368" width="465" height="92" rx="12"/>
+  <text class="label" x="827" y="402" text-anchor="middle">8. Independent verifier</text>
+  <text class="small" x="827" y="428" text-anchor="middle">PASS / BLOCK / UNKNOWN • no self-approval</text>
+
+  <rect class="warn" x="100" y="505" width="920" height="86" rx="12"/>
+  <text class="label" x="560" y="538" text-anchor="middle">Safety invariants</text>
+  <text class="small" x="560" y="565" text-anchor="middle">No OCR/PDF claim • no AI provider required • no external network • no purchase record commit</text>
+
+  <text class="small" x="560" y="630" text-anchor="middle">v1 supports small text, CSV, JSON and Markdown only. Scanned images/PDF and external connectors are deferred.</text>
+  <text class="small" x="560" y="657" text-anchor="middle">A report is not a committed business transaction. Review and explicit approval are required for future write connectors.</text>
+  <text class="small" x="560" y="700" text-anchor="middle">CeliaOS / CELIA • October 2026</text>
+</svg>
