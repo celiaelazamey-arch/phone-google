@@ -46,6 +46,7 @@ test.describe('لوحة المهام المجدولة — الوضع الثاب�
     await page.locator('[data-testid="job-title"]').fill('عنوان معدّل');
     await page.locator('[data-testid="job-save"]').click();
     await expect(page.locator('#cr-tbody')).toContainText('عنوان معدّل');
+    const renamedRow = page.locator('#cr-tbody tr', { hasText: 'عنوان معدّل' });
 
     await page.locator('[data-testid="toggle-9001"]').uncheck();
     await expect(page.locator('#cr-tbody tr', { hasText: 'فحص صحة الخادم اليومي' })).toContainText('معطّلة');
@@ -57,7 +58,7 @@ test.describe('لوحة المهام المجدولة — الوضع الثاب�
     await expect(page.locator('#cr-history-body tr')).toHaveCount(2);
     await page.locator('#cr-history-dialog [data-close]').click();
 
-    await createdRow.getByRole('button', { name: /حذف/ }).click();
+    await renamedRow.getByRole('button', { name: /حذف/ }).click();
     await expect(page.locator('#cr-delete-dialog')).toBeVisible();
     const confirm = page.locator('[data-testid="confirm-delete"]');
     await confirm.click();
