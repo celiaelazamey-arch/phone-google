@@ -297,21 +297,38 @@ export function createDemoStore(nowMs = Date.now()) {
       return jobs.map(normalizeJob);
     },
     create(input) {
-      const check = validateJobInput(input);
-      if (!check.ok) {
+      // تحقق مستوى المتجر: الحمولة مبنية بجدول زمني ولا تحمل kind النموذجي.
+      const title = String(input?.title ?? '').trim();
+      const url = String(input?.url ?? '').trim();
+      let urlOk = false;
+      try {
+        const parsed = new URL(url);
+        urlOk = ['https:', 'http:'].includes(parsed.protocol);
+      } catch { /* urlOk يبقى false */ }
+      let schedule = input.schedule;
+      if (!schedule || typeof schedule !== 'object') {
+        try {
+          schedule = buildSchedule(input);
+        } catch {
+          const error = new Error('بيانات غير صالحة');
+          error.details = { kind: 'نوع الجدول غير معروف.' };
+          throw error;
+        }
+      }
+      if (!title || title.length > 120 || !urlOk) {
         const error = new Error('بيانات غير صالحة');
-        error.details = check.errors;
+        error.details = { title: title ? '' : 'العنوان مطلوب.', url: urlOk ? '' : 'رابط غير صالح.' };
         throw error;
       }
       const jobId = sequence += 1;
       const job = {
         jobId,
-        title: check.value.title,
-        url: check.value.url,
+        title,
+        url,
         enabled: input.enabled !== false,
         saveResponses: Boolean(input.saveResponses),
         requestMethod: Number(input.requestMethod) || 0,
-        schedule: buildSchedule(input)
+        schedule
       };
       jobs = [...jobs, job];
       history.set(jobId, []);
