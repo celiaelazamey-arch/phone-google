@@ -6,12 +6,12 @@
 
 - **الموافقة:** طلب المالك «موافق على تنفيذdocument_data_automation svgsvg canvas».
 - **مرجع البداية:** `main` عند `ba3e51fa45b02cfe21315bcd752a9ca2158a6249`، التطبيق `0.2.1`، `schema 1`.
-- **فرع التغيير:** [`feature/document-data-automation`](https://github.com/celiaelazamey-arch/phone-google/tree/feature/document-data-automation). الفرع يحتوي التغييرات المحفوظة في GitHub؛ تُراجع حالة PR #39 ونتائج CI مباشرة قبل الدمج.
+- **فرع التغيير:** [`feature/document-data-automation`](https://github.com/celiaelazamey-arch/phone-google/tree/feature/document-data-automation) · [PR #39](https://github.com/celiaelazamey-arch/phone-google/pull/39) مفتوح كـDraft ولم يُدمج. آخر حالة CI رُصدت ناجحة على الفرع؛ ارجع إلى Checks في PR للتحقق من أحدث HEAD.
 - **ما أُضيف على الفرع:** `src/agent/automation/{schema,reader,extractor,validator,tools}.js`؛ تسجيل الأدوات الأربع عبر حلقة الوكيل؛ تخطيط حتمي يبدأ بعلامة صريحة؛ فحص التكرار من تقارير `agent_tool_runs` الحالية؛ فحص `document_automation_integrity` في المُتحقّق المستقل؛ `test/agent-document-automation.test.js`؛ SVG مصدر + نسخة ثابتة عامة + صفحة Canvas للتصور؛ توثيق حدود القدرة.
 - **حدود الإصدار الأول:** CSV/JSON/TXT/Markdown ونصوص/ملفات صغيرة؛ لا PDF/صور/OCR ولا استخراج سحابي أو شبكة. `data.report` لا يكتب سجل مشتريات ويبقي `action.status=not_committed`. فحص التكرار تاريخي وليس ذريًا ضد التسابق المتزامن.
-- **الفحوص:** لم أستطع استنساخ المستودع محليًا بسبب تعذر DNS إلى `github.com` في بيئة التنفيذ؛ لذلك لم تُشغّل اختبارات Node محليًا. حالة CI على فرع/PR يجب التحقق منها بعد فتح المراجعة؛ لا تُنقل النتائج التاريخية إلى هذه المهمة.
+- **الفحوص:** تعذر الاستنساخ محليًا بسبب DNS، لكن CI الفعلي على فرع المراجعة نجح: Node 22 و24 (258/258 لكل منهما)، اختبار MySQL 8.4، المتصفح/الإتاحة، الحاوية، Spider، `npm audit`، `check:secrets`، `check:continuity`، و`build:pages`. لا تعتمد على هذا بدل التحقق من أحدث HEAD في PR.
 - **الحفظ/النشر:** التغييرات محفوظة في فرع GitHub من خلال واجهة المستودع. لم يُدمج PR ولم يُنشر التطبيق ولم تُجرَ ترحيلات MySQL أو تغييرات حساب/أسرار.
-- **الخطوة التالية:** مراجعة الكود والفروق، فتح Draft PR، رصد CI، وإصلاح أي إخفاق. لا دمج حتى تظهر نتائج CI ومراجعة توافق واضحة.
+- **الخطوة التالية:** مراجعة بشرية لفروق PR #39، ثم قرار المالك بالدمج. يبقى النشر/الترحيل خارج النطاق؛ لا يُعلن Production Ready بمجرد نجاح CI.
 
 ## السياق السابق — الخطوات التالية للتشغيل الحقيقي
 
