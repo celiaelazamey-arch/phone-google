@@ -1,6 +1,6 @@
 # الحالة الحالية — ابدأ من هنا
 
-**آخر مراجعة:** 27 أكتوبر 2026 · **نوع الجلسة الحالية:** جوجل أولًا — تنفيذ GOOG-001 (رابط ربط أحادي الاستخدام + أمر واتساب للمالك) و[دليل ربط Google](../google-connect.md)
+**آخر مراجعة:** 27 أكتوبر 2026 · **نوع الجلسة الحالية:** جوجل أولًا — GOOG-001 مدموج في PR #27، وهذه الجلسة أضافت **GOOG-002** (فحص جاهزية الربط بلا شبكة) و[دليل ربط Google](../google-connect.md) · سجل الجلسة: [2026-10-27-goog002-preflight](sessions/2026-10-27-goog002-preflight.md)
 
 ## الطلب الحالي (أعلى أولوية)
 
@@ -14,6 +14,11 @@ DEC-012، وأربعة صفوف AGENT. **لا كود ولا مخطط جديد و
 `POST /api/google/consent-link` (مالك فقط) · `GET /auth/google?ticket=` عام يتحقق من التوقيع والصف غير المستخدم
 قبل التحويل · أمر واتساب «اربط جوجل» يعمل فقط من `APP_OWNER_PHONE_E164`. **8/8 اختبارات** في
 `test/google-consent.test.js` والمجموع **83/83**. **لم يُختبر ربط حي مع Google** (لا اعتماد ولا نطاق عام).
+
+**منفذ (GOOG-002، هذه الجلسة):** `src/google-preflight.js` (10 فحوص بيئة بحالات pass/warn/fail، بلا شبكة
+وبلا طباعة أي سر) · `npm run google:doctor` · `GET /api/google/preflight` (مالك فقط) · قسم 6 في دليل الربط.
+**12 اختبارًا جديدًا** والمجموع **95/95** و`npm run check` على **61** ملفًا. **PR #27 مدموج فعلًا** عند
+`47c7033` فلا شيء ينتظر دمجًا. **لا يثبت** قبول Google نفسه ولا يُغني عن `200` حي.
 
 **سياق (جلسة جوجل):** المالك أرسل مقتطف ربط Google من محادثة أخرى ليُضاف إلى `src/server.js`. التدقيق بالكود أثبت أن
 الربط **منفذ بالفعل** في `src/google.js` بشكل أقوى، وأن المقتطف غير صالح هنا: `require` في مشروع ESM، وملف
@@ -34,7 +39,7 @@ DEC-012، وأربعة صفوف AGENT. **لا كود ولا مخطط جديد و
 ## الواقع والهوية
 
 - المستودع: `celiaelazamey-arch/phone-google`؛ خط الأساس لهذه الجلسة `5dead2c888d445fcaf18e4a1717a282d616a8fa3` (دمج PR #26 على `main`). طلبات PR #17 و#21 و#22 و#23 و#24 و#25 و#26 مدموجة.
-- الفرع المعطى لهذه الجلسة: `arena/051ed103-phone-google`. تحقّق دائمًا من الفرع النشط ولا تنشئ أو تنتقل لفرع آخر. (الفرعان `arena/64505100-…` و`arena/20079390-…` انتهيا بعد الدمج ولا يُعدّل منهما شيء.)
+- الفرع المعطى لهذه الجلسة: `arena/24d51c71-phone-google` على خط أساس `47c7033` (دمج PR #27). تحقّق دائمًا من الفرع النشط ولا تنشئ أو تنتقل لفرع آخر. (`arena/64505100-…` و`arena/20079390-…` و`arena/051ed103-…` انتهت بعد الدمج ولا يُعدّل منها شيء.)
 - الكود الحالي `0.2.1` / السابق `0.2.0` / `schema: 1` كما هي دون أي تعديل — حزمة السبّابة طرفية لا تمس Node أو المخطط.
 - المستودع مقتطاع (shallow) بعمق 1؛ اختبار توافق 0.2.0 يحتاج commit قاعدة `2508893bd7e6d447b2e19374933556322cc9cdb7` محليًا (`git fetch --depth=1 origin <sha>`) — جُلب في هذه الجلسة فصار 75/75.
 - لا رابط Render/Aiven دائم منشأ (HOST-003 بانتظار تفويض المالك).
@@ -65,9 +70,9 @@ DEC-012، وأربعة صفوف AGENT. **لا كود ولا مخطط جديد و
 - `python -m unittest discover -s tests -v` (داخل `celia-google-spider/`): **10/10 ناجحة** (شاملة مصافحة MCP stdio).
 - `python -m pytest -q`: **10 passed**. و`python -m compileall -q celia_spider tests` سليم.
 - `zip -T dist/celia-google-spider-v0.1.0.zip`: سليم (19 ملفًا، بلا اعتمادات أو فهارس).
-- `npm run check`: ناجح — فحص syntax لـ **55 ملف JavaScript**.
+- `npm run check`: ناجح — فحص syntax لـ **61 ملف JavaScript**.
 - `npm run release:check`: ناجح — `0.2.1` / السابق `0.2.0` / `databaseSchema: 1`.
-- `npm test`: **75/75 ناجحة** بعد جلب commit قاعدة 0.2.0 (انظر «الواقع والهوية»).
+- `npm test`: **95/95 ناجحة** (83 بعد GOOG-001 + 12 لـGOOG-002) بعد `git fetch --unshallow` لجلب commit قاعدة 0.2.0 (انظر «الواقع والهوية»).
 - `npm run check:secrets`: ناجح — تتبع 9/9 أسرار (قيم غير مضيئة محليًا بمفردها؛ التحقق الحي 401/200 يشغّله CI).
 - `npm run celia:mcp:verify`: ناجح — مصافحة وفحص جاهزية، 12 أداة.
 - `npm run build:pages`: ناجح — 6 صفحات ثابتة (`dist/`).
@@ -85,8 +90,9 @@ DEC-012، وأربعة صفوف AGENT. **لا كود ولا مخطط جديد و
 
 ## الخطوة التالية بالضبط
 
-1. **اختبار الربط الحي:** بعد وضع `GOOGLE_CLIENT_ID/SECRET` و`APP_OWNER_EMAIL` و`APP_BASE_URL` على نطاق HTTPS
-   (HOST-003)، اطلب `POST /api/google/consent-link` وافتح الرابط؛ ثم `200` من
+1. **اختبار الربط الحي:** ضع `GOOGLE_CLIENT_ID/SECRET` و`APP_OWNER_EMAIL` و`APP_OWNER_PHONE_E164` و`APP_BASE_URL`
+   على نطاق HTTPS (HOST-003) ⇒ شغّل `npm run google:doctor` (أو `GET /api/google/preflight`) حتى تختفي كل
+   `fail` ⇒ اطلب `POST /api/google/consent-link` وافتح الرابط ⇒ ثم `200` من
    `/api/google/calendar/events?maxResults=1`. لا تدّعِ نجاحًا قبل رؤية هذا الـ200.
 2. **أربعة قرارات المالك أعلاه** — بدونها لا يبدأ AGENT-001؛ الافتراض الافتراضي عند غياب القرار مذكور في DEC-012.
 2. **`npm ci && npm run check && npm run check:secrets && npm run check:continuity && npm test`** في بيئة كاملة

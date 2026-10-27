@@ -6,6 +6,7 @@ import { createServiceRegistry, safeError, ServiceUnavailableError } from './res
 import { decryptJson, encryptJson, hashOAuthState, safeEqual } from './security.js';
 import { createIdempotencyStore, isValidIdempotencyKey } from './idempotency.js';
 import { consentTicketDefaults, mintConsentTicket, verifyConsentTicket } from './consent-ticket.js';
+import { preflightGoogleConfig } from './google-preflight.js';
 
 const GOOGLE_SCOPES = [
   'openid',
@@ -77,7 +78,7 @@ export async function createGoogleConsentLink({ pool, config, now = Date.now() }
   };
 }
 
-export function createGoogleRouter({ pool, config, services = createServiceRegistry(config), idempotencyStore = createIdempotencyStore() }) {
+export function createGoogleRouter({ pool, config, services = createServiceRegistry(config), idempotencyStore = createIdempotencyStore(), env = process.env }) {
   const router = express.Router();
   const guarded = (name, action, sideEffect = false) => services.run(name, (signal) =>
     action({ signal, timeout: config.resilience?.timeoutMs || 8000, retry: false }), { sideEffect });
@@ -178,6 +179,13 @@ export function createGoogleRouter({ pool, config, services = createServiceRegis
   });
 
   router.use('/api', requireApiToken(config));
+
+  // Owner-only, offline: explains why the connection is failing before a browser is opened.
+  // The report never contains a secret value (see src/google-preflight.js).
+  router.get('/api/google/preflight', (_req, res) => {
+    res.set('Cache-Control', 'no-store');
+    return res.json(preflightGoogleConfig(env));
+  });
 
   // Owner-only: returns a single-use, ten-minute connection link that can be delivered in chat.
   router.post('/api/google/consent-link', async (_req, res, next) => {
