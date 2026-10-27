@@ -62,6 +62,9 @@ async function readFromRoot(requestedPath, rootDir) {
   assertSafeFileName(candidate);
   const realCandidate = await fs.realpath(candidate);
   if (!withinRoot(configuredRoot, realCandidate)) throw codedError('document_path_outside_root');
+  // Check the resolved target too: an innocent-looking in-root symlink must not
+  // bypass the denylist for hidden files or secret-bearing filenames.
+  assertSafeFileName(realCandidate);
   const stat = await fs.stat(realCandidate);
   if (!stat.isFile()) throw codedError('document_not_file');
   if (stat.size > 8192) throw codedError('document_too_large');
