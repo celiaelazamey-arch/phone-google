@@ -198,3 +198,136 @@ test('real MySQL 8.4 acceptance: installation, persistence, signed webhook, lega
   await writeFile(path.join(root, '.validation-artifacts/mysql-evidence.json'), JSON.stringify(evidence, null, 2) + '\n');
   console.log(`Actual MySQL ${version}: ${checks.length} acceptance checks passed; synthetic backup restored; no production deployment.`);
 });
+
+/**
+ * Agent runtime on real MySQL 8.4 (AGENT-001 / COMP-003).
+ *
+ * Proves the production adapter, not the SQLite demo: the ledger CLI applies the
+ * additive migration twice (idempotent), the durable store persists a full run, a
+ * duplicate client id is not replayed, and an interrupted in-flight call is marked
+ * unknown instead of being re-executed. Its own throwaway schema only.
+ */
+test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome recovery', { timeout: 90000 }, async (t) => {
+  assert.equal(process.env.CELIA_MYSQL_TESTS, 'true', 'Use the isolated CI MySQL service');
+  const host = process.env.MYSQL_TEST_HOST || '127.0.0.1';
+  assert.ok(['127.0.0.1', 'localhost', '::1'].includes(host), 'Loopback only');
+  const password = process.env.MYSQL_TEST_PASSWORD;
+  assert.ok(password);
+  const port = Number(process.env.MYSQL_TEST_PORT || 3306);
+  const suffix = crypto.randomBytes(8).toString('hex');
+  const schema = `celia_ci_agent_${suffix}`;
+  assert.match(schema, /^celia_ci_agent_[a-f0-9]{16}$/);
+  const admin = await mysql.createConnection({ host, port, user: 'root', password, charset: 'utf8mb4', timezone: 'Z' });
+  await admin.query(`CREATE DATABASE \`${schema}\` CHARACTER SET utf8mb4`);
+
+  const { createMysqlDriver } = await import('../src/agent/drivers.js');
+  const { createAgentStore } = await import('../src/agent/store.js');
+  const { createAgentRuntime } = await import('../src/agent/runtime.js');
+  const { createDefaultTools } = await import('../src/agent/tools.js');
+  const { createDemoPlanner } = await import('../src/agent/planner.js');
+
+  const mysqlEnv = {
+    NODE_ENV: 'test',
+    MYSQL_HOST: host,
+    MYSQL_PORT: String(port),
+    MYSQL_DATABASE: schema,
+    MYSQL_USER: 'root',
+    MYSQL_PASSWORD: password
+  };
+  const config = loadCeliaMcpConfig({
+    ...mysqlEnv,
+    CELIA_MCP_API_TOKEN: crypto.randomBytes(32).toString('hex'),
+    TOKEN_ENCRYPTION_KEY: crypto.randomBytes(32).toString('base64'),
+    CELIA_DISABLE_OLLAMA: 'true'
+  });
+  let pool;
+  t.after(async () => {
+    await pool?.end().catch(() => {});
+    await admin.query(`DROP DATABASE IF EXISTS \`${schema}\``).catch(() => {});
+    await admin.end().catch(() => {});
+  });
+
+  await bootstrapEmptySchema({ ...config, mysql: { ...config.mysql, database: schema } });
+
+  const { runMigrations } = await import('../src/schema-migrations.js');
+  const directory = path.join(root, 'sql', 'migrations');
+  const migrationConnection = await mysql.createConnection({ ...config.mysql, database: schema, charset: 'utf8mb4', timezone: 'Z' });
+  try {
+    const before = await runMigrations({ connection: migrationConnection, directory });
+    assert.equal(before.ledger, 'missing', 'dry run reports the missing ledger and writes nothing');
+
+    const applied = await runMigrations({ connection: migrationConnection, directory, apply: true });
+    assert.deepEqual(applied.appliedNow, ['0002_agent-runtime.sql']);
+
+    const second = await runMigrations({ connection: migrationConnection, directory, apply: true });
+    assert.deepEqual(second.pending, [], 'a second apply is a no-op');
+    const status = await runMigrations({ connection: migrationConnection, directory, statusOnly: true });
+    assert.equal(status.applied.length, 1);
+    assert.equal(status.applied[0].version, 2);
+  } finally {
+    await migrationConnection.end();
+  }
+
+  // The CLI is the documented entry point; keep a smoke check with a readable error.
+  try {
+    const { stdout } = await exec(process.execPath, ['scripts/migrate.mjs', '--status'], {
+      cwd: root,
+      env: { ...process.env, ...mysqlEnv }
+    });
+    assert.equal(JSON.parse(stdout).applied.length, 1);
+  } catch (error) {
+    throw new Error(`migrate CLI failed: ${String(error?.stderr || error?.message || '').slice(0, 600)}`);
+  }
+
+  pool = mysql.createPool({ ...config.mysql, database: schema, charset: 'utf8mb4', timezone: 'Z', connectionLimit: 4 });
+  await pool.execute('INSERT INTO app_users (id) VALUES (?) ON DUPLICATE KEY UPDATE id = VALUES(id)', [config.userId]);
+  const store = createAgentStore({ driver: createMysqlDriver(pool) });
+  const runtime = createAgentRuntime({
+    store,
+    tools: createDefaultTools({ statusProvider: () => ({ version: '0.2.1', storage: 'mysql' }) }),
+    planner: createDemoPlanner(),
+    ownerId: config.userId,
+    logger: { error() {} }
+  });
+  t.after(() => runtime.shutdown().catch(() => {}));
+
+  const thread = await store.createThread({ ownerId: config.userId, title: 'MySQL acceptance' });
+  const submitted = await runtime.submit({
+    threadId: thread.id,
+    message: 'جهّز خطة أسبوعية وراجع حالة النظام',
+    clientMessageId: 'mysql-acceptance-0001'
+  });
+  assert.equal(submitted.created, true);
+  const finished = await runtime.runToCompletion(submitted.run.id);
+  assert.equal(finished.status, 'succeeded');
+  const detail = await runtime.detail(submitted.run.id);
+  assert.ok(detail.steps.length >= 6);
+  assert.equal(detail.run.usage.steps, detail.steps.length);
+
+  const duplicate = await runtime.submit({ threadId: thread.id, message: 'مكرر', clientMessageId: 'mysql-acceptance-0001' });
+  assert.equal(duplicate.created, false);
+  assert.equal(duplicate.run.id, submitted.run.id);
+
+  // Interrupted in-flight call: claim, start a tool run, expire the lease.
+  const crashThread = await store.createThread({ ownerId: config.userId, title: 'crash' });
+  const crash = await runtime.submit({ threadId: crashThread.id, message: 'انقطاع', clientMessageId: 'mysql-crash-0001' });
+  assert.equal(await store.claimRun(crash.run.id, { leaseMs: 60_000, workerId: 'dead-worker' }), true);
+  const step = await store.appendStep({ runId: crash.run.id, kind: 'act', title: 'celia.thread_context' });
+  const inFlight = await store.startToolRun({
+    runId: crash.run.id,
+    stepId: step.id,
+    toolName: 'celia.thread_context',
+    risk: 'read',
+    idempotencyKey: `${crash.run.id}:${step.index}:celia.thread_context`
+  });
+  await store.heartbeat(crash.run.id, { leaseMs: -5000 });
+  const recovered = await runtime.runToCompletion(crash.run.id);
+  assert.equal(recovered.status, 'needs_reconciliation');
+  assert.equal((await store.listToolRuns(crash.run.id)).find((r) => r.id === inFlight.toolRun.id).status, 'unknown');
+
+  // The five core tables are untouched by the additive migration.
+  const [tables] = await pool.execute('SELECT TABLE_NAME AS name FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()');
+  const names = tables.map((row) => row.name);
+  assert.equal(names.filter((name) => name.startsWith('agent_')).length, 5);
+  assert.ok(['app_users', 'oauth_states', 'google_credentials', 'whatsapp_contacts', 'whatsapp_messages'].every((name) => names.includes(name)));
+});

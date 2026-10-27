@@ -173,7 +173,14 @@ jobs:
           MYSQL_TEST_PORT: ${{ job.services.mysql.ports[3306] }}
           MYSQL_TEST_CONTAINER: ${{ job.services.mysql.id }}
           MYSQL_TEST_PASSWORD: synthetic-ci-only-password
-        run: npm run test:mysql
+        run: |
+          set -o pipefail
+          npm run test:mysql 2>&1 | tee /tmp/mysql-suite.log
+      - name: Surface failure details as a readable annotation
+        if: failure()
+        run: |
+          DETAIL="$(tail -12 /tmp/mysql-suite.log 2>/dev/null | tr '\n' ' ' | tr -d '\r' | sed 's/%/%25/g' | cut -c1-900)"
+          echo "::error title=mysql-suite::${DETAIL:-suite failed without a log tail}"
       - name: Retain sanitized acceptance evidence, never SQL dumps or credentials
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

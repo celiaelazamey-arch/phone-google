@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>مساحة الوكيل — سيليا</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/fonts.css">
+  <link rel="stylesheet" href="/agent.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="dot" aria-hidden="true"></span>
+      <div>
+        <h1>مساحة الوكيل</h1>
+        <p class="sub">حلقة Plan → Act → Observe بحالة دائمة في قاعدة البيانات</p>
+      </div>
+    </div>
+    <nav aria-label="روابط">
+      <a href="/studio">الاستوديو</a>
+      <a href="/system">حالة النظام</a>
+      <a href="/deploy">النشر</a>
+    </nav>
+  </header>
+
+  <main class="layout">
+    <section class="card auth" aria-labelledby="auth-title">
+      <h2 id="auth-title">دخول المالك</h2>
+      <p class="hint">رمز المالك يُستخدم في هذا المتصفح فقط ولا يُخزَّن على الخادم. لا تلصق أسرار مزوّدين هنا.</p>
+      <label class="field">
+        <span>رمز الوصول (Bearer)</span>
+        <input id="token" type="password" autocomplete="off" spellcheck="false" placeholder="APP_API_TOKEN">
+      </label>
+      <button id="connect" class="primary" type="button">اتصال</button>
+      <p id="auth-status" class="status" role="status">غير متصل</p>
+    </section>
+
+    <section class="card status-card" aria-labelledby="status-title">
+      <h2 id="status-title">حالة التشغيل</h2>
+      <p class="badge" id="mode-badge">جارٍ الفحص…</p>
+      <ul class="facts">
+        <li><span>المخزن</span><b id="fact-store">—</b></li>
+        <li><span>المخطط</span><b id="fact-planner">—</b></li>
+        <li><span>سقف الخطوات</span><b id="fact-steps">—</b></li>
+        <li><span>سقف التكلفة</span><b id="fact-cost">—</b></li>
+      </ul>
+      <p class="hint" id="mode-note"></p>
+    </section>
+
+    <section class="card thread" aria-labelledby="thread-title">
+      <div class="row">
+        <h2 id="thread-title">المهمة</h2>
+        <button id="new-thread" class="ghost" type="button">خيط جديد</button>
+      </div>
+      <label class="field">
+        <span>عنوان الخيط</span>
+        <input id="thread-title-input" type="text" maxlength="200" value="مهمة جديدة" autocomplete="off">
+      </label>
+      <label class="field">
+        <span>وصف المهمة</span>
+        <textarea id="message" rows="4" maxlength="4000" placeholder="مثال: جهّز مخططًا لخطة أسبوعية وراجع حالة النظام"></textarea>
+      </label>
+      <div class="row actions">
+        <button id="run" class="primary" type="button" disabled>تشغيل المهمة</button>
+        <button id="cancel" class="danger" type="button" disabled>إلغاء</button>
+      </div>
+      <p class="hint">كل نقرة تُنشئ <code>client_message_id</code> واحدًا؛ النقر المكرر يعيد نفس التشغيل ولا يضاعفه.</p>
+    </section>
+
+    <section class="card run" aria-labelledby="run-title">
+      <div class="row">
+        <h2 id="run-title">التشغيل</h2>
+        <span id="run-state" class="pill idle">لا تشغيل</span>
+      </div>
+      <div class="usage">
+        <span>خطوات: <b id="usage-steps">0</b></span>
+        <span>تكلفة: <b id="usage-cost">0</b> ⨯ 10⁻⁶ $</span>
+        <span>رموز: <b id="usage-tokens">0</b></span>
+      </div>
+      <ol id="steps" class="steps" aria-live="polite"></ol>
+      <pre id="delivery" class="delivery" hidden></pre>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p>M1 تجريبي: الحلقة والتخزين والاستئناف والإلغاء وبوابة المخاطر منفذة ومختبرة؛ المخطط حتمي لا نموذج لغوي، والأثر الخارجي مرفوض بانتظار AGENT-002. لا تدّعِ هذه الصفحة وكيلًا عامًا.</p>
+  </footer>
+
+  <script src="/agent.js" type="module"></script>
+</body>
+</html>

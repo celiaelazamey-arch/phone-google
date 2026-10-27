@@ -8,6 +8,7 @@ npm-debug.log*
 dist/
 
 .celia-deploy/
+.data/
 .release-artifacts/
 playwright-report/
 test-results/

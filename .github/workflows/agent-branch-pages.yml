@@ -1,0 +1,67 @@
+name: Agent branch Pages preview
+
+# Publishes the *static* build to GitHub Pages so the owner gets a free HTTPS URL
+# without a payment card. It is a static snapshot: /api/agent is not available
+# there, and the page says so instead of pretending to run the agent loop.
+#
+# Verified 2026-10-27: Pages is not enabled on this repository and the GitHub App
+# token available to this session cannot create it — `configure-pages` with
+# `enablement: true` also returned "Resource not accessible by integration".
+# The owner has to click once: Settings → Pages → Source: GitHub Actions.
+# Until then this job reports a clear skip instead of a red failure or a fake deploy.
+
+on:
+  push:
+    branches: [arena/bc862105-phone-google]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-agent-preview
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/arena/bc862105-phone-google'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build:pages
+      - name: Ensure no obvious secret values leaked into dist
+        run: |
+          if grep -RInE "(APP_API_TOKEN|TOKEN_ENCRYPTION_KEY|GEMINI_API_KEY|MYSQL_PASSWORD)=" dist; then
+            echo '::error::A secret assignment was found in dist.'
+            exit 1
+          fi
+      - name: Detect whether this token may configure Pages
+        id: pages
+        continue-on-error: true
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+        with:
+          enablement: true
+      - name: Explain the skip (owner action required)
+        if: steps.pages.outcome == 'failure'
+        run: |
+          echo "::warning title=Pages not enabled::GitHub Pages must be enabled once by the repository owner (Settings → Pages → Source: GitHub Actions). This session's token cannot create it, and no payment card is involved."
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        if: steps.pages.outcome == 'success'
+        with:
+          path: dist
+      - id: deployment
+        if: steps.pages.outcome == 'success'
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
