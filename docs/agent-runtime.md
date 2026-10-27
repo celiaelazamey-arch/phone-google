@@ -201,4 +201,4 @@ npm audit --omit=dev --audit-level=moderate         # 0 ثغرات
 
 **حدود الإصدار الأول:** قراءة الملفات مقيدة بالجذر المسموح وحد 8KiB للملف و1200 حرف للنص؛ لا تدعم PDF أو الصور أو OCR، ولا تفتح الشبكة. كشف التكرار يراجع تقارير `data.report` الناجحة السابقة (آخر 2000 تقرير)، وهو فحص تاريخي وليس قفلًا ذريًا ضد مهمتين متزامنتين. لا يُدَّعى منع سباقات التكرار على مستوى المعاملات بعد.
 
-الرسم: [Document Automation SVG](document-data-automation.svg). اختبارات العقد: `test/agent-document-automation.test.js`. هذه القدرة على فرع مراجعة ولا تعدّ منجزة في `main` حتى الدمج وتشغيل CI.
+الرسم: [Document Automation SVG](document-data-automation.svg). اختبارات العقد: `test/agent-document-automation.test.js`. اجتازت القدرة بوابات CI على فرع المراجعة، لكنها ليست منجزة في `main` قبل مراجعة ودمج PR #39.
