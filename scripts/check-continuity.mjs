@@ -16,7 +16,7 @@ async function list(dir) {
   }
   return files;
 }
-const files = ['AGENTS.md', 'README.md', 'docs/2026-development-plan.md', 'docs/agent-runtime-plan.md', 'docs/compatibility-contract.md', 'docs/free-hosting.md', ...await list(directory)];
+const files = ['AGENTS.md', 'README.md', 'docs/2026-development-plan.md', 'docs/agent-runtime-plan.md', 'docs/google-connect.md', 'docs/compatibility-contract.md', 'docs/free-hosting.md', ...await list(directory)];
 const sources = new Map(await Promise.all(files.map(async (file) => [file, await readFile(path.join(root, file), 'utf8')])));
 let links = 0;
 for (const [file, content] of sources) {
