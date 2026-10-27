@@ -3,6 +3,7 @@ import { requireApiToken } from './auth.js';
 import { generateWhatsAppReply } from './gemini.js';
 import { createServiceRegistry, safeError, ServiceUnavailableError, UpstreamError } from './resilience.js';
 import { isValidE164, isWithinCustomerWindow, safeEqual, verifyWhatsAppSignature } from './security.js';
+import { createIdempotencyStore, isValidIdempotencyKey } from './idempotency.js';
 
 function extractInboundMessages(payload) {
   const messages = [];
@@ -95,7 +96,7 @@ export function createWhatsAppWebhookRouter({ pool, config, services = createSer
   return router;
 }
 
-export function createWhatsAppApiRouter({ pool, config, services = createServiceRegistry(config) }) {
+export function createWhatsAppApiRouter({ pool, config, services = createServiceRegistry(config), idempotencyStore = createIdempotencyStore() }) {
   const router = express.Router();
   router.use('/api', requireApiToken(config));
 
@@ -123,17 +124,45 @@ export function createWhatsAppApiRouter({ pool, config, services = createService
     const phone = typeof req.body?.phone === 'string' ? (req.body.phone.startsWith('+') ? req.body.phone : `+${req.body.phone}`) : '';
     const text = req.body?.text;
     if (!isValidE164(phone) || typeof text !== 'string' || !text.trim()) return res.status(400).json({ error: 'valid_phone_and_text_required' });
+    const headerKey = req.get('Idempotency-Key') || req.get('idempotency-key') || '';
+    const bodyKey = typeof req.body?.idempotencyKey === 'string' ? req.body.idempotencyKey : (typeof req.body?.idempotency_key === 'string' ? req.body.idempotency_key : '');
+    const idempotencyKey = isValidIdempotencyKey(headerKey) ? headerKey : (isValidIdempotencyKey(bodyKey) ? bodyKey : null);
+    if (idempotencyKey) {
+      const cached = idempotencyStore.get(idempotencyKey);
+      if (cached) {
+        if (cached._idempotencyStatus === 'in_progress') return res.status(409).json({ error: 'idempotency_conflict_in_progress' });
+        return res.status(200).json({ ...cached, _idempotencyReplay: true });
+      }
+      if (!idempotencyStore.claim(idempotencyKey)) {
+        const again = idempotencyStore.get(idempotencyKey);
+        if (again?._idempotencyStatus === 'in_progress') return res.status(409).json({ error: 'idempotency_conflict_in_progress' });
+        if (again) return res.status(200).json({ ...again, _idempotencyReplay: true });
+      }
+    }
     try {
       const [rows] = await pool.execute('SELECT opted_in, last_inbound_at FROM whatsapp_contacts WHERE phone_e164 = ?', [phone]);
       const contact = rows[0];
-      if (!contact?.opted_in) return res.status(403).json({ error: 'recipient_has_not_opted_in' });
-      if (!isWithinCustomerWindow(contact.last_inbound_at)) return res.status(403).json({ error: 'outside_customer_service_window_use_approved_template' });
-      const providerId = await services.run('whatsapp', (signal) => sendWhatsAppText({ config, phone, text, signal }), { sideEffect: true });
-      if (providerId) await pool.execute(
-        'INSERT IGNORE INTO whatsapp_messages (provider_message_id, phone_e164, direction, message_type, body, status) VALUES (?, ?, ?, ?, ?, ?)',
-        [providerId, phone, 'outbound', 'text', text.trim().slice(0, 4000), 'sent']
-      );
-      return res.status(202).json({ status: 'accepted', providerMessageId: providerId });
+      if (!contact?.opted_in) {
+        if (idempotencyKey) idempotencyStore.fail(idempotencyKey);
+        return res.status(403).json({ error: 'recipient_has_not_opted_in' });
+      }
+      if (!isWithinCustomerWindow(contact.last_inbound_at)) {
+        if (idempotencyKey) idempotencyStore.fail(idempotencyKey);
+        return res.status(403).json({ error: 'outside_customer_service_window_use_approved_template' });
+      }
+      try {
+        const providerId = await services.run('whatsapp', (signal) => sendWhatsAppText({ config, phone, text, signal }), { sideEffect: true });
+        if (providerId) await pool.execute(
+          'INSERT IGNORE INTO whatsapp_messages (provider_message_id, phone_e164, direction, message_type, body, status) VALUES (?, ?, ?, ?, ?, ?)',
+          [providerId, phone, 'outbound', 'text', text.trim().slice(0, 4000), 'sent']
+        );
+        const result = { status: 'accepted', providerMessageId: providerId };
+        if (idempotencyKey) idempotencyStore.complete(idempotencyKey, result);
+        return res.status(idempotencyKey ? 200 : 202).json(result);
+      } catch (inner) {
+        if (idempotencyKey) idempotencyStore.fail(idempotencyKey);
+        throw inner;
+      }
     } catch (error) {
       console.error('WhatsApp send failed:', error.code || 'upstream_failed');
       if (error instanceof ServiceUnavailableError) return res.status(503).json({ error: safeError(error), outcomeUnknown: error.outcomeUnknown });

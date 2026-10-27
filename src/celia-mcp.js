@@ -20,6 +20,7 @@ import { createMemoryPool } from './memory-pool.js';
 import { checkOllamaHealth, generateCeliaReply, normalizeOllamaBaseUrl } from './ollama.js';
 import { decryptJson, encryptJson, isValidE164, isWithinCustomerWindow, safeEqual } from './security.js';
 import { sendWhatsAppText } from './whatsapp.js';
+import { createIdempotencyStore, extractIdempotencyKey, isValidIdempotencyKey } from './idempotency.js';
 
 const MCP_PROTOCOL_VERSION = '2024-11-05';
 
@@ -204,7 +205,7 @@ export const MCP_TOOLS = Object.freeze([
   },
   {
     name: 'google_calendar_events_create',
-    description: 'إنشاء موعد جديد في Google Calendar الأساسي.',
+    description: 'إنشاء موعد جديد في Google Calendar الأساسي. يدعم Idempotency-Key لمنع التكرار بعد الاستئناف.',
     inputSchema: {
       type: 'object',
       required: ['summary', 'start', 'end'],
@@ -212,7 +213,8 @@ export const MCP_TOOLS = Object.freeze([
         summary: { type: 'string', description: 'عنوان الموعد.' },
         start: { type: 'string', description: 'وقت البداية بصيغة ISO 8601.' },
         end: { type: 'string', description: 'وقت النهاية بصيغة ISO 8601.' },
-        timeZone: { type: 'string', description: 'المنطقة الزمنية الاختيارية (مثل Africa/Cairo أو UTC).' }
+        timeZone: { type: 'string', description: 'المنطقة الزمنية الاختيارية (مثل Africa/Cairo أو UTC).' },
+        idempotencyKey: { type: 'string', description: 'مفتاح تفرد اختياري (8-64 حرفًا a-zA-Z0-9_- ) لمنع تكرار إنشاء الموعد عند إعادة المحاولة.' }
       },
       additionalProperties: false
     }
@@ -280,13 +282,14 @@ export const MCP_TOOLS = Object.freeze([
   },
   {
     name: 'whatsapp_send_text',
-    description: 'إرسال رسالة WhatsApp فردية لعميل وافق مسبقًا وداخل نافذة خدمة العملاء (24 ساعة).',
+    description: 'إرسال رسالة WhatsApp فردية لعميل وافق مسبقًا وداخل نافذة خدمة العملاء (24 ساعة). يدعم Idempotency-Key لمنع الإرسال المكرر.',
     inputSchema: {
       type: 'object',
       required: ['phone', 'text'],
       properties: {
         phone: { type: 'string', description: 'رقم الهاتف بصيغة E.164.' },
-        text: { type: 'string', description: 'نص الرسالة (1–4096 حرفًا).' }
+        text: { type: 'string', description: 'نص الرسالة (1–4096 حرفًا).' },
+        idempotencyKey: { type: 'string', description: 'مفتاح تفرد اختياري (8-64 حرفًا) لمنع تكرار الإرسال عند إعادة المحاولة أو استئناف التطبيق.' }
       },
       additionalProperties: false
     }
@@ -345,7 +348,7 @@ export async function buildStatusSummary(pool, config, { probeOllama = false, se
   };
 }
 
-export function createCeliaMcpHandler({ pool, config, services = createServiceRegistry(config) }) {
+export function createCeliaMcpHandler({ pool, config, services = createServiceRegistry(config), idempotencyStore = createIdempotencyStore() }) {
   pool = isolatePool(pool, services);
   async function runTool(name, args = {}, signal) {
     switch (name) {
@@ -423,19 +426,39 @@ export function createCeliaMcpHandler({ pool, config, services = createServiceRe
         if (!Number.isFinite(startDate.getTime()) || !Number.isFinite(endDate.getTime()) || endDate <= startDate) {
           throw new Error('invalid_event_time_range');
         }
-        const client = await getGoogleClient(pool, config);
-        const calendar = google.calendar({ version: 'v3', auth: client });
-        const tz = timeZone ? { timeZone: String(timeZone).slice(0, 100) } : {};
-        const { data } = await calendar.events.insert({
-          calendarId: 'primary',
-          requestBody: {
-            summary: summary.trim().slice(0, 200),
-            start: { dateTime: startDate.toISOString(), ...tz },
-            end: { dateTime: endDate.toISOString(), ...tz }
-          },
-          fields: 'id,summary,start,end,htmlLink,status'
-        }, { signal, retry: false, timeout: config.resilience?.timeoutMs || 8000 });
-        return { event: data };
+        const idempotencyKey = extractIdempotencyKey({ args });
+        if (idempotencyKey) {
+          const cached = idempotencyStore.get(idempotencyKey);
+          if (cached) {
+            if (cached._idempotencyStatus === 'in_progress') throw Object.assign(new Error('idempotency_conflict_in_progress'), { status: 409 });
+            return { ...cached, _idempotencyReplay: true };
+          }
+          if (!idempotencyStore.claim(idempotencyKey)) {
+            const again = idempotencyStore.get(idempotencyKey);
+            if (again?._idempotencyStatus === 'in_progress') throw Object.assign(new Error('idempotency_conflict_in_progress'), { status: 409 });
+            if (again) return { ...again, _idempotencyReplay: true };
+          }
+        }
+        try {
+          const client = await getGoogleClient(pool, config);
+          const calendar = google.calendar({ version: 'v3', auth: client });
+          const tz = timeZone ? { timeZone: String(timeZone).slice(0, 100) } : {};
+          const { data } = await calendar.events.insert({
+            calendarId: 'primary',
+            requestBody: {
+              summary: summary.trim().slice(0, 200),
+              start: { dateTime: startDate.toISOString(), ...tz },
+              end: { dateTime: endDate.toISOString(), ...tz }
+            },
+            fields: 'id,summary,start,end,htmlLink,status'
+          }, { signal, retry: false, timeout: config.resilience?.timeoutMs || 8000 });
+          const result = { event: data };
+          if (idempotencyKey) idempotencyStore.complete(idempotencyKey, result);
+          return result;
+        } catch (error) {
+          if (idempotencyKey) idempotencyStore.fail(idempotencyKey);
+          throw error;
+        }
       }
       case 'google_contacts_search': {
         const q = String(args?.q || '').trim().toLocaleLowerCase().slice(0, 100);
@@ -490,20 +513,44 @@ export function createCeliaMcpHandler({ pool, config, services = createServiceRe
         const phone = rawPhone.startsWith('+') ? rawPhone : `+${rawPhone}`;
         const text = typeof args?.text === 'string' ? args.text : '';
         if (!isValidE164(phone) || !text.trim()) throw new Error('valid_phone_and_text_required');
+        const idempotencyKey = extractIdempotencyKey({ args });
+        if (idempotencyKey) {
+          const cached = idempotencyStore.get(idempotencyKey);
+          if (cached) {
+            if (cached._idempotencyStatus === 'in_progress') throw Object.assign(new Error('idempotency_conflict_in_progress'), { status: 409 });
+            return { ...cached, _idempotencyReplay: true };
+          }
+          if (!idempotencyStore.claim(idempotencyKey)) {
+            const again = idempotencyStore.get(idempotencyKey);
+            if (again?._idempotencyStatus === 'in_progress') throw Object.assign(new Error('idempotency_conflict_in_progress'), { status: 409 });
+            if (again) return { ...again, _idempotencyReplay: true };
+          }
+        }
         const [rows] = await pool.execute('SELECT opted_in, last_inbound_at FROM whatsapp_contacts WHERE phone_e164 = ?', [phone]);
         const contact = rows[0];
-        if (!contact?.opted_in) throw new Error('recipient_has_not_opted_in');
+        if (!contact?.opted_in) {
+          if (idempotencyKey) idempotencyStore.fail(idempotencyKey);
+          throw new Error('recipient_has_not_opted_in');
+        }
         if (!isWithinCustomerWindow(contact.last_inbound_at)) {
+          if (idempotencyKey) idempotencyStore.fail(idempotencyKey);
           throw new Error('outside_customer_service_window_use_approved_template');
         }
-        const providerMessageId = await sendWhatsAppText({ config, phone, text, signal });
-        if (providerMessageId) {
-          await pool.execute(
-            'INSERT IGNORE INTO whatsapp_messages (provider_message_id, phone_e164, direction, message_type, body, status) VALUES (?, ?, ?, ?, ?, ?)',
-            [providerMessageId, phone, 'outbound', 'text', text.trim().slice(0, 4000), 'sent']
-          );
+        try {
+          const providerMessageId = await sendWhatsAppText({ config, phone, text, signal });
+          if (providerMessageId) {
+            await pool.execute(
+              'INSERT IGNORE INTO whatsapp_messages (provider_message_id, phone_e164, direction, message_type, body, status) VALUES (?, ?, ?, ?, ?, ?)',
+              [providerMessageId, phone, 'outbound', 'text', text.trim().slice(0, 4000), 'sent']
+            );
+          }
+          const result = { status: 'accepted', phone, providerMessageId };
+          if (idempotencyKey) idempotencyStore.complete(idempotencyKey, result);
+          return result;
+        } catch (error) {
+          if (idempotencyKey) idempotencyStore.fail(idempotencyKey);
+          throw error;
         }
-        return { status: 'accepted', phone, providerMessageId };
       }
       case 'find_skills': {
         const query = String(args?.query || '').trim().toLowerCase();

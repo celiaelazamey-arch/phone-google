@@ -4,6 +4,7 @@ import { google } from 'googleapis';
 import { requireApiToken } from './auth.js';
 import { createServiceRegistry, safeError, ServiceUnavailableError } from './resilience.js';
 import { decryptJson, encryptJson, hashOAuthState, safeEqual } from './security.js';
+import { createIdempotencyStore, isValidIdempotencyKey } from './idempotency.js';
 
 const GOOGLE_SCOPES = [
   'openid',
@@ -56,7 +57,7 @@ function handleError(res, error) {
   return res.status(status).json({ error: status === 503 ? 'google_not_configured' : status === 409 ? 'google_not_connected' : 'google_request_failed' });
 }
 
-export function createGoogleRouter({ pool, config, services = createServiceRegistry(config) }) {
+export function createGoogleRouter({ pool, config, services = createServiceRegistry(config), idempotencyStore = createIdempotencyStore() }) {
   const router = express.Router();
   const guarded = (name, action, sideEffect = false) => services.run(name, (signal) =>
     action({ signal, timeout: config.resilience?.timeoutMs || 8000, retry: false }), { sideEffect });
@@ -198,14 +199,36 @@ export function createGoogleRouter({ pool, config, services = createServiceRegis
       if (!Number.isFinite(startDate.getTime()) || !Number.isFinite(endDate.getTime()) || endDate <= startDate) {
         return res.status(400).json({ error: 'invalid_event_time_range' });
       }
-      const client = await getAuthenticatedClient(pool, config, config.userId);
-      const calendar = google.calendar({ version: 'v3', auth: client });
-      const { data } = await guarded('google.calendar', (options) => calendar.events.insert({
-        calendarId: 'primary',
-        requestBody: { summary: summary.trim().slice(0, 200), start: { dateTime: startDate.toISOString(), ...(timeZone ? { timeZone: String(timeZone).slice(0, 100) } : {}) }, end: { dateTime: endDate.toISOString(), ...(timeZone ? { timeZone: String(timeZone).slice(0, 100) } : {}) } },
-        fields: 'id,summary,start,end,htmlLink,status'
-      }, options), true);
-      return res.status(201).json({ event: data });
+      const headerKey = req.get('Idempotency-Key') || req.get('idempotency-key') || '';
+      const bodyKey = typeof req.body?.idempotencyKey === 'string' ? req.body.idempotencyKey : (typeof req.body?.idempotency_key === 'string' ? req.body.idempotency_key : '');
+      const idempotencyKey = isValidIdempotencyKey(headerKey) ? headerKey : (isValidIdempotencyKey(bodyKey) ? bodyKey : null);
+      if (idempotencyKey) {
+        const cached = idempotencyStore.get(idempotencyKey);
+        if (cached) {
+          if (cached._idempotencyStatus === 'in_progress') return res.status(409).json({ error: 'idempotency_conflict_in_progress' });
+          return res.status(200).json({ ...cached, _idempotencyReplay: true });
+        }
+        if (!idempotencyStore.claim(idempotencyKey)) {
+          const again = idempotencyStore.get(idempotencyKey);
+          if (again?._idempotencyStatus === 'in_progress') return res.status(409).json({ error: 'idempotency_conflict_in_progress' });
+          if (again) return res.status(200).json({ ...again, _idempotencyReplay: true });
+        }
+      }
+      try {
+        const client = await getAuthenticatedClient(pool, config, config.userId);
+        const calendar = google.calendar({ version: 'v3', auth: client });
+        const { data } = await guarded('google.calendar', (options) => calendar.events.insert({
+          calendarId: 'primary',
+          requestBody: { summary: summary.trim().slice(0, 200), start: { dateTime: startDate.toISOString(), ...(timeZone ? { timeZone: String(timeZone).slice(0, 100) } : {}) }, end: { dateTime: endDate.toISOString(), ...(timeZone ? { timeZone: String(timeZone).slice(0, 100) } : {}) } },
+          fields: 'id,summary,start,end,htmlLink,status'
+        }, options), true);
+        const result = { event: data };
+        if (idempotencyKey) idempotencyStore.complete(idempotencyKey, result);
+        return res.status(201).json(result);
+      } catch (inner) {
+        if (idempotencyKey) idempotencyStore.fail(idempotencyKey);
+        throw inner;
+      }
     } catch (error) { return handleError(res, error); }
   });
 
