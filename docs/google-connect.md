@@ -150,8 +150,8 @@ curl -s -X POST -H "Authorization: Bearer $APP_API_TOKEN" \
 **محليًا** (`.env` مقروء تلقائيًا):
 
 ```sh
-npm run google:doctor            # تقرير عربي/إنجليزي مختصر + رمز خروج 1 عند وجود مانع
-npm run google:doctor -- --json  # نفس التقرير للقراءة الآلية
+npm run google:doctor                    # تقرير عربي/إنجليزي مختصر + رمز خروج 1 عند وجود مانع
+npm run --silent google:doctor -- --json # JSON وحده على stdout للقراءة الآلية
 ```
 
 **على الخدمة المنشورة** (مالك فقط، بترويسة Bearer):
@@ -175,8 +175,9 @@ curl -s -H "Authorization: Bearer $APP_API_TOKEN" https://<نطاقك>/api/googl
 
 الفحص **لا يثبت** أن Google سيقبل الطلب: لا يتحقق من وجود العميل فعليًا في Google Cloud، ولا من أن البريد
 مضاف في **Test users**، ولا من أن النطاق يعمل. هذه تبقى إجراءاتك في القسم 2، ودليل الأعراض في القسم 4.
-**10/10 اختبارات** في `test/google-preflight.test.js` + `test/google-preflight-route.test.js` (منها اختبار
-«لا يتسرب أي سر إلى التقرير»، واختبار أن المسار يرد 401 بلا Bearer).
+**15/15 اختبارًا** في `test/google-preflight.test.js` + `test/google-preflight-route.test.js` +
+`test/google-doctor.test.js` (منها «لا يتسرب أي سر إلى التقرير»، و401 بلا Bearer، وأن `--json` يبقى JSON
+نقيًا قابلًا للتحليل عند النجاح والفشل مع الحفاظ على رمز الخروج 1 عند وجود مانع).
 
 ## 7. حدود يجب قولها
 
