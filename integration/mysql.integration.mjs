@@ -11,6 +11,7 @@ import { connect as connectSocket } from 'node:net';
 import { loadMysqlConfig } from '../src/mysql-config.js';
 import { bootstrapEmptySchema } from '../src/bootstrap-schema.js';
 import { loadCeliaMcpConfig, createCeliaMcpApp, MCP_TOOLS } from '../src/celia-mcp.js';
+import { assertBackwardCompatibleMcpTools } from '../src/mcp-contract.js';
 import { createPool, ensureOwner } from '../src/db.js';
 import { encryptJson, decryptJson } from '../src/security.js';
 
@@ -163,7 +164,7 @@ test('real MySQL 8.4 acceptance: installation, persistence, signed webhook, lega
     const archive = await exec('git', ['archive', baseline], { cwd: root, encoding: 'buffer', maxBuffer: 8 * 1024 * 1024 });
     await pipeCommand('tar', ['-x', '-C', previousDirectory], archive.stdout);
     const previous = await import(pathToFileURL(path.join(previousDirectory, 'src/celia-mcp.js')).href);
-    assert.deepEqual(previous.MCP_TOOLS.map((t) => [t.name, t.inputSchema]), MCP_TOOLS.map((t) => [t.name, t.inputSchema]));
+    assertBackwardCompatibleMcpTools(previous.MCP_TOOLS, MCP_TOOLS);
     const oldConfig = previous.loadCeliaMcpConfig({ ...env, CELIA_ENABLE_INTEGRATIONS: 'false' });
     const old = await serve(oldConfig, previous.createCeliaMcpApp);
     try {

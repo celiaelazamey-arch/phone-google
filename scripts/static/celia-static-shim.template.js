@@ -684,6 +684,12 @@
                 name: 'سياسة الرد الآمن على العملاء',
                 description: 'القواعد الإلزامية لتوليد الردود عبر Gemini أو Ollama',
                 mimeType: 'text/plain'
+              },
+              {
+                uri: 'celia://secrets/readiness',
+                name: 'جاهزية أسرار المستودع التسعة (منقحة)',
+                description: 'تقرير جاهزية الأسرار التسعة دون كشف أي قيم حساسة',
+                mimeType: 'application/json'
               }
             ]
           }
@@ -700,6 +706,42 @@
         }
         if (uri === 'celia://policy/customer-reply') {
           return { jsonrpc: '2.0', id: id ?? null, result: { contents: [{ uri, mimeType: 'text/plain', text: POLICY_AR }] } };
+        }
+        if (uri === 'celia://secrets/readiness') {
+          const staticSecrets = [
+            'AGENETROUTERAPI_KEY',
+            'AI_GATEWAY_API_KEY',
+            'CELIA_MCP_API_TOKEN',
+            'CELIA_VOICE_ID',
+            'DEEPSEEK_API_KEY',
+            'ELEVENLABS_API_KEY',
+            'FIGMA_ACCESS_TOKEN',
+            'GEMINI_API_KEY',
+            'YOUR_CODATA_API_KEY'
+          ].map((secretName) => ({ secretName, configured: false }));
+          return {
+            jsonrpc: '2.0',
+            id: id ?? null,
+            result: {
+              contents: [
+                {
+                  uri,
+                  mimeType: 'application/json',
+                  text: JSON.stringify(
+                    {
+                      scope: 'static-preview',
+                      totalSecretsTracked: 9,
+                      configuredCount: 0,
+                      secrets: staticSecrets,
+                      notice: 'النسخة الثابتة لا تحمل أي أسرار مستودع في المتصفح.'
+                    },
+                    null,
+                    2
+                  )
+                }
+              ]
+            }
+          };
         }
         return rpcError(id, -32602, `Unknown resource URI: ${uri}`);
       }

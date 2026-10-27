@@ -26,7 +26,7 @@ export class UpstreamError extends Error {
 const VALIDATION_ERRORS = new Set([
   "q is required",
   "customerMessage is required",
-  "provider must be auto, gemini, ollama, or local",
+  "provider must be auto, gemini, ai_gateway, deepseek, agentrouter, ollama, or local",
   "summary, start, and end are required",
   "invalid_event_time_range",
   "google_not_configured",
@@ -37,6 +37,13 @@ const VALIDATION_ERRORS = new Set([
   "valid_phone_and_text_required",
   "recipient_has_not_opted_in",
   "outside_customer_service_window_use_approved_template",
+  "elevenlabs_not_configured",
+  "voice_id_not_configured",
+  "voice_text_required",
+  "figma_not_configured",
+  "invalid_figma_file_key",
+  "codata_not_configured",
+  "codata_base_url_not_configured",
 ]);
 
 function countsAsFailure(error) {
@@ -227,7 +234,18 @@ export function loadResilienceConfig(env = process.env) {
 export function loadFeatures(env = process.env) {
   return Object.freeze(
     Object.fromEntries(
-      ["google", "whatsapp", "gemini", "ollama"].map((name) => [
+      [
+        "google",
+        "whatsapp",
+        "gemini",
+        "ollama",
+        "ai_gateway",
+        "deepseek",
+        "agentrouter",
+        "elevenlabs",
+        "figma",
+        "codata",
+      ].map((name) => [
         name,
         env[`CELIA_DISABLE_${name.toUpperCase()}`] !== "true",
       ]),
@@ -243,7 +261,13 @@ export function createServiceRegistry(config = {}) {
   });
   for (const name of [
     "gemini",
+    "ai_gateway",
+    "deepseek",
+    "agentrouter",
     "ollama",
+    "elevenlabs",
+    "figma",
+    "codata",
     "whatsapp",
     "google.oauth",
     "google.gmail",

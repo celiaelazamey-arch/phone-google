@@ -76,6 +76,9 @@
     vaultGeminiKey: document.getElementById('vault-gemini-key'),
     vaultGroqKey: document.getElementById('vault-groq-key'),
     btnVerifyVault: document.getElementById('btn-verify-vault'),
+    btnTestVoice: document.getElementById('btn-test-voice'),
+    voicePlayer: document.getElementById('celia-voice-player'),
+    secretsGrid: document.getElementById('secrets-readiness-grid'),
     vaultFeedback: document.getElementById('vault-feedback'),
     ollamaLiveBadge: document.getElementById('ollama-live-badge')
   };
@@ -215,21 +218,37 @@
         recordTrace('تعطل مزوّد المتصفح → بديل محلي', { degraded: true }, Math.round(performance.now()) - start);
       }
     }
-    if (mode === 'ollama-local' && (!state.mcpToken || window.CeliaStatic)) {
-      throw new Error('Ollama يعمل عبر خادم سيليا فقط. اضبطه على الخادم وأدخل رمز المالك؛ لا يتصل المتصفح بـ localhost.');
+    const serverModeMap = {
+      'gemini-server': 'gemini',
+      'ai-gateway-server': 'ai_gateway',
+      'deepseek-server': 'deepseek',
+      'agentrouter-server': 'agentrouter',
+      'ollama-local': 'ollama'
+    };
+    if (serverModeMap[mode] && (!state.mcpToken || window.CeliaStatic)) {
+      throw new Error('مزودو الخادم المحميون يعملون عبر خادم سيليا فقط. أدخل رمز CELIA_MCP_API_TOKEN في خزنة المصادقة؛ لا تُكشف أسرار المستودع في المتصفح.');
     }
-    const providerArg = mode === 'ollama-local' ? 'ollama' : mode === 'celia-builtin' || browserProviderFailed ? 'local' : 'auto';
+    const providerArg = serverModeMap[mode]
+      ? serverModeMap[mode]
+      : mode === 'celia-builtin' || browserProviderFailed
+        ? 'local'
+        : 'auto';
     const { data } = await callMcpRpc('tools/call', {
       name: 'celia_ai_reply', arguments: { customerMessage: promptText, provider: providerArg }
     });
     if (data.result?.isError || data.error) throw new Error('تعذر تنفيذ الرد من المزوّد المختار. جرّب المحرك المحلي أو راجع مركز النظام.');
     const out = data.result?.structuredContent;
     if (!out?.reply) throw new Error('لم يرجع الخادم ردًا صالحًا؛ لا يُفترض نجاح المهمة.');
+    const serverLabels = {
+      gemini: `Gemini (${out.model}) · خادم MCP`,
+      ai_gateway: `AI Gateway (${out.model}) · خادم MCP`,
+      deepseek: `DeepSeek (${out.model}) · خادم MCP`,
+      agentrouter: `AgentRouter (${out.model}) · خادم MCP`,
+      ollama: `Ollama (${out.model}) · خادم MCP`
+    };
     return {
       reply: out.reply,
-      engineLabel: out.provider === 'gemini' ? `Gemini (${out.model}) · خادم MCP`
-        : out.provider === 'ollama' ? `Ollama (${out.model}) · خادم MCP`
-          : `حارس سيليا المحلي${out.degraded || browserProviderFailed ? ' · وضع بديل' : ''}`
+      engineLabel: serverLabels[out.provider] || `حارس سيليا المحلي${out.degraded || browserProviderFailed ? ' · وضع بديل' : ''}`
     };
   }
 
@@ -923,6 +942,27 @@
     el.waCryptoReport.textContent = JSON.stringify(data.cryptography, null, 2);
   });
 
+  async function refreshSecretsReadiness() {
+    if (!el.secretsGrid || !state.mcpToken || state.mcpToken.length < 32 || window.CeliaStatic) return;
+    try {
+      const res = await fetch('./api/secrets/status', {
+        headers: { authorization: `Bearer ${state.mcpToken}` },
+        cache: 'no-store'
+      });
+      if (!res.ok) return;
+      const report = await res.json();
+      if (!Array.isArray(report.secrets)) return;
+      el.secretsGrid.innerHTML = report.secrets
+        .map(
+          (item) =>
+            `<div class="kv-item"><span dir="ltr">${escapeHtml(item.secretName)}</span><span class="kv-val">${item.configured ? 'مهيأ على الخادم ✓' : 'غير مضبوط'}</span></div>`
+        )
+        .join('');
+    } catch {
+      /* Sanitized optional UI refresh */
+    }
+  }
+
   // Free Models & Vault Save
   el.btnVerifyVault.addEventListener('click', async () => {
     state.mcpToken = el.vaultMcpToken.value.trim();
@@ -936,14 +976,53 @@
     try {
       const res = await callMcpRpc('ping');
       updateAuthUi();
+      await refreshSecretsReadiness();
       el.vaultFeedback.textContent =
         res.mode === 'owner'
-          ? '✓ تم التوثيق بنجاح في وضع المالك المباشر (POST /mcp Bearer)!'
+          ? '✓ تم التوثيق بنجاح في وضع المالك المباشر وتحديث حالة أسرار الخادم!'
           : '✓ تم حفظ إعدادات النماذج المجانية لجلسة المتصفح بنجاح!';
     } catch (err) {
       el.vaultFeedback.textContent = `⚠ فشل التحقق من رمز CELIA_MCP_API_TOKEN: ${err.message}`;
     }
   });
+
+  if (el.btnTestVoice) {
+    el.btnTestVoice.addEventListener('click', async () => {
+      const token = (el.vaultMcpToken?.value || state.mcpToken || '').trim();
+      if (!token || token.length < 32 || window.CeliaStatic) {
+        el.vaultFeedback.textContent = '⚠ أدخل رمز CELIA_MCP_API_TOKEN الصالح أولًا لتشغيل صوت سيليا عبر الخادم.';
+        return;
+      }
+      el.btnTestVoice.disabled = true;
+      el.vaultFeedback.textContent = 'جارٍ توليد الصوت العربي عبر ElevenLabs + CELIA_VOICE_ID…';
+      try {
+        const res = await fetch('./api/voice/speak', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            text: 'مرحبًا بك، أنا سيليا، مساعدتك الذكية المتصلة بنظامك بالكامل.'
+          })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.audioBase64) {
+          throw new Error(data.error || `HTTP ${res.status}`);
+        }
+        if (el.voicePlayer) {
+          el.voicePlayer.src = `data:${data.mimeType || 'audio/mpeg'};base64,${data.audioBase64}`;
+          el.voicePlayer.hidden = false;
+          el.voicePlayer.play().catch(() => {});
+        }
+        el.vaultFeedback.textContent = `✓ تم توليد صوت سيليا بنجاح (${data.model} · ${data.bytesLength} بايت)!`;
+      } catch (err) {
+        el.vaultFeedback.textContent = `⚠ تعذر توليد الصوت: ${err.message}`;
+      } finally {
+        el.btnTestVoice.disabled = false;
+      }
+    });
+  }
 
   bootstrap();
 })();

@@ -2,8 +2,8 @@
   "schema": 1,
   "reviewedAt": "2026-10-27",
   "repository": "celiaelazamey-arch/phone-google",
-  "inspectedBaseline": "2508893bd7e6d447b2e19374933556322cc9cdb7",
-  "ownerStatement": "النظام موجود حاليًا في GitHub؛ مطلوب اختيار استضافة ورابط مجانيين والنشر دون بطاقة دفع",
+  "inspectedBaseline": "d5cdac830aa213cfe0f096d6519c786516593c57",
+  "ownerStatement": "النظام موجود حاليًا في GitHub؛ مطلوب اختيار استضافة ورابط مجانيين والنشر دون بطاقة دفع، وتوظيف أسرار المستودع التسعة في النظام بالكامل",
   "constraints": {
     "paidResourcesAuthorized": false,
     "paymentCardAuthorized": false,
@@ -11,6 +11,17 @@
     "subdomainRatherThanPurchasedDomain": true,
     "productionDataStatus": "not-confirmed-do-not-assume-disposable"
   },
+  "repositorySecretNamesConfirmedByOwner": [
+    "AGENETROUTERAPI_KEY",
+    "AI_GATEWAY_API_KEY",
+    "CELIA_MCP_API_TOKEN",
+    "CELIA_VOICE_ID",
+    "DEEPSEEK_API_KEY",
+    "ELEVENLABS_API_KEY",
+    "FIGMA_ACCESS_TOKEN",
+    "GEMINI_API_KEY",
+    "YOUR_CODATA_API_KEY"
+  ],
   "selectedPath": {
     "web": "Render Free, one combined Node web service",
     "database": "Aiven Free MySQL, a dedicated empty database",
@@ -27,9 +38,12 @@
   },
   "observations": {
     "planPullRequest21": "merged",
+    "pullRequest22": "merged",
+    "pullRequest23": "merged",
     "pagesCreationAttempt": "403 Resource not accessible by integration",
     "hostingCredentialsPresentInCheckedEnvironment": false,
-    "githubActionsSecretNamesReadable": false,
+    "githubActionsSecretNamesConfirmedByOwner": true,
+    "githubActionsSecretsValuesExposed": false,
     "databaseSchemaChanges": false
   },
   "remainingOwnerAction": "Sign in and approve the selected FREE services in their own dashboards; configure credentials there only. Never paste credentials or payment information into chat."

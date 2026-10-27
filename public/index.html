@@ -179,6 +179,10 @@
                     <select id="studio-provider" aria-label="اختيار المحرك المجاني">
                       <option value="auto">تلقائي ذكي (مجاني 100%)</option>
                       <option value="gemini-browser">Gemini 2.5 Flash (مجاني — AI Studio)</option>
+                      <option value="gemini-server">Gemini 2.5 Flash (خادم — GEMINI_API_KEY)</option>
+                      <option value="ai-gateway-server">AI Gateway (خادم — AI_GATEWAY_API_KEY)</option>
+                      <option value="deepseek-server">DeepSeek (خادم — DEEPSEEK_API_KEY)</option>
+                      <option value="agentrouter-server">AgentRouter (خادم — AGENETROUTERAPI_KEY)</option>
                       <option value="ollama-local">Ollama محلي (qwen2.5:7b مجاني)</option>
                       <option value="groq-free">Groq مجاني فائق السرعة (Llama 3.3)</option>
                       <option value="celia-builtin">محرك سيليا المدمج (فوري بدون مفتاح)</option>
@@ -345,15 +349,30 @@
             <div class="surface-card owner-vault-card">
               <div class="owner-vault-head">
                 <div>
-                  <h3>🔐 وضع المالك الموثّق (<code>CELIA_MCP_API_TOKEN</code>)</h3>
-                  <p>واجهة سيليا تعمل فورًا في وضع الاستوديو الآمن بدون رمز. وعند لصق رمز <code>CELIA_MCP_API_TOKEN</code> هنا، تتحول جميع الطلبات مباشرةً إلى نقطة <code>POST /mcp</code> المحمية بصلاحية المالك الكاملة (يُحفظ في ذاكرة التبويب المؤقتة فقط).</p>
+                  <h3>🔐 وضع المالك الموثّق (<code>CELIA_MCP_API_TOKEN</code>) وتكامل الأسرار التسعة</h3>
+                  <p>واجهة سيليا تعمل فورًا في وضع الاستوديو الآمن بدون رمز. وعند لصق رمز <code>CELIA_MCP_API_TOKEN</code> هنا، تتحول جميع الطلبات مباشرةً إلى نقاط المالك المحمية (<code>/mcp</code>، <code>/api/secrets/status</code>، <code>/api/ai/reply</code>، <code>/api/voice/speak</code>، <code>/api/figma/*</code>، <code>/api/codata/*</code>) دون كشف أي مفتاح في المتصفح.</p>
                 </div>
               </div>
               <div class="vault-input-row">
                 <input type="password" id="vault-mcp-token" placeholder="اختياري: الصق قيمة CELIA_MCP_API_TOKEN للترقية لوضع المالك المباشر" autocomplete="off" dir="ltr" />
                 <button type="button" class="primary-btn" id="btn-verify-vault">حفظ وفحص الاتصال الحي</button>
+                <button type="button" class="mini-btn" id="btn-test-voice">🔊 تجربة صوت سيليا</button>
               </div>
               <div class="vault-feedback" id="vault-feedback"></div>
+              <audio id="celia-voice-player" controls hidden style="margin-top:10px;width:100%;max-width:440px;"></audio>
+              <div id="secrets-readiness-panel" style="margin-top:14px;">
+                <div class="kv-grid" id="secrets-readiness-grid">
+                  <div class="kv-item"><span dir="ltr">AGENETROUTERAPI_KEY</span><span class="kv-val">مربوط بالخادم (عبر Bearer)</span></div>
+                  <div class="kv-item"><span dir="ltr">AI_GATEWAY_API_KEY</span><span class="kv-val">مربوط بالخادم (عبر Bearer)</span></div>
+                  <div class="kv-item"><span dir="ltr">CELIA_MCP_API_TOKEN</span><span class="kv-val">حارس مصادقة المالك</span></div>
+                  <div class="kv-item"><span dir="ltr">CELIA_VOICE_ID</span><span class="kv-val">هوية صوت سيليا</span></div>
+                  <div class="kv-item"><span dir="ltr">DEEPSEEK_API_KEY</span><span class="kv-val">مربوط بالخادم (عبر Bearer)</span></div>
+                  <div class="kv-item"><span dir="ltr">ELEVENLABS_API_KEY</span><span class="kv-val">توليد الصوت العربي TTS</span></div>
+                  <div class="kv-item"><span dir="ltr">FIGMA_ACCESS_TOKEN</span><span class="kv-val">قراءة ملفات التصميم</span></div>
+                  <div class="kv-item"><span dir="ltr">GEMINI_API_KEY</span><span class="kv-val">المزود السحابي الأساسي</span></div>
+                  <div class="kv-item"><span dir="ltr">YOUR_CODATA_API_KEY</span><span class="kv-val">موصل مساحة Codata (قراءة)</span></div>
+                </div>
+              </div>
             </div>
           </div>
         </section>

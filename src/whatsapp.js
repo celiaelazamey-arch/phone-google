@@ -1,6 +1,6 @@
 import express from 'express';
 import { requireApiToken } from './auth.js';
-import { generateWhatsAppReply } from './gemini.js';
+import { generateCeliaReply } from './ollama.js';
 import { createServiceRegistry, safeError, ServiceUnavailableError, UpstreamError } from './resilience.js';
 import { isValidE164, isWithinCustomerWindow, safeEqual, verifyWhatsAppSignature } from './security.js';
 import { createIdempotencyStore, isValidIdempotencyKey } from './idempotency.js';
@@ -74,7 +74,17 @@ export function createWhatsAppWebhookRouter({ pool, config, services = createSer
           const contact = rows[0];
           if (contact?.opted_in && contact?.ai_opted_in && isWithinCustomerWindow(contact.last_inbound_at)) {
             try {
-              const reply = await services.run('gemini', (signal) => generateWhatsAppReply({ config, customerMessage: message.body, signal }));
+              const aiResult = await generateCeliaReply({
+                config: { ...config, features: { ollama: false, ...config.features } },
+                services,
+                customerMessage: message.body,
+                provider: config.celia?.aiProvider || 'auto'
+              });
+              const allowLocalAuto = config.celia?.aiProvider === 'local';
+              if (aiResult.provider === 'celia-local-policy-engine' && !allowLocalAuto) {
+                throw Object.assign(new Error('ai_provider_unavailable'), { code: 'AI_UNAVAILABLE' });
+              }
+              const reply = aiResult.reply;
               const providerId = await services.run('whatsapp', (signal) => sendWhatsAppText({ config, phone: message.from, text: reply, signal }), { sideEffect: true });
               if (providerId) await pool.execute(
                 'INSERT IGNORE INTO whatsapp_messages (provider_message_id, phone_e164, direction, message_type, body, status) VALUES (?, ?, ?, ?, ?, ?)',

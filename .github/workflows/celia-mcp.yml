@@ -10,6 +10,10 @@ on:
         description: 'Optional live Gemini probe (main only; never gates offline tests)'
         type: boolean
         default: false
+      live_providers:
+        description: 'Optional live probe of all configured repository secrets (main only; never logs keys or content)'
+        type: boolean
+        default: false
 
 concurrency:
   group: celia-quality-${{ github.workflow }}-${{ github.ref }}
@@ -53,6 +57,19 @@ jobs:
           CELIA_MCP_DISABLE_MYSQL: 'true'
           CELIA_DISABLE_OLLAMA: 'true'
         run: npm run celia:mcp:verify
+      - name: Verify repository secrets wiring & zero-leak isolation
+        if: matrix.node == '24'
+        env:
+          AGENETROUTERAPI_KEY: ${{ secrets.AGENETROUTERAPI_KEY }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          CELIA_MCP_API_TOKEN: ${{ secrets.CELIA_MCP_API_TOKEN }}
+          CELIA_VOICE_ID: ${{ secrets.CELIA_VOICE_ID }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          FIGMA_ACCESS_TOKEN: ${{ secrets.FIGMA_ACCESS_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          YOUR_CODATA_API_KEY: ${{ secrets.YOUR_CODATA_API_KEY }}
+        run: npm run check:secrets
       - run: npm run build:pages
 
   container:
@@ -144,8 +161,8 @@ jobs:
           if-no-files-found: error
 
   live-gemini:
-    name: Optional external Gemini availability
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.live_gemini
+    name: Optional external provider availability probes
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && (inputs.live_gemini || inputs.live_providers)
     runs-on: ubuntu-latest
     environment: integration-probes
     timeout-minutes: 5
@@ -156,16 +173,52 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci --no-audit --no-fund
-      - name: Probe only a synthetic message; never print key or generated content
+      - name: Probe synthetic requests only; never print keys or generated content
         env:
+          PROBE_ALL: ${{ inputs.live_providers && 'true' || 'false' }}
+          AGENETROUTERAPI_KEY: ${{ secrets.AGENETROUTERAPI_KEY }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          CELIA_MCP_API_TOKEN: ${{ secrets.CELIA_MCP_API_TOKEN }}
+          CELIA_VOICE_ID: ${{ secrets.CELIA_VOICE_ID }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          FIGMA_ACCESS_TOKEN: ${{ secrets.FIGMA_ACCESS_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY }}
+          YOUR_CODATA_API_KEY: ${{ secrets.YOUR_CODATA_API_KEY }}
           CELIA_MCP_DISABLE_MYSQL: 'true'
           CELIA_DISABLE_OLLAMA: 'true'
         run: |
           node --input-type=module -e '
-            import { generateWhatsAppReply } from "./src/gemini.js";
-            if (!process.env.GEMINI_API_KEY) throw new Error("Configure GEMINI_API_KEY in environment secrets");
-            const reply = await generateWhatsAppReply({ config: { gemini: { apiKey: process.env.GEMINI_API_KEY, model: "gemini-2.5-flash" } }, customerMessage: "مرحبا، كيف أتواصل مع موظف؟" });
-            if (!reply) process.exit(1);
-            console.log("Gemini synthetic probe passed. No response content logged.");
+            import crypto from "node:crypto";
+            import { loadCeliaMcpConfig } from "./src/celia-mcp.js";
+            import { generateCeliaReply } from "./src/ollama.js";
+            import { fetchFigmaProfile, getCodataStatus, probeCeliaVoice } from "./src/secrets-hub.js";
+            const token = process.env.CELIA_MCP_API_TOKEN?.length >= 32 ? process.env.CELIA_MCP_API_TOKEN : crypto.randomBytes(32).toString("hex");
+            const config = loadCeliaMcpConfig({ ...process.env, CELIA_MCP_API_TOKEN: token });
+            const results = [];
+            if (config.gemini.apiKey) {
+              const r = await generateCeliaReply({ config, customerMessage: "مرحبا، كيف أتواصل مع موظف؟", provider: "gemini" });
+              results.push({ provider: "gemini", ok: Boolean(r.reply) });
+            }
+            if (process.env.PROBE_ALL === "true") {
+              for (const [id, key] of [["ai_gateway", config.aiGateway.apiKey], ["deepseek", config.deepseek.apiKey], ["agentrouter", config.agentrouter.apiKey]]) {
+                if (!key) continue;
+                const r = await generateCeliaReply({ config, customerMessage: "مرحبا، كيف أتواصل مع موظف؟", provider: id });
+                results.push({ provider: id, ok: Boolean(r.reply) });
+              }
+              if (config.elevenlabs.apiKey && config.elevenlabs.voiceId) {
+                const v = await probeCeliaVoice({ config });
+                results.push({ provider: "elevenlabs", ok: Boolean(v.reachable) });
+              }
+              if (config.figma.accessToken) {
+                const f = await fetchFigmaProfile({ config });
+                results.push({ provider: "figma", ok: Boolean(f.id) });
+              }
+              if (config.codata.apiKey) {
+                const c = await getCodataStatus({ config, probe: Boolean(config.codata.baseUrl) });
+                results.push({ provider: "codata", configured: c.configured, probed: Boolean(config.codata.baseUrl) });
+              }
+            }
+            if (!results.length) throw new Error("No requested provider secrets configured in environment");
+            console.log(JSON.stringify({ syntheticProbes: results, responseContentLogged: false }, null, 2));
           '

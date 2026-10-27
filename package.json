@@ -25,7 +25,8 @@
     "test:resilience": "node --test test/resilience.test.js test/operations.test.js test/deployment.test.js",
     "test:browser": "playwright test",
     "test:mysql": "node --test integration/mysql.integration.mjs",
-    "check:continuity": "node scripts/check-continuity.mjs"
+    "check:continuity": "node scripts/check-continuity.mjs",
+    "check:secrets": "node scripts/check-secrets-wiring.mjs"
   },
   "dependencies": {
     "dotenv": "^18.0.9",
