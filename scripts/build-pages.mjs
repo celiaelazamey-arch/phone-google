@@ -115,12 +115,22 @@ export async function build() {
     toolsCount: tools.length
   };
 
+  // Optional pointer to the separate always-on service. It is only a URL the owner
+  // pasted at build time: the build cannot verify it, so every surface reports
+  // `verified: false` and must never present it as a live deployment.
+  const rawServiceUrl = String(process.env.CELIA_REAL_SERVICE_URL || '').trim();
+  if (rawServiceUrl && !/^https:\/\/[a-z0-9.-]+(:\d+)?(\/.*)?$/i.test(rawServiceUrl)) {
+    throw new Error('CELIA_REAL_SERVICE_URL must be an https URL');
+  }
+  const realService = { url: rawServiceUrl || null, verified: false };
+
   const shim = template
     .replaceAll('/*__CELIA_TOOLS_JSON__*/', JSON.stringify(tools, null, 2))
     .replaceAll('/*__CELIA_SERVER_INFO__*/', JSON.stringify(serverInfo, null, 2))
     .replaceAll('/*__CELIA_BUILD_META__*/', JSON.stringify(buildMeta, null, 2))
     .replaceAll('/*__CELIA_RELEASE__*/', JSON.stringify(RELEASE, null, 2))
-    .replaceAll('/*__CELIA_RELEASE_HISTORY__*/', JSON.stringify(RELEASE_HISTORY, null, 2));
+    .replaceAll('/*__CELIA_RELEASE_HISTORY__*/', JSON.stringify(RELEASE_HISTORY, null, 2))
+    .replaceAll('/*__CELIA_REAL_SERVICE__*/', JSON.stringify(realService, null, 2));
 
   if (shim.includes('__CELIA_')) throw new Error('بقيت علامة قالب غير مستبدلة في الطبقة الثابتة');
   try {

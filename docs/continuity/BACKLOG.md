@@ -85,7 +85,7 @@
 |---|---|---|---|---|
 | HOST-001 | P0 | متحقق — 0.2.1 وTLS hostname في CI9010120 | COMP-001 | وضع موحد اختياري يعيد استخدام REST/OAuth/Webhook مع MCP، strict TLS/CA، أول install فارغ فقط؛ لا schema جديد أو fallback ذاكرة أو كسر الوضع القديم |
 | HOST-002 | P1 | متحقق — 20 اختبار متصفح محليًا وفي CI9010120 | HOST-001 | مركز نشر عربي وJSON قراءة آمنة وروابط نشر من الفرع، static/stale و320px واضحان؛ لا جمع أسرار أو نجاح وهمي |
-| HOST-003 | P0 | بانتظار تفويض الحسابات — لا نشر دائم (أُعيد فحص تفعيل Pages من الجلسة: 403 لصلاحية الرمز) | HOST-001, HOST-002, QA-001 | خدمة Free + MySQL Free + HTTPS فعليان دون بطاقة أو تكلفة، قبول خارجي وrestart وrestore لحساب المالك ثم Google/Meta بموافقته؛ لا يغلق بكود أو preview |
+| HOST-003 | P0 | بانتظار تفويض الحسابات — لا نشر دائم (أُعيد فحص تفعيل Pages في 2026-10-27: `403 Resource not accessible by integration`). **خطة التشغيل الحر جاهزة ومنفذة كوثائق واختبارات (DEC-017):** `deploy/free-always-on/README.md` + `GET /api/deployment/hosting` بحالة `not-verified`؛ لم يُنشأ حساب ولا خدمة | HOST-001, HOST-002, QA-001 | خدمة Free + MySQL Free + HTTPS فعليان دون بطاقة أو تكلفة، قبول خارجي وrestart وrestore لحساب المالك ثم Google/Meta بموافقته؛ لا يغلق بكود أو preview |
 
 ## موصل Celia Google Spider (حزمة Python مستقلة)
 
