@@ -72,6 +72,29 @@ jobs:
         run: npm run check:secrets
       - run: npm run build:pages
 
+  spider:
+    name: Python 3.11 · Celia Google Spider tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b0 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.11'
+      - name: Install spider dependencies (no credentials, offline suite only)
+        working-directory: celia-google-spider
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "mcp>=1.9" "google-api-python-client>=2.100" "google-auth-oauthlib>=1.0" "google-auth-httplib2>=0.2" "pytest>=8"
+      - name: unittest suite (includes real MCP stdio handshake, 6 tools)
+        working-directory: celia-google-spider
+        run: python -m unittest discover -s tests -v
+      - name: pytest suite + syntax check
+        working-directory: celia-google-spider
+        run: |
+          python -m pytest -q
+          python -m compileall -q celia_spider
+
   container:
     name: Node 24 container smoke test
     runs-on: ubuntu-latest

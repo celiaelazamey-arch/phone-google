@@ -1,0 +1,22 @@
+# مفاتيح OAuth والرموز — لا ترفعها أبدًا
+credentials.json
+token.json
+client_secret*.json
+
+# قاعدة البيانات والفهرس المحلي
+*.sqlite3
+*.sqlite3-journal
+*.sqlite3-wal
+*.sqlite3-shm
+
+# بيئات Python والمخلفات
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# حزم النشر المولّدة
+dist/
+*.zip
