@@ -1,12 +1,12 @@
 # الحالة الحالية — ابدأ من هنا
 
-**آخر مراجعة:** 27 أكتوبر 2026 · **المهمة الحالية:** DOC-001 — تنفيذ `document_data_automation` مع توثيق SVG/Canvas على فرع مراجعة مستقل. سجل الجلسة: [2026-10-27-document-data-automation](sessions/2026-10-27-document-data-automation.md) · القرار: DEC-019.
+**آخر مراجعة:** 27 أكتوبر 2026 · **المهمة الحالية:** DOC-AUTO-001 — تنفيذ `document_data_automation` مع توثيق SVG/Canvas على فرع مراجعة مستقل. سجل الجلسة: [2026-10-27-document-data-automation](sessions/2026-10-27-document-data-automation.md) · القرار: DEC-019.
 
 ## الطلب الحالي — أتمتة المستندات والبيانات
 
 - **الموافقة:** طلب المالك «موافق على تنفيذdocument_data_automation svgsvg canvas».
 - **مرجع البداية:** `main` عند `ba3e51fa45b02cfe21315bcd752a9ca2158a6249`، التطبيق `0.2.1`، `schema 1`.
-- **فرع التغيير:** [`feature/document-data-automation`](https://github.com/celiaelazamey-arch/phone-google/tree/feature/document-data-automation). آخر commit رُصد أثناء تحديث هذا السجل هو ما قبل التوثيق النهائي/فتح PR؛ يُستخرج مرجع HEAD النهائي من GitHub بعد اكتمال هذه الجلسة.
+- **فرع التغيير:** [`feature/document-data-automation`](https://github.com/celiaelazamey-arch/phone-google/tree/feature/document-data-automation). الفرع يحتوي التغييرات المحفوظة في GitHub؛ تُراجع حالة PR #39 ونتائج CI مباشرة قبل الدمج.
 - **ما أُضيف على الفرع:** `src/agent/automation/{schema,reader,extractor,validator,tools}.js`؛ تسجيل الأدوات الأربع عبر حلقة الوكيل؛ تخطيط حتمي يبدأ بعلامة صريحة؛ فحص التكرار من تقارير `agent_tool_runs` الحالية؛ فحص `document_automation_integrity` في المُتحقّق المستقل؛ `test/agent-document-automation.test.js`؛ SVG مصدر + نسخة ثابتة عامة + صفحة Canvas للتصور؛ توثيق حدود القدرة.
 - **حدود الإصدار الأول:** CSV/JSON/TXT/Markdown ونصوص/ملفات صغيرة؛ لا PDF/صور/OCR ولا استخراج سحابي أو شبكة. `data.report` لا يكتب سجل مشتريات ويبقي `action.status=not_committed`. فحص التكرار تاريخي وليس ذريًا ضد التسابق المتزامن.
 - **الفحوص:** لم أستطع استنساخ المستودع محليًا بسبب تعذر DNS إلى `github.com` في بيئة التنفيذ؛ لذلك لم تُشغّل اختبارات Node محليًا. حالة CI على فرع/PR يجب التحقق منها بعد فتح المراجعة؛ لا تُنقل النتائج التاريخية إلى هذه المهمة.
