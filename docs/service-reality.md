@@ -59,8 +59,10 @@
 
 ## ما أُصلح في الشيفرة بناءً على هذا الدليل
 
-- `workers/celia-edge/worker.js` `/readyz`: كان يعلن `storage.durable: true` لمجرد وجود أسرار R2 — واجهة زائفة؛ الآن
-  `durable: false` + `r2CredentialsPresent` + `durabilityVerifiedBy: 'service-reality audit'`.
+- `workers/celia-edge/worker.js` `/readyz`: كان يعلن `storage.durable: true` لمجرد وجود أسرار R2 — واجهة زائفة؛
+  ثم صار `durable: false` صادقًا مع `r2CredentialsPresent`، والآن (DEC-035) صار الدوام **حقيقيًا** عبر D1:
+  كل نداء يكتب رمزًا جديدًا ويقرأه، و`durable: true` لا تُعلن إلا بعد تطابق فعلي؛ وبدون ربط D1 يبقى `false`
+  بسبب صريح. سجل `edge_audit` سلسلة تجزئة تكشف أي تعديل.
 - الافتراضي `deepseek-chat` → `deepseek-flash` في `src/ai-providers.js`, `src/ollama.js`, `src/celia-mcp.js`,
   `src/operations.js`, `src/secrets-hub.js`, `.env.example` (يبقى `DEEPSEEK_MODEL` قابلًا للتجاوز).
 - `generateOpenAiCompatibleReply`: رفض المزوّد يحمل الآن نص سببه (`upstreamDetail`: رصيد/صلاحية/نموذج) بلا مفتاح ولا

@@ -6,6 +6,8 @@ import { applyRetirementsToEnv, flagNameFor, loadServiceRetirements, RETIRABLE_F
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const workerPath = path.join(root, 'workers/celia-edge/worker.js');
+const statePath = path.join(root, 'workers/celia-edge/state.js');
+const migrationPath = path.join(root, 'workers/celia-edge/migrations/0001_state.sql');
 const pkgPath = path.join(root, 'package.json');
 
 const SECRET_KEYS = [
@@ -29,7 +31,56 @@ const SECRET_KEYS = [
   'YOUR_CODATA_API_KEY'
 ];
 
-export function buildWorkerMetadata({ env = process.env, version = '0.2.1', commit = 'main', retirements = loadServiceRetirements() } = {}) {
+export const D1_DATABASE_NAME = 'celia-edge-state';
+
+/**
+ * Creates the D1 database if the account does not have it yet, so the first deploy after this change does not
+ * need a manual step. Idempotent: an existing database with the same name is reused untouched.
+ */
+export async function ensureD1Database({ accountId, apiToken, fetchImpl = fetch, name = D1_DATABASE_NAME, log = () => {} }) {
+  const baseUrl = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}`;
+  const headers = { authorization: `Bearer ${apiToken}` };
+  const listed = await fetchImpl(`${baseUrl}/d1/database?per_page=100`, { headers });
+  const listedJson = await listed.json().catch(() => ({}));
+  if (!listed.ok) throw new Error(`d1_list_${listed.status}`);
+  const existing = (listedJson?.result || []).find((entry) => entry?.name === name);
+  if (existing?.uuid) return { id: existing.uuid, name, created: false };
+  const created = await fetchImpl(`${baseUrl}/d1/database`, {
+    method: 'POST',
+    headers: { ...headers, 'content-type': 'application/json' },
+    body: JSON.stringify({ name })
+  });
+  const createdJson = await created.json().catch(() => ({}));
+  const id = createdJson?.result?.uuid;
+  if (!created.ok || !id) throw new Error(`d1_create_${created.status}`);
+  log(`D1 database ${name} created (${id})`);
+  return { id, name, created: true };
+}
+
+/** Applies the DDL in `migrations/0001_state.sql`, statement by statement, through the D1 query API. */
+export async function applyMigrations({ accountId, apiToken, databaseId, sql, fetchImpl = fetch, log = () => {} }) {
+  const baseUrl = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}`;
+  const headers = { authorization: `Bearer ${apiToken}`, 'content-type': 'application/json' };
+  const statements = String(sql)
+    .split(';')
+    .map((part) => part.trim())
+    .filter((part) => part && part.split('\n').some((line) => line.trim() && !line.trim().startsWith('--')));
+  let applied = 0;
+  for (const statement of statements) {
+    const response = await fetchImpl(`${baseUrl}/d1/database/${encodeURIComponent(databaseId)}/query`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ sql: statement })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload?.success === false) throw new Error(`d1_migration_${response.status}`);
+    applied += 1;
+  }
+  log(`D1 migrations applied: ${applied} statement(s)`);
+  return { statements: applied };
+}
+
+export function buildWorkerMetadata({ env = process.env, version = '0.2.1', commit = 'main', d1DatabaseId = null, retirements = loadServiceRetirements() } = {}) {
   // Retired services (DEC-030) travel to the edge as plain_text flags so /api/secrets/status tells the same truth as Git.
   const effectiveEnv = applyRetirementsToEnv(env, retirements);
   const retirementBindings = RETIRABLE_FEATURES
@@ -38,6 +89,9 @@ export function buildWorkerMetadata({ env = process.env, version = '0.2.1', comm
     .map((flag) => ({ type: 'plain_text', name: flag, text: 'true' }));
   const bindings = [
     ...retirementBindings,
+    // D1 binding. Absent when the database could not be created — the worker then reports
+    // storage.durable = false with the reason instead of pretending to persist.
+    ...(d1DatabaseId ? [{ type: 'd1', name: 'DB', id: d1DatabaseId }] : []),
     {
       type: 'plain_text',
       name: 'ALLOWED_ORIGIN',
@@ -81,11 +135,27 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
 
   const pkg = JSON.parse(await readFile(pkgPath, 'utf8'));
   const workerSource = await readFile(workerPath, 'utf8');
+  const stateSource = await readFile(statePath, 'utf8');
+  const migrationSql = await readFile(migrationPath, 'utf8');
   const commit = String(env.GITHUB_SHA || 'main').trim();
+
+  let d1 = { ok: false, reason: 'dry_run' };
+  if (!dryRun) {
+    try {
+      const database = await ensureD1Database({ accountId, apiToken, fetchImpl, log });
+      const migrations = await applyMigrations({ accountId, apiToken, databaseId: database.id, sql: migrationSql, fetchImpl, log });
+      d1 = { ok: true, id: database.id, name: database.name, created: database.created, migrations };
+    } catch (error) {
+      d1 = { ok: false, reason: String(error?.message || error).slice(0, 200) };
+      log(`::warning title=Celia D1::${d1.reason} — deploying without the binding; the worker will report storage.durable=false`);
+    }
+  }
+
   const metadata = buildWorkerMetadata({
     env,
     version: pkg.version,
-    commit
+    commit,
+    d1DatabaseId: d1.ok ? d1.id : null
   });
   const secretBindingsCount = metadata.bindings.filter((b) => b.type === 'secret_text').length;
 
@@ -119,6 +189,12 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
       'worker.js',
       new Blob([workerSource], { type: 'application/javascript+module' }),
       'worker.js'
+    );
+    // `worker.js` imports `./state.js`; both modules must travel in the same upload or the deploy fails.
+    form.append(
+      'state.js',
+      new Blob([stateSource], { type: 'application/javascript+module' }),
+      'state.js'
     );
     return form;
   };
@@ -224,7 +300,8 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
     version: pkg.version,
     commit,
     secretBindingsInjected: secretBindingsCount,
-    totalSecretsTracked: SECRET_KEYS.length
+    totalSecretsTracked: SECRET_KEYS.length,
+    d1
   };
 
   if (env.GITHUB_STEP_SUMMARY) {
@@ -237,6 +314,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
         workerUrl ? `- Live Edge URL: ${workerUrl}` : '- Live Edge URL: subdomain not enabled yet',
         `- Secrets Injected: **${secretBindingsCount} / ${SECRET_KEYS.length}**`,
         `- Live \`/readyz\` check: **${liveReady ? 'PASS' : 'pending propagation'}**`,
+        `- Durable storage (D1 \`${D1_DATABASE_NAME}\`): **${d1.ok ? `${d1.id}${d1.created ? ' (created)' : ''}` : `unavailable — ${d1.reason}`}**`,
         ''
       ].join('\n'),
       'utf8'

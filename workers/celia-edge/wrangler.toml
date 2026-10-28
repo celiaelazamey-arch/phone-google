@@ -6,3 +6,7 @@ workers_dev = true
 [vars]
 ALLOWED_ORIGIN = "https://celiaelazamey-arch.github.io"
 CELIA_VERSION = "0.2.1"
+
+# Durable state (DEC-035) is bound at deploy time by scripts/deploy-cloudflare-edge.mjs, which creates the
+# database if needed, applies migrations/0001_state.sql and injects the real id into the upload metadata.
+# Nothing is hard-coded here on purpose: a stale id in this file would deploy against the wrong database.
