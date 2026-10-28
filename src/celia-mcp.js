@@ -1116,13 +1116,13 @@ async function runStdioServer({ pool, config }) {
   });
 }
 
-async function runSelfTest() {
+export async function runSelfTest({ env: baseEnv = process.env, log = console.log } = {}) {
   const fallbackToken = crypto.randomBytes(32).toString('hex');
   const env = {
-    ...process.env,
+    ...baseEnv,
     CELIA_MCP_API_TOKEN:
-      process.env.CELIA_MCP_API_TOKEN && !isPlaceholder(process.env.CELIA_MCP_API_TOKEN) && process.env.CELIA_MCP_API_TOKEN.length >= 32
-        ? process.env.CELIA_MCP_API_TOKEN
+      baseEnv.CELIA_MCP_API_TOKEN && !isPlaceholder(baseEnv.CELIA_MCP_API_TOKEN) && baseEnv.CELIA_MCP_API_TOKEN.length >= 32
+        ? baseEnv.CELIA_MCP_API_TOKEN
         : fallbackToken
   };
   const config = loadCeliaMcpConfig(env, { requireToken: true });
@@ -1177,7 +1177,7 @@ async function runSelfTest() {
       config.agentrouter?.apiKey
     );
     let aiVerification = { tested: false, provider: null, note: 'لا يوجد مزود سحابي مفعّل للفحص الحي أو خادم Ollama نشط في هذه البيئة' };
-    if (process.env.CELIA_VERIFY_SKIP_CLOUD !== 'true' && (anyCloudConfigured || statusData?.providers?.ollama?.reachable)) {
+    if (env.CELIA_VERIFY_SKIP_CLOUD !== 'true' && (anyCloudConfigured || statusData?.providers?.ollama?.reachable)) {
       const replyCall = await rpc(4, 'tools/call', {
         name: 'celia_ai_reply',
         arguments: {
@@ -1196,7 +1196,7 @@ async function runSelfTest() {
       };
     }
 
-    console.log(
+    log(
       JSON.stringify(
         {
           selfTest: 'passed',

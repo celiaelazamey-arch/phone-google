@@ -73,17 +73,17 @@ export function buildWorkerMetadata({ env = process.env, version = '0.2.1', comm
   };
 }
 
-async function main() {
-  const accountId = String(process.env.CLOUDFLARE_ACCOUNT_ID || '').trim();
-  const apiToken = String(process.env.CLOUDFLARE_API_TOKEN || '').trim();
-  const scriptName = String(process.env.CELIA_WORKER_NAME || 'celia-phone-google').trim();
-  const dryRun = process.argv.includes('--dry-run') || !accountId || !apiToken;
+export async function main({ argv = process.argv.slice(2), env = process.env, fetchImpl = fetch, log = console.log } = {}) {
+  const accountId = String(env.CLOUDFLARE_ACCOUNT_ID || '').trim();
+  const apiToken = String(env.CLOUDFLARE_API_TOKEN || '').trim();
+  const scriptName = String(env.CELIA_WORKER_NAME || 'celia-phone-google').trim();
+  const dryRun = argv.includes('--dry-run') || !accountId || !apiToken;
 
   const pkg = JSON.parse(await readFile(pkgPath, 'utf8'));
   const workerSource = await readFile(workerPath, 'utf8');
-  const commit = String(process.env.GITHUB_SHA || 'main').trim();
+  const commit = String(env.GITHUB_SHA || 'main').trim();
   const metadata = buildWorkerMetadata({
-    env: process.env,
+    env,
     version: pkg.version,
     commit
   });
@@ -99,7 +99,7 @@ async function main() {
       totalSecretsTracked: SECRET_KEYS.length,
       reason: !accountId || !apiToken ? 'missing_cloudflare_credentials' : 'explicit_dry_run'
     };
-    console.log(JSON.stringify(report, null, 2));
+    log(JSON.stringify(report, null, 2));
     return;
   }
 
@@ -124,7 +124,7 @@ async function main() {
   };
 
   let baseUrl = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(resolvedAccountId)}`;
-  let uploadRes = await fetch(
+  let uploadRes = await fetchImpl(
     `${baseUrl}/workers/scripts/${encodeURIComponent(scriptName)}`,
     {
       method: 'PUT',
@@ -136,7 +136,7 @@ async function main() {
 
   if (!uploadRes.ok || uploadJson.success === false) {
     // Attempt automatic account ID discovery via Cloudflare Accounts API in case CLOUDFLARE_ACCOUNT_ID differs
-    const accRes = await fetch('https://api.cloudflare.com/client/v4/accounts? page=1&per_page=5', {
+    const accRes = await fetchImpl('https://api.cloudflare.com/client/v4/accounts? page=1&per_page=5', {
       method: 'GET',
       headers: authHeaders
     }).catch(() => null);
@@ -145,7 +145,7 @@ async function main() {
     if (discoveredId && discoveredId !== resolvedAccountId) {
       resolvedAccountId = String(discoveredId).trim();
       baseUrl = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(resolvedAccountId)}`;
-      uploadRes = await fetch(
+      uploadRes = await fetchImpl(
         `${baseUrl}/workers/scripts/${encodeURIComponent(scriptName)}`,
         {
           method: 'PUT',
@@ -170,20 +170,20 @@ async function main() {
       totalSecretsTracked: SECRET_KEYS.length,
       note: 'Ensure CLOUDFLARE_API_TOKEN has Account -> Workers Scripts -> Edit permission.'
     };
-    if (process.env.GITHUB_STEP_SUMMARY) {
+    if (env.GITHUB_STEP_SUMMARY) {
       await appendFile(
-        process.env.GITHUB_STEP_SUMMARY,
+        env.GITHUB_STEP_SUMMARY,
         `### Cloudflare Worker Edge Deployment\n- Status: \`api-rejected\` (HTTP ${uploadRes.status}, code \`${code}\`, message: \`${message}\`)\n- Secrets prepared: **${secretBindingsCount} / ${SECRET_KEYS.length}**\n`,
         'utf8'
       );
     }
-    console.log(`::notice title=Cloudflare Edge Status::${JSON.stringify(summary)}`);
-    console.log(JSON.stringify(summary, null, 2));
+    log(`::notice title=Cloudflare Edge Status::${JSON.stringify(summary)}`);
+    log(JSON.stringify(summary, null, 2));
     return;
   }
 
   // Enable workers.dev route if available
-  await fetch(
+  await fetchImpl(
     `${baseUrl}/workers/scripts/${encodeURIComponent(scriptName)}/subdomain`,
     {
       method: 'POST',
@@ -195,7 +195,7 @@ async function main() {
     }
   ).catch(() => {});
 
-  const subRes = await fetch(`${baseUrl}/workers/subdomain`, {
+  const subRes = await fetchImpl(`${baseUrl}/workers/subdomain`, {
     method: 'GET',
     headers: authHeaders
   }).catch(() => null);
@@ -206,7 +206,7 @@ async function main() {
   let liveReady = false;
   if (workerUrl) {
     try {
-      const probeRes = await fetch(`${workerUrl}/readyz`);
+      const probeRes = await fetchImpl(`${workerUrl}/readyz`);
       if (probeRes.ok) {
         const probeData = await probeRes.json().catch(() => ({}));
         liveReady = Boolean(probeData.ready);
@@ -227,9 +227,9 @@ async function main() {
     totalSecretsTracked: SECRET_KEYS.length
   };
 
-  if (process.env.GITHUB_STEP_SUMMARY) {
+  if (env.GITHUB_STEP_SUMMARY) {
     await appendFile(
-      process.env.GITHUB_STEP_SUMMARY,
+      env.GITHUB_STEP_SUMMARY,
       [
         '### Cloudflare Worker Edge Deployment',
         `- Status: **deployed**`,
@@ -243,8 +243,8 @@ async function main() {
     );
   }
 
-  console.log(`::notice title=Cloudflare Edge Status::${JSON.stringify(report)}`);
-  console.log(JSON.stringify(report, null, 2));
+  log(`::notice title=Cloudflare Edge Status::${JSON.stringify(report)}`);
+  log(JSON.stringify(report, null, 2));
 }
 
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;

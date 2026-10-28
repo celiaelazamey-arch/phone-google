@@ -19,7 +19,7 @@
     "celia:mcp:stdio": "node src/celia-mcp.js --stdio",
     "celia:mcp:verify": "node src/celia-mcp.js --self-test",
     "test": "node --test",
-    "test:coverage": "node --test --experimental-test-coverage --test-coverage-include=src/** --test-coverage-include=scripts/** --test-coverage-include=workers/** --test-coverage-lines=80 --test-coverage-branches=65 --test-coverage-functions=78",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-include=src/** --test-coverage-include=scripts/** --test-coverage-include=workers/** --test-coverage-lines=89 --test-coverage-branches=71 --test-coverage-functions=82",
     "check": "node scripts/check.mjs",
     "build:pages": "node scripts/build-pages.mjs",
     "preview:pages": "node scripts/build-pages.mjs && node scripts/serve-pages.mjs",

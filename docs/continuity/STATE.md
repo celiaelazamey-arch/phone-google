@@ -1,13 +1,32 @@
 # الحالة الحالية — ابدأ من هنا
 
-**آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** **خطة المحافظة على `main@715060a` (DEC-031، OPS-005)** على الفرع
-`arena/828764c2-phone-google` (متفرع من دمج PR #46) · سجل الجلسة:
-[2026-10-28-preservation-plan](sessions/2026-10-28-preservation-plan.md) · السجل السابق:
-[2026-10-28-service-reality-audit](sessions/2026-10-28-service-reality-audit.md) ·
-الخطة: [docs/preservation-plan.md](../preservation-plan.md) · واقع الخدمات: [docs/service-reality.md](../service-reality.md) ·
+**آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** **خطة 100% — نظام منشور بلا أخطاء وبلا بطاقة (PLAN-001)**
+على الفرع `arena/6b68cfb2-phone-google` (من `main@fc4d60f`) · سجل الجلسة:
+[2026-10-28-plan-100-percent](sessions/2026-10-28-plan-100-percent.md) · السجل السابق:
+[2026-10-28-preservation-plan](sessions/2026-10-28-preservation-plan.md) ·
+الخطة: [docs/plan-100-percent.md](../plan-100-percent.md) · واقع الخدمات: [docs/service-reality.md](../service-reality.md) ·
+المحافظة: [docs/preservation-plan.md](../preservation-plan.md) ·
 المرجع التشغيلي: [deploy/free-always-on/README.md](../../deploy/free-always-on/README.md)
 
-## الطلب الحالي (أعلى أولوية) — «خطط للمحافظة لما وصلنا له حتى الآن» (DEC-031، OPS-005)
+## الطلب الحالي (أعلى أولوية) — «خطة تنفيذية للوصول إلى 100% منشور بلا أخطاء وبلا فيزا» (PLAN-001، REL-002، QA-006)
+
+- **ما نُفِّذ في هذه الجلسة (على الفرع، قبل الدمج):** فصل بوابات الإصدار الأربع في خطوات مسمّاة داخل
+  `.github/workflows/release.yml` (الفشل الوحيد على `main@fc4d60f` كان «exit code 1» بلا اسم بوابة، والـjob توقف بعد 20
+  ثانية أي قبل `npm test` البالغ 24 ثانية) + **نشر idempotent** يقارن `SHA256SUMS` فلا يفشل إعادة التشغيل على أصول متطابقة
+  + مدخل `live_only` في `service-reality.yml` (تحقق من السرّ في ~دقيقة بدل ~20).
+- **التغطية:** 383/383 اختبارًا (كانت 326)، أسطر **90.29%** وفروع 73.20 ودوال 83.79 (كانت 85.72/71.79/83.83)، والأرضية في
+  CI صارت **89/71/82** بدل 80/65/78 (`package.json` + `COVERAGE_FLOOR` + اختبارها).
+- **اختبارات جديدة:** `deploy-cloudflare-edge`، `deploy-release`، `learn-source`، `reality-notify-main`، `lifecycle`،
+  `celia-mcp-tools`، `celia-mcp-protocol`، `celia-mcp-selftest`، `agent-tool-validation`، `outbound-guards`.
+- **الخدمات الحية لم تتغيّر:** 11 متحققة / 1 فاشلة / 4 متقاعدة من 12 مهيأة = **91.7%**؛ الفشل الوحيد `CELIA_VOICE_ID`
+  (القيمة الواصلة للـworkflow ليست بين 22 صوتًا مرئيًا؛ القائمة تضم `cela=AnsOWV53Mdx5fcIanRBB`).
+- **النشر الكامل:** لم يُنفَّذ ولا يُدّعى — `deploy-render.yml` يخرج `not-configured` ويسمّي الناقص:
+  `CELIA_LIVE_URL` (variable) + `RENDER_API_KEY`/`RENDER_SERVICE_ID` أو `RENDER_DEPLOY_HOOK_URL`، والحسابان (Render Free،
+  Aiven MySQL Free) غير موجودين.
+- **الخطوة التالية (المالك، خمس لوحات في [plan-100-percent](../plan-100-percent.md) §2):** `CELIA_VOICE_ID` في Repository
+  secrets → «تم»؛ ثم Aiven + Render Blueprint + `CELIA_LIVE_URL` وأسرار Render → `verify:live` PASS؛ ثم Meta وGoogle.
+
+## الطلب السابق — «خطط للمحافظة لما وصلنا له حتى الآن» (DEC-031، OPS-005)
 
 - **ما وصلنا إليه (مدموج في `main@715060a`):** 324/324 اختبارًا (تغطية 85.8/72/84)، MySQL حقيقي 11/11، Pages ✅ `40650636259`،
   Worker ✅ `40650636104` (`liveReady`، 18/18 + مفاتيح التقاعد)، Release ✅ `40650636330`، 10 خدمات متحققة / 4 متقاعدة في Git /
