@@ -18,6 +18,10 @@ on:
         description: 'Minimum working rate of configured services (0..1)'
         type: string
         default: '0.95'
+      live_only:
+        description: 'Skip the offline suite and the MySQL suite (fast secret check, ~1 minute)'
+        type: boolean
+        default: false
   push:
     branches: ['**']
 
@@ -100,7 +104,7 @@ jobs:
           AGENTROUTER_MODEL: ${{ vars.AGENTROUTER_MODEL }}
           AI_GATEWAY_MODEL: ${{ vars.AI_GATEWAY_MODEL }}
           GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/service-reality.mjs --min-rate ${{ inputs.min_rate || '0.95' }}
+        run: node scripts/service-reality.mjs --min-rate ${{ inputs.min_rate || '0.95' }} ${{ inputs.live_only && '--skip-offline' || '' }}
       - name: Notify the owner through one tracking issue (main, scheduled/manual runs only)
         if: always() && github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && hashFiles('.validation-artifacts/service-reality.json') != ''
         env:

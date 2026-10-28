@@ -127,7 +127,7 @@ export function classifyGoogleTokenResponse(status, body = {}) {
 }
 
 /** Regression floor for the offline suite (DEC-031). Current: ~85.8 / 72 / 84 — headroom is deliberate. */
-export const COVERAGE_FLOOR = Object.freeze({ lines: 80, branches: 65, functions: 78 });
+export const COVERAGE_FLOOR = Object.freeze({ lines: 89, branches: 71, functions: 82 });
 
 export function coverageShortfalls(coverage, floor = COVERAGE_FLOOR) {
   if (!coverage) return [];

@@ -37,8 +37,12 @@ test('the tracking-issue body names failed services, their secrets and the retir
 });
 
 test('coverage floor: below any metric is a named shortfall, the floor leaves headroom under the current suite', () => {
-  assert.deepEqual(COVERAGE_FLOOR, { lines: 80, branches: 65, functions: 78 });
-  assert.deepEqual(coverageShortfalls({ lines: 85.8, branches: 72, functions: 84 }), []);
-  assert.deepEqual(coverageShortfalls({ lines: 79.9, branches: 72, functions: 70 }), ['lines 79.9% < 80%', 'functions 70% < 78%']);
+  assert.deepEqual(COVERAGE_FLOOR, { lines: 89, branches: 71, functions: 82 });
+  assert.deepEqual(coverageShortfalls({ lines: 90.3, branches: 73.2, functions: 83.8 }), []);
+  assert.deepEqual(coverageShortfalls({ lines: 88.9, branches: 70.9, functions: 81.9 }), [
+    'lines 88.9% < 89%',
+    'branches 70.9% < 71%',
+    'functions 81.9% < 82%'
+  ]);
   assert.deepEqual(coverageShortfalls(null), []);
 });

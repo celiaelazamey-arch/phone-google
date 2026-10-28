@@ -300,7 +300,7 @@ test('service-reality workflow wires existing secrets plus optional WhatsApp cre
   const quality = fs.readFileSync(path.join(root, '.github/workflows/celia-mcp.yml'), 'utf8');
   assert.ok(quality.includes('npm run test:coverage'), 'CI enforces the coverage floor');
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-  assert.match(pkg.scripts['test:coverage'], /--test-coverage-lines=80 --test-coverage-branches=65 --test-coverage-functions=78/);
+  assert.match(pkg.scripts['test:coverage'], /--test-coverage-lines=89 --test-coverage-branches=71 --test-coverage-functions=82/);
   assert.ok(!/MYSQL_PASSWORD:|MYSQL_SSL_CA_BASE64|TOKEN_ENCRYPTION_KEY/.test(workflow));
   for (const flag of ['AI_GATEWAY', 'DEEPSEEK', 'AGENTROUTER', 'ELEVENLABS', 'FIGMA', 'CODATA', 'CLOUDFLARE_R2']) {
     assert.ok(workflow.includes(`CELIA_DISABLE_${flag}: \${{ vars.CELIA_DISABLE_${flag} }}`), `${flag} retirement switch missing`);

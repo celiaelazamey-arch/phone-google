@@ -1,28 +1,62 @@
 # الحالة الحالية — ابدأ من هنا
 
-**آخر مراجعة:** 28 أكتوبر 2026 · **التركيز الحالي:** تجهيز WhatsApp مجاني-أولًا على البنية القائمة في `main@b70f9149add3699090ac7874a51019e2dc2c345a` ·
-سجل الجلسة: [2026-10-28-whatsapp-free-first-setup](sessions/2026-10-28-whatsapp-free-first-setup.md) ·
-السجل السابق: [2026-10-28-knowledge-ingest-tie-fix](sessions/2026-10-28-knowledge-ingest-tie-fix.md) ·
-الخطة: [docs/preservation-plan.md](../preservation-plan.md) · واقع الخدمات: [docs/service-reality.md](../service-reality.md) ·
-مرجع الاستضافة: [docs/free-hosting.md](../free-hosting.md) · التشغيل: [deploy/free-always-on/README.md](../../deploy/free-always-on/README.md)
 
-## الحالة التنفيذية الحالية — WhatsApp مجاني-أولًا (WA-005 / DEC-032)
 
-- **main الحالي:** `b70f9149add3699090ac7874a51019e2dc2c345a`; تم دمج PR #51 بعد نجاح وظائف CI المطلوبة على رأس PR [run 40673674333](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40673674333).
-- **بعد الدمج:** جودة `main` ناجحة [40673821757](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40673821757)، GitHub Pages ناجح [40673821758](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40673821758)، Cloudflare Worker ناجح [40673821848](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40673821848)، وإصدار v0.2.1 ومرفقاته نجحت [40673821824](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40673821824). الإصدار يشير إلى commit `b70f9149`.
-- **Render ليس منشورًا:** تشغيل [40673950617](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40673950617) نجح في التشخيص فقط وأعلن `not-configured`; ينقص `CELIA_LIVE_URL` و`RENDER_API_KEY` مع `RENDER_SERVICE_ID` (أو `RENDER_DEPLOY_HOOK_URL`)، وإنشاء الخادم/قاعدة Aiven بواسطة المالك. لم يُدّعَ نشر الخلفية.
-- التنفيذ الحالي في `src/whatsapp.js` يحتوي Webhook/REST: HMAC على raw bytes، إزالة تكرار معرف رسالة Meta، موافقات `opted_in` و`ai_opted_in`، وحد نافذة 24 ساعة؛ الرد الآلي افتراضيًا متوقف.
-- PR #51 أضاف حقول التشغيل إلى `render.yaml`, إصدار Graph API افتراضي `v26.0`, ومسبار `whatsapp_cloud_api` للقراءة فقط للتحقق من رقم Meta، واختبارات وتوثيق [PR #51](https://github.com/celiaelazamey-arch/phone-google/pull/51).
-- التدقيق الحي لخدمات Meta **لم يُشغّل** بعد الدمج؛ workflow `Service reality audit` تخطّى التشغيل لأنه لا توجد إشارة `[reality]` ولا dispatch يدوي. لا يوجد دليل حالي على اتصال WhatsApp الحقيقي أو استلام/إرسال رسالة.
-- الأسرار المطلوبة ولم تظهر في القائمة السابقة: `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`. `PHONE_NUMBER` هو رقم المالك وليس Meta Phone Number ID ولا access token.
-- GitHub Actions secrets لا تنتقل تلقائيًا إلى Render. أضف الأسرار الأربعة في Repository Actions secrets لتفعيل مسبار القراءة، وأدخل قيم التشغيل نفسها في Render Dashboard بعد إنشاء الخدمة. لا تُرسل الأسرار في المحادثة أو Git.
-- **ضابط أمان:** `WHATSAPP_AUTO_REPLY_ENABLED=false` باقٍ؛ المسبار ينفذ GET فقط ولا يرسل رسالة. ابدأ برقم Meta التجريبي. لا تعلن أن WhatsApp يعمل end-to-end حتى ينجح تحدي Webhook وتوقيع POST وdedup والقبول الحي.
-- **الحوكمة:** فرع `main` ما زال غير محمي في آخر قراءة (`protected=false`); إعداد الحماية إجراء مستقل للمالك.
-- القرار المعماري: إعادة استخدام Express + MySQL الموجودين وعدم إنشاء D1/Webhook موازٍ بلا خطة هجرة؛ Worker الحالي طبقة حالة/جدولة ولا يملك binding D1.
-- المرجع: [خطة الاستضافة](../free-hosting.md)، [وثائق Meta](https://whatsappbusiness.com/developers/developer-hub/)، [تدقيق الخدمات](../service-reality.md).
+**آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** **خطة 100% — نظام منشور بلا أخطاء وبلا بطاقة (PLAN-001)**
+على الفرع `arena/6b68cfb2-phone-google` (من `main@fc4d60f`) · سجل الجلسة:
+[2026-10-28-plan-100-percent](sessions/2026-10-28-plan-100-percent.md) · السجل السابق:
+[2026-10-28-preservation-plan](sessions/2026-10-28-preservation-plan.md) ·
+الخطة: [docs/plan-100-percent.md](../plan-100-percent.md) · واقع الخدمات: [docs/service-reality.md](../service-reality.md) ·
+المحافظة: [docs/preservation-plan.md](../preservation-plan.md) ·
+المرجع التشغيلي: [deploy/free-always-on/README.md](../../deploy/free-always-on/README.md)
 
-## سجل سابق — إصلاح فشل الإصدار (PR #49)
+## الطلب الحالي (أعلى أولوية) — «خطة تنفيذية للوصول إلى 100% منشور بلا أخطاء وبلا فيزا» (PLAN-001، REL-002، QA-006)
 
+## الطلب السابق — WhatsApp مجاني-أولًا (DEC-032، PR #51، مدموج في `main@b70f914`)
+
+- PR #51 أضاف حقول تشغيل WhatsApp إلى `render.yaml`، وجعل إصدار Graph الافتراضي `v26.0`، وأضاف مسبار `whatsapp_cloud_api`
+  للقراءة فقط (GET فقط، لا إرسال) مع اختبارات وتوثيق؛ سجل الجلسة:
+  [2026-10-28-whatsapp-free-first-setup](sessions/2026-10-28-whatsapp-free-first-setup.md).
+- **بعد دمج #51 صار الإصدار أخضر على `main`:** جودة `40673821757`، Pages `40673821758`، Worker `40673821848`، وإصدار
+  `v0.2.1` بأصوله `40673821824` — أي أن فشل `Publish verified release` الذي عالجه هذا الفرع **لم يتكرر بعد إصلاح PR #49**.
+- **Render ما زال غير منشور:** run `40673950617` انتهى `not-configured` وينقص `CELIA_LIVE_URL` و`RENDER_API_KEY` +
+  `RENDER_SERVICE_ID` (أو `RENDER_DEPLOY_HOOK_URL`) وإنشاء خادم Render وقاعدة Aiven.
+- الأسرار الأربعة `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` / `WHATSAPP_APP_SECRET` / `WHATSAPP_VERIFY_TOKEN`
+  لم تظهر في قائمة الأسرار؛ `PHONE_NUMBER` هو رقم المالك لا Phone Number ID ولا توكن. الرد الآلي باقٍ `false`، ولم يُشغَّل
+  تدقيق حي لـMeta بعد الدمج (لا يوجد دليل على اتصال WhatsApp حقيقي).
+- `main` غير محمي في آخر قراءة (`protected=false`) — إجراء مالك مستقل.
+
+
+
+- **ما نُفِّذ في هذه الجلسة (على الفرع، قبل الدمج):** فصل بوابات الإصدار الأربع في خطوات مسمّاة داخل
+  `.github/workflows/release.yml` (الفشل الوحيد على `main@fc4d60f` كان «exit code 1» بلا اسم بوابة، والـjob توقف بعد 20
+  ثانية أي قبل `npm test` البالغ 24 ثانية) + **نشر idempotent** يقارن `SHA256SUMS` فلا يفشل إعادة التشغيل على أصول متطابقة
+  + مدخل `live_only` في `service-reality.yml` (تحقق من السرّ في ~دقيقة بدل ~20).
+- **التغطية:** 383/383 اختبارًا (كانت 326)، أسطر **90.29%** وفروع 73.20 ودوال 83.79 (كانت 85.72/71.79/83.83)، والأرضية في
+  CI صارت **89/71/82** بدل 80/65/78 (`package.json` + `COVERAGE_FLOOR` + اختبارها).
+- **اختبارات جديدة:** `deploy-cloudflare-edge`، `deploy-release`، `learn-source`، `reality-notify-main`، `lifecycle`،
+  `celia-mcp-tools`، `celia-mcp-protocol`، `celia-mcp-selftest`، `agent-tool-validation`، `outbound-guards`.
+- **الخدمات الحية لم تتغيّر:** 11 متحققة / 1 فاشلة / 4 متقاعدة من 12 مهيأة = **91.7%**؛ الفشل الوحيد `CELIA_VOICE_ID`
+  (القيمة الواصلة للـworkflow ليست بين 22 صوتًا مرئيًا؛ القائمة تضم `cela=AnsOWV53Mdx5fcIanRBB`).
+- **النشر الكامل:** لم يُنفَّذ ولا يُدّعى — `deploy-render.yml` يخرج `not-configured` ويسمّي الناقص:
+  `CELIA_LIVE_URL` (variable) + `RENDER_API_KEY`/`RENDER_SERVICE_ID` أو `RENDER_DEPLOY_HOOK_URL`، والحسابان (Render Free،
+  Aiven MySQL Free) غير موجودين.
+- **حالة `main` الآن (`b70f914`):** الإصدار صار أخضر بعد PR #49 (`40673821824`) فدليل REL-002 على `main` متوفر، وWhatsApp
+  صار له حقول تشغيل ومسبار قراءة فقط (DEC-032)، وRender ما زال `not-configured`.
+- **الخطوة التالية (المالك، خمس لوحات في [plan-100-percent](../plan-100-percent.md) §2):** `CELIA_VOICE_ID` في Repository
+  secrets → «تم»؛ ثم Aiven + Render Blueprint + `CELIA_LIVE_URL` وأسرار Render → `verify:live` PASS؛ ثم أسرار Meta الأربعة
+  وتحدي Webhook؛ ثم عميل Google OAuth.
+
+## الطلب السابق — «خطط للمحافظة لما وصلنا له حتى الآن» (DEC-031، OPS-005)
+
+## الطلب السابق — إصلاح حتمي لفشل نشر الإصدار (PR #49، مدموج في `main@8a9fc56`)
+
+- **السبب الجذري الحقيقي لفشل `Publish verified release` على `main@fc4d60f` (run `40665130469`):** اختبار
+  `test/knowledge-ingest.test.js:164` — `KnowledgeStore.stats()` كان يختار آخر سجل بـ`ORDER BY started_at DESC` وحده، فإذا
+  تساوى توقيتان بدقة المللي ثانية لم يكن السجل المختار هو الأحدث. الإصلاح: `rowid DESC` لكسر التعادل + تثبيت ساعة الاختبار
+  (سجل الجلسة: [2026-10-28-knowledge-ingest-tie-fix](sessions/2026-10-28-knowledge-ingest-tie-fix.md)). **تصحيح ذاتي:** تحليلي
+  المبدئي في جلسة PLAN-001 استنتج من زمن التوقف (20 ثانية) أن الفشل قبل `npm test`؛ الفحص المتوازي أثبت أنه داخل الاختبار —
+  ولهذا صار فصل البوابات في خطوات مسمّاة مطلبًا لا تحسينًا.
 - `main` ما زال عند `fc4d60fddb66ad4349ddf664e23e094444a939b8` وقت بدء هذه الجلسة؛ لا دمج ولا تغيير على `main`.
 - run `40665130469` لـ`Publish verified release` فشل في `test/knowledge-ingest.test.js:164`؛ فحوص الجودة على commit نفسه نجحت في run `40665130587`، ونشر Pages/Cloudflare وRender نجح في التشغيلات المسجلة.
 - السبب الجذري: `KnowledgeStore.stats()` كان يختار آخر سجل بـ`ORDER BY started_at DESC` فقط. إذا تساوى توقيت تشغيلين بدقة المللي ثانية، فقد لا يكون السجل المختار هو الأحدث.
@@ -32,7 +66,7 @@
 - فجوات المالك المستقلة ما زالت: ضبط `CELIA_VOICE_ID` في **Repository secrets → Actions** إلى `AnsOWV53Mdx5fcIanRBB` ثم تشغيل تدقيق الخدمات الحية؛ تفعيل حماية `main` بأسماء الفحوص المطلوبة في خطة المحافظة. التدقيق الحي الأخير الموثق على الفرع هو 11/12 (91.7%)، وليس 95% أو 100%.
 - معيار الاستكمال: نجاح كل وظائف PR #49، ثم الدمج وفق بوابة الفحوص، وإعادة فحص الإصدار على commit الدمج، وبعد تحديث السر تشغيل تدقيق حي على `main` وإثبات نسبة الخدمات من artifact/annotations. لا تُغيّر عتبات التغطية لإخفاء الفشل.
 
-## الطلب الحالي (أعلى أولوية) — «خطط للمحافظة لما وصلنا له حتى الآن» (DEC-031، OPS-005)
+
 
 - **ما وصلنا إليه (مدموج في `main@715060a`):** 324/324 اختبارًا (تغطية 85.8/72/84)، MySQL حقيقي 11/11، Pages ✅ `40650636259`،
   Worker ✅ `40650636104` (`liveReady`، 18/18 + مفاتيح التقاعد)، Release ✅ `40650636330`، 10 خدمات متحققة / 4 متقاعدة في Git /
