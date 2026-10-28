@@ -14,9 +14,9 @@ import { canonicalRisk } from '../src/knowledge/tool-policy.js';
 const root = path.resolve(import.meta.dirname, '..');
 const registryDir = path.join(root, 'data', 'kb');
 
-const tempStore = async (t) => {
+const tempStore = async (t, { clock = Date.now } = {}) => {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'celia-kb-test-'));
-  const store = await KnowledgeStore.open({ file: path.join(directory, 'kb.sqlite3') });
+  const store = await KnowledgeStore.open({ file: path.join(directory, 'kb.sqlite3'), clock });
   t.after(() => {
     store.close();
     rmSync(directory, { recursive: true, force: true });
@@ -133,7 +133,10 @@ test('validate: a CSV cannot grant itself a permission that the code does not', 
 });
 
 test('ingest: dry-run writes nothing, then apply is idempotent and reports real counts', async (t) => {
-  const { store } = await tempStore(t);
+  // Pin the clock so consecutive runs share the same started_at; latest-run selection
+  // must still be deterministic when SQLite timestamps tie at millisecond precision.
+  const instant = Date.parse('2026-10-28T09:33:34.000Z');
+  const { store } = await tempStore(t, { clock: () => instant });
   const csv = toolsCsv([
     {
       id: 'celia_status',
