@@ -2,7 +2,9 @@
 
 **آخر تدقيق حقيقي:** 28 أكتوبر 2026 · workflow `Service reality audit` · run
 [`40660546276`](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40660546276) على الفرع
-`arena/3d9557b5-phone-google` (commit `5a72033`) بعد تحديث المالك للسرّين `CELIA_VOICE_ID` و`FIGMA_ACCESS_TOKEN` · الأداة:
+`arena/3d9557b5-phone-google` (commit `5a72033`؛ أُعيد بتشخيص أوسع في run
+[`40661486530`](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40661486530)، commit `34b58da`، نفس النتيجة)
+بعد تحديث المالك للسرّين `CELIA_VOICE_ID` و`FIGMA_ACCESS_TOKEN` · الأداة:
 `scripts/service-reality.mjs` (`npm run reality`). التشخيص التفصيلي للأعطال الأصلية جاء من run
 [`40646881277`](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40646881277).
 
@@ -42,7 +44,7 @@
 | 11 | Vercel AI Gateway | `AI_GATEWAY_API_KEY` | ⏸️ متقاعدة في Git | المفتاح صالح (`/models` يسرد 498 نموذجًا) لكن الطلب **403**: «AI Gateway requires a valid credit card on file» — **يتعارض مع قيد «لا بطاقة»** | المالك: بطاقة أو **تقاعد** (`CELIA_DISABLE_AI_GATEWAY=true`) |
 | 12 | DeepSeek | `DEEPSEEK_API_KEY` | ⏸️ متقاعدة في Git | المفتاح صالح لكن **402 Insufficient Balance**؛ كما أن `/models` يسرد `deepseek-flash` و`deepseek-v4-pro` فقط — الافتراضي القديم `deepseek-chat` لم يعد مدرجًا (**أُصلح الافتراضي إلى `deepseek-flash`**) | المالك: شحن رصيد أو تقاعد |
 | 13 | AgentRouter | `AGENETROUTERAPI_KEY` | ⏸️ متقاعدة في Git | المفتاح يُقبل لكن `/models` يعيد **0 نماذج** و`chat/completions` يعيد 200 بجسم فارغ — حساب بلا حصة/نماذج | المالك: مراجعة حساب agentrouter أو تقاعد |
-| 14 | ElevenLabs (صوت سيليا) | `ELEVENLABS_API_KEY` + `CELIA_VOICE_ID` | ❌ فاشلة (الوحيدة) | بعد التحديث: المفتاح صالح (`/user` 200) و**يولّد صوتًا فعلًا** (15,925 بايت بصوت مرئي)، لكن `/voices/{CELIA_VOICE_ID}` → 400 `voice_not_found`: القيمة الجديدة ليست بين 22 صوتًا مرئيًا لهذا المفتاح — صوت من المكتبة أو مستنسخ يجب إضافته أولًا إلى «My Voices» في الحساب الذي يخصه المفتاح | المالك: `CELIA_VOICE_ID` = معرّف من القائمة المرئية (20 حرفًا، مثلًا `EXAVITQu4vr4xnSDxMaL` Sarah، `FGY2WhTYpPnrIDTdsKH5` Laura، `CwhRBWXzGAHq8TQ4Fs17` Roger) أو إضافة صوت سيليا إلى My Voices ثم نسخ معرّفه |
+| 14 | ElevenLabs (صوت سيليا) | `ELEVENLABS_API_KEY` + `CELIA_VOICE_ID` | ❌ فاشلة (الوحيدة) | بعد التحديث: المفتاح صالح (`/user` 200) و**يولّد صوتًا فعلًا** (15,925 بايت بصوت مرئي)، لكن `/voices/{CELIA_VOICE_ID}` → 400 `voice_not_found`: القيمة الجديدة ليست بين 22 صوتًا مرئيًا لهذا المفتاح — صوت من المكتبة أو مستنسخ يجب إضافته أولًا إلى «My Voices» في الحساب الذي يخصه المفتاح | المالك: `CELIA_VOICE_ID` = `AnsOWV53Mdx5fcIanRBB` — **الصوت المخصص باسم `cela` الموجود فعلًا في الحساب** (ظهر في قائمة الـrun `40661486530`)، أو أي معرّف آخر من القائمة (مثلًا `EXAVITQu4vr4xnSDxMaL` Sarah) |
 | 15 | Figma | `FIGMA_ACCESS_TOKEN` | ✅ متحققة (بعد التجديد) | كان 401؛ التوكن الجديد يجيب على `/v1/me` | — |
 | 16 | Cloudflare R2 (تخزين) | `CLOUDFLARE_R2_*` ×3 | ⏸️ متقاعدة في Git | `ListBuckets` موقّع SigV4 لم يصل: **TLS handshake مرفوض** على `<account>.r2.cloudflarestorage.com` — النمط المعتاد عندما لا يكون R2 مفعّلًا على الحساب (لم يُنشأ bucket قط) أو عندما لا يملك هذا الحساب هذه المفاتيح | المالك: تفعيل R2 وإنشاء bucket (قد يتطلب وسيلة دفع لدى Cloudflare) أو تقاعد |
 | 17 | Codata | `YOUR_CODATA_API_KEY` | 🟡 لا يمكن التحقق | لا `CODATA_BASE_URL` معروفًا؛ `getCodataStatus` حضور فقط | المالك: الرابط الرسمي أو تقاعد |
