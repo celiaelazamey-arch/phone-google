@@ -1,0 +1,18 @@
+{
+  "$schema": "https://docs.github.com/copilot/mcp-configuration",
+  "name": "CeliaOS — read-only MCP profile (2026)",
+  "description": "قراءة فقط: أربع أدوات حالة واستكشاف. كل أداة كتابة أو أثر خارجي تُرفض في الطبقة الوسيطة قبل وصولها للخادم. لا مفاتيح ولا بطاقة في هذا الملف.",
+  "mcpServers": {
+    "celiaos": {
+      "type": "local",
+      "command": "node",
+      "args": ["scripts/celia-copilot-mcp-bridge.mjs"],
+      "tools": ["celia_status", "find_skills", "system_live_view", "celia_secrets_status"],
+      "env": {
+        "CELIA_MCP_DISABLE_MYSQL": "true",
+        "CELIA_DISABLE_OLLAMA": "true",
+        "CELIA_EXTENDED_MCP_TOOLS": "true"
+      }
+    }
+  }
+}

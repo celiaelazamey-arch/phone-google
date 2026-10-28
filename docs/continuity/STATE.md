@@ -1,14 +1,22 @@
 # الحالة الحالية — ابدأ من هنا
 
+**آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** **طبقة حماية Copilot + مخططها البصري (AGENT-005)** على الفرع
+`arena/9946d4aa-phone-google` (من `main@be2710b`) · سجل الجلسة:
+[2026-10-28-copilot-mcp-bridge](sessions/2026-10-28-copilot-mcp-bridge.md) · الدليل: [docs/copilot-mcp](../copilot-mcp/README.md) ·
+خطة 100%: [docs/plan-100-percent.md](../plan-100-percent.md) · واقع الخدمات: [docs/service-reality.md](../service-reality.md)
 
+## الطلب الحالي (أعلى أولوية) — «مخطط بصري لمعمارية طبقة حماية Copilot، تحقق من 100%» (AGENT-005)
 
-**آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** **خطة 100% — نظام منشور بلا أخطاء وبلا بطاقة (PLAN-001)**
-على الفرع `arena/6b68cfb2-phone-google` (من `main@fc4d60f`) · سجل الجلسة:
-[2026-10-28-plan-100-percent](sessions/2026-10-28-plan-100-percent.md) · السجل السابق:
-[2026-10-28-preservation-plan](sessions/2026-10-28-preservation-plan.md) ·
-الخطة: [docs/plan-100-percent.md](../plan-100-percent.md) · واقع الخدمات: [docs/service-reality.md](../service-reality.md) ·
-المحافظة: [docs/preservation-plan.md](../preservation-plan.md) ·
-المرجع التشغيلي: [deploy/free-always-on/README.md](../../deploy/free-always-on/README.md)
+- **لماذا جسر لا إعداد JSON:** Copilot يستدعي أدوات MCP المفعّلة **دون موافقة لكل استدعاء**، فالقيد يوضع في شيفرة أمام
+  الخادم. `scripts/celia-copilot-mcp-bridge.mjs` (stdio أمام `src/celia-mcp.js`) يفرض أربع بوابات: قائمة سماح بأربع أدوات
+  قراءة، `readOnlyHint` مفروض من الجسر، قدرات `tools` فقط (رفض prompts/resources)، وتنقية نتائج مع حجب أي قيمة سرّية.
+- **الفرق عن الحزمة السابقة:** الجسر والإعداد صارا **داخل Git** ولهما اختبارات؛ والاختبار الحاسم صار E2E على **الخادم
+  الحقيقي** (16 أداة) لا على خادم اصطناعي — وهو ما كشف أن الخادم لا يُعلن `celia_secrets_status` إلا بـ
+  `CELIA_EXTENDED_MCP_TOOLS`، فأصبح الجسر يضبطها ويُفلتر بعدها.
+- **المخطط:** `docs/copilot-mcp/architecture.svg` (+ `.html` وMermaid) مُولَّد من ثوابت السياسة نفسها عبر
+  `npm run copilot:diagram`، و`--check` يفشل عند أي قدم أو تجاوز نصي (`lintLayout`).
+- **التحقق:** **401/401** اختبارًا، تغطية **90.51/73.24/83.88**، والجسر **16/16** اختبارًا.
+- **لم يُثبت:** الاتصال الفعلي ببيئة Copilot المستضافة (لا صلاحية إعدادات MCP في حساب المالك).
 
 ## الطلب الحالي (أعلى أولوية) — «خطة تنفيذية للوصول إلى 100% منشور بلا أخطاء وبلا فيزا» (PLAN-001، REL-002، QA-006)
 
