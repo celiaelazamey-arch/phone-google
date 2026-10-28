@@ -1,13 +1,24 @@
 # الحالة الحالية — ابدأ من هنا
 
-**آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** إصلاح حتمي لفشل نشر الإصدار — PR #49 على
-`fix/knowledge-last-run-tie-20261028` · سجل الجلسة: [2026-10-28-knowledge-ingest-tie-fix](sessions/2026-10-28-knowledge-ingest-tie-fix.md) ·
-سجل المحافظة السابق: [2026-10-28-preservation-plan](sessions/2026-10-28-preservation-plan.md) ·
-سجل التدقيق السابق: [2026-10-28-service-reality-audit](sessions/2026-10-28-service-reality-audit.md) ·
+**آخر مراجعة:** 28 أكتوبر 2026 · **التركيز الحالي:** تجهيز WhatsApp مجاني-أولًا على البنية القائمة في `main@8a9fc567c6c0f32fac7d75ccd8ed0a0bf637d1e7` ·
+سجل الجلسة: [2026-10-28-whatsapp-free-first-setup](sessions/2026-10-28-whatsapp-free-first-setup.md) ·
+السجل السابق: [2026-10-28-knowledge-ingest-tie-fix](sessions/2026-10-28-knowledge-ingest-tie-fix.md) ·
 الخطة: [docs/preservation-plan.md](../preservation-plan.md) · واقع الخدمات: [docs/service-reality.md](../service-reality.md) ·
-المرجع التشغيلي: [deploy/free-always-on/README.md](../../deploy/free-always-on/README.md)
+مرجع الاستضافة: [docs/free-hosting.md](../free-hosting.md) · التشغيل: [deploy/free-always-on/README.md](../../deploy/free-always-on/README.md)
 
-## الحالة التنفيذية الحالية — إصلاح فشل الإصدار (PR #49)
+## الحالة التنفيذية الحالية — WhatsApp مجاني-أولًا (WA-005 / DEC-032)
+
+- `main` عند `8a9fc567c6c0f32fac7d75ccd8ed0a0bf637d1e7` بعد دمج PR #49 الذي أصلح ترتيب `lastRun` في شبكة المعرفة. تغييرات WhatsApp على فرع مستقل وتحتاج نجاح CI/مراجعة.
+- التنفيذ الحالي في `src/whatsapp.js` يحتوي بالفعل على Webhook/REST: HMAC على raw bytes، إزالة تكرار معرف رسالة Meta، أوامر مالك Google، الموافقة `opted_in` و`ai_opted_in`، وحد 24 ساعة؛ الرد الآلي افتراضيًا متوقف.
+- الفجوة كانت في إعداد التشغيل: `render.yaml` لم يعرّف متغيرات Meta المطلوبة، ومسبار `whatsapp_cloud_api` لا يجري طلب Graph API. الإضافة على الفرع تُضيف حقول Blueprint، ومسبار GET للقراءة فقط للتحقق من رقم Meta، وتغطية اختبارات ووثائق.
+- الأسرار المطلوبة لهذا التكامل غير موجودة ضمن القائمة التي تمت مراجعتها سابقًا: `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`. `PHONE_NUMBER` الموجود يخص رقم المالك ولا يحل محل معرّف رقم Meta أو access token.
+- GitHub Actions secrets لا تُنقل تلقائيًا إلى Render. يلزم إدخال أسرار التشغيل في Render Dashboard، وإضافة الأربعة إلى Repository Actions secrets فقط إذا رغبت بتشغيل المسبار الحي. لا تُرسلها في المحادثة ولا تحفظها في Git.
+- حد القبول المجاني: بدء الاختبار برقم Meta التجريبي؛ مسبار Graph API لا يرسل رسائل؛ اختبارات webhook تثبت challenge/HMAC/dedup؛ `WHATSAPP_AUTO_REPLY_ENABLED=false` حتى موافقة صاحب النظام واكتمال اختبار end-to-end. لا ادعاء أن الإنتاج مجاني بلا حدود أو أن اتصال Meta حي قبل فحصه.
+- القرار المعماري: إعادة استخدام Express + MySQL الموجودين. لا نضيف مسار D1 موازٍ لأن Worker الحالي لا يملك binding D1 ولأن سجل الرسائل/الموافقات الحالي في MySQL؛ إضافة مخزنين دون خطة هجرة ستقسم الحقيقة.
+- الحالة: تغييرات الكود والتوثيق موجودة على `feat/whatsapp-free-first-setup-20261028`؛ لم يُفتح PR ولم يُعلن اجتياز CI أو اتصال حي بعد.
+- الروابط: [خطة الاستضافة](../free-hosting.md)، [وثائق Meta](https://whatsappbusiness.com/developers/developer-hub/)، [تدقيق الخدمات](../service-reality.md).
+
+## سجل سابق — إصلاح فشل الإصدار (PR #49)
 
 - `main` ما زال عند `fc4d60fddb66ad4349ddf664e23e094444a939b8` وقت بدء هذه الجلسة؛ لا دمج ولا تغيير على `main`.
 - run `40665130469` لـ`Publish verified release` فشل في `test/knowledge-ingest.test.js:164`؛ فحوص الجودة على commit نفسه نجحت في run `40665130587`، ونشر Pages/Cloudflare وRender نجح في التشغيلات المسجلة.

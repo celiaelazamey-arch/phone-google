@@ -67,7 +67,7 @@ export function loadConfig(env = process.env) {
       appSecret: env.WHATSAPP_APP_SECRET || '',
       accessToken: env.WHATSAPP_ACCESS_TOKEN || '',
       phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID || '',
-      apiVersion: env.WHATSAPP_API_VERSION || 'v23.0',
+      apiVersion: env.WHATSAPP_API_VERSION || 'v26.0',
       autoReplyEnabled: env.WHATSAPP_AUTO_REPLY_ENABLED === 'true'
     }
   });
