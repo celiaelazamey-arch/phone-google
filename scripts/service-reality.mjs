@@ -204,14 +204,23 @@ export function buildProbes({ config, env, fetchImpl = fetch, timeoutMs, publica
       run: async () => {
         if (!config.cloudflare?.apiToken) return { verdict: 'not-configured', detail: 'token absent' };
         const headers = { accept: 'application/json', authorization: `Bearer ${config.cloudflare.apiToken}` };
-        const verify = await probeJson(fetchImpl, `${config.cloudflare.baseUrl}/user/tokens/verify`, { headers }, timeoutMs);
-        if (!verify.json?.success || verify.json?.result?.status !== 'active') return { verdict: 'failed', detail: `token verify ${verify.status} ${verify.json?.result?.status || ''}`.trim(), latencyMs: verify.latencyMs };
+        // User-owned tokens verify under /user; account-owned tokens only under /accounts/{id}.
+        let verify = await probeJson(fetchImpl, `${config.cloudflare.baseUrl}/user/tokens/verify`, { headers }, timeoutMs);
+        let owner = 'user token';
+        if ((!verify.json?.success || verify.json?.result?.status !== 'active') && config.cloudflare.accountId) {
+          const accountVerify = await probeJson(fetchImpl, `${config.cloudflare.baseUrl}/accounts/${encodeURIComponent(config.cloudflare.accountId)}/tokens/verify`, { headers }, timeoutMs);
+          if (accountVerify.json?.success && accountVerify.json?.result?.status === 'active') { verify = accountVerify; owner = 'account token'; }
+        }
+        if (!verify.json?.success || verify.json?.result?.status !== 'active') {
+          const errors = (verify.json?.errors || []).map((entry) => `${entry.code}:${String(entry.message || '').slice(0, 60)}`).join(', ');
+          return { verdict: 'failed', detail: `token verify ${verify.status} ${verify.json?.result?.status || ''} ${errors}`.trim(), latencyMs: verify.latencyMs };
+        }
         let scripts = null;
         if (config.cloudflare.accountId) {
           const list = await probeJson(fetchImpl, `${config.cloudflare.baseUrl}/accounts/${encodeURIComponent(config.cloudflare.accountId)}/workers/scripts/${encodeURIComponent(publication.workerScript || 'celia-phone-google')}`, { headers }, timeoutMs);
           scripts = list.status === 200 ? 'worker script visible to this token' : `worker script lookup ${list.status}`;
         }
-        return { verdict: 'verified', detail: ['token active', scripts].filter(Boolean).join('; '), latencyMs: verify.latencyMs };
+        return { verdict: 'verified', detail: [`${owner} active`, scripts].filter(Boolean).join('; '), latencyMs: verify.latencyMs };
       }
     },
     {
@@ -346,7 +355,8 @@ export async function runProbes(probes, { env, timeoutMs }) {
 // ---------- offline + mysql ----------
 
 export function runOfflineSuite({ cwd = root, env = process.env } = {}) {
-  const args = ['--test', '--experimental-test-coverage', '--test-coverage-include=src/**', '--test-coverage-include=scripts/**', '--test-coverage-include=workers/**'];
+  // TAP is forced: Node ≥ 23 defaults to the spec reporter even without a TTY, whose summary lines differ.
+  const args = ['--test', '--test-reporter=tap', '--test-reporter-destination=stdout', '--experimental-test-coverage', '--test-coverage-include=src/**', '--test-coverage-include=scripts/**', '--test-coverage-include=workers/**'];
   const result = spawnSync(process.execPath, args, { cwd, env: { ...env, CELIA_SERVICE_REALITY_CHILD: '1' }, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   const summary = parseTestSummary(`${result.stdout}\n${result.stderr}`);
   return { ...summary, exitCode: result.status, weakest: Object.entries(summary.files).sort((a, b) => a[1].lines - b[1].lines).slice(0, 8).map(([file, cov]) => ({ file, ...cov })) };
@@ -354,7 +364,7 @@ export function runOfflineSuite({ cwd = root, env = process.env } = {}) {
 
 export function runMysqlSuite({ cwd = root, env = process.env } = {}) {
   if (env.CELIA_MYSQL_TESTS !== 'true') return { ran: false, reason: 'CELIA_MYSQL_TESTS != true (no real MySQL in this environment)' };
-  const result = spawnSync(process.execPath, ['--test', 'integration/mysql.integration.mjs'], { cwd, env, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  const result = spawnSync(process.execPath, ['--test', '--test-reporter=tap', '--test-reporter-destination=stdout', 'integration/mysql.integration.mjs'], { cwd, env, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   const summary = parseTestSummary(`${result.stdout}\n${result.stderr}`);
   return { ran: true, tests: summary.tests, pass: summary.pass, fail: summary.fail, exitCode: result.status };
 }
@@ -400,7 +410,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
       import('../src/celia-mcp.js'), import('../src/ollama.js'), import('../src/secrets-hub.js'), import('./deploy-render.mjs')
     ]);
     const token = String(env.CELIA_MCP_API_TOKEN || '').trim().length >= 32 ? env.CELIA_MCP_API_TOKEN : crypto.randomBytes(32).toString('hex');
-    const config = loadCeliaMcpConfig({ ...env, CELIA_MCP_API_TOKEN: token, CELIA_MCP_DISABLE_MYSQL: 'true', CELIA_DISABLE_OLLAMA: 'true' });
+    const config = loadCeliaMcpConfig({ ...env, CELIA_MCP_API_TOKEN: token, CELIA_MCP_DISABLE_MYSQL: 'true', CELIA_DISABLE_OLLAMA: 'true', CELIA_SERVICE_TIMEOUT_MS: env.CELIA_SERVICE_TIMEOUT_MS || String(Math.min(Math.max(options.timeoutMs, 50), 60_000)) });
     const probes = buildProbes({ config, env, fetchImpl, timeoutMs: options.timeoutMs, publication, version: pkg.version, modules: { generateCeliaReply, planDeployment, ...hub } });
     report.live = await runProbes(probes, { env, timeoutMs: options.timeoutMs });
     report.score = scoreServices(report.live);
@@ -424,6 +434,11 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
   process.stdout.write(`${markdown}\n`);
   const annotation = sanitize(JSON.stringify({ verdict: report.verdict, offline: report.offline ? `${report.offline.pass}/${report.offline.tests}` : null, coverageLines: report.offline?.coverage?.lines ?? null, mysql: report.mysql?.ran ? `${report.mysql.pass}/${report.mysql.tests}` : 'not-run', live: report.score, failed: report.live?.filter((s) => s.verdict === 'failed').map((s) => s.id) || [] }), env);
   process.stdout.write(`::${report.verdict === 'pass' ? 'notice' : 'error'} title=Service Reality::${annotation}\n`);
+  for (const service of report.live || []) {
+    if (service.verdict === 'failed') process.stdout.write(`::warning title=Service Reality · ${service.id} failed::${sanitize(service.detail, env).replace(/\n/g, ' ')}\n`);
+  }
+  if (report.offline) process.stdout.write(`::notice title=Service Reality · offline::${sanitize(JSON.stringify({ tests: report.offline.tests, pass: report.offline.pass, fail: report.offline.fail, exitCode: report.offline.exitCode, coverage: report.offline.coverage, weakest: report.offline.weakest?.slice(0, 5) }), env)}\n`);
+  if (report.mysql) process.stdout.write(`::notice title=Service Reality · mysql::${sanitize(JSON.stringify(report.mysql), env)}\n`);
   if (leaked.length) return 3;
   return report.verdict === 'pass' ? 0 : 1;
 }
