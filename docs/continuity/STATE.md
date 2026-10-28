@@ -1,11 +1,22 @@
 # الحالة الحالية — ابدأ من هنا
 
-**آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** **خطة المحافظة على `main@715060a` (DEC-031، OPS-005)** على الفرع
-`arena/828764c2-phone-google` (متفرع من دمج PR #46) · سجل الجلسة:
-[2026-10-28-preservation-plan](sessions/2026-10-28-preservation-plan.md) · السجل السابق:
-[2026-10-28-service-reality-audit](sessions/2026-10-28-service-reality-audit.md) ·
+**آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** إصلاح حتمي لفشل نشر الإصدار — PR #49 على
+`fix/knowledge-last-run-tie-20261028` · سجل الجلسة: [2026-10-28-knowledge-ingest-tie-fix](sessions/2026-10-28-knowledge-ingest-tie-fix.md) ·
+سجل المحافظة السابق: [2026-10-28-preservation-plan](sessions/2026-10-28-preservation-plan.md) ·
+سجل التدقيق السابق: [2026-10-28-service-reality-audit](sessions/2026-10-28-service-reality-audit.md) ·
 الخطة: [docs/preservation-plan.md](../preservation-plan.md) · واقع الخدمات: [docs/service-reality.md](../service-reality.md) ·
 المرجع التشغيلي: [deploy/free-always-on/README.md](../../deploy/free-always-on/README.md)
+
+## الحالة التنفيذية الحالية — إصلاح فشل الإصدار (PR #49)
+
+- `main` ما زال عند `fc4d60fddb66ad4349ddf664e23e094444a939b8` وقت بدء هذه الجلسة؛ لا دمج ولا تغيير على `main`.
+- run `40665130469` لـ`Publish verified release` فشل في `test/knowledge-ingest.test.js:164`؛ فحوص الجودة على commit نفسه نجحت في run `40665130587`، ونشر Pages/Cloudflare وRender نجح في التشغيلات المسجلة.
+- السبب الجذري: `KnowledgeStore.stats()` كان يختار آخر سجل بـ`ORDER BY started_at DESC` فقط. إذا تساوى توقيت تشغيلين بدقة المللي ثانية، فقد لا يكون السجل المختار هو الأحدث.
+- الإصلاح المعزول في PR #49: إضافة `rowid DESC` لكسر التعادل، وتثبيت ساعة الاختبار بحيث تتساوى الطوابع الزمنية عمدًا. رابط PR: https://github.com/celiaelazamey-arch/phone-google/pull/49.
+- تشغيل PR `40671238246`: سجل Node 24 `fail 0` في الاختبارات، لكن بوابة `check:continuity` رفضت التغيير أولًا لغياب `STATE.md` وسجل الجلسة؛ أضيف هذا السجل والملف المصاحب ضمن الـPR. لا يُعلن نجاح CI الكامل قبل اكتمال التشغيل النهائي بعد التوثيق.
+- لا تغييرات على الأسرار أو إعدادات النشر أو بيانات الإنتاج في هذا الإصلاح. لم يُدمج PR، ولم يُعاد تشغيل نشر الإصدار.
+- فجوات المالك المستقلة ما زالت: ضبط `CELIA_VOICE_ID` في **Repository secrets → Actions** إلى `AnsOWV53Mdx5fcIanRBB` ثم تشغيل تدقيق الخدمات الحية؛ تفعيل حماية `main` بأسماء الفحوص المطلوبة في خطة المحافظة. التدقيق الحي الأخير الموثق على الفرع هو 11/12 (91.7%)، وليس 95% أو 100%.
+- معيار الاستكمال: نجاح كل وظائف PR #49، ثم الدمج وفق بوابة الفحوص، وإعادة فحص الإصدار على commit الدمج، وبعد تحديث السر تشغيل تدقيق حي على `main` وإثبات نسبة الخدمات من artifact/annotations. لا تُغيّر عتبات التغطية لإخفاء الفشل.
 
 ## الطلب الحالي (أعلى أولوية) — «خطط للمحافظة لما وصلنا له حتى الآن» (DEC-031، OPS-005)
 
