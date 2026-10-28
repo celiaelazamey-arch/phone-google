@@ -735,6 +735,33 @@
 **الثمن المقبول:** D1 ليس MySQL — لا معاملات متعددة الجداول كما في المحرك الكامل، والاستعلامات بسيطة عمدًا.
 لذلك يبقى `HOST-003` (الخادم الكامل بـMySQL) مفتوحًا، ولا يُغلق بهذا القرار.
 
-**الدليل:** `test/edge-d1.test.js` (12 اختبارًا): لا دوام بلا ربط · تطابق الرمز يمنح `true` · قاعدة معطوبة
-تعطي `false` وسببها · الدوران والتَّرقيم ورفض القيمة الكبيرة والمفتاح الفاسد · كسر السلسلة يُكتشف عند الرابط
-المكسور · السجل لا يحوي القيمة · 401 بلا رمز · 503 عند غياب D1 · ربط D1 لا يظهر في البيانات إلا عند وجوده.
+**الدليل:** `test/edge-d1.test.js` (12 اختبارًا) ثم توسعته في PR `#69` المدموج في `main@44532f4` إلى **23 اختبارًا** مع
+إثبات حي من تشغيلة `Deploy (Cloudflare Edge)` رقم `40706047781`: `d1: { ok: true, id: "f63ccd9f-49b1-4eca-861b-fd478c433518", name: "celia-edge-state", migrations: { statements: 4 } }`
+و`storage: { mode: "d1", durable: true, latencyMs: 106 }`.
+
+## DEC-036 — الخطة التنفيذية لإكمال البنود وسد الفجوات وتدوير مفاتيح التشفير (`v2.<keyId>`) وتحصين الحافة وSSRF
+
+- **التاريخ:** 2026-10-28 · **الحالة:** منفَّذ ومُختبر محليًا وموثّق عبر الموصلات الخاصة للمالك · **المهمة:** `PLAN-001`، `SEC-001`، `SEC-002`، `SEC-003`، `SEC-005`، `DOC-002`، `QA-005`، `QA-006`، `OPS-005` · **يعتمد على:** DEC-025, DEC-031, DEC-035
+
+- **السياق:** بعد دمج PR `#69` (`main@44532f4552c20b8fb51402e14cff8fc15356b97c`) وثبوت دوام قاعدة Cloudflare D1 الحية (`storage.durable: true`) ووصول المسابر الحية إلى `12/12 = 100%` (`40680228320`)، طلب المالك خطة تنفيذية شاملة لإكمال البنود الناقصة وسد الفجوات والثغرات مع تفعيل جميع الأدوات والموصلات الـ11 المتصلة دون المساس بقيود `AGENTS.md` (صفر بطاقة دفع، صفر نشر مفاتيح سرية، عدم حذف أو كسر العقود القائمة).
+
+- **القرار:**
+  1. **تدوير مفاتيح تشفير رموز OAuth (`SEC-005` في `src/security.js` + `src/{config,google,celia-mcp,celia-ui}.js`):**
+     - دعم صيغة المغلف المختوم `v2.<keyId>.<iv>.<tag>.<ciphertext>` مع ربط معرف المفتاح في `Additional Authenticated Data` (`celia-token-envelope:v2:<keyId>`) لمنع خلط المفاتيح أو استبدال المعرّف.
+     - الإبقاء على التوافق التام مع المغلفات القديمة `v1.<iv>.<tag>.<ciphertext>`: تظل كتابة المفتاح المفرد بلا `keyId` تنتج `v1.*` حفاظًا على عقود الإصدارات السابقة، بينما تدعم `parseEncryptionKeyring` (سواء بصيغة المعاملين أو الكائن) و`decryptJson` فك تشفير أي مفتاح مسمّى أو مفتاح قديم، وتتيح `rotateEncryptedJson` إعادة التشفير الآمن مع إرجاع `{ rotated, previousVersion, keyId, payload }`.
+     - جعل متغيري `TOKEN_ENCRYPTION_KEY_ID` و`TOKEN_ENCRYPTION_KEYRING` اختياريين بالكامل دون كسر `render.yaml` أو عقود الإقلاع.
+  2. **تحصين حارس SSRF الشامل (`SEC-003` في `src/ai-providers.js` و`workers/celia-edge/worker.js`):**
+     - تصدير دالة `isDisallowedHost(hostname)` بعد توسيعها لحجب جميع نطاقات IPv4 الخاصة والمحجوزة (`0.0.0.0/8`، `10/8`، `100.64/10` CGNAT، `127/8`، `169.254/16` metadata، `172.16/12`، `192.168/16`، `198.18/15`، `>=224`) ونطاقات IPv6 المحلية والخاصة (`::1`، `::`، `fc00::/7` ULA، `fe80::/10`، وعناوين `::ffff:` المدمجة بنمط عشري أو سداسي عشري) ونطاقات `.local`/`.internal`/`.localhost`.
+     - فرض نفس الحارس داخل `validateCronJobPayload` على الحافة بحيث يُرفض أي هدف داخلي أو غير `https://` برمز `422 Unprocessable Entity` قبل وصول الطلب إلى `api.cron-job.org`.
+  3. **تحصين بوابة الحافة وعقد التدقيق (`SEC-001`, `SEC-002`, `OPS-005`):**
+     - مقارنة رمز المالك بزمن ثابت آمن للطول عبر تجزئة `SHA-256` للجانبين قبل المقارنة الثابتة، وتحديد سقف جسم JSON عند `8 KiB` (`413`)، وإرجاع `405` مع ترويسة `Allow`، وفصل `/health` الخامل عن `/readyz` الفاحص لدوام `env.DB`، واعتماد مهلة اتصال صريحة (`504`/`502`) وترويسات أمنية (`X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, `Cache-Control: no-store`) ودعم أصليْ الواجهة (`https://celiaelazamey-arch.github.io,http://localhost:3000`).
+     - إضافة `wiredInEdgeOrReadinessNames` في `src/secrets-hub.js` لتوضيح الأسرار الموصولة فعليًا في الحافة وفحص الجاهزية مع الحفاظ على `presentUnwiredNames` للتوافق الخلفي مع اختبارات حزمة التدقيق.
+  4. **مطابقة المسارات بين Express وGitHub Pages (`DOC-002`, `QA-005`):**
+     - توصيل مسارات `/computer` و`/computer.html` و`/computer-permissions` و`/computer-permissions.html` و`/computer.css` في `src/celia-ui.js`، ورفع فحص النشر الحي في `.github/workflows/pages.yml` إلى `12/12` مسارًا.
+  5. **مزامنة منظومة الموصلات الخاصة بالمالك دون أي أسرار:**
+     - تدوين الخطة التنفيذية في `docs/executive-completion-plan.md`، وإنشاء مشروع ومهام التتبع في `Linear` (فريق `CEL`)، وصفحة المرجع التنفيذي في `Notion`، وحزمة المجلد الخاص في `Google Drive` (`Google Docs` + `Google Sheets` + `Google Slides`)، ونسخة مرجعية منقّاة في `Dropbox`، مع الإبقاء على `Supabase` و`Vercel` و`Gmail` دون أي تعديل إنتاجي أو مراسلة خارجية.
+
+- **البدائل المرفوضة:** (أ) فرض صيغة `v2` إجباريًا على كل استدعاء مفرد لـ`encryptJson` بدون `keyId` — يكسر توافق البيانات المشفرة وعقود الاختبار؛ (ب) تشغيل مشروع Supabase المتوقف أو إنشاء مشروع Vercel جديد دون تفويض صريح — يخالف مبدأ عدم إحداث أثر إنتاجي غير مفوض؛ (ج) إغلاق `HOST-003` استنادًا إلى دوام D1 وحده — مرفوض لأن محرك Express/MySQL الكامل ما زال غير منشور.
+
+- **الأثر:** تحديث `src/{security,config,google,celia-mcp,celia-ui,ai-providers,secrets-hub}.js`، و`workers/celia-edge/{worker.js,wrangler.toml}`، و`scripts/{deploy-cloudflare-edge,service-reality}.mjs`، و`.github/workflows/pages.yml`، وإضافة `test/security-surface-audit.test.js` وتوسيع اختبارات الحافة وصفحة الكمبيوتر ومخزن المعرفة، وإصدار `docs/executive-completion-plan.md`. **لا تغيير في `schema 1` ولا في الإصدار `0.2.1` ولا في قائمة الأسرار الـ18 الإلزامية.**
+

@@ -16,20 +16,31 @@ const UNWIRED_KNOWN_ENV_KEYS = Object.freeze([
   'CLOUDFLARE_R2_S3_ENDPOINT'
 ]);
 
+const EDGE_AND_READINESS_WIRED_KEYS = new Set([
+  'CELIAOS_CRONJOB_ORG_API_KEY',
+  'CLOUDFLARE_ACCOUNT_ID',
+  'CLOUDFLARE_API_TOKEN',
+  'CLOUDFLARE_R2_ACCESS_KEY_ID',
+  'CLOUDFLARE_R2_SECRET_ACCESS_KEY',
+  'CLOUDFLARE_R2_S3_ENDPOINT'
+]);
+
 export function inspectUnwiredEnvironmentVariables(env = process.env) {
   const presentUnwired = UNWIRED_KNOWN_ENV_KEYS.filter(
     (name) => typeof env?.[name] === 'string' && env[name].trim().length > 0
   );
+  const wiredInEdgeOrReadinessNames = presentUnwired.filter((name) => EDGE_AND_READINESS_WIRED_KEYS.has(name));
   const phoneAliasUsed =
     !String(env?.APP_OWNER_PHONE_E164 || '').trim() &&
     Boolean(String(env?.PHONE_NUMBER || '').trim());
   return {
     presentUnwiredNames: presentUnwired,
+    wiredInEdgeOrReadinessNames,
     phoneAliasUsed,
     noteAr:
       presentUnwired.length > 0
-        ? `المتغيرات (${presentUnwired.join(', ')}) موجودة في البيئة لكن لا يوجد لها موصل مفعّل في الكود الحالي؛ لا تُقرأ ولا تُسرب.`
-        : 'لا توجد متغيرات إضافية غير موصولة في البيئة الحالية.'
+        ? `المتغيرات (${presentUnwired.join(', ')}) معزولة عن مسار محادثات العملاء في خادم Express وموصولة فقط في فحص الجاهزية المالك وWorker الحافة (Cloudflare Edge) دون تسريب قيمها.`
+        : 'لا توجد متغيرات بنية تحتية إضافية محقونة خارج مسار المحادثات الأساسي.'
   };
 }
 

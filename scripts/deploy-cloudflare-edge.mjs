@@ -189,7 +189,9 @@ export function buildWorkerMetadata({ env = process.env, version = '0.2.1', comm
     {
       type: 'plain_text',
       name: 'ALLOWED_ORIGIN',
-      text: String(env.ALLOWED_ORIGIN || 'https://celiaelazamey-arch.github.io').trim()
+      text: String(
+        env.ALLOWED_ORIGIN || 'https://celiaelazamey-arch.github.io,https://celia-phone-google-ui.pages.dev'
+      ).trim()
     },
     {
       type: 'plain_text',

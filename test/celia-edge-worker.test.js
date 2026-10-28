@@ -123,3 +123,115 @@ test('EDGE-03: buildWorkerMetadata prepares secret_text bindings for all 18 repo
   assert.equal(bmJson.passedCount, 20);
   assert.equal(bmJson.decision, 'GO');
 });
+
+test('edge worker: enforces SSRF guard, 405 allow headers, 413 payload caps, security headers, and passive /health vs active /readyz', async () => {
+  const originalFetch = globalThis.fetch;
+  let upstreamCalls = 0;
+  globalThis.fetch = async () => {
+    upstreamCalls += 1;
+    return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+
+  try {
+    const dualOriginEnv = {
+      ...FULL_EDGE_ENV,
+      ALLOWED_ORIGIN: 'https://celiaelazamey-arch.github.io,https://celia-phone-google-ui.pages.dev'
+    };
+    const authHeaders = {
+      authorization: `Bearer ${FULL_EDGE_ENV.CELIA_MCP_API_TOKEN}`,
+      'content-type': 'application/json',
+      origin: 'https://celia-phone-google-ui.pages.dev'
+    };
+
+    const blockedUrls = [
+      'http://example.com/hook',
+      'https://localhost/hook',
+      'https://127.0.0.1/hook',
+      'https://169.254.169.254/latest/meta-data/',
+      'https://100.64.0.10/internal',
+      'https://[::1]/hook',
+      'https://[::ffff:127.0.0.1]/hook',
+      'https://[fc00::1]/hook',
+      'https://[fe80::1]/hook',
+      'https://metadata.google.internal/computeMetadata/v1/',
+      'https://user:pass@example.com/hook',
+      'https://example.com/hook#frag'
+    ];
+
+    for (const badUrl of blockedUrls) {
+      const res = await edgeWorker.fetch(
+        new Request('https://celia-phone-google.workers.dev/api/cron/jobs', {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({ job: { url: badUrl, title: 'bad' } })
+        }),
+        dualOriginEnv
+      );
+      assert.equal(res.status, 422, `SSRF guard must block ${badUrl}`);
+      assert.equal(res.headers.get('access-control-allow-origin'), 'https://celia-phone-google-ui.pages.dev');
+      assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
+      assert.equal(res.headers.get('x-frame-options'), 'DENY');
+    }
+    assert.equal(upstreamCalls, 0, 'blocked SSRF URLs must never reach fetch()');
+
+    // 405 Method Not Allowed with explicit Allow header
+    const wrongMethod = await edgeWorker.fetch(
+      new Request('https://celia-phone-google.workers.dev/api/secrets/status', {
+        method: 'POST',
+        headers: authHeaders
+      }),
+      dualOriginEnv
+    );
+    assert.equal(wrongMethod.status, 405);
+    assert.match(wrongMethod.headers.get('allow') || '', /GET/);
+
+    // 413 Payload Too Large on /api/cron/jobs (>8 KiB)
+    const hugeRes = await edgeWorker.fetch(
+      new Request('https://celia-phone-google.workers.dev/api/cron/jobs', {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ job: { url: 'https://example.com/ping', title: 'x'.repeat(10_000) } })
+      }),
+      dualOriginEnv
+    );
+    assert.equal(hugeRes.status, 413);
+
+    // Passive /health must NOT execute D1 write/read SQL, while /readyz DOES probe D1
+    let d1PreparedCount = 0;
+    let lastToken = null;
+    const fakeDb = {
+      prepare() {
+        d1PreparedCount += 1;
+        return {
+          bind(_key, token) {
+            if (token) lastToken = token;
+            return this;
+          },
+          async run() {
+            return { success: true };
+          },
+          async first() {
+            return { token: lastToken, updated_at: '2026-10-28T00:00:00.000Z' };
+          }
+        };
+      }
+    };
+    const envWithD1 = { ...dualOriginEnv, DB: fakeDb };
+    const healthRes = await edgeWorker.fetch(new Request('https://celia-phone-google.workers.dev/health'), envWithD1);
+    const healthBody = await healthRes.json();
+    assert.equal(healthRes.status, 200);
+    assert.equal(healthBody.storage.mode, 'd1');
+    assert.equal(healthBody.storage.durable, false);
+    assert.equal(d1PreparedCount, 0, '/health must remain passive and never write to D1');
+
+    const readyRes = await edgeWorker.fetch(new Request('https://celia-phone-google.workers.dev/readyz'), envWithD1);
+    const readyBody = await readyRes.json();
+    assert.equal(readyRes.status, 200);
+    assert.equal(readyBody.storage.mode, 'd1');
+    assert.equal(readyBody.storage.durable, true);
+    assert.ok(d1PreparedCount >= 2, '/readyz must actively verify D1 read+write');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+

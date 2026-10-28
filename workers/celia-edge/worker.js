@@ -1,7 +1,12 @@
-import { createStateStore, probeDurability } from './state.js';
+import { createStateStore, isD1Bound, probeDurability } from './state.js';
 
 const CRONJOB_ORIGIN = 'https://api.cron-job.org';
 const MAX_BODY_BYTES = 8192;
+const UPSTREAM_TIMEOUT_MS = 15_000;
+const DEFAULT_ALLOWED_ORIGINS = [
+  'https://celiaelazamey-arch.github.io',
+  'https://celia-phone-google-ui.pages.dev'
+];
 const ALLOWED_JOB_FIELDS = new Set([
   'url',
   'title',
@@ -37,27 +42,54 @@ function hasSecret(env, name) {
   return Boolean(val && !/^replace-with-/i.test(val));
 }
 
+function utf8ByteLength(text) {
+  return new TextEncoder().encode(String(text || '')).byteLength;
+}
+
 function constantTimeEqual(a, b) {
-  const sa = String(a || '');
-  const sb = String(b || '');
-  if (!sa || !sb || sa.length !== sb.length) return false;
-  let diff = 0;
-  for (let i = 0; i < sa.length; i += 1) {
-    diff |= sa.charCodeAt(i) ^ sb.charCodeAt(i);
+  const enc = new TextEncoder();
+  const bytesA = enc.encode(String(a || ''));
+  const bytesB = enc.encode(String(b || ''));
+  if (bytesA.length === 0 || bytesB.length === 0) return false;
+  const maxLen = Math.max(bytesA.length, bytesB.length);
+  let diff = bytesA.length ^ bytesB.length;
+  for (let i = 0; i < maxLen; i += 1) {
+    const byteA = i < bytesA.length ? bytesA[i] : 0;
+    const byteB = bytesB[i % bytesB.length];
+    diff |= byteA ^ byteB;
   }
   return diff === 0;
 }
 
+function parseAllowedOrigins(env) {
+  const raw = String(env?.ALLOWED_ORIGIN || '').trim();
+  if (!raw) return DEFAULT_ALLOWED_ORIGINS;
+  const origins = raw
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return origins.length > 0 ? origins : DEFAULT_ALLOWED_ORIGINS;
+}
+
 function corsHeaders(request, env) {
-  const allowed = String(env?.ALLOWED_ORIGIN || 'https://celiaelazamey-arch.github.io').trim();
+  const allowedList = parseAllowedOrigins(env);
   const origin = request.headers.get('origin') || '';
   const headers = {
     'cache-control': 'no-store',
-    'x-content-type-options': 'nosniff'
+    'x-content-type-options': 'nosniff',
+    'x-frame-options': 'DENY',
+    'referrer-policy': 'no-referrer',
+    'strict-transport-security': 'max-age=31536000; includeSubDomains',
+    'content-security-policy': "default-src 'none'; frame-ancestors 'none'"
   };
-  if (allowed && origin === allowed) {
-    headers['access-control-allow-origin'] = allowed;
-    headers['access-control-allow-methods'] = 'GET, POST, PATCH, DELETE, OPTIONS';
+  const matchedOrigin = allowedList.includes('*')
+    ? '*'
+    : origin && allowedList.includes(origin)
+      ? origin
+      : null;
+  if (matchedOrigin) {
+    headers['access-control-allow-origin'] = matchedOrigin;
+    headers['access-control-allow-methods'] = 'GET, POST, PUT, PATCH, DELETE, OPTIONS';
     headers['access-control-allow-headers'] = 'Authorization, Content-Type, Idempotency-Key';
     headers['vary'] = 'Origin';
   }
@@ -71,6 +103,14 @@ function jsonResponse(body, status = 200, extraHeaders = {}) {
       'content-type': 'application/json; charset=utf-8',
       ...extraHeaders
     }
+  });
+}
+
+function methodNotAllowedResponse(allowedMethods, baseHeaders = {}) {
+  const allow = Array.isArray(allowedMethods) ? allowedMethods.join(', ') : String(allowedMethods);
+  return jsonResponse({ error: 'method_not_allowed', allowed: allow }, 405, {
+    ...baseHeaders,
+    allow
   });
 }
 
@@ -119,8 +159,6 @@ export function buildEdgeSecretsReport(env = {}) {
   const secrets = TRACKED_SECRETS.map(([secretName, role, boundary]) => ({
     secretName,
     configured: hasSecret(env, secretName),
-    // `retired` = the owner explicitly took this service out of the product (CELIA_DISABLE_<boundary>=true,
-    // DEC-030): a present-but-dead credential is reported as such instead of parading as capability.
     retired: isRetired(env, boundary),
     role,
     boundary
@@ -139,8 +177,72 @@ export function buildEdgeSecretsReport(env = {}) {
   };
 }
 
-function validateCronJobPayload(payload, { partial = false } = {}) {
-  if (!payload || typeof payload !== 'object' || !payload.job || typeof payload.job !== 'object') {
+function isDisallowedIpv4(host) {
+  const match = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!match) return false;
+  const octets = match.slice(1).map(Number);
+  if (octets.some((n) => Number.isNaN(n) || n < 0 || n > 255)) return true;
+  const [a, b] = octets;
+  if (a === 0 || a === 10 || a === 127) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true;
+  if (a >= 224) return true;
+  return false;
+}
+
+export function isDisallowedTargetHost(rawHostname) {
+  const raw = String(rawHostname || '').trim().toLowerCase();
+  if (!raw) return true;
+  const host = raw.startsWith('[') && raw.endsWith(']') ? raw.slice(1, -1) : raw;
+  if (!host) return true;
+  if (
+    host === 'localhost' ||
+    host.endsWith('.localhost') ||
+    host.endsWith('.local') ||
+    host.endsWith('.internal') ||
+    host === 'metadata.google.internal' ||
+    host === 'metadata'
+  ) {
+    return true;
+  }
+  if (/^\d+$/.test(host) || /^0x[0-9a-f]+$/i.test(host)) {
+    return true;
+  }
+  if (isDisallowedIpv4(host)) return true;
+
+  if (host.includes(':')) {
+    const normalized = host.split('%')[0];
+    if (normalized === '::' || normalized === '::1' || normalized === '0:0:0:0:0:0:0:1' || normalized === '0:0:0:0:0:0:0:0') {
+      return true;
+    }
+    if (/^f[cd][0-9a-f]{2}:/i.test(normalized) || /^f[cd][0-9a-f]{0,2}$/i.test(normalized.split(':')[0])) {
+      return true;
+    }
+    if (/^fe[89ab][0-9a-f]:/i.test(normalized)) {
+      return true;
+    }
+    if (/^ff[0-9a-f]{2}:/i.test(normalized)) {
+      return true;
+    }
+    const v4MappedDotted = normalized.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i);
+    if (v4MappedDotted) {
+      return isDisallowedIpv4(v4MappedDotted[1]);
+    }
+    const v4MappedHex = normalized.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i);
+    if (v4MappedHex) {
+      const hi = parseInt(v4MappedHex[1], 16);
+      const lo = parseInt(v4MappedHex[2], 16);
+      const dotted = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+      return isDisallowedIpv4(dotted);
+    }
+  }
+  return false;
+}
+
+export function validateCronJobPayload(payload, { partial = false } = {}) {
+  if (!payload || typeof payload !== 'object' || !payload.job || typeof payload.job !== 'object' || Array.isArray(payload.job)) {
     return { ok: false, error: 'invalid_job_payload' };
   }
   const job = payload.job;
@@ -152,8 +254,17 @@ function validateCronJobPayload(payload, { partial = false } = {}) {
   if (!partial || job.url !== undefined) {
     try {
       const parsed = new URL(String(job.url || ''));
-      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      if (parsed.protocol !== 'https:') {
         return { ok: false, error: 'invalid_job_url_protocol' };
+      }
+      if (parsed.username || parsed.password) {
+        return { ok: false, error: 'disallowed_job_url_credentials' };
+      }
+      if (parsed.hash) {
+        return { ok: false, error: 'disallowed_job_url_fragment' };
+      }
+      if (isDisallowedTargetHost(parsed.hostname)) {
+        return { ok: false, error: 'disallowed_job_url_host' };
       }
     } catch {
       return { ok: false, error: 'invalid_job_url' };
@@ -177,17 +288,33 @@ export default {
       commit: String(env.CELIA_BUILD_SHA || 'main')
     };
 
-    if (request.method === 'GET' && (pathname === '/' || pathname === '/health' || pathname === '/readyz')) {
+    if (pathname === '/' || pathname === '/health' || pathname === '/readyz') {
+      if (request.method !== 'GET') {
+        return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
+      }
       const readiness = buildEdgeSecretsReport(env);
-      // `durable` is not a capability flag: every call writes a fresh token to D1 and reads it back. A bound
-      // but broken database therefore reports false with the reason, and an unbound worker keeps saying so.
+      const r2CredentialsPresent = Boolean(
+        hasSecret(env, 'CLOUDFLARE_R2_ACCESS_KEY_ID') &&
+          hasSecret(env, 'CLOUDFLARE_R2_SECRET_ACCESS_KEY') &&
+          hasSecret(env, 'CLOUDFLARE_R2_S3_ENDPOINT')
+      );
+      // `/health` is a passive liveness probe that never writes to D1 on public traffic; `/readyz` (and `/`)
+      // earn `durable: true` only by writing a fresh token to D1 and reading it back.
+      const durabilityReport =
+        pathname === '/health'
+          ? {
+              mode: isD1Bound(env) ? 'd1' : 'cloudflare-edge',
+              durable: false,
+              reason: isD1Bound(env)
+                ? 'passive_liveness_use_readyz_for_write_probe'
+                : 'd1_not_bound',
+              checkedAt: new Date().toISOString()
+            }
+          : await probeDurability(env);
+
       const storage = {
-        ...(await probeDurability(env)),
-        r2CredentialsPresent: Boolean(
-          hasSecret(env, 'CLOUDFLARE_R2_ACCESS_KEY_ID') &&
-            hasSecret(env, 'CLOUDFLARE_R2_SECRET_ACCESS_KEY') &&
-            hasSecret(env, 'CLOUDFLARE_R2_S3_ENDPOINT')
-        )
+        ...durabilityReport,
+        r2CredentialsPresent
       };
       return jsonResponse(
         {
@@ -204,7 +331,10 @@ export default {
       );
     }
 
-    if (request.method === 'GET' && pathname === '/version') {
+    if (pathname === '/version') {
+      if (request.method !== 'GET') {
+        return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
+      }
       return jsonResponse(
         {
           version: release.version,
@@ -217,10 +347,10 @@ export default {
       );
     }
 
-    if (
-      request.method === 'GET' &&
-      (pathname === '/api/protocol-benchmark.json' || pathname === '/api/protocol/benchmark')
-    ) {
+    if (pathname === '/api/protocol-benchmark.json' || pathname === '/api/protocol/benchmark') {
+      if (request.method !== 'GET') {
+        return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
+      }
       return jsonResponse(
         {
           protocol: 'CELIAOS_USER_SWITCH_AND_PRODUCT_SUPERIORITY_V1',
@@ -248,7 +378,10 @@ export default {
       );
     }
 
-    if (request.method === 'GET' && (pathname === '/api/system' || pathname === '/api/deployment')) {
+    if (pathname === '/api/system' || pathname === '/api/deployment') {
+      if (request.method !== 'GET') {
+        return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
+      }
       const readiness = buildEdgeSecretsReport(env);
       return jsonResponse(
         {
@@ -284,14 +417,19 @@ export default {
       }
     }
 
-    // Durable key/value state and its audit chain (DEC-035). Every write appends a hash-chained record, so a
-    // change can be reconstructed later and tampering is detectable without storing the value twice.
-    if (pathname === '/api/state' && request.method === 'GET') {
+    // Durable key/value state and its audit chain (DEC-035).
+    if (pathname === '/api/state') {
+      if (request.method !== 'GET') {
+        return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
+      }
       const { status, body } = await stateResult(() => createStateStore(env).list({ limit: url.searchParams.get('limit') }));
       return jsonResponse(body, status, baseHeaders);
     }
 
-    if (pathname === '/api/audit' && request.method === 'GET') {
+    if (pathname === '/api/audit') {
+      if (request.method !== 'GET') {
+        return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
+      }
       const { status, body } = await stateResult(() => createStateStore(env).audit({ limit: url.searchParams.get('limit') }));
       return jsonResponse(body, status, baseHeaders);
     }
@@ -305,7 +443,7 @@ export default {
       }
       if (request.method === 'PUT' || request.method === 'POST') {
         const raw = await request.text();
-        if (raw.length > MAX_BODY_BYTES) {
+        if (utf8ByteLength(raw) > MAX_BODY_BYTES) {
           return jsonResponse({ error: 'payload_too_large' }, 413, baseHeaders);
         }
         let value = raw;
@@ -318,14 +456,20 @@ export default {
         const { status, body } = await stateResult(() => store.put(key, value));
         return jsonResponse(body, status, baseHeaders);
       }
-      return jsonResponse({ error: 'method_not_allowed' }, 405, baseHeaders);
+      return methodNotAllowedResponse(['GET', 'PUT', 'POST', 'OPTIONS'], baseHeaders);
     }
 
-    if (request.method === 'GET' && pathname === '/api/secrets/status') {
+    if (pathname === '/api/secrets/status') {
+      if (request.method !== 'GET') {
+        return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
+      }
       return jsonResponse(buildEdgeSecretsReport(env), 200, baseHeaders);
     }
 
-    if (request.method === 'GET' && pathname === '/api/storage/r2/status') {
+    if (pathname === '/api/storage/r2/status') {
+      if (request.method !== 'GET') {
+        return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
+      }
       return jsonResponse(
         {
           configured: Boolean(
@@ -344,7 +488,10 @@ export default {
       );
     }
 
-    if (request.method === 'GET' && (pathname === '/api/cron/status' || pathname === '/api/cron/health')) {
+    if (pathname === '/api/cron/status' || pathname === '/api/cron/health') {
+      if (request.method !== 'GET') {
+        return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
+      }
       return jsonResponse(
         {
           ok: true,
@@ -358,24 +505,35 @@ export default {
     }
 
     if (pathname.startsWith('/api/cron/jobs')) {
-      const cronKey = String(env.CELIAOS_CRONJOB_ORG_API_KEY || '').trim();
-      if (!cronKey) {
-        return jsonResponse({ error: 'cronjob_not_configured' }, 503, baseHeaders);
-      }
-
       const subPath = pathname.slice('/api/cron'.length); // /jobs or /jobs/:id or /jobs/:id/history
       if (!/^\/jobs(\/\d+(\/history)?)?$/.test(subPath)) {
         return jsonResponse({ error: 'invalid_cron_path' }, 400, baseHeaders);
       }
 
+      const isCollection = subPath === '/jobs';
+      const isHistory = subPath.endsWith('/history');
+      const allowedMethods = isCollection
+        ? ['GET', 'POST', 'OPTIONS']
+        : isHistory
+          ? ['GET', 'OPTIONS']
+          : ['GET', 'PATCH', 'DELETE', 'OPTIONS'];
+      if (!allowedMethods.includes(request.method)) {
+        return methodNotAllowedResponse(allowedMethods, baseHeaders);
+      }
+
+      const cronKey = String(env.CELIAOS_CRONJOB_ORG_API_KEY || '').trim();
+      if (!cronKey) {
+        return jsonResponse({ error: 'cronjob_not_configured' }, 503, baseHeaders);
+      }
+
       let upstreamMethod = request.method;
       let upstreamBody;
-      if (request.method === 'POST' && subPath === '/jobs') {
+      if (request.method === 'POST' && isCollection) {
         upstreamMethod = 'PUT';
       }
       if (request.method === 'POST' || request.method === 'PATCH') {
         const rawText = await request.text();
-        if (rawText.length > MAX_BODY_BYTES) {
+        if (utf8ByteLength(rawText) > MAX_BODY_BYTES) {
           return jsonResponse({ error: 'payload_too_large' }, 413, baseHeaders);
         }
         let parsed;
@@ -391,15 +549,26 @@ export default {
         upstreamBody = JSON.stringify({ job: check.job });
       }
 
-      const upstreamRes = await fetch(`${CRONJOB_ORIGIN}${subPath}`, {
-        method: upstreamMethod,
-        headers: {
-          accept: 'application/json',
-          authorization: `Bearer ${cronKey}`,
-          ...(upstreamBody ? { 'content-type': 'application/json' } : {})
-        },
-        body: upstreamBody
-      });
+      let upstreamRes;
+      try {
+        upstreamRes = await fetch(`${CRONJOB_ORIGIN}${subPath}`, {
+          method: upstreamMethod,
+          headers: {
+            accept: 'application/json',
+            authorization: `Bearer ${cronKey}`,
+            ...(upstreamBody ? { 'content-type': 'application/json' } : {})
+          },
+          body: upstreamBody,
+          signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
+        });
+      } catch (err) {
+        const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError';
+        return jsonResponse(
+          { error: timedOut ? 'cronjob_upstream_timeout' : 'cronjob_upstream_unreachable' },
+          timedOut ? 504 : 502,
+          baseHeaders
+        );
+      }
 
       if (!upstreamRes.ok) {
         return jsonResponse(

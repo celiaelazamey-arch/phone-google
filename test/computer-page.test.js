@@ -111,3 +111,41 @@ test('computer page: it is reachable from the studio and from the status page', 
   assert.match(rewriteFn, /computer/, 'the rewrite map must know ./computer');
   assert.match(rewriteFn, /computer\.html/, 'and must point it at computer.html');
 });
+
+test('computer page: Express UI router serves /computer, /computer-permissions, and /computer.css with strict CSP', async () => {
+  const { connectPoolWithFallback, createCeliaMcpApp, loadCeliaMcpConfig } = await import('../src/celia-mcp.js');
+  const config = loadCeliaMcpConfig(
+    {
+      NODE_ENV: 'test',
+      CELIA_MCP_API_TOKEN: 'c'.repeat(48),
+      TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+      CELIA_MCP_DISABLE_MYSQL: 'true',
+      CELIA_DISABLE_OLLAMA: 'true'
+    },
+    { requireToken: true }
+  );
+  const pool = await connectPoolWithFallback(config);
+  const app = createCeliaMcpApp({ pool, config });
+  const server = await new Promise((resolve) => {
+    const s = app.listen(0, '127.0.0.1', () => resolve(s));
+  });
+  const { port } = server.address();
+  const baseUrl = `http://127.0.0.1:${port}`;
+  try {
+    for (const route of ['/computer', '/computer.html', '/computer-permissions', '/computer-permissions.html']) {
+      const res = await fetch(`${baseUrl}${route}`);
+      assert.equal(res.status, 200, `${route} must return HTTP 200 on Express UI router`);
+      assert.match(res.headers.get('content-type') || '', /text\/html/);
+      assert.match(res.headers.get('content-security-policy') || '', /default-src 'self'/);
+      const body = await res.text();
+      assert.ok(body.length > 500, `${route} body should not be empty`);
+    }
+    const cssRes = await fetch(`${baseUrl}/computer.css`);
+    assert.equal(cssRes.status, 200, '/computer.css must return HTTP 200');
+    assert.match(cssRes.headers.get('content-type') || '', /text\/css/);
+    await pool.end?.();
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+

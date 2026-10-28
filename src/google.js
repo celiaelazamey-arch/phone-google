@@ -40,13 +40,14 @@ async function getAuthenticatedClient(pool, config, userId) {
     throw error;
   }
   const client = oauthClient(config);
-  const tokens = decryptJson(rows[0].encrypted_tokens, config.encryptionKey);
+  const keyTarget = config.encryptionKeyring || config.encryptionKey;
+  const tokens = decryptJson(rows[0].encrypted_tokens, keyTarget);
   client.setCredentials(tokens);
   client.on('tokens', (freshTokens) => {
     const merged = { ...tokens, ...freshTokens, refresh_token: freshTokens.refresh_token || tokens.refresh_token };
     pool.execute(
       'UPDATE google_credentials SET encrypted_tokens = ? WHERE user_id = ?',
-      [encryptJson(merged, config.encryptionKey), userId]
+      [encryptJson(merged, keyTarget), userId]
     ).catch(() => console.error('Could not persist refreshed Google credentials'));
   });
   return client;
@@ -236,14 +237,15 @@ export function createGoogleRouter({ pool, config, services = createServiceRegis
         }
       }
       const userId = rows[0].user_id;
+      const keyTarget = config.encryptionKeyring || config.encryptionKey;
       const [oldRows] = await pool.execute('SELECT encrypted_tokens FROM google_credentials WHERE user_id = ?', [userId]);
-      const previous = oldRows.length ? decryptJson(oldRows[0].encrypted_tokens, config.encryptionKey) : {};
+      const previous = oldRows.length ? decryptJson(oldRows[0].encrypted_tokens, keyTarget) : {};
       const merged = { ...previous, ...tokens, refresh_token: tokens.refresh_token || previous.refresh_token };
       if (!merged.refresh_token) return res.status(400).send('Google did not return a refresh token. Revoke the app grant and reconnect.');
       await pool.execute(
         `INSERT INTO google_credentials (user_id, encrypted_tokens, scopes) VALUES (?, ?, ?)
          ON DUPLICATE KEY UPDATE encrypted_tokens = VALUES(encrypted_tokens), scopes = VALUES(scopes)`,
-        [userId, encryptJson(merged, config.encryptionKey), (tokens.scope || '').split(' ').filter(Boolean).join(' ')]
+        [userId, encryptJson(merged, keyTarget), (tokens.scope || '').split(' ').filter(Boolean).join(' ')]
       );
       return res.status(200).send('Google account connected. You may close this page and return to the assistant.');
     } catch (error) { return next(error); }

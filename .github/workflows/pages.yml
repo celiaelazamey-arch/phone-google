@@ -123,6 +123,8 @@ jobs:
               "/deploy.html",
               "/live.html",
               "/skills.html",
+              "/computer.html",
+              "/computer-permissions.html",
               "/api/protocol-benchmark.json",
               "/api/live.json"
             ];
@@ -155,5 +157,5 @@ jobs:
                 process.exit(1);
               }
             }
-            console.log(`::notice title=GitHub Pages Live Verified::10/10 live routes returned HTTP 200 OK on ${base} (including /protocol.html and 20/20 benchmark API)`);
+            console.log(`::notice title=GitHub Pages Live Verified::12/12 live routes returned HTTP 200 OK on ${base} (including /protocol.html, /computer.html, /computer-permissions.html, and 20/20 benchmark API)`);
           '

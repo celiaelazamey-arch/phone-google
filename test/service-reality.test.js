@@ -139,7 +139,7 @@ test('probes classify a fake Cloudflare/R2/Google/edge world without touching th
       return reply(400, { error: 'invalid_grant' });
     }
     if (target.endsWith('/api/secrets/status')) return init.headers?.authorization ? reply(200, { configuredCount: 18, totalSecretsTracked: 18 }) : reply(401, { error: 'unauthorized' });
-    if (target.endsWith('/readyz')) return reply(200, { ok: true, release: { version: '0.2.1', commit: 'abcdef1234567' } });
+    if (target.endsWith('/readyz')) return reply(200, { ok: true, release: { version: '0.2.1', commit: 'abcdef1234567' }, storage: { mode: 'd1', durable: true } });
     if (target.endsWith('/version.json')) return reply(200, { version: '0.2.1', commit: 'abcdef1234567' });
     if (target.startsWith('https://ghcr.io/token')) return reply(200, { token: 'anon' });
     if (target.includes('/manifests/')) return reply(200, { schemaVersion: 2 });
@@ -161,6 +161,7 @@ test('probes classify a fake Cloudflare/R2/Google/edge world without touching th
   assert.equal(byId.google_oauth_client.verdict, 'verified');
   assert.equal(byId.owner_token_edge.verdict, 'verified');
   assert.equal(byId.worker_edge_public.verdict, 'verified');
+  assert.match(byId.worker_edge_public.detail, /storage d1 \(durable=true\)/);
   assert.equal(byId.pages_static.verdict, 'verified');
   assert.equal(byId.ghcr_image.verdict, 'verified');
   assert.equal(byId.github_release.verdict, 'verified');

@@ -23,6 +23,7 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, oper
     ownerPhone: null,
     ownerPhoneSourceEnv: null,
     encryptionKey: '',
+    encryptionKeyring: null,
     extendedMcpTools: false,
     allowCloudFailover: false,
     gemini: Object.freeze({ ...config.gemini, apiKey: '' }),
@@ -96,6 +97,12 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, oper
   router.get(['/system', '/system.html'], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'system.html')));
   router.get('/system.css', (_req, res) => res.type('text/css').sendFile(path.join(PUBLIC_DIR, 'system.css')));
   router.get('/system.js', (_req, res) => res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'system.js')));
+
+  router.get(['/computer', '/computer.html'], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'computer.html')));
+  router.get(['/computer-permissions', '/computer-permissions.html'], (_req, res) =>
+    res.sendFile(path.join(PUBLIC_DIR, 'computer-permissions.html'))
+  );
+  router.get('/computer.css', (_req, res) => res.type('text/css').sendFile(path.join(PUBLIC_DIR, 'computer.css')));
 
   router.get('/live', (_req, res) => {
     res.sendFile(path.join(PUBLIC_DIR, 'live.html'));

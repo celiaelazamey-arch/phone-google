@@ -1,14 +1,36 @@
 # الحالة الحالية — ابدأ من هنا
 
-**آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** **إصلاح محلل ترحيل D1 على الحافة + تنظيف الـPRs المتجاوزة (DEC-035، OPS-005)**
-على الفرع `arena/3f0d6498-phone-google` · سجل الجلسة:
-[2026-10-28-edge-d1-sql-splitter-and-pr-hygiene](sessions/2026-10-28-edge-d1-sql-splitter-and-pr-hygiene.md) ·
-سجل D1 السابق: [2026-10-28-edge-d1-durability](sessions/2026-10-28-edge-d1-durability.md) ·
+**آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** **تنفيذ الخطة التنفيذية لإكمال البنود الناقصة وسد الفجوات والثغرات ومزامنة الموصلات الـ11 (DEC-036، PLAN-001، SEC-001/002/003/005، DOC-002، QA-005/006، OPS-005)**
+على الفرع `arena/83dde20a-phone-google` (متفرع من `main@44532f4552c20b8fb51402e14cff8fc15356b97c` بعد دمج PR `#69`) ·
+سجل الجلسة الحالي: [2026-10-28-executive-gap-closure](sessions/2026-10-28-executive-gap-closure.md) ·
+الخطة التنفيذية الشاملة: [docs/executive-completion-plan.md](../executive-completion-plan.md) ·
+سجل D1 السابق: [2026-10-28-edge-d1-sql-splitter-and-pr-hygiene](sessions/2026-10-28-edge-d1-sql-splitter-and-pr-hygiene.md) ·
 الدليل: [docs/computer-permissions](../computer-permissions/README.md) · صفحة الكمبيوتر:
 [docs/computer-use.md](../computer-use.md) · حوكمة المشكلات: [docs/issue-triage.md](../issue-triage.md) ·
 واقع الخدمات: [docs/service-reality.md](../service-reality.md)
 
-## الطلب الحالي (أعلى أولوية) — «إتمام دوام D1 الفعلي على الحافة وتنظيف الـPRs المفتوحة»
+## الطلب الحالي (أعلى أولوية) — «خطة تنفيذية لإكمال البنود الناقصة وسد الفجوات والثغرات والتنفيذ الشامل»
+
+### 1. إثبات خط الأساس الحي على `main@44532f4` بعد دمج PR `#69`
+
+- **Cloudflare Edge + D1 (`40706047781`):** `status: "deployed"`، `liveReady: true`، `18/18` سرًّا، إنشاء وترحيل وربط القاعدة `celia-edge-state` (`f63ccd9f-49b1-4eca-861b-fd478c433518`، `4` عبارات SQL نظيفة)، وإثبات حي من `/readyz`: `storage: { mode: "d1", durable: true, latencyMs: 106 }`.
+- **GitHub Pages (`40706047514`) والإصدار (`40706047877`) والجودة (`40706047968`):** كلها خضراء على `main@44532f4`.
+- **واقع الخدمات الحية (`40680228320`):** `verdict: pass`، **12/12 خدمة متحققة = 100%** (`workingRate: 1`, `failed: []`) شاملة توليف ElevenLabs الصوتي الفعلي وFigma وGemini وCloudflare وGoogle OAuth client.
+
+### 2. الثغرات والفجوات البرمجية والأمنية التي أُغلقت في `arena/83dde20a-phone-google` (`DEC-036`)
+
+1. **تدوير مفاتيح تشفير رموز OAuth (`SEC-005` — `src/security.js`, `src/{config,google,celia-mcp,celia-ui}.js`):** دعم حلقة مفاتيح مسمّاة `parseEncryptionKeyring` والمغلف المختوم بـAAD (`v2.<keyId>.<iv>.<tag>.<ciphertext>`) مع بقاء `v1.*` متوافقًا بالكامل ودالة `rotateEncryptedJson` دون كسر العقود القائمة.
+2. **تحصين حارس SSRF الشامل (`SEC-003` — `src/ai-providers.js`, `workers/celia-edge/worker.js`):** حجب جميع عناوين IPv4/IPv6 الخاصة والمحلية وCGNAT وmetadata وعناوين `::ffff:` المدمجة، وتطبيقه كذلك على أهداف مهام الحافة في `validateCronJobPayload` (`422`).
+3. **تحصين خادم الحافة ومركز الأسرار (`SEC-001`, `SEC-002`, `OPS-005`):** مقارنة رمز المالك بزمن ثابت آمن للطول عبر `SHA-256`، فرض حد `8 KiB` على أجسام JSON (`413`)، `405` مع `Allow`، فصل `/health` عن `/readyz`، ترويسات أمنية صارمة، دعم أصليْ CORS (`celiaelazamey-arch.github.io` + `localhost:3000`)، وإضافة `wiredInEdgeOrReadinessNames` في `src/secrets-hub.js` وإبراز `storage.mode`/`durable` في `scripts/service-reality.mjs`.
+4. **سد فجوة التوجيه وفحوص الصفحات والوثائق (`DOC-002`, `QA-005`, `QA-006`, `PLAN-001`):** ربط مسارات `/computer` و`/computer.html` و`/computer-permissions` و`/computer-permissions.html` و`/computer.css` في `src/celia-ui.js`، ورفع فحص `pages.yml` إلى `12/12` مسارًا حيًا، وتحديث `docs/{deployment-profile.json,service-reality.md,plan-100-percent.md,preservation-plan.md}` و`README.md` وإصدار [docs/executive-completion-plan.md](../executive-completion-plan.md)، مع إضافة `test/security-surface-audit.test.js` وتوسيع اختبارات الحافة والكمبيوتر ومخزن المعرفة.
+5. **مزامنة الموصلات الـ11 المتصلة بنطاق خاص للمالك وصفر أسرار:** توثيق وتتبع الخطة التنفيذية عبر مشروع `Linear` (`55a2e8fd-c1fe-4253-9485-efc0b76cc95e` ومهام `CEL-5`..`CEL-11` على فريق `CEL`)، ومجلد `Google Drive` الخاص (`1ZhVmTDGam2i_EixiwI0bGPxbJ4gShOPo` شاملاً مستند `Google Docs` `1HEv5hkdaYfGu8akZkR3fFcyis3sJrstF2jwiikQE0PA` وجدول `Google Sheets` `18cXH45gVKC8QALyvHRAFddW_0EoZXY7gaSXts4yeNhw` وعرض `Google Slides` `1MLHKJx0Ukr3DB5jn6dmNUpkQ4_Hv__atDEjnbwRzios` من 5 شرائح)، ونسخة `Dropbox` (`/CeliaOS-Executive-Plan-2026/executive-completion-plan.md`)، مع التحقق القرائي من `Google Calendar` (`timezone: UTC`) و`Gmail` (`celiaelazamey@gmail.com` دون إرسال أي بريد) و`Supabase` (`yqzhgogmtscoqejuxplv` `INACTIVE`) و`Vercel` (`0` مشاريع) و`Notion` (المتاح للتكامل حالياً هو دليل `People` المُدار من Notion فقط — مشاركة صفحة عادية تتيح إنشاء صفحات فرعية).
+
+### 3. ما يتبقى حصريًا لقرار أو لوحة المالك (لا يُغلق بكود)
+
+- تفعيل حماية الفرع `main` في إعدادات GitHub (`Settings → Branches` — حالياً `protected: false`).
+- حسم مسار الخادم الخلفي الكامل (`HOST-003`) بعد قيد بطاقة Render (`DEC-034`)، وقرار PR `#38` المفتوح، وربط Google الحي (`GOOG-001`) وتطبيق Meta الاختياري (`WA-005`) وبيانات `SPDR-002` وسياسات `DATA-004`/`GOV-001`/`REL-001`.
+
+## الطلب السابق — «إتمام دوام D1 الفعلي على الحافة وتنظيف الـPRs المفتوحة»
 
 ### حجب Render بالبطاقة → الدوام على الحافة (2026-10-28، DEC-034/DEC-035)
 
