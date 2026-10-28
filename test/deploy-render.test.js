@@ -110,6 +110,20 @@ test('an API key alone is enough: no service id and no URL have to be typed by h
   assert.equal(ready.ok, true);
 });
 
+test('a malformed URL does not block discovery — the API supplies the truth instead of a guess', () => {
+  // The owner stored a value that is not a URL at all (no scheme). With a key present it must be ignored,
+  // not treated as a fatal misconfiguration: the service lookup can still find the real URL.
+  const withKey = planDeployment({ RENDER_API_KEY: 'rnd_key', CELIA_LIVE_URL_SECRET: 'celia-phone-google.onrender.com' });
+  assert.equal(withKey.ok, true);
+  assert.equal(withKey.liveUrl, null);
+  assert.equal(withKey.needsDiscovery, true);
+  assert.match(withKey.warnings.join(' '), /not an https URL/);
+  // Without a key there is nothing to fall back on, so it stays a hard error.
+  const noKey = planDeployment({ CELIA_LIVE_URL_SECRET: 'celia-phone-google.onrender.com' });
+  assert.equal(noKey.ok, false);
+  assert.ok(noKey.missing.includes('CELIA_LIVE_URL must be an https URL'));
+});
+
 test('pickService resolves by name and refuses to guess between several services', () => {
   const payload = { services: [
     { service: { id: 'srv-1', name: 'celia-phone-google', serviceDetails: { url: 'https://celia-phone-google.onrender.com' } } },

@@ -18,8 +18,13 @@
   (اكتشاف `id`+`url` من `GET /v1/services`، ورفض التخمين عند تعدّد الخدمات مع طباعة الأسماء المرئية).
 - **الدليل:** 14/14 في `test/deploy-render.test.js`، و`--plan` بمفتاح فقط يعطي `status: planned` و`missing: []`.
 - **`celia-phone-google.onrender.com` يعيد صفحة Render «Not Found»** → الخدمة لم تُنشأ بعد (أو باسم آخر).
-- **ما يتبقى:** دمج #62 (فيبدأ `deploy-render.yml` تلقائيًا بعد CI على `main`) أو «Run workflow» من الواجهة —
-  الاثنان خارج صلاحية الجلسة: `workflow_dispatch` = 403 و`actions/secrets` = 403، والدمج قرار المالك.
+- **دُمج #62** (`main@23154a8`): Pages نشرت صفحة الصلاحيات (متحقَّق بجلبها)، والـWorker يعلن `commit 23154a8`.
+- **تشخيص حقيقي (28 أكتوبر، تشغيل `40694847170`):** `GET /v1/services` = **200 و`count=0`** → لا خدمة واحدة في
+  حساب Render؛ و`celia-phone-google.onrender.com/readyz` = **404**؛ و`CELIA_LIVE_URL` **غير قابل للتحليل كـURL**.
+  أي أن «تم» لم تُنشئ خدمة، والقيمة المخزّنة ليست رابطًا. التفصيل: [جلسة التحقق](sessions/2026-10-28-live-verification.md).
+- **أُصلح:** رابط فاسد لم يعد يمنع الاكتشاف — يُسقَط بتحذير عند وجود المفتاح، ويأتي الرابط من الـAPI (15/15).
+- **ما يتبقى:** إنشاء Blueprint في Render + ضبط `CELIA_LIVE_URL` **بالمخطّط**. بعدها أول CI على `main` ينشر
+  تلقائيًا. `workflow_dispatch` و`actions/secrets` = 403 للجلسة، والدمج/الإنشاء قرار المالك.
 
 
 - **السياسة شيفرة:** `src/agent/computer-policy.js` — 16 قدرة × 4 حالات (مسموح 7 · موافقة 3 · مقيّد 2 · محظور 4)
