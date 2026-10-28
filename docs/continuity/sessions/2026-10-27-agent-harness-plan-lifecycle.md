@@ -54,6 +54,9 @@
 11. **توظيف جميع أسرار المستودع الـ18 وبوابة Cloudflare Worker والنشر الآلي (`DEC-025`):**
    - توسيع `buildSecretsReadiness` و`scripts/check-secrets-wiring.mjs` و`.github/workflows/celia-mcp.yml` لربط وفحص **الأسرار الـ18 جميعًا** (`18/18`) مع صفر تسريب، وإضافة `workers/celia-edge/worker.js` و`scripts/deploy-cloudflare-edge.mjs` و`.github/workflows/cloudflare-deploy.yml` وتحديث `.github/workflows/release.yml` و`test/celia-edge-worker.test.js`.
 
+12. **بروتوكول التفوق واكتساب المستخدمين وحزمة Benchmark الـ20 حالة وإنفوجرافيك `/protocol` (`DEC-026`):**
+   - إنشاء `src/agent/automation/benchmark.js` (`BM-01..BM-20`، `20/20 PASS`، `0` قبول/رفض خاطئ، `100%` ثبات إعادة تشغيل)، وصفحة الإنفوجرافيك المعماري العربي التفاعلي `public/protocol.{html,css,js}` على `/protocol`، ووثيقة `docs/user-switch-protocol.md`، واختبارات `test/agent-benchmark-20.test.js` (`BENCH-01..BENCH-02`).
+
 ## 2. نتائج الفحوص الفعلية (محليًا وفي GitHub Actions CI)
 
 - `npm run build:pages`: ناجح (8 صفحات ثابتة في `dist/`).

@@ -9,6 +9,7 @@
 import { mkdir, readFile, readdir, rm, writeFile, copyFile, cp, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { RELEASE, RELEASE_HISTORY, SERVER_INFO } from '../src/version.js';
+import { runDocumentAutomationBenchmark } from '../src/agent/automation/index.js';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -97,6 +98,7 @@ function rewriteStaticHostLinks(html) {
     .replace(/href="\.\/index\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./index.html${suffix}"`)
     .replace(/href="\.\/studio\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./index.html${suffix}"`)
     .replace(/href="\.\/agent\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./agent.html${suffix}"`)
+    .replace(/href="\.\/protocol\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./protocol.html${suffix}"`)
     .replace(/href="\.\/kb\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./kb.html${suffix}"`)
     // روابط التشخيص المباشرة: Pages يخدم ملفات فقط، لذا تشير إلى لقطات JSON ثابتة.
     .replace(/href="\.\/health"/g, 'href="./health.json"')
@@ -213,6 +215,11 @@ export async function build() {
     'utf8'
   );
   await mkdir(path.join(DIST_DIR, 'api'), { recursive: true });
+  await writeFile(
+    path.join(DIST_DIR, 'api', 'protocol-benchmark.json'),
+    `${JSON.stringify(await runDocumentAutomationBenchmark(), null, 2)}\n`,
+    'utf8'
+  );
   await writeFile(
     path.join(DIST_DIR, 'api', 'live.json'),
     `${JSON.stringify(

@@ -1,4 +1,5 @@
 import express from 'express';
+import { runDocumentAutomationBenchmark } from './agent/automation/index.js';
 
 /**
  * Owner-only HTTP surface for the M1 agent loop (AGENT-001).
@@ -47,6 +48,14 @@ export function createAgentRouter({ agent, authorize, logger = console }) {
     try {
       const report = await current.metrics(current.status().ownerId);
       return res.set('Cache-Control', 'no-store').json(report);
+    } catch (error) {
+      return fail(res, error);
+    }
+  });
+
+  router.get('/benchmark', async (_req, res) => {
+    try {
+      return res.set('Cache-Control', 'no-store').json(await runDocumentAutomationBenchmark());
     } catch (error) {
       return fail(res, error);
     }

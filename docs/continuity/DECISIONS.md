@@ -499,6 +499,19 @@
 - **السبب:** ضمان فحص وتوظيف جميع الأسرار الـ18 فعليًا في CI والنشر الحافي دون أي تسرب للأسرار.
 - **الأثر:** تحديث [src/ai-providers.js](../../src/ai-providers.js)، [src/celia-mcp.js](../../src/celia-mcp.js)، [src/celia-ui.js](../../src/celia-ui.js)، [src/resilience.js](../../src/resilience.js)، [src/secrets-hub.js](../../src/secrets-hub.js)، [scripts/check-secrets-wiring.mjs](../../scripts/check-secrets-wiring.mjs)، [scripts/deploy-cloudflare-edge.mjs](../../scripts/deploy-cloudflare-edge.mjs)، [workers/celia-edge/worker.js](../../workers/celia-edge/worker.js)، و[test/celia-edge-worker.test.js](../../test/celia-edge-worker.test.js).
 
+## DEC-026 — بروتوكول التفوق واكتساب المستخدمين (`User Switch & Product Superiority Protocol`): Benchmark الـ20 حالة وإنفوجرافيك `/protocol`
+
+- **التاريخ:** 27 أكتوبر 2026 (مساءً) · **الحالة:** منفذ ومتحقق محليًا وفي GitHub Actions CI · **المهمة:** AGENT-001، QA-001، QA-003، UX-001
+- **السياق:** تطبيق «بروتوكول البناء واكتساب المستخدمين — CeliaOS» لإثبات سبب اختيار المستخدمين لـCeliaOS بدلًا من Claude وManus في مجال ضيق ومحدد (`document_data_automation`) بالاعتماد على الأدلة الموقّعة (`SHA-256`) وبوابة الفهم (`Comprehension Gate`)، وتحويل البروتوكول إلى إنفوجرافيك معماري عربي تفاعلي.
+- **القرار:**
+  1. **بناء حزمة Benchmark الـ20 حالة القابلة لإعادة التشغيل ([src/agent/automation/benchmark.js](../../src/agent/automation/benchmark.js)):**
+     - تغطي 20 حالة ممثلة (`BM-01..BM-20`): فواتير `CSV/JSON/TXT` سليمة عبر `SAR/USD/AED/EGP/EUR`، أخطاء حسابية وتواريخ وعملات غير مدعومة، حقول إلزامية ناقصة، محاولات حقن تعليمات خبيثة (`Prompt Injection`) داخل المستندات، كشف الفواتير المكررة، وثبات إعادة التشغيل (`Replay Determinism = 100%`) وكشف تناقض الشرح في `Comprehension Gate`.
+     - إتاحة النتيجة عبر `GET /api/agent/benchmark` و`GET /api/protocol-benchmark.json`.
+  2. **بناء الإنفوجرافيك المعماري العربي التفاعلي ([public/protocol.html](../../public/protocol.html) على المسار `/protocol`) ووثيقة البروتوكول ([docs/user-switch-protocol.md](../user-switch-protocol.md)):**
+     - يعرض المراحل التسع (0 إلى 8)، خط أنابيب التنفيذ ذي المحطات الثماني، مصفوفة المقارنة الموثقة مع Claude وManus، وبطاقة الأداء الحية للـ20 حالة مع قرار `GO` تقنيًا و`ITERATE` ميدانيًا.
+- **السبب:** إثبات التفوق بالأدلة القابلة للقياس وإعادة التشغيل بدل الادعاءات التسويقية العامة.
+- **الأثر:** إضافة [src/agent/automation/benchmark.js](../../src/agent/automation/benchmark.js)، [public/protocol.html](../../public/protocol.html)، [public/protocol.css](../../public/protocol.css)، [public/protocol.js](../../public/protocol.js)، [docs/user-switch-protocol.md](../user-switch-protocol.md)، و[test/agent-benchmark-20.test.js](../../test/agent-benchmark-20.test.js).
+
 ## إضافة قرار لاحق
 
 استخدم معرفًا جديدًا، والتاريخ والحالة والسياق والبدائل والقرار والسبب والأثر ومرجع المهمة، واذكر صراحة القرار المستبدل إن وجد. لا تنسخ أسرارًا أو مخطط إنتاج يحوي بيانات شخصية إلى سجل القرار.
