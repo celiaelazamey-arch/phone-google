@@ -100,6 +100,7 @@ function rewriteStaticHostLinks(html) {
     .replace(/href="\.\/agent\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./agent.html${suffix}"`)
     .replace(/href="\.\/protocol\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./protocol.html${suffix}"`)
     .replace(/href="\.\/computer\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./computer.html${suffix}"`)
+    .replace(/href="\.\/computer-permissions\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./computer-permissions.html${suffix}"`)
     .replace(/href="\.\/kb\/?([?#][^"]*)?"/g, (_, suffix = '') => `href="./kb.html${suffix}"`)
     // روابط التشخيص المباشرة: Pages يخدم ملفات فقط، لذا تشير إلى لقطات JSON ثابتة.
     .replace(/href="\.\/health"/g, 'href="./health.json"')

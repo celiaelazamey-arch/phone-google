@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>صلاحيات وكيل الكمبيوتر في CeliaOS — مصفوفة سياسة (غير موصولة)</title>
+    <meta
+      name="description"
+      content="مصفوفة صلاحيات وكيل الكمبيوتر داخل CeliaOS: مسموح، موافقة، مقيّد، محظور — مع NETWORK=DENY وEXTERNAL GATES=CLOSED وIDENTITY=NOT_PROVEN، وميزة الاستقلالية المصحوبة بأدلة."
+    />
+    <link rel="stylesheet" href="./fonts.css" />
+    <style>
+      :root {
+        --bg: #0b1030; --bg2: #121a4a; --card: #161f55; --line: #2e3a8c; --txt: #eaf0ff; --mut: #a9b6e8;
+        --ok: #34d399; --warn: #fbbf24; --rest: #38bdf8; --bad: #f87171; --vio: #8b5cf6; --cy: #22d3ee;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; color: var(--txt); line-height: 1.7;
+        background: radial-gradient(1100px 560px at 82% -10%, #3b2a8f55, transparent),
+          radial-gradient(880px 480px at 8% 8%, #0e749033, transparent), var(--bg);
+        font-family: "IBM Plex Sans Arabic", system-ui, Tahoma, sans-serif;
+      }
+      .wrap { max-width: 1200px; margin: 0 auto; padding: 20px 16px 40px; }
+      .skip { position: absolute; inset-inline-start: -9999px; }
+      .skip:focus { inset-inline-start: 12px; top: 8px; background: var(--cy); color: #06102c; padding: 8px 12px; border-radius: 8px; }
+      .topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;
+        border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; background: #ffffff08; }
+      .brand { font-weight: 800; background: linear-gradient(135deg, var(--vio), var(--cy));
+        -webkit-background-clip: text; background-clip: text; color: transparent; }
+      nav { display: flex; flex-wrap: wrap; gap: 6px; }
+      nav a { color: var(--mut); text-decoration: none; font-size: 13px; padding: 5px 11px; border-radius: 999px; }
+      nav a:hover, nav a:focus-visible { color: var(--txt); background: #ffffff0a; }
+      nav a[aria-current="page"] { color: var(--cy); border: 1px solid var(--cy); }
+      header.hero { text-align: center; margin: 26px 0 10px; }
+      header.hero h1 { margin: 0 0 6px; font-size: clamp(24px, 3.8vw, 36px); }
+      header.hero p { margin: 0; color: var(--mut); }
+      .truth { margin: 18px 0; border: 1px solid #fbbf2477; background: #fbbf2412; border-radius: 14px; padding: 12px 14px; font-size: 13.5px; }
+      .truth b { color: var(--warn); }
+      .state { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+      .state code { background: #00000033; border: 1px solid var(--line); border-radius: 8px; padding: 2px 8px; font-size: 12px; direction: ltr; }
+      .cols { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 10px; }
+      .col { background: var(--bg2); border: 1px solid var(--line); border-radius: 16px; padding: 12px; }
+      .col-title { margin: 0 0 4px; font-size: 15px; display: flex; justify-content: space-between; align-items: center; }
+      .col-title[data-status="allowed"] { color: var(--ok); }
+      .col-title[data-status="approval_required"] { color: var(--warn); }
+      .col-title[data-status="restricted"] { color: var(--rest); }
+      .col-title[data-status="denied"] { color: var(--bad); }
+      .count { font-size: 12px; border: 1px solid var(--line); border-radius: 999px; padding: 0 8px; color: var(--mut); }
+      .col-note { margin: 0 0 10px; color: var(--mut); font-size: 12px; }
+      .cap { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-bottom: 10px; }
+      .cap h4 { margin: 0 0 4px; font-size: 13.5px; }
+      .cap .scope { margin: 0 0 6px; color: var(--mut); font-size: 12px; }
+      .cap .gate { margin: 0; font-size: 11.5px; color: var(--mut); }
+      .cap .gate span { color: var(--cy); }
+      .flags { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+      .flag { font-size: 11px; border-radius: 999px; padding: 1px 8px; border: 1px solid var(--line); }
+      .flag.off { color: var(--warn); border-color: #fbbf2466; }
+      .flag.on { color: var(--ok); border-color: #34d39966; }
+      section.block { margin-top: 26px; }
+      section.block h2 { font-size: 19px; margin: 0 0 12px; }
+      section.block h2 small { font-size: 12.5px; color: var(--mut); font-weight: 400; }
+      ol.flow { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+      ol.flow li { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px; display: flex; gap: 8px; }
+      ol.flow b { width: 24px; height: 24px; flex: none; border-radius: 50%; background: var(--vio); color: #fff;
+        display: grid; place-items: center; font-size: 12px; }
+      ol.flow small { display: block; color: var(--mut); font-size: 11.5px; }
+      ul.rules { margin: 0; padding-inline-start: 18px; color: var(--mut); font-size: 13.5px; }
+      ul.rules li { margin-bottom: 4px; }
+      .feature { background: linear-gradient(160deg, var(--card), var(--bg2)); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+      .feature h2 { margin-top: 0; }
+      .thesis { color: var(--txt); font-size: 14.5px; margin: 0 0 12px; }
+      .pillars { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+      .pillar { background: #ffffff08; border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+      .pillar h4 { margin: 0 0 4px; color: var(--cy); font-size: 13.5px; }
+      .pillar p { margin: 0; color: var(--mut); font-size: 12.5px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+      th, td { border: 1px solid var(--line); padding: 7px 9px; text-align: start; vertical-align: top; }
+      th { background: #ffffff0a; color: var(--cy); font-weight: 700; }
+      td { color: var(--mut); }
+      .notclaimed { margin-top: 12px; border: 1px dashed #fbbf2477; border-radius: 12px; padding: 10px; color: var(--warn); font-size: 13px; }
+      footer { margin-top: 26px; text-align: center; color: var(--mut); font-size: 12.5px; }
+      footer a { color: var(--cy); }
+      @media (max-width: 980px) {
+        .cols { grid-template-columns: 1fr 1fr; }
+        ol.flow { grid-template-columns: 1fr; }
+      }
+      @media (max-width: 620px) { .cols { grid-template-columns: 1fr; } }
+      @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+      @media (forced-colors: active) { .cap, .col, .feature { border: 1px solid CanvasText; } }
+      :focus-visible { outline: 2px solid var(--cy); outline-offset: 2px; }
+    </style>
+  </head>
+  <body data-page="computer-permissions">
+    <a class="skip" href="#main-content">انتقل إلى المحتوى الرئيسي</a>
+    <div class="wrap">
+      <div class="topbar">
+        <span class="brand">CeliaOS</span>
+        <nav aria-label="التنقل الرئيسي">
+          <a href="./index.html">الاستوديو</a>
+          <a href="./agent">الوكيل المحكوم</a>
+          <a href="./system">مركز النظام</a>
+          <a href="./computer.html">استخدام الكمبيوتر</a>
+          <a href="./computer-permissions.html" aria-current="page">صلاحيات الكمبيوتر</a>
+        </nav>
+      </div>
+
+      <header class="hero">
+        <h1>صلاحيات وكيل الكمبيوتر في CeliaOS</h1>
+        <p>مصفوفة سياسة — تُولَّد من الشيفرة نفسها التي تصدر القرار.</p>
+      </header>
+
+      <div class="truth" role="note">
+        <b>ليست قدرات مُشغَّلة.</b>
+        0 من 16 قدرة موصولة بمحرك تنفيذ (<code>AGENT-003</code> موقوفة). القرار يُحسب فعليًا، لكن
+        <code>executable</code> يبقى <code>false</code> — والمخطط يوثّق الحدود بدل أن يوحي بقدرة قائمة.
+        <div class="state">
+          <code>NETWORK = DENY</code>
+          <code>EXTERNAL GATES = CLOSED</code>
+          <code>IDENTITY = NOT_PROVEN</code>
+          <code>computer-agent-policy-v1</code>
+        </div>
+      </div>
+
+      <main id="main-content">
+        <section class="block" aria-label="مصفوفة الصلاحيات">
+          <div class="cols">
+        <section class="col" aria-labelledby="col-allowed">
+          <h3 id="col-allowed" class="col-title" data-status="allowed">
+            مسموح <span class="count">7</span>
+          </h3>
+          <p class="col-note">داخل النطاق المحدد، وبلا أثر خارجي</p>
+          <article class="cap" data-status="allowed">
+            <h4>فهم المهمة ووضع خطة</h4>
+            <p class="scope">عقد المهمة المعتمد</p>
+            <p class="gate"><span>البوابة</span> Goal contract</p>
+            <div class="flags">
+              <span class="flag off">غير موصولة</span>
+              <span class="flag on">مختبَرة</span>
+            </div>
+          </article>
+          <article class="cap" data-status="allowed">
+            <h4>مشاهدة الشاشة والتقاط الصور</h4>
+            <p class="scope">الجلسة المصرح بها فقط</p>
+            <p class="gate"><span>البوابة</span> Session scope</p>
+            <div class="flags">
+              <span class="flag off">غير موصولة</span>
+              <span class="flag on">مختبَرة</span>
+            </div>
+          </article>
+          <article class="cap" data-status="allowed">
+            <h4>قراءة عناصر الصفحة والنوافذ</h4>
+            <p class="scope">نطاق المهمة الحالية</p>
+            <p class="gate"><span>البوابة</span> Task scope</p>
+            <div class="flags">
+              <span class="flag off">غير موصولة</span>
+              <span class="flag on">مختبَرة</span>
+            </div>
+          </article>
+          <article class="cap" data-status="allowed">
+            <h4>النقر بالماوس</h4>
+            <p class="scope">عناصر مرتبطة بالخطة المعتمدة</p>
+            <p class="gate"><span>البوابة</span> Plan-linked target</p>
+            <div class="flags">
+              <span class="flag off">غير موصولة</span>
+              <span class="flag on">مختبَرة</span>
+            </div>
+          </article>
+          <article class="cap" data-status="allowed">
+            <h4>الكتابة واستخدام لوحة المفاتيح</h4>
+            <p class="scope">حقول وتطبيقات مصرح بها</p>
+            <p class="gate"><span>البوابة</span> Field allowlist</p>
+            <div class="flags">
+              <span class="flag off">غير موصولة</span>
+              <span class="flag on">مختبَرة</span>
+            </div>
+          </article>
+          <article class="cap" data-status="allowed">
+            <h4>التمرير والتنقل داخل الصفحة</h4>
+            <p class="scope">النطاق المسموح</p>
+            <p class="gate"><span>البوابة</span> Task scope</p>
+            <div class="flags">
+              <span class="flag off">غير موصولة</span>
+              <span class="flag on">مختبَرة</span>
+            </div>
+          </article>
+          <article class="cap" data-status="allowed">
+            <h4>إيقاف التنفيذ فورًا وإلغاء ما بعده</h4>
+            <p class="scope">متاح دائمًا للمشغّل</p>
+            <p class="gate"><span>البوابة</span> Operator kill switch</p>
+            <div class="flags">
+              <span class="flag off">غير موصولة</span>
+              <span class="flag on">مختبَرة</span>
+            </div>
+          </article>
+        </section>
+        <section class="col" aria-labelledby="col-approval_required">
+          <h3 id="col-approval_required" class="col-title" data-status="approval_required">
+            يتطلب موافقة <span class="count">3</span>
+          </h3>
+          <p class="col-note">undefined</p>
+          <article class="cap" data-status="approval_required">
+            <h4>إرسال رسالة أو تقديم نموذج</h4>
+            <p class="scope">موافقة بشرية قبل الإرسال</p>
+            <p class="gate"><span>البوابة</span> Approval gate</p>
+            <div class="flags">
+              <span class="flag off">غير موصولة</span>
+              <span class="flag on">مختبَرة</span>
+            </div>
+          </article>
+          <article class="cap" data-status="approval_required">
+            <h4>حذف الملفات أو تغيير إعدادات حساسة</h4>
+            <p class="scope">موافقة حسب خطورة التغيير</p>
+            <p class="gate"><span>البوابة</span> Risk-scaled approval</p>
+            <div class="flags">
+              <span class="flag off">غير موصولة</span>
+              <span class="flag on">مختبَرة</span>
+            </div>
+          </article>
+          <article class="cap" data-status="approval_required">
+            <h4>المدفوعات وتغيير الصلاحيات</h4>
+            <p class="scope">موافقة بشرية إلزامية، لا تنفيذ تلقائي</p>
+            <p class="gate"><span>البوابة</span> Human-in-the-loop</p>
+            <div class="flags">
+              <span class="flag off">غير موصولة</span>
+              <span class="flag on">مختبَرة</span>
+            </div>
+          </article>
+        </section>
+        <section class="col" aria-labelledby="col-restricted">
+          <h3 id="col-restricted" class="col-title" data-status="restricted">
+            مقيّد <span class="count">2</span>
+          </h3>
+          <p class="col-note">إذن صريح لهذا الهدف تحديدًا</p>
+          <article class="cap" data-status="restricted">
+            <h4>تنزيل الملفات أو رفعها</h4>
+            <p class="scope">إذن صريح + تحقق من المصدر والوجهة</p>
+            <p class="gate"><span>البوابة</span> Source/destination check</p>
+            <div class="flags">
+              <span class="flag off">غير موصولة</span>
+              <span class="flag on">مختبَرة</span>
+            </div>
+          </article>
+          <article class="cap" data-status="restricted">
+            <h4>إنشاء الملفات وتعديلها</h4>
+            <p class="scope">مسارات مسموح بها + استرجاع</p>
+            <p class="gate"><span>البوابة</span> Path allowlist + rollback</p>
+            <div class="flags">
+              <span class="flag off">غير موصولة</span>
+              <span class="flag on">مختبَرة</span>
+            </div>
+          </article>
+        </section>
+        <section class="col" aria-labelledby="col-denied">
+          <h3 id="col-denied" class="col-title" data-status="denied">
+            محظور <span class="count">4</span>
+          </h3>
+          <p class="col-note">مرفوضة بالسياسة، لا استثناء</p>
+          <article class="cap" data-status="denied">
+            <h4>فتح موقع خارجي أو الاتصال بالإنترنت</h4>
+            <p class="scope">بوابة الشبكة مغلقة</p>
+            <p class="gate"><span>البوابة</span> NETWORK = DENY</p>
+            <div class="flags">
+              <span class="flag off">غير موصولة</span>
+              <span class="flag on">مختبَرة</span>
+            </div>
+          </article>
+          <article class="cap" data-status="denied">
+            <h4>تثبيت البرامج أو تنفيذ أوامر النظام</h4>
+            <p class="scope">لا صلاحيات مسؤول نظام</p>
+            <p class="gate"><span>البوابة</span> Admin boundary</p>
+            <div class="flags">
+              <span class="flag off">غير موصولة</span>
+              <span class="flag on">مختبَرة</span>
+            </div>
+          </article>
+          <article class="cap" data-status="denied">
+            <h4>الوصول إلى كلمات المرور ومفاتيح API</h4>
+            <p class="scope">الأسرار لا تُعرض ولا تُسجَّل</p>
+            <p class="gate"><span>البوابة</span> Secret boundary</p>
+            <div class="flags">
+              <span class="flag off">غير موصولة</span>
+              <span class="flag on">مختبَرة</span>
+            </div>
+          </article>
+          <article class="cap" data-status="denied">
+            <h4>تنفيذ إجراءات خارجية باسم المستخدم</h4>
+            <p class="scope">حتى إثبات الهوية وفتح البوابات</p>
+            <p class="gate"><span>البوابة</span> IDENTITY = NOT_PROVEN</p>
+            <div class="flags">
+              <span class="flag off">غير موصولة</span>
+              <span class="flag on">مختبَرة</span>
+            </div>
+          </article>
+        </section>
+          </div>
+        </section>
+
+        <section class="block" aria-labelledby="flow-title">
+          <h2 id="flow-title">كيف يقرر الوكيل النقرة أو الكتابة؟ <small>خمس خطوات، لا واحدة</small></h2>
+          <ol class="flow">
+          <li><b>1</b><span><strong>فهم الهدف</strong><small>ما المطلوب وما نطاقه؟</small></span></li>
+          <li><b>2</b><span><strong>فحص السياسة والصلاحية</strong><small>هل يسمح النظام بهذا التطبيق والإجراء والهدف؟</small></span></li>
+          <li><b>3</b><span><strong>طلب موافقة عند الحاجة</strong><small>الإجراءات الحساسة تتوقف حتى القرار البشري</small></span></li>
+          <li><b>4</b><span><strong>النقر أو الكتابة</strong><small>داخل النطاق المسموح فقط</small></span></li>
+          <li><b>5</b><span><strong>التحقق وتسجيل الدليل</strong><small>النتيجة الفعلية + سبب القرار + الموافقة</small></span></li>
+          </ol>
+        </section>
+
+        <section class="block" aria-labelledby="rules-title">
+          <h2 id="rules-title">قواعد إلزامية داخل CeliaOS</h2>
+          <ul class="rules">
+          <li>المنع الافتراضي: أي صلاحية غير محددة بوضوح تُرفض</li>
+          <li>أقل صلاحية: لا يحصل الوكيل إلا على ما تحتاجه المهمة الحالية</li>
+          <li>النية ليست نتيجة: النقر لا يعني نجاح العملية، والتحقق مستقل</li>
+          <li>الإيقاف عند الغموض: إذا تغيرت الصفحة أو الهدف، يتوقف الوكيل ويعيد التقييم</li>
+          <li>سجل قابل للمراجعة: الإجراء والسبب والقرار والنتيجة، بلا كلمات مرور أو أسرار</li>
+          <li>إيقاف فوري: للمشغّل أن يوقف التنفيذ ويلغي الإجراءات اللاحقة</li>
+          </ul>
+        </section>
+
+        <section class="block">
+          <div class="feature">
+            <h2>الميزة التنافسية: الاستقلالية المصحوبة بأدلة <small>Evidence-Carrying Autonomy</small></h2>
+            <p class="thesis">لا يكفي أن يعلن الوكيل نجاحه؛ عليه أن يقدّم دليلًا يُتحقق منه مستقلًا عنه — وهذا ما لا تمنحه سهولة النقر والكتابة وحدها.</p>
+            <div class="pillars">
+          <article class="pillar"><h4>حوكمة قبل التنفيذ</h4><p>كل إجراء يمر بمحرك السياسة؛ الأداة لا تتجاوز الصلاحية حتى لو طلب النموذج ذلك.</p></article>
+          <article class="pillar"><h4>دليل لكل خطوة</h4><p>الهدف، قرار السياسة، نتيجة الأداة، والدليل الداعم — مسجّلة ومترابطة.</p></article>
+          <article class="pillar"><h4>ناقد ومتحقق مستقلان</h4><p>يفحصان الناتج الفعلي ويكشفان النجاح الكاذب بدل تصديق تقرير الوكيل عن نفسه.</p></article>
+          <article class="pillar"><h4>استعادة قابلة للتدقيق</h4><p>سجل متين يعيد بناء الحالة؛ وإعادة التشغيل لا تكرر الأثر الخارجي تلقائيًا.</p></article>
+          <article class="pillar"><h4>اختبار موضوعي مستمر</h4><p>مهام ثابتة تقيس الصحة والالتزام بالصلاحيات والتعافي والتكلفة.</p></article>
+            </div>
+            <table>
+              <caption class="col-note">المراحل — معيار نجاح لكل مرحلة، لا شعارات</caption>
+              <thead>
+                <tr><th>#</th><th>المرحلة</th><th>ما نبنيه</th><th>معيار النجاح</th></tr>
+              </thead>
+              <tbody>
+              <tr><td>1</td><td>تثبيت الحوكمة</td><td>Capability Registry + Policy Engine + بوابات الموافقة</td><td>صفر إجراءات غير مصرح بها في الاختبارات</td></tr>
+              <tr><td>2</td><td>إثبات التنفيذ</td><td>Evidence Ledger + متحقق مستقل + استعادة آمنة</td><td>لا نجاح دون دليل كافٍ</td></tr>
+              <tr><td>3</td><td>تعميم الاختبارات</td><td>مهام متعددة وأخطاء متعمدة وإعادة محاولة</td><td>قياس النجاح الكاذب والفشل الكاذب وإعادة البناء</td></tr>
+              <tr><td>4</td><td>المقارنة العادلة</td><td>تشغيل المهام نفسها على CeliaOS وClaude وManus</td><td>نتائج قابلة للتكرار: دقة وتكلفة وزمن وأمان</td></tr>
+              </tbody>
+            </table>
+            <p class="notclaimed">هذه ميزة مستهدفة، وليست إثبات تفوّق حالي: لا مقارنة مهام موحّدة أُجريت بعد، ولا محرك تنفيذ كمبيوتر موصول في هذا المستودع.</p>
+          </div>
+        </section>
+      </main>
+
+      <footer>
+        computer-agent-policy-v1 · مُولَّد من <code>src/agent/computer-policy.js</code> ·
+        <a href="./computer.html">صفحة استخدام الكمبيوتر</a> · <a href="./system">حالة النظام الحقيقية</a>
+      </footer>
+    </div>
+  </body>
+</html>

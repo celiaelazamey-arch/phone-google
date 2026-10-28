@@ -36,6 +36,8 @@
     "test:copilot-bridge": "node --test test/copilot-mcp-bridge.test.js",
     "copilot:diagram": "node scripts/render-copilot-architecture.mjs",
     "copilot:diagram:check": "node scripts/render-copilot-architecture.mjs --check",
+    "computer:permissions": "node scripts/render-computer-permissions.mjs",
+    "computer:permissions:check": "node scripts/render-computer-permissions.mjs --check",
     "test:mysql": "node --test integration/mysql.integration.mjs",
     "google:doctor": "node scripts/google-doctor.mjs",
     "check:continuity": "node scripts/check-continuity.mjs",
