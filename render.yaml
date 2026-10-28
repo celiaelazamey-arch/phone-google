@@ -61,6 +61,20 @@ services:
         sync: false
       - key: YOUR_CODATA_API_KEY
         sync: false
+      # WhatsApp Cloud API runtime credentials must be entered in Render's environment dashboard.
+      # Repository Actions secrets are only available to workflows; they do not propagate to the runtime.
+      - key: APP_OWNER_PHONE_E164
+        sync: false
+      - key: WHATSAPP_ACCESS_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_APP_SECRET
+        sync: false
+      - key: WHATSAPP_VERIFY_TOKEN
+        sync: false
+      - key: WHATSAPP_API_VERSION
+        value: 'v26.0'
       - key: CELIA_DISABLE_OLLAMA
         value: 'true'
       # Retired services (DEC-030, docs/deployment-profile.json → serviceRetirements): credentials proven dead by the
