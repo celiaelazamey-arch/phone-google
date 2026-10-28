@@ -96,7 +96,7 @@ test('EDGE-02: /api/cron/status, /api/storage/r2/status, and /api/cron/jobs enfo
   assert.equal(badFieldRes.status, 422);
 });
 
-test('EDGE-03: buildWorkerMetadata prepares secret_text bindings for all 18 repository secrets', () => {
+test('EDGE-03: buildWorkerMetadata prepares secret_text bindings for all 18 repository secrets and worker serves /version and /api/protocol-benchmark.json', async () => {
   const metadata = buildWorkerMetadata({
     env: FULL_EDGE_ENV,
     version: '0.2.1',
@@ -104,4 +104,22 @@ test('EDGE-03: buildWorkerMetadata prepares secret_text bindings for all 18 repo
   });
   const secretBindings = metadata.bindings.filter((b) => b.type === 'secret_text');
   assert.equal(secretBindings.length, 18);
+
+  const verRes = await edgeWorker.fetch(
+    new Request('https://celia-phone-google.workers.dev/version'),
+    FULL_EDGE_ENV
+  );
+  assert.equal(verRes.status, 200);
+  const verJson = await verRes.json();
+  assert.equal(verJson.version, '0.2.1');
+
+  const bmRes = await edgeWorker.fetch(
+    new Request('https://celia-phone-google.workers.dev/api/protocol-benchmark.json'),
+    FULL_EDGE_ENV
+  );
+  assert.equal(bmRes.status, 200);
+  const bmJson = await bmRes.json();
+  assert.equal(bmJson.totalCases, 20);
+  assert.equal(bmJson.passedCount, 20);
+  assert.equal(bmJson.decision, 'GO');
 });

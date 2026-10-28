@@ -95,39 +95,68 @@ async function main() {
     return;
   }
 
-  const baseUrl = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}`;
+  let resolvedAccountId = accountId;
   const authHeaders = {
     authorization: `Bearer ${apiToken}`
   };
 
-  const form = new FormData();
-  form.append(
-    'metadata',
-    new Blob([JSON.stringify(metadata)], { type: 'application/json' }),
-    'metadata.json'
-  );
-  form.append(
-    'worker.js',
-    new Blob([workerSource], { type: 'application/javascript+module' }),
-    'worker.js'
-  );
+  const makeForm = () => {
+    const form = new FormData();
+    form.append(
+      'metadata',
+      new Blob([JSON.stringify(metadata)], { type: 'application/json' }),
+      'metadata.json'
+    );
+    form.append(
+      'worker.js',
+      new Blob([workerSource], { type: 'application/javascript+module' }),
+      'worker.js'
+    );
+    return form;
+  };
 
-  const uploadRes = await fetch(
+  let baseUrl = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(resolvedAccountId)}`;
+  let uploadRes = await fetch(
     `${baseUrl}/workers/scripts/${encodeURIComponent(scriptName)}`,
     {
       method: 'PUT',
       headers: authHeaders,
-      body: form
+      body: makeForm()
     }
   );
-  const uploadJson = await uploadRes.json().catch(() => ({}));
+  let uploadJson = await uploadRes.json().catch(() => ({}));
+
+  if (!uploadRes.ok || uploadJson.success === false) {
+    // Attempt automatic account ID discovery via Cloudflare Accounts API in case CLOUDFLARE_ACCOUNT_ID differs
+    const accRes = await fetch('https://api.cloudflare.com/client/v4/accounts? page=1&per_page=5', {
+      method: 'GET',
+      headers: authHeaders
+    }).catch(() => null);
+    const accJson = accRes ? await accRes.json().catch(() => ({})) : {};
+    const discoveredId = accJson?.result?.[0]?.id;
+    if (discoveredId && discoveredId !== resolvedAccountId) {
+      resolvedAccountId = String(discoveredId).trim();
+      baseUrl = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(resolvedAccountId)}`;
+      uploadRes = await fetch(
+        `${baseUrl}/workers/scripts/${encodeURIComponent(scriptName)}`,
+        {
+          method: 'PUT',
+          headers: authHeaders,
+          body: makeForm()
+        }
+      );
+      uploadJson = await uploadRes.json().catch(() => ({}));
+    }
+  }
 
   if (!uploadRes.ok || uploadJson.success === false) {
     const code = uploadJson?.errors?.[0]?.code || uploadRes.status;
+    const message = uploadJson?.errors?.[0]?.message || 'cloudflare_api_rejected';
     const summary = {
       status: 'api-rejected',
       httpStatus: uploadRes.status,
       errorCode: code,
+      errorMessage: message,
       scriptName,
       secretBindingsPrepared: secretBindingsCount,
       totalSecretsTracked: SECRET_KEYS.length,
@@ -136,10 +165,11 @@ async function main() {
     if (process.env.GITHUB_STEP_SUMMARY) {
       await appendFile(
         process.env.GITHUB_STEP_SUMMARY,
-        `### Cloudflare Worker Edge Deployment\n- Status: \`api-rejected\` (HTTP ${uploadRes.status}, code \`${code}\`)\n- Secrets prepared: **${secretBindingsCount} / ${SECRET_KEYS.length}**\n`,
+        `### Cloudflare Worker Edge Deployment\n- Status: \`api-rejected\` (HTTP ${uploadRes.status}, code \`${code}\`, message: \`${message}\`)\n- Secrets prepared: **${secretBindingsCount} / ${SECRET_KEYS.length}**\n`,
         'utf8'
       );
     }
+    console.log(`::notice title=Cloudflare Edge Status::${JSON.stringify(summary)}`);
     console.log(JSON.stringify(summary, null, 2));
     return;
   }
@@ -205,6 +235,7 @@ async function main() {
     );
   }
 
+  console.log(`::notice title=Cloudflare Edge Status::${JSON.stringify(report)}`);
   console.log(JSON.stringify(report, null, 2));
 }
 
