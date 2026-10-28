@@ -15,6 +15,9 @@ import {
   scoreServices,
   signAwsV4
 } from '../scripts/service-reality.mjs';
+import { applyRetirementsToEnv, loadServiceRetirements, normalizeRetirements, retirementFlags } from '../src/service-retirements.js';
+import { buildWorkerMetadata } from '../scripts/deploy-cloudflare-edge.mjs';
+import { buildEdgeSecretsReport } from '../workers/celia-edge/worker.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -143,7 +146,12 @@ test('failure diagnostics name the broken secret (402 balance, wrong voice id, u
     if (target === 'https://api.deepseek.com/v1/models') return reply(200, { data: [{ id: 'deepseek-chat' }, { id: 'deepseek-reasoner' }] });
     if (target === 'https://api.elevenlabs.io/v1/voices/voiceXYZ') return reply(400, { detail: { status: 'voice_not_found' } });
     if (target === 'https://api.elevenlabs.io/v1/user') return reply(200, { subscription: { tier: 'free' } });
-    if (target === 'https://api.elevenlabs.io/v1/voices') return reply(200, { voices: [{ voice_id: 'other1' }, { voice_id: 'other2' }] });
+    if (target === 'https://api.elevenlabs.io/v1/voices') return reply(200, { voices: [{ voice_id: 'other1', name: 'Aria' }, { voice_id: 'other2', name: 'Roger' }] });
+    if (target === 'https://api.elevenlabs.io/v1/text-to-speech/other1') {
+      assert.equal(init.method, 'POST');
+      assert.equal(JSON.parse(init.body).text, 'اختبار');
+      return new Response(new Uint8Array(1200), { status: 200, headers: { 'content-type': 'audio/mpeg' } });
+    }
     if (target.startsWith('https://typo-host.example.net/')) throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ENOTFOUND' } });
     if (target.startsWith('https://acc1.r2.cloudflarestorage.com/')) return new Response('<Error><Code>InvalidAccessKeyId</Code></Error>', { status: 403, headers: { 'content-type': 'application/xml' } });
     throw new Error(`unexpected ${target}`);
@@ -162,7 +170,8 @@ test('failure diagnostics name the broken secret (402 balance, wrong voice id, u
   assert.match(byId.deepseek.detail, /\/models 200 \(2 models, e\.g\. deepseek-chat, deepseek-reasoner; configured model listed\)/);
   assert.equal(byId.elevenlabs.verdict, 'failed');
   assert.match(byId.elevenlabs.detail, /GET \/voices\/\{CELIA_VOICE_ID\} → 400 \(voice_not_found\); API key valid \(\/user 200\)/);
-  assert.match(byId.elevenlabs.detail, /2 voices visible, configured voice id NOT among them/);
+  assert.match(byId.elevenlabs.detail, /2 voices visible, configured voice id NOT among them \(visible e\.g\. Aria=other1, Roger=other2\)/);
+  assert.match(byId.elevenlabs.detail, /key CAN synthesize with visible voice Aria \(1200 bytes\) → only CELIA_VOICE_ID needs fixing/);
   assert.equal(byId.cloudflare_r2.verdict, 'failed');
   assert.match(byId.cloudflare_r2.detail, /unreachable \(ENOTFOUND\)/);
   assert.match(byId.cloudflare_r2.detail, /canonical endpoint derived from CLOUDFLARE_ACCOUNT_ID answers \(failed: /);
@@ -183,6 +192,39 @@ test('an owner-retired service is reported as disabled and excluded from the wor
   assert.equal(score.disabled, 1);
   assert.equal(score.configured, 0);
   assert.equal(score.workingRate, null);
+});
+
+test('retirement manifest: validated, reversible, and told identically by the audit, the Worker bindings/report and render.yaml', () => {
+  const retirements = loadServiceRetirements();
+  assert.deepEqual(Object.keys(retirements).sort(), ['agentrouter', 'ai_gateway', 'cloudflare_r2', 'deepseek']);
+  for (const entry of Object.values(retirements)) {
+    assert.match(entry.evidence, /run 40646881277/);
+    assert.equal(entry.decision, 'DEC-030');
+    assert.ok(entry.reversal.length > 20, 'every retirement states how to undo it');
+  }
+  assert.throws(() => normalizeRetirements({ nope: { reason: 'x', decidedOn: '2026-10-28' } }), /unknown feature "nope"/);
+  assert.throws(() => normalizeRetirements({ figma: { reason: '', decidedOn: '2026-10-28' } }), /reason is required/);
+  assert.throws(() => normalizeRetirements({ figma: { reason: 'dead', decidedOn: 'yesterday' } }), /YYYY-MM-DD/);
+  // environment wins only when it says something
+  const env = applyRetirementsToEnv({ CELIA_DISABLE_DEEPSEEK: 'false', CELIA_DISABLE_AI_GATEWAY: '' }, retirements);
+  assert.equal(env.CELIA_DISABLE_DEEPSEEK, 'false');
+  assert.equal(env.CELIA_DISABLE_AI_GATEWAY, 'true');
+  assert.equal(env.CELIA_DISABLE_CLOUDFLARE_R2, 'true');
+  // Worker deploy carries the flags as plain_text bindings; secret_text bindings are untouched
+  const metadata = buildWorkerMetadata({ env: { AI_GATEWAY_API_KEY: 'k' }, version: '0.2.1', commit: 'abc', retirements });
+  const flags = metadata.bindings.filter((b) => b.type === 'plain_text' && b.name.startsWith('CELIA_DISABLE_')).map((b) => b.name).sort();
+  assert.deepEqual(flags, Object.keys(retirementFlags(retirements)).sort());
+  assert.equal(metadata.bindings.filter((b) => b.type === 'secret_text').length, 1);
+  // Worker report marks the retired boundaries without pretending the secrets vanished
+  const report = buildEdgeSecretsReport({ AI_GATEWAY_API_KEY: 'k', CLOUDFLARE_R2_ACCESS_KEY_ID: 'a', CLOUDFLARE_R2_SECRET_ACCESS_KEY: 's', CLOUDFLARE_R2_S3_ENDPOINT: 'https://x.r2.cloudflarestorage.com', ...retirementFlags(retirements) });
+  assert.deepEqual(report.retiredServices.sort(), ['agentrouter', 'ai_gateway', 'cloudflare_r2', 'deepseek']);
+  assert.equal(report.configuredCount, 4);
+  assert.equal(report.secrets.find((s) => s.secretName === 'AI_GATEWAY_API_KEY').retired, true);
+  assert.equal(report.secrets.find((s) => s.secretName === 'GEMINI_API_KEY').retired, false);
+  // render.yaml blueprint defaults must match the manifest exactly (no silent drift either way)
+  const blueprint = fs.readFileSync(path.join(root, 'render.yaml'), 'utf8');
+  const blueprintFlags = [...blueprint.matchAll(/- key: (CELIA_DISABLE_[A-Z0-9_]+)\n\s+value: 'true'/g)].map((m) => m[1]).filter((flag) => flag !== 'CELIA_DISABLE_OLLAMA').sort();
+  assert.deepEqual(blueprintFlags, Object.keys(retirementFlags(retirements)).sort());
 });
 
 test('service-reality workflow wires all 18 secrets, a real MySQL service, and never a Render/MySQL production credential', () => {

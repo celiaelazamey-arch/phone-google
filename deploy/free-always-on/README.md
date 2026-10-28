@@ -181,3 +181,10 @@ CELIA_MCP_API_TOKEN=… npm run verify:live -- --url https://<service>.onrender.
 لا حساب ولا نشر ولا ترحيل على قاعدة حقيقية ولا مفتاح تشفير ولا بطاقة. تفعيل Pages حدث من جهة المالك
 (القسم 4 البند 4) لكن أول نشر فعلي لم يحدث بعد ولم يُتحقق من الرابط. الملفات والاختبارات والدليل جاهزة؛
 الخطوة الحاسمة تحتاج نقرة المالك، ثم `npm run verify:live` لتحويل القائمة إلى دليل.
+
+## الخدمات المتقاعدة في التصميم (DEC-030)
+
+`render.yaml` يضبط افتراضيًا `CELIA_DISABLE_AI_GATEWAY`، `CELIA_DISABLE_DEEPSEEK`، `CELIA_DISABLE_AGENTROUTER`،
+`CELIA_DISABLE_CLOUDFLARE_R2` على `'true'` لأن تدقيق الواقع (`docs/service-reality.md`) أثبت أن اعتماداتها ميتة أو تتطلب
+بطاقة. المصدر: `docs/deployment-profile.json → serviceRetirements`. لا تقلبها إلى `'false'` إلا بعد إصلاح الحساب وتشغيلة
+`[reality]` خضراء لتلك الخدمة.

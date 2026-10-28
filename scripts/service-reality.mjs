@@ -26,6 +26,7 @@ import { spawnSync } from 'node:child_process';
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { applyRetirementsToEnv, normalizeRetirements } from '../src/service-retirements.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DEFAULT_OUT = '.validation-artifacts/service-reality.json';
@@ -187,9 +188,29 @@ export function buildProbes({ config, env, fetchImpl = fetch, timeoutMs, publica
         if (!config.elevenlabs?.apiKey) return { verdict: 'not-configured', detail: 'API key absent' };
         if (!config.elevenlabs?.voiceId) return { verdict: 'failed', detail: 'CELIA_VOICE_ID missing or malformed' };
         const started = Date.now();
+        // A voice that cannot speak is a name. Synthesize six characters for real (free tier: 10k chars/month);
+        // the audio is counted, never stored or logged.
+        const synthesize = async (voiceId) => {
+          const response = await fetchImpl(`${config.elevenlabs.baseUrl}/text-to-speech/${encodeURIComponent(voiceId)}`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', accept: 'audio/mpeg', 'xi-api-key': config.elevenlabs.apiKey },
+            body: JSON.stringify({ text: 'اختبار', model_id: 'eleven_multilingual_v2' }),
+            signal: withTimeout(timeoutMs)
+          });
+          const type = response.headers.get('content-type') || '';
+          if (response.ok && /audio\//i.test(type)) return { ok: true, bytes: (await response.arrayBuffer()).byteLength, status: response.status };
+          const body = await response.text().catch(() => '');
+          let reason = '';
+          try { const parsed = JSON.parse(body); reason = String(parsed?.detail?.status || parsed?.detail?.message || parsed?.detail || '').slice(0, 80); } catch { reason = body.slice(0, 60); }
+          return { ok: false, status: response.status, reason };
+        };
         try {
           const voice = await probeCeliaVoice({ config, timeoutMs });
-          return { verdict: voice.reachable ? 'verified' : 'failed', detail: voice.reachable ? `voice found (category ${voice.category || 'n/a'})` : 'voice not reachable', latencyMs: Date.now() - started };
+          if (!voice.reachable) return { verdict: 'failed', detail: 'voice not reachable', latencyMs: Date.now() - started };
+          const tts = await synthesize(config.elevenlabs.voiceId);
+          return tts.ok
+            ? { verdict: 'verified', detail: `voice found (category ${voice.category || 'n/a'}) and synthesized 6 characters (${tts.bytes} bytes of audio, not stored)`, latencyMs: Date.now() - started }
+            : { verdict: 'failed', detail: `voice found but text-to-speech → ${tts.status}${tts.reason ? ` (${tts.reason})` : ''}: the key cannot synthesize with this voice`, latencyMs: Date.now() - started };
         } catch (error) {
           // Split "key is wrong" from "voice id is wrong" so the owner fixes the right secret.
           const headers = { accept: 'application/json', 'xi-api-key': config.elevenlabs.apiKey };
@@ -201,7 +222,10 @@ export function buildProbes({ config, env, fetchImpl = fetch, timeoutMs, publica
           const ids = catalogue.map((entry) => String(entry?.voice_id || ''));
           const suggestions = catalogue.slice(0, 3).map((entry) => `${String(entry?.name || '?').slice(0, 24)}=${String(entry?.voice_id || '')}`).join(', ');
           const keyValid = user.status === 200;
-          const detail = `GET /voices/{CELIA_VOICE_ID} → ${voice.status || error?.upstreamStatus || 'error'}${reason(voice) ? ` (${reason(voice)})` : ''}; API key ${keyValid ? 'valid (/user 200)' : `rejected (/user ${user.status}${reason(user) ? ` ${reason(user)}` : ''})`}; ${voices.status === 200 ? `${ids.length} voices visible, configured voice id ${ids.includes(config.elevenlabs.voiceId) ? 'listed' : `NOT among them${suggestions ? ` (visible e.g. ${suggestions})` : ''}`}` : `/voices ${voices.status}`}`;
+          // Can this key speak at all? Try one visible voice so the owner knows whether to fix the key or only the voice id.
+          const sample = catalogue[0]?.voice_id ? await synthesize(String(catalogue[0].voice_id)).catch((cause) => ({ ok: false, status: 0, reason: cause?.cause?.code || cause?.name || 'request failed' })) : null;
+          const synthesis = sample ? (sample.ok ? `key CAN synthesize with visible voice ${String(catalogue[0]?.name || '?').slice(0, 24)} (${sample.bytes} bytes) → only CELIA_VOICE_ID needs fixing` : `key cannot synthesize even with a visible voice (text-to-speech → ${sample.status}${sample.reason ? ` ${sample.reason}` : ''}) → the key itself needs replacing`) : 'synthesis not attempted (no visible voice)';
+          const detail = `GET /voices/{CELIA_VOICE_ID} → ${voice.status || error?.upstreamStatus || 'error'}${reason(voice) ? ` (${reason(voice)})` : ''}; API key ${keyValid ? 'valid (/user 200)' : `rejected (/user ${user.status}${reason(user) ? ` ${reason(user)}` : ''})`}; ${voices.status === 200 ? `${ids.length} voices visible, configured voice id ${ids.includes(config.elevenlabs.voiceId) ? 'listed' : `NOT among them${suggestions ? ` (visible e.g. ${suggestions})` : ''}`}` : `/voices ${voices.status}`}; ${synthesis}`;
           return { verdict: 'failed', detail, latencyMs: Date.now() - started };
         }
       }
@@ -393,14 +417,18 @@ export const PROBE_FEATURE = Object.freeze({
   google_oauth_client: 'google', google_workspace: 'google'
 });
 
-export async function runProbes(probes, { env, timeoutMs, features = null }) {
+export async function runProbes(probes, { env, timeoutMs, features = null, retirements = {} }) {
   const results = [];
   for (const probe of probes) {
     const started = Date.now();
     const feature = PROBE_FEATURE[probe.id];
     if (feature && features && features[feature] === false) {
       // An owner-retired service is neither a façade nor a failure: it is explicitly out of the product.
-      results.push({ id: probe.id, label: probe.label, category: probe.category, secret: probe.secret, verdict: 'disabled', detail: `retired by the owner (CELIA_DISABLE_${feature.toUpperCase()}=true) — not counted`, latencyMs: 0 });
+      const manifest = retirements?.[feature];
+      const detail = manifest
+        ? `retired in Git (docs/deployment-profile.json → serviceRetirements.${feature}, ${manifest.decidedOn}${manifest.decision ? `, ${manifest.decision}` : ''}): ${manifest.reason} — reversal: ${manifest.reversal} — not counted`
+        : `retired by the owner (CELIA_DISABLE_${feature.toUpperCase()}=true) — not counted`;
+      results.push({ id: probe.id, label: probe.label, category: probe.category, secret: probe.secret, verdict: 'disabled', detail: sanitize(detail, env), latencyMs: 0 });
       continue;
     }
     try {
@@ -466,7 +494,10 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
   const pkg = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
   const profile = JSON.parse(await readFile(path.join(root, 'docs/deployment-profile.json'), 'utf8'));
   const publication = { ...profile.publication, repository: profile.repository?.replace(/^https?:\/\/github\.com\//, '') || 'celiaelazamey-arch/phone-google', workerScript: 'celia-phone-google' };
-  const report = { schema: 1, generatedAt: new Date().toISOString(), commit: env.GITHUB_SHA || null, minRate: options.minRate, offline: null, mysql: null, live: null, score: null };
+  // Git-reviewed retirements (DEC-030) become CELIA_DISABLE_* flags unless the owner's environment already decides.
+  const retirements = normalizeRetirements(profile.serviceRetirements);
+  env = applyRetirementsToEnv(env, retirements);
+  const report = { schema: 1, generatedAt: new Date().toISOString(), commit: env.GITHUB_SHA || null, minRate: options.minRate, retirements: Object.keys(retirements), offline: null, mysql: null, live: null, score: null };
 
   if (!options.skipOffline) report.offline = runOfflineSuite({ env });
   if (!options.skipOffline) report.mysql = runMysqlSuite({ env });
@@ -478,7 +509,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
     const token = String(env.CELIA_MCP_API_TOKEN || '').trim().length >= 32 ? env.CELIA_MCP_API_TOKEN : crypto.randomBytes(32).toString('hex');
     const config = loadCeliaMcpConfig({ ...env, CELIA_MCP_API_TOKEN: token, CELIA_MCP_DISABLE_MYSQL: 'true', CELIA_DISABLE_OLLAMA: 'true', CELIA_SERVICE_TIMEOUT_MS: env.CELIA_SERVICE_TIMEOUT_MS || String(Math.min(Math.max(options.timeoutMs, 50), 60_000)) });
     const probes = buildProbes({ config, env, fetchImpl, timeoutMs: options.timeoutMs, publication, version: pkg.version, modules: { generateCeliaReply, planDeployment, ...hub } });
-    report.live = await runProbes(probes, { env, timeoutMs: options.timeoutMs, features: config.features });
+    report.live = await runProbes(probes, { env, timeoutMs: options.timeoutMs, features: config.features, retirements });
     report.score = scoreServices(report.live);
   }
 

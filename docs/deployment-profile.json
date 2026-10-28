@@ -61,5 +61,36 @@
     "script": "scripts/deploy-render.mjs",
     "inputs": { "variable": ["CELIA_LIVE_URL"], "secrets": ["RENDER_API_KEY", "RENDER_SERVICE_ID", "RENDER_DEPLOY_HOOK_URL (alternative)"], "reused": ["CELIA_MCP_API_TOKEN", "CELIAOS_CRONJOB_ORG_API_KEY"] },
     "untilConfigured": "every run ends green with a not-configured notice naming the missing inputs; no deployment is claimed"
+  },
+  "serviceRetirementsNote": "Explicit, reversible retirements of services whose credentials are proven dead (DEC-030). Same flags as CELIA_DISABLE_<SERVICE>; a non-empty environment value wins over this file. Honoured by scripts/service-reality.mjs (verdict disabled), scripts/deploy-cloudflare-edge.mjs (Worker plain_text bindings) and render.yaml.",
+  "serviceRetirements":   {
+    "ai_gateway": {
+      "reason": "Vercel AI Gateway answers 403 'requires a valid credit card on file' for every completion while the key itself lists 498 models; the project forbids payment cards, so the service can never work here",
+      "decidedOn": "2026-10-28",
+      "decision": "DEC-030",
+      "evidence": "service-reality run 40646881277 (annotation 'Service Reality · ai_gateway failed')",
+      "reversal": "delete this entry once the owner adds a card to the Vercel team (not recommended under the no-card constraint)"
+    },
+    "cloudflare_r2": {
+      "reason": "SigV4-signed ListBuckets never reaches R2: the TLS handshake is refused for <account>.r2.cloudflarestorage.com, the pattern of an account on which R2 was never enabled (no bucket) or whose keys belong elsewhere; nothing in the code reads or writes R2",
+      "decidedOn": "2026-10-28",
+      "decision": "DEC-030",
+      "evidence": "service-reality run 40646881277 (annotation 'Service Reality · cloudflare_r2 failed')",
+      "reversal": "enable R2 in the Cloudflare dashboard, create a bucket, re-issue the three CLOUDFLARE_R2_* secrets, delete this entry, push a [reality] commit"
+    },
+    "deepseek": {
+      "reason": "DeepSeek answers 402 'Insufficient Balance' (key valid); the account has no credit and the project adds none",
+      "decidedOn": "2026-10-28",
+      "decision": "DEC-030",
+      "evidence": "service-reality run 40646881277 (annotation 'Service Reality · deepseek failed')",
+      "reversal": "top up the DeepSeek account, optionally set DEEPSEEK_MODEL (the live /models lists deepseek-flash and deepseek-v4-pro), delete this entry, push a [reality] commit"
+    },
+    "agentrouter": {
+      "reason": "AgentRouter accepts the key but exposes 0 models and returns an empty 200 body for chat completions: an account without quota or model access",
+      "decidedOn": "2026-10-28",
+      "decision": "DEC-030",
+      "evidence": "service-reality run 40646881277 (annotation 'Service Reality · agentrouter failed')",
+      "reversal": "restore quota/models on agentrouter.org, set AGENTROUTER_MODEL to a listed model, delete this entry, push a [reality] commit"
+    }
   }
 }

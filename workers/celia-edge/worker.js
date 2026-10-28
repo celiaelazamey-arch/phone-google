@@ -88,22 +88,31 @@ function verifyBearer(request, env) {
   return { ok: true };
 }
 
+function isRetired(env, boundary) {
+  return String(env?.[`CELIA_DISABLE_${String(boundary).toUpperCase()}`] || '').trim() === 'true';
+}
+
 export function buildEdgeSecretsReport(env = {}) {
   const secrets = TRACKED_SECRETS.map(([secretName, role, boundary]) => ({
     secretName,
     configured: hasSecret(env, secretName),
+    // `retired` = the owner explicitly took this service out of the product (CELIA_DISABLE_<boundary>=true,
+    // DEC-030): a present-but-dead credential is reported as such instead of parading as capability.
+    retired: isRetired(env, boundary),
     role,
     boundary
   }));
   const configuredCount = secrets.filter((item) => item.configured).length;
+  const retired = [...new Set(secrets.filter((item) => item.retired).map((item) => item.boundary))];
   return {
     scope: 'cloudflare-edge',
     totalSecretsTracked: secrets.length,
     configuredCount,
     allConfigured: configuredCount === secrets.length,
+    retiredServices: retired,
     secrets,
     notice:
-      'Sanitized readiness only: secret values are never exposed or logged, and configuration is not proof of live external connectivity.'
+      'Sanitized readiness only: secret values are never exposed or logged, and configuration is not proof of live external connectivity. Services listed in retiredServices are explicitly out of the product (see docs/service-reality.md).'
   };
 }
 

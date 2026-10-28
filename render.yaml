@@ -63,5 +63,15 @@ services:
         sync: false
       - key: CELIA_DISABLE_OLLAMA
         value: 'true'
+      # Retired services (DEC-030, docs/deployment-profile.json → serviceRetirements): credentials proven dead by the
+      # service-reality audit; flip to 'false' only after the account works again and a [reality] run says so.
+      - key: CELIA_DISABLE_AI_GATEWAY
+        value: 'true'
+      - key: CELIA_DISABLE_DEEPSEEK
+        value: 'true'
+      - key: CELIA_DISABLE_AGENTROUTER
+        value: 'true'
+      - key: CELIA_DISABLE_CLOUDFLARE_R2
+        value: 'true'
       - key: WHATSAPP_AUTO_REPLY_ENABLED
         value: 'false'
