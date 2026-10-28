@@ -438,3 +438,10 @@ test('بناء الصفحات يرفض رابط خدمة غير https بدل ح�
     await build();
   }
 });
+
+test('صفحة استخدام الكمبيوتر تُبنى وتُحقن بالطبقة الثابتة وتُربط من الاستوديو', async () => {
+  const page = await readFile(path.join(DIST_DIR, 'computer.html'), 'utf8');
+  assert.match(page, /celia-static-shim\.js/, 'الطبقة الثابتة تُحقن في كل صفحة');
+  const studio = await readFile(path.join(DIST_DIR, 'index.html'), 'utf8');
+  assert.match(studio, /href="\.\/computer\.html"/, 'البناء يحوّل ./computer إلى ./computer.html');
+});

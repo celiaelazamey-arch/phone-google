@@ -50,6 +50,8 @@ jobs:
       # regenerating it would let the published map claim a permission the code no longer grants.
       - name: Copilot architecture map matches the enforced policy
         run: npm run copilot:diagram:check
+      - name: Computer permission matrix matches the enforced policy
+        run: npm run computer:permissions:check
       - name: Require handoff for implementation changes
         if: github.event_name == 'pull_request'
         env:
