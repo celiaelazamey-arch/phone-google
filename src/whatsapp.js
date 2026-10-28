@@ -4,7 +4,8 @@ import { generateCeliaReply } from './ollama.js';
 import { createServiceRegistry, safeError, ServiceUnavailableError, UpstreamError } from './resilience.js';
 import { isValidE164, isWithinCustomerWindow, safeEqual, verifyWhatsAppSignature } from './security.js';
 import { createIdempotencyStore, isValidIdempotencyKey } from './idempotency.js';
-import { createGoogleConsentLink } from './google.js';
+import { createGoogleConsentLink, fetchInboxMessages, listAgendaEvents } from './google.js';
+import { agendaRange, formatAgendaReply, formatInboxReply, ownerGoogleErrorReply, parseOwnerGoogleCommand } from './owner-google-commands.js';
 
 /**
  * Owner-only chat command: "اربط جوجل" / "connect google".
@@ -52,7 +53,34 @@ export async function sendWhatsAppText({ config, phone, text, signal, timeoutMs 
   return result.messages?.[0]?.id || '';
 }
 
-export function createWhatsAppWebhookRouter({ pool, config, services = createServiceRegistry(config) }) {
+/**
+ * Executes one parsed owner command against Google and returns the WhatsApp reply text.
+ * `googleOps` is injectable for tests; defaults to the real Gmail/Calendar fetchers.
+ */
+export async function runOwnerGoogleCommand({ pool, config, command, now = new Date(), signal, googleOps = { fetchInboxMessages, listAgendaEvents } }) {
+  const timeZone = config.timezone || 'Africa/Cairo';
+  try {
+    if (command.kind === 'latest_email') {
+      const messages = await googleOps.fetchInboxMessages({ pool, config, unreadOnly: command.unreadOnly, maxResults: command.unreadOnly ? 5 : 1, signal });
+      let fallback = null;
+      if (command.unreadOnly && !messages.length) {
+        fallback = (await googleOps.fetchInboxMessages({ pool, config, unreadOnly: false, maxResults: 1, signal }))[0] || null;
+      }
+      return formatInboxReply({ unreadOnly: command.unreadOnly, messages, fallback, timeZone });
+    }
+    if (command.kind === 'agenda') {
+      const range = agendaRange(command.range, { now, timeZone });
+      const events = await googleOps.listAgendaEvents({ pool, config, timeMin: range.timeMin, timeMax: range.timeMax, signal });
+      return formatAgendaReply({ range: command.range, events, label: range.label, timeZone });
+    }
+    throw Object.assign(new Error('unknown_owner_command'), { status: 400 });
+  } catch (error) {
+    console.error('WhatsApp owner Google command failed:', error.code || error.status || 'google_command_failed');
+    return ownerGoogleErrorReply(error);
+  }
+}
+
+export function createWhatsAppWebhookRouter({ pool, config, services = createServiceRegistry(config), googleOps }) {
   const router = express.Router();
 
   router.get('/', (req, res) => {
@@ -94,6 +122,21 @@ export function createWhatsAppWebhookRouter({ pool, config, services = createSer
             );
           } catch (error) {
             console.error('WhatsApp Google connect link failed:', error.code || 'google_link_failed');
+          }
+          continue;
+        }
+        // Owner-only Gmail/Calendar commands ("لخص آخر إيميل", "هات جدولي"): metadata + snippet only, no LLM.
+        const ownerCommand = message.body && config.ownerPhone && message.from === config.ownerPhone ? parseOwnerGoogleCommand(message.body) : null;
+        if (ownerCommand) {
+          try {
+            const reply = await runOwnerGoogleCommand({ pool, config, command: ownerCommand, ...(googleOps ? { googleOps } : {}) });
+            const providerId = await services.run('whatsapp', (signal) => sendWhatsAppText({ config, phone: message.from, text: reply, signal }), { sideEffect: true });
+            if (providerId) await pool.execute(
+              'INSERT IGNORE INTO whatsapp_messages (provider_message_id, phone_e164, direction, message_type, body, status) VALUES (?, ?, ?, ?, ?, ?)',
+              [providerId, message.from, 'outbound', 'text', reply.slice(0, 4000), 'sent']
+            );
+          } catch (error) {
+            console.error('WhatsApp owner Google reply failed:', error.code || 'whatsapp_send_failed');
           }
           continue;
         }

@@ -1,13 +1,26 @@
 # الحالة الحالية — ابدأ من هنا
 
-**آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** **أتمتة ما بعد حسابي المالك للخادم الكامل (DEC-028)** على الفرع
+**آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** **أتمتة ما بعد حسابي المالك للخادم الكامل (DEC-028) + أوامر Gmail/Calendar للمالك عبر واتساب (DEC-029)** على الفرع
 `arena/bf717032-phone-google` · سجل الجلسة:
 [2026-10-28-render-release-automation](sessions/2026-10-28-render-release-automation.md) · سجل الجلسة السابقة:
 [2026-10-27-learning-protocol-and-publish-links](sessions/2026-10-27-learning-protocol-and-publish-links.md) ·
 البروتوكول: [docs/learning-protocol.md](../learning-protocol.md) · الخطة: [docs/go-live-plan.md](../go-live-plan.md) ·
 المرجع التشغيلي: [deploy/free-always-on/README.md](../../deploy/free-always-on/README.md)
 
-## الطلب الحالي (أعلى أولوية) — «الأسرار موجودة، استخدمها» → أتمتة النشر على Render والتحقق (DEC-028)
+## الطلب الحالي (أعلى أولوية) — «هنربط جوجل بالواتساب: لخص آخر إيميل / هات جدولي» (DEC-029، GOOG-003)
+
+- **ما طلبه المالك (بلصق إرشاد من محادثة أخرى):** ربط Google بواتساب بمسار Python `InstalledAppFlow` + `credentials.json` +
+  `token.json`، وإصلاح «مافيش إيميلات جديدة» بـ`q=""`. **الحكم:** لا يُنسخ (خادم بلا متصفح، عميل Desktop ≠ Web، توكن خام في ملف)؛
+  الربط موجود في Node بعميل Web + تشفير، و`credentials.json` شأن السبّابة Python (Drive فقط). التفاصيل: `docs/google-connect.md` §6ب.
+- **ما نُفِّذ:** `src/owner-google-commands.js` (تحليل/تنسيق نقي، منطقة زمنية `CELIA_TIMEZONE` افتراضي `Africa/Cairo` مع التوقيت
+  الصيفي)، `fetchInboxMessages`/`listAgendaEvents` في `src/google.js` (`INBOX` بلا `is:unread` إلا عند طلب «الجديدة»؛ عميل محقون
+  للاختبار)، التوصيل في `src/whatsapp.js` **للمالك فقط** بعد أمر «اربط جوجل»؛ `test/owner-google-commands.test.js` 8/8 (تحليل،
+  مدى اليوم عبر تبديل DST المصري 29 أكتوبر، التنسيق، أخطاء بلا تسريب، 409 قبل الربط، webhook: المالك يحصل على الرد وعميل بنفس
+  النص لا يحرّك Google ولا واتساب). لا نموذج لغوي، لا إرسال بريد، لا تعديل تقويم.
+- **ما يبقى:** التشغيل الحي يحتاج الخادم الكامل منشورًا (HOST-003 → الخطوات الثلاث أدناه) ثم «اربط جوجل» من رقم المالك.
+  `credentials.json` غير مطلوب للخادم.
+
+## الطلب السابق في الجلسة نفسها — «الأسرار موجودة، استخدمها» → أتمتة النشر على Render والتحقق (DEC-028)
 
 - **الواقع عند `main@a930383` (دمج PR #45، 2026-10-28 01:31 UTC):** Pages `https://celiaelazamey-arch.github.io/phone-google/`
   (deployment `7374774785`، 10/10 مسارات في `40615518798`)، Worker `https://celia-phone-google.celiaelazamey.workers.dev`

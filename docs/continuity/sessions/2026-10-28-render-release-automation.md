@@ -42,6 +42,19 @@
 - **الاستمرارية:** DEC-028، BACKLOG HOST-003، STATE، هذا السجل.
 - لا تغيير في `render.yaml` (يبقى `autoDeployTrigger: off`)، ولا في `TRACKED_SECRETS`، ولا الأدوات ولا المخطط.
 
+## الجزء الثاني من الجلسة — أوامر Gmail/Calendar للمالك عبر واتساب (DEC-029، GOOG-003)
+
+- **الطلب:** لصق المالك إرشادًا خارجيًا (Python `InstalledAppFlow`، `credentials.json`/`token.json`، `q=""` بدل `is:unread`،
+  «لما حد يبعت لخص آخر إيميل») طالبًا ربط Google بواتساب. لم يُنسخ المسار؛ نُفِّذ المطلوب على البنية الموجودة.
+- **ما تغير:** `src/owner-google-commands.js` (جديد: `parseOwnerGoogleCommand`، `agendaRange`/`timeZoneOffsetMinutes`،
+  `formatInboxReply`، `formatAgendaReply`، `ownerGoogleErrorReply`، `arabicCount`)؛ `src/google.js` (+`fetchInboxMessages`،
+  +`listAgendaEvents`)؛ `src/whatsapp.js` (+`runOwnerGoogleCommand`، فرع المالك في الـwebhook، خيار `googleOps` للاختبار)؛
+  `src/config.js` (+`timezone` من `CELIA_TIMEZONE`)؛ `.env.example`؛ `docs/google-connect.md` §6ب؛ `README.md`؛
+  `docs/go-live-plan.md` 3ب؛ `test/owner-google-commands.test.js` (8). الاستمرارية: DEC-029، BACKLOG GOOG-003، STATE، هذا السجل.
+- **قرارات:** المالك فقط؛ بيانات + مقتطف بلا نموذج لغوي؛ `INBOX` بلا `is:unread` إلا عند «الجديدة» مع إظهار آخر مقروء عند الفراغ؛
+  لا تغيير في النطاقات ولا أدوات MCP (لتجنب كسر N/N−1) ولا المخطط.
+- **غير مثبت:** التشغيل الحي — يحتاج HOST-003 ثم «اربط جوجل» من رقم المالك.
+
 ## الفحوص
 
 | الأمر/الفحص | commit/البيئة | النتيجة أو سبب عدم التشغيل |
@@ -50,6 +63,7 @@
 | `node scripts/deploy-render.mjs --plan` | محليًا بلا مدخلات | `status: not-configured`، `missing: [CELIA_LIVE_URL (repository variable), RENDER_API_KEY + RENDER_SERVICE_ID (or RENDER_DEPLOY_HOOK_URL)]`، خروج 0 |
 | `npm run check` · `release:check` · `check:secrets` · `build:pages` · `check:continuity` | محليًا | 106 ملفات سليمة · 0.2.1/schema 1 · 18/18 سرًا متتبعًا بلا تسريب · dist 9 صفحات · 33 وثيقة و125 رابطًا و52 مهمة بلا دورات |
 | `npm test` | محليًا (بعد `npm ci` و`git fetch --unshallow`) | 303/303 — اختبار الانحراف `free-hosting-plan` احتاج إضافة `CELIA_LIVE_URL` إلى قائمة الأسماء غير-Render (متغيّر GitHub لا مفتاح Render)؛ اختبار N/N−1 يفشل في النسخة الضحلة فقط |
+| `node --test test/owner-google-commands.test.js` | هذا الفرع، محليًا | 8/8 (بلا شبكة؛ `graph.facebook.com` مُستبدل بـ`fetch` وهمي) |
 | تشغيل حقيقي لـ`deploy-render.yml` | — | **لم يُنفَّذ**: لا خدمة Render ولا مدخلات؛ أول تشغيل بعد الدمج سيعيد `not-configured` أخضر حتى يضيفها المالك |
 
 ## الحفظ والتسليم

@@ -72,6 +72,57 @@ export async function createGoogleDriveClient({ pool, config, userId }) {
   return google.drive({ version: 'v3', auth: client });
 }
 
+/**
+ * Newest INBOX messages for the owner's WhatsApp commands ("لخص آخر إيميل", "الإيميلات الجديدة").
+ * No `is:unread` filter unless asked: "the last email" must come back even when already read.
+ * `gmailClient` is injectable so the command path is testable without Google.
+ */
+export async function fetchInboxMessages({ pool, config, userId = config.userId, unreadOnly = false, maxResults = 1, signal, gmailClient } = {}) {
+  const gmail = gmailClient || google.gmail({ version: 'v1', auth: await getAuthenticatedClient(pool, config, userId) });
+  const requestOptions = { signal, retry: false, timeout: config.resilience?.timeoutMs || 8000 };
+  const limit = Math.max(1, Math.min(10, Number(maxResults) || 1));
+  const listed = await gmail.users.messages.list({ userId: 'me', labelIds: ['INBOX'], maxResults: limit, ...(unreadOnly ? { q: 'is:unread' } : {}) }, requestOptions);
+  const ids = (listed.data?.messages || []).map((entry) => entry.id).filter(Boolean);
+  const messages = await Promise.all(ids.map(async (id) => {
+    const { data } = await gmail.users.messages.get({ userId: 'me', id, format: 'metadata', metadataHeaders: ['From', 'Subject', 'Date'] }, requestOptions);
+    const headers = Object.fromEntries((data?.payload?.headers || []).map((header) => [String(header.name || '').toLowerCase(), header.value]));
+    const internal = Number(data?.internalDate);
+    return {
+      id,
+      from: headers.from || '',
+      subject: headers.subject || '',
+      date: Number.isFinite(internal) && internal > 0 ? new Date(internal).toISOString() : (headers.date || ''),
+      snippet: data?.snippet || '',
+      unread: (data?.labelIds || []).includes('UNREAD')
+    };
+  }));
+  return messages;
+}
+
+/**
+ * Primary-calendar events between two instants for the owner's "جدولي" command. `calendarClient`
+ * is injectable for tests; without a connected account it throws the same 409 as the REST route.
+ */
+export async function listAgendaEvents({ pool, config, userId = config.userId, timeMin, timeMax, maxResults = 20, signal, calendarClient } = {}) {
+  const calendar = calendarClient || google.calendar({ version: 'v3', auth: await getAuthenticatedClient(pool, config, userId) });
+  const { data } = await calendar.events.list({
+    calendarId: 'primary',
+    timeMin: new Date(timeMin).toISOString(),
+    timeMax: new Date(timeMax).toISOString(),
+    singleEvents: true,
+    orderBy: 'startTime',
+    maxResults: Math.max(1, Math.min(50, Number(maxResults) || 20))
+  }, { signal, retry: false, timeout: config.resilience?.timeoutMs || 8000 });
+  return (data?.items || []).map((event) => ({
+    id: event.id,
+    summary: event.summary || '',
+    status: event.status || 'confirmed',
+    location: event.location || '',
+    start: event.start || {},
+    end: event.end || {}
+  }));
+}
+
 function handleError(res, error) {
   const status = Number.isInteger(error.status) ? error.status : 502;
   if (status >= 500) console.error('Google integration request failed:', error.code || 'upstream_failed');
