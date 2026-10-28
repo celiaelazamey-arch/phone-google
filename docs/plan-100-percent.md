@@ -44,6 +44,7 @@
 | الخدمات الحية | **11 متحققة / 1 فاشلة من 12 مهيأة = 91.7%** (ElevenLabs) | run [`40663707956`](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40663707956) |
 | النشر | Pages ✅ · Worker ✅ · GHCR ✅ · Release ✅ · **Render ✗ (لا حساب)** | annotations الـruns |
 | فشل واحد على `main@fc4d60f` | `Publish verified release` فشل في خطوة تحقق **مدموجة** بلا تسمية البوابة | run `40665130469` |
+| **بعد الدمج (PLAN-001/REL-002/QA-006)** على `main@5709bad` | **كل الـworkflows ناجحة**: الجودة `40674752264` · الإصدار `40674752228` (بواباته الأربع مسمّاة كلها ✅) · Pages `40674752288` · Worker `40674752211` · Render `40674873835` | `gh run list --branch main` |
 
 **سبب الفشل الحقيقي (مثبت في PR #49 المدموج في `main@8a9fc56`):** اختبار `test/knowledge-ingest.test.js:164` — كان
 `KnowledgeStore.stats()` يختار آخر سجل بـ`ORDER BY started_at DESC` وحده، فإذا تساوى توقيتان بدقة المللي ثانية لم يكن
@@ -78,7 +79,9 @@ Settings فقط، وهذا المشروع يفحص عدم تسريب أي قيم
 3. **QA-006:** رفع أرضية التغطية إلى 89/71/82 (المقاس 90.29/73.20/83.79) وإضافة 21 اختبارًا جديدًا في 8 ملفات تغطي
    ما كان أهمّ ثقب: مسارات تشغيل الحافة، دورة الإيقاف، معالج الإصدار، بروتوكول MCP وأدواته، تحقق أدوات الوكيل، وبوابات
    الإرسال الخارجي (WhatsApp/Calendar).
-   **البوابة:** `Celia quality & resilience` أخضر على Node 22 و24، و`Publish verified release` أخضر على `main` بعد الدمج.
+   **البوابة:** `Celia quality & resilience` أخضر على Node 22 و24، و`Publish verified release` أخضر على `main` بعد الدمج —
+   **تحققت:** run [`40674752228`](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40674752228) على
+   `main@5709bad` أظهر `Gate 1/4` … `Gate 4/4` كلها `success` ثم نشرًا ناجحًا.
 
 ### المرحلة P1 — «سرّ واحد يفصل الخدمات عن 95%» (ينتظر O1)
 4. تشغيل التدقيق بوضع سريع جديد: `workflow_dispatch` → `Service reality audit` → `live_only: true` → ~دقيقة واحدة بدل
