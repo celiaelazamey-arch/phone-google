@@ -1,0 +1,65 @@
+name: Issue triage (governed)
+
+# AGENT-006. Free to run: the only credential is the workflow's own GITHUB_TOKEN (issues:write), so this needs no
+# card, no account and no secret. Scope is issues only — this workflow cannot edit code, open a PR, touch a
+# workflow, read a secret, or deploy anything, because `permissions:` grants nothing beyond issues.
+#
+# Mode: `cautious` applies allowlisted labels when confidence ≥ 0.90 (max 10/day, rollback 7 days).
+# Switch `TRIAGE_MODE` to `propose` to record recommendations without changing any issue.
+
+on:
+  issues:
+    types: [opened, edited]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Issue number to triage'
+        required: true
+        type: string
+      mode:
+        description: 'propose (record only) or cautious (apply allowlisted labels above 0.90)'
+        type: choice
+        options: [cautious, propose]
+        default: cautious
+      apply:
+        description: 'Perform the writes (uncheck to print the plan only)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: issue-triage-${{ github.event.issue.number || inputs.issue_number }}
+  cancel-in-progress: false
+
+jobs:
+  triage:
+    # Pull requests are not issues for this loop, and the ledger issue must never triage itself.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.issue.pull_request == null &&
+       !contains(github.event.issue.labels.*.name, 'triage:ledger'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Decide and record (issues only)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TRIAGE_MODE: ${{ inputs.mode || 'cautious' }}
+          TRIAGE_REVIEWER: triage-workflow
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            node scripts/issue-triage.mjs --issue "${{ inputs.issue_number }}" --mode "$TRIAGE_MODE" ${{ inputs.apply && '--apply' || '' }}
+          else
+            node scripts/issue-triage.mjs --event "$GITHUB_EVENT_PATH" --mode "$TRIAGE_MODE" --apply
+          fi

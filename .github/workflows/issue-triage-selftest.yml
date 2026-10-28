@@ -1,0 +1,70 @@
+name: Issue triage self-test (governed)
+
+# Proof harness for AGENT-006. It runs the *same* command the production workflow runs, against real issues in
+# this repository, using the workflow's own GITHUB_TOKEN (issues:write) — because that token, unlike a bot token
+# with partial permissions, can actually comment and label.
+#
+# Bootstrapping note: the `push` trigger below exists only so the first proof run can happen on a branch, before
+# this workflow reaches the default branch. It is removed in the follow-up commit; what remains is manual.
+
+on:
+  push:
+    paths:
+      - '.github/workflows/issue-triage-selftest.yml'
+  workflow_dispatch:
+    inputs:
+      issues:
+        description: 'Comma-separated issue numbers to triage'
+        required: true
+        default: '56,57,58'
+        type: string
+      mode:
+        description: 'propose (record only) or cautious (apply allowlisted labels above 0.90)'
+        type: choice
+        options: [cautious, propose]
+        default: cautious
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  prove:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      - name: Triage the self-test issues (cautious)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          TRIAGE_MODE: ${{ inputs.mode || 'cautious' }}
+          TRIAGE_REVIEWER: triage-selftest
+        run: |
+          set -euo pipefail
+          for n in $(echo "${{ inputs.issues || '56,57,58' }}" | tr ',' ' '); do
+            echo "::group::issue #$n"
+            node scripts/issue-triage.mjs --issue "$n" --mode "$TRIAGE_MODE" --apply
+            echo "::endgroup::"
+          done
+
+      - name: Read the ledger back and verify the hash chain
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/issue-triage-verify.mjs
+
+      - name: Retire the bootstrap self-test issues
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for n in 56 57 58; do
+            gh issue close "$n" --reason "not planned" --comment "Self-test complete — the decision record is in the triage audit ledger. Closing so the queue stays real."
+          done
