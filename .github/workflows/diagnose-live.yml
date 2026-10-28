@@ -1,14 +1,9 @@
 name: Live URL diagnostic (temporary)
 
 # TEMPORARY — deleted in the commit that follows its first run.
-#
-# Why it exists: CELIA_LIVE_URL is stored as a repository secret, so this session cannot read it
-# (`GET /actions/secrets` → 403) and `workflow_dispatch` is also 403. Without the host there is no honest way
-# to say whether the Render backend is deployed. This job prints ONLY public facts:
-#   - the host/path of the configured URL (never the value of any secret),
-#   - the Render services the API key can see (names and public URLs),
-#   - the HTTP status and a short body snippet of /readyz, /version, /health.
-# It never echoes the key, the token, or any secret value.
+# Prints ONLY public facts (host, service names/URLs, HTTP status) as check-run annotations, so the result is
+# readable without access to the job log. Never echoes a secret value. Exits 0 unless the assertions on the
+# *shape* of the configuration fail (that is the signal we want).
 
 on:
   push:
@@ -33,45 +28,4 @@ jobs:
           LIVE_SECRET: ${{ secrets.CELIA_LIVE_URL }}
           LIVE_VAR: ${{ vars.CELIA_LIVE_URL }}
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-        run: |
-          set -u
-          node --input-type=module -e '
-            const raw = ((process.env.LIVE_SECRET || process.env.LIVE_VAR) || "").trim();
-            const source = (process.env.LIVE_SECRET || "").trim() ? "secret" : (process.env.LIVE_VAR || "").trim() ? "variable" : "none";
-            if (!raw) { console.log("live-url: (not set in either tab)"); process.exit(0); }
-            const url = new URL(raw);
-            console.log(`live-url source: ${source}`);
-            console.log(`live-url host: ${url.host}`);
-            console.log(`live-url path: ${url.pathname === "/" ? "(root)" : url.pathname}`);
-            console.log(`live-url on onrender: ${url.host.endsWith(".onrender.com")}`);
-          '
-
-          echo "--- render services visible to the key ---"
-          curl -sS -o /tmp/services.json -w "render api: HTTP %{http_code}\n" \
-            -H "Authorization: Bearer ${RENDER_API_KEY}" \
-            -H "accept: application/json" \
-            "https://api.render.com/v1/services?limit=100" || true
-          node --input-type=module -e '
-            import { readFileSync } from "node:fs";
-            let payload = {};
-            try { payload = JSON.parse(readFileSync("/tmp/services.json", "utf8")); } catch { console.log("render payload: unreadable"); process.exit(0); }
-            if (payload.message) { console.log(`render message: ${payload.message}`); process.exit(0); }
-            const rows = (payload.services || payload.items || []).map((row) => row.service || row);
-            console.log(`render services: ${rows.length}`);
-            for (const row of rows) {
-              console.log(`  - ${row.name} -> ${row.serviceDetails && row.serviceDetails.url ? row.serviceDetails.url : "(no url)"} [${row.type || "?"}${row.suspended ? " / suspended=" + row.suspended : ""}]`);
-            }
-          '
-
-          echo "--- live surface ---"
-          HOST=$(node --input-type=module -e 'const raw=((process.env.LIVE_SECRET||process.env.LIVE_VAR)||"").trim(); if(!raw){console.log("");process.exit(0);} console.log(new URL(raw).host)')
-          if [ -z "$HOST" ]; then
-            echo "no host configured"
-            exit 0
-          fi
-          for probe in /readyz /version /health; do
-            code=$(curl -sS -o /tmp/body -w "%{http_code}" --max-time 25 "https://${HOST}${probe}" || echo 000)
-            echo "${probe}: HTTP ${code}"
-            head -c 200 /tmp/body 2>/dev/null | tr -d '\n' | sed 's/^/    /'
-            echo
-          done
+        run: node .github/scripts/diagnose-live.mjs
