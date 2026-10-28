@@ -130,7 +130,7 @@ export function splitSqlStatements(sql) {
 }
 
 /** Applies the DDL in `migrations/0001_state.sql`, statement by statement, through the D1 query API. */
-export async function applyMigrations({ accountId, apiToken, databaseId, sql, fetchImpl = fetch, log = () => {} }) {
+export async function applyMigrations({ accountId, apiToken, databaseId, sql, fetchImpl = fetch, retryDelayMs = 400, log = () => {} }) {
   const baseUrl = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}`;
   const headers = { authorization: `Bearer ${apiToken}`, 'content-type': 'application/json' };
   const statements = splitSqlStatements(sql);
@@ -164,7 +164,7 @@ export async function applyMigrations({ accountId, apiToken, databaseId, sql, fe
         break;
       }
       lastDetail = detail;
-      await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs * (attempt + 1)));
     }
     if (lastDetail) {
       throw new Error(`d1_migration_failed:statement_${index + 1}:${String(lastDetail).slice(0, 160)}`);
@@ -221,7 +221,7 @@ export function buildWorkerMetadata({ env = process.env, version = '0.2.1', comm
   };
 }
 
-export async function main({ argv = process.argv.slice(2), env = process.env, fetchImpl = fetch, log = console.log } = {}) {
+export async function main({ argv = process.argv.slice(2), env = process.env, fetchImpl = fetch, retryDelayMs = 400, log = console.log } = {}) {
   const accountId = String(env.CLOUDFLARE_ACCOUNT_ID || '').trim();
   const apiToken = String(env.CLOUDFLARE_API_TOKEN || '').trim();
   const scriptName = String(env.CELIA_WORKER_NAME || 'celia-phone-google').trim();
@@ -242,7 +242,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
     try {
       database = await ensureD1Database({ accountId, apiToken, fetchImpl, log });
       d1BindingId = database.id;
-      const migrations = await applyMigrations({ accountId, apiToken, databaseId: database.id, sql: migrationSql, fetchImpl, log });
+      const migrations = await applyMigrations({ accountId, apiToken, databaseId: database.id, sql: migrationSql, fetchImpl, retryDelayMs, log });
       d1 = { ok: true, id: database.id, name: database.name, created: database.created, migrations };
     } catch (error) {
       d1 = {

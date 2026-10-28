@@ -259,7 +259,7 @@ test('an already-existing table is not a failure, and a real rejection names the
       headers: { 'content-type': 'application/json' }
     });
   await assert.rejects(
-    () => applyMigrations({ accountId: 'acc', apiToken: 'tok', databaseId: 'db-1', sql: 'CREAT TABLE a (id TEXT);', fetchImpl: rejected }),
+    () => applyMigrations({ accountId: 'acc', apiToken: 'tok', databaseId: 'db-1', sql: 'CREAT TABLE a (id TEXT);', fetchImpl: rejected, retryDelayMs: 5 }),
     /d1_migration_failed:statement_1:near "CREAT": syntax error/
   );
 
@@ -269,7 +269,7 @@ test('an already-existing table is not a failure, and a real rejection names the
       headers: { 'content-type': 'application/json' }
     });
   await assert.rejects(
-    () => applyMigrations({ accountId: 'acc', apiToken: 'tok', databaseId: 'db-1', sql: 'SELECT 1;', fetchImpl: itemRejected }),
+    () => applyMigrations({ accountId: 'acc', apiToken: 'tok', databaseId: 'db-1', sql: 'SELECT 1;', fetchImpl: itemRejected, retryDelayMs: 5 }),
     /d1_migration_failed:statement_1:SQLITE_ERROR: syntax error/
   );
 });

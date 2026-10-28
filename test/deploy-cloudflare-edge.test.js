@@ -211,6 +211,7 @@ test('edge deploy: when D1 exists but migration fails, warning honestly notes th
       }
       return jsonResponse(200, { result: {} });
     },
+    retryDelayMs: 5,
     log: (line) => lines.push(line)
   });
 
