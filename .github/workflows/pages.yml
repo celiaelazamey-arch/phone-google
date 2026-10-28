@@ -108,3 +108,52 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+      - name: Verify live GitHub Pages deployment (10/10 routes HTTP 200 OK)
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          node --input-type=module -e '
+            const base = String(process.env.PAGE_URL || "https://celiaelazamey-arch.github.io/phone-google/").replace(/\/+$/, "");
+            const routes = [
+              "/",
+              "/protocol.html",
+              "/agent.html",
+              "/kb.html",
+              "/system.html",
+              "/deploy.html",
+              "/live.html",
+              "/skills.html",
+              "/api/protocol-benchmark.json",
+              "/api/live.json"
+            ];
+            for (const route of routes) {
+              const target = `${base}${route}`;
+              let ok = false;
+              let lastStatus = 0;
+              for (let attempt = 1; attempt <= 12; attempt += 1) {
+                try {
+                  const res = await fetch(target, { headers: { "cache-control": "no-cache" } });
+                  lastStatus = res.status;
+                  if (res.status === 200) {
+                    const text = await res.text();
+                    if (route === "/api/protocol-benchmark.json") {
+                      const parsed = JSON.parse(text);
+                      if (parsed.totalCases === 20 && parsed.passedCount === 20 && parsed.decision === "GO") {
+                        ok = true;
+                        break;
+                      }
+                    } else if (text.length > 50) {
+                      ok = true;
+                      break;
+                    }
+                  }
+                } catch {}
+                await new Promise((r) => setTimeout(r, 3000));
+              }
+              if (!ok) {
+                console.error(`::error title=Live Verification Failed::${target} returned ${lastStatus}`);
+                process.exit(1);
+              }
+            }
+            console.log(`::notice title=GitHub Pages Live Verified::10/10 live routes returned HTTP 200 OK on ${base} (including /protocol.html and 20/20 benchmark API)`);
+          '

@@ -56,6 +56,7 @@
 
 12. **بروتوكول التفوق واكتساب المستخدمين وحزمة Benchmark الـ20 حالة وإنفوجرافيك `/protocol` (`DEC-026`):**
    - إنشاء `src/agent/automation/benchmark.js` (`BM-01..BM-20`، `20/20 PASS`، `0` قبول/رفض خاطئ، `100%` ثبات إعادة تشغيل)، وصفحة الإنفوجرافيك المعماري العربي التفاعلي `public/protocol.{html,css,js}` على `/protocol`، ووثيقة `docs/user-switch-protocol.md`، واختبارات `test/agent-benchmark-20.test.js` (`BENCH-01..BENCH-02`).
+   - تعزيز التحقق الحي في `.github/workflows/pages.yml` (فحص HTTP 200 للمسارات الـ10 الحية بعد النشر)، ومزامنة حزم الإصدار الموقّع `v0.2.1` في `.github/workflows/release.yml`، وإضافة `/version` و`/api/protocol-benchmark.json` إلى `workers/celia-edge/worker.js`.
 
 ## 2. نتائج الفحوص الفعلية (محليًا وفي GitHub Actions CI)
 
