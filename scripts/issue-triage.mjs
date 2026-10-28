@@ -28,6 +28,8 @@ import {
 } from '../src/agent/issue-triage/audit.js';
 import { LABEL_COLORS, LEDGER_LABEL, LEDGER_TITLE } from '../src/agent/issue-triage/policy.js';
 
+export const ROLLBACK_MARKER = 'celia-triage-rollback';
+
 export function parseArgs(argv) {
   const options = {
     issue: null,
@@ -59,8 +61,21 @@ export function parseArgs(argv) {
   return options;
 }
 
+/**
+ * The `gh` calls are injectable so the write path itself (label creation, ledger adoption, rollback) is testable
+ * without a network or a token. Production never sets a runner.
+ */
+let ghRunner = null;
+
+export function setGhRunner(runner) {
+  ghRunner = runner;
+  return () => {
+    ghRunner = null;
+  };
+}
+
 export function gh(args, { allowFailure = false } = {}) {
-  const result = spawnSync('gh', args, { encoding: 'utf8', env: process.env });
+  const result = ghRunner ? ghRunner(args) : spawnSync('gh', args, { encoding: 'utf8', env: process.env });
   if (result.status !== 0) {
     if (allowFailure) return { ok: false, stdout: result.stdout || '', stderr: result.stderr || '' };
     throw new Error(`gh ${args.join(' ')} failed: ${(result.stderr || result.stdout || '').trim().slice(0, 400)}`);
@@ -103,11 +118,14 @@ export function repository(explicit) {
  */
 export function findLedgers(repo) {
   const issues = ghLines(['api', `repos/${repo}/issues?state=all&per_page=100&sort=created&direction=asc`]);
-  return issues
+  const ledgers = issues
     .filter((issue) => !issue.pull_request)
     .filter((issue) => issue.title === LEDGER_TITLE || (issue.labels || []).some((label) => (label.name || label) === LEDGER_LABEL))
-    .map((issue) => issue.number)
-    .sort((a, b) => a - b);
+    .map((issue) => ({ number: issue.number, state: issue.state }));
+  // A closed ledger is history, not a destination: only fall back to one when nothing open exists.
+  const open = ledgers.filter((ledger) => ledger.state === 'open');
+  const pool = open.length ? open : ledgers;
+  return pool.map((ledger) => ledger.number).sort((a, b) => a - b);
 }
 
 export function resolveLedger(repo, { existing = null, apply = false } = {}) {
@@ -203,13 +221,30 @@ export function fetchIssue(repo, number) {
   return { number: issue.number, title: issue.title || '', body: issue.body || '', url: issue.html_url || null };
 }
 
-export const ROLLBACK_MARKER = 'celia-triage-rollback';
-
 export function readLedger(repo, ledgerNumber) {
   if (!ledgerNumber) return { comments: [], records: [], chain: { ok: true, count: 0 } };
   const comments = ghLines(['api', `repos/${repo}/issues/${ledgerNumber}/comments?per_page=100`]);
   const records = parseLedgerComments(comments);
   return { comments, records, chain: verifyDecisionChain(records) };
+}
+
+/**
+ * Perform a rollback: remove exactly the labels this decision added, tell the issue, and write a marker into the
+ * ledger so the undo is auditable next to the action it reverses.
+ */
+export function applyRollback({ repo, record, plan, reviewer = 'github-actions', ledger = null, now = new Date() }) {
+  const issueNumber = record.issue.number;
+  if (plan.removeLabels.length) {
+    gh(['api', '-X', 'DELETE', `repos/${repo}/issues/${issueNumber}/labels/${encodeURIComponent(plan.removeLabels.join(','))}`]);
+  }
+  const humanNote = `↩️ **تم التراجع** عن القرار \`${record.id.slice(0, 12)}\` بواسطة ${reviewer}.${plan.removeLabels.length ? ` أُزيلت: ${plan.removeLabels.join(', ')}.` : ''}`;
+  gh(['api', '-X', 'POST', `repos/${repo}/issues/${issueNumber}/comments`, '-f', `body=${humanNote}`]);
+  const ledgerNumber = ledger ?? resolveLedger(repo);
+  if (ledgerNumber) {
+    const marker = JSON.stringify({ ref: record.id, at: now.toISOString(), actor: reviewer, issue: issueNumber, removedLabels: plan.removeLabels });
+    gh(['api', '-X', 'POST', `repos/${repo}/issues/${ledgerNumber}/comments`, '-f', `body=<!-- ${ROLLBACK_MARKER} ${marker} -->\n${humanNote}`]);
+  }
+  return { rolledBack: record.id, issue: issueNumber, removed: plan.removeLabels, ledger: ledgerNumber };
 }
 
 function main() {
@@ -229,18 +264,7 @@ function main() {
       console.log(JSON.stringify({ dryRun: true, rollback: plan }, null, 2));
       return;
     }
-    const issueNumber = record.issue.number;
-    if (plan.removeLabels.length) {
-      gh(['api', '-X', 'DELETE', `repos/${repo}/issues/${issueNumber}/labels/${encodeURIComponent(plan.removeLabels.join(','))}`]);
-    }
-    const humanNote = `↩️ **تم التراجع** عن القرار \`${record.id.slice(0, 12)}\` بواسطة ${options.reviewer}.${plan.removeLabels.length ? ` أُزيلت: ${plan.removeLabels.join(', ')}.` : ''}`;
-    gh(['api', '-X', 'POST', `repos/${repo}/issues/${issueNumber}/comments`, '-f', `body=${humanNote}`]);
-    const ledgerForRollback = options.ledger ?? resolveLedger(repo);
-    if (ledgerForRollback) {
-      const marker = JSON.stringify({ ref: record.id, at: new Date().toISOString(), actor: options.reviewer, issue: issueNumber, removedLabels: plan.removeLabels });
-      gh(['api', '-X', 'POST', `repos/${repo}/issues/${ledgerForRollback}/comments`, '-f', `body=<!-- celia-triage-rollback ${marker} -->\n${humanNote}`]);
-    }
-    console.log(JSON.stringify({ rolledBack: record.id, issue: issueNumber, removed: plan.removeLabels }, null, 2));
+    console.log(JSON.stringify({ ...applyRollback({ repo, record, plan, reviewer: options.reviewer, ledger: options.ledger }), applied: true }, null, 2));
     return;
   }
 

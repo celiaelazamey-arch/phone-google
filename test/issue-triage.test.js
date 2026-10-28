@@ -28,7 +28,18 @@ import {
   withinRollbackWindow
 } from '../src/agent/issue-triage/audit.js';
 import { triageIssue } from '../src/agent/issue-triage/index.js';
-import { buildPlan, parseArgs, planRollback } from '../scripts/issue-triage.mjs';
+import {
+  ROLLBACK_MARKER,
+  applyRollback,
+  buildPlan,
+  ensureLabels,
+  findLedgers,
+  parseArgs,
+  planRollback,
+  readLedger,
+  resolveLedger,
+  setGhRunner
+} from '../scripts/issue-triage.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const fixedNow = new Date('2026-10-28T09:00:00.000Z');
@@ -357,4 +368,155 @@ test('record comment is human-readable and machine-readable at once', () => {
   assert.match(comment, /تطبيق تلقائي/);
   assert.match(comment, /التراجع/);
   assert.ok(comment.split('\n').length > 5);
+});
+
+
+// --- write-path tests: the same functions the workflow runs, with `gh` stubbed out -------------------------
+
+const REPO = 'owner/name';
+
+/** Minimal `gh` double: matches on the endpoint (last argument) and records every call. */
+function fakeGh(routes) {
+  const calls = [];
+  const runner = (args) => {
+    calls.push(args);
+    const key = args.join(' ');
+    for (const [pattern, response] of routes) {
+      if (pattern instanceof RegExp ? pattern.test(key) : key.includes(pattern)) {
+        return typeof response === 'function' ? response(args) : { status: 0, stdout: response ?? '', stderr: '' };
+      }
+    }
+    return { status: 0, stdout: '', stderr: '' };
+  };
+  runner.calls = calls;
+  return runner;
+}
+
+const ledgerLine = (number, state, extra = {}) =>
+  JSON.stringify({ number, state, title: 'Triage audit ledger', labels: [{ name: 'triage:ledger' }], ...extra });
+
+test('ledger: an open ledger wins over a closed duplicate, and pull requests are never ledgers', () => {
+  const runner = fakeGh([
+    [/issues\?state=all/, [ledgerLine(60, 'closed'), ledgerLine(59, 'open'), ledgerLine(44, 'open', { pull_request: {}, title: 'Triage audit ledger' })].join('\n')]
+  ]);
+  const restore = setGhRunner(runner);
+  try {
+    assert.deepEqual(findLedgers(REPO), [59]);
+  } finally {
+    restore();
+  }
+});
+
+test('ledger: when every ledger is closed the oldest is still adopted instead of creating a fourth', () => {
+  const runner = fakeGh([[ /issues\?state=all/, [ledgerLine(60, 'closed'), ledgerLine(59, 'closed')].join('\n') ]]);
+  const restore = setGhRunner(runner);
+  try {
+    assert.deepEqual(findLedgers(REPO), [59, 60]);
+  } finally {
+    restore();
+  }
+});
+
+test('ledger: an explicit number is honoured with no lookups at all', () => {
+  const runner = fakeGh([]);
+  const restore = setGhRunner(runner);
+  try {
+    assert.equal(resolveLedger(REPO, { existing: 7 }), 7);
+    assert.equal(runner.calls.length, 0);
+  } finally {
+    restore();
+  }
+});
+
+test('ledger: it is created once and its number is read back, not assumed', () => {
+  const runner = fakeGh([
+    [/repos\/owner\/name\/labels\?per_page/, '[]'],
+    [/issues\?state=all/, ''],
+    [/issue create/, ''],
+    [/-X POST repos\/owner\/name\/labels/, '{}']
+  ]);
+  let created = false;
+  const runner2 = (args) => {
+    const key = args.join(' ');
+    runner2.calls.push(args);
+    if (key.includes('issues?state=all')) {
+      return { status: 0, stdout: created ? ledgerLine(77, 'open') : '', stderr: '' };
+    }
+    if (key.includes('issue create')) {
+      created = true;
+      return { status: 0, stdout: '', stderr: '' };
+    }
+    if (key.includes('labels?per_page')) return { status: 0, stdout: '[]', stderr: '' };
+    if (key.includes('-X POST') && key.includes('/labels')) return { status: 0, stdout: '{}', stderr: '' };
+    return { status: 0, stdout: '', stderr: '' };
+  };
+  void runner;
+  runner2.calls = [];
+  const restore = setGhRunner(runner2);
+  try {
+    assert.equal(resolveLedger(REPO, { apply: true }), 77);
+    assert.ok(runner2.calls.some((args) => args.join(' ').includes('issue create')));
+  } finally {
+    restore();
+  }
+});
+
+test('labels: only the missing ones are created, never the existing ones', () => {
+  const runner = fakeGh([
+    [/-X POST repos\/owner\/name\/labels/, '{}'],
+    [/labels\?per_page/, JSON.stringify([{ name: 'bug' }])]
+  ]);
+  const restore = setGhRunner(runner);
+  try {
+    const missing = ensureLabels(REPO, ['bug', 'priority:high'], { apply: true });
+    assert.deepEqual(missing, ['priority:high']);
+    const creates = runner.calls.filter((args) => {
+      const key = args.join(' ');
+      return key.includes('-X POST') && key.includes('/labels');
+    });
+    assert.equal(creates.length, 1);
+    assert.ok(creates[0].includes('name=priority:high'));
+  } finally {
+    restore();
+  }
+});
+
+test('ledger: comments are read back into a verified chain', () => {
+  const first = triageIssue({ issue: bugIssue, mode: 'cautious', now: fixedNow });
+  const second = triageIssue({
+    issue: { number: 61, title: 'تسريب مفاتيح في السجلات', body: 'ثغرة: المفتاح ظاهر في logs ويمكن استغلاله.' },
+    mode: 'cautious',
+    history: [first.record],
+    now: fixedNow
+  });
+  const payload = [first.record, second.record].map((record) => JSON.stringify({ body: formatRecordComment(record) })).join('\n');
+  const runner = fakeGh([[/comments\?per_page/, payload]]);
+  const restore = setGhRunner(runner);
+  try {
+    const { records, chain } = readLedger(REPO, 59);
+    assert.equal(records.length, 2);
+    assert.equal(chain.ok, true, JSON.stringify(chain));
+  } finally {
+    restore();
+  }
+});
+
+test('rollback: removes exactly the applied labels and writes the undo into the ledger', () => {
+  const result = triageIssue({ issue: bugIssue, mode: 'cautious', now: fixedNow });
+  const plan = planRollback(result.record, { now: fixedNow });
+  const runner = fakeGh([[/issues\?state=all/, ledgerLine(59, 'open')]]);
+  const restore = setGhRunner(runner);
+  try {
+    const summary = applyRollback({ repo: REPO, record: result.record, plan, reviewer: 'owner', now: fixedNow });
+    assert.deepEqual(summary.removed, ['bug', 'priority:high']);
+    assert.equal(summary.ledger, 59);
+    const text = runner.calls.map((args) => args.join(' ')).join('\n');
+    assert.match(text, /DELETE repos\/owner\/name\/issues\/42\/labels\/bug%2Cpriority%3Ahigh/);
+    assert.match(text, /issues\/42\/comments/);
+    const markerCall = runner.calls.find((args) => args.join(' ').includes(ROLLBACK_MARKER));
+    assert.ok(markerCall, 'the undo must be recorded in the ledger');
+    assert.ok(markerCall.join(' ').includes('\"actor\":\"owner\"'));
+  } finally {
+    restore();
+  }
 });

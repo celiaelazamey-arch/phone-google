@@ -4,13 +4,10 @@ name: Issue triage self-test (governed)
 # this repository, using the workflow's own GITHUB_TOKEN (issues:write) — a token that, unlike the assistant's
 # installation token, can actually comment and label.
 #
-# Bootstrapping note: the `push` trigger below exists only so the first proof runs can happen on a branch, before
-# this workflow reaches the default branch. It is removed in the follow-up commit; what remains is manual.
+# Manual only: the bootstrap `push` trigger was removed after the first proof runs (40682911724, 40683251035)
+# succeeded, so this harness can no longer fire on its own. Run it when a policy change needs re-proving.
 
 on:
-  push:
-    paths:
-      - '.github/workflows/issue-triage-selftest.yml'
   workflow_dispatch:
     inputs:
       issues:
@@ -59,13 +56,3 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: node scripts/issue-triage-verify.mjs
-
-      - name: Retire the bootstrap artefacts
-        if: github.event_name == 'push'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # #60 was created by the pre-fix ledger race: a label-filtered lookup lagged one second behind the
-          # creation of #59. Its single record stays in history; the canonical chain from here is #59.
-          gh issue close 60 --reason "not planned" --comment "Superseded: duplicate ledger created by the pre-fix lookup race in the first bootstrap run. The canonical chain is #59; this issue's single record is preserved above."
-          gh issue close 61 --reason "not planned" --comment "Self-test complete — the decision record is in the triage audit ledger (#59). Closing so the queue stays real."
