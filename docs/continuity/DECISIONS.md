@@ -735,6 +735,57 @@
 **الثمن المقبول:** D1 ليس MySQL — لا معاملات متعددة الجداول كما في المحرك الكامل، والاستعلامات بسيطة عمدًا.
 لذلك يبقى `HOST-003` (الخادم الكامل بـMySQL) مفتوحًا، ولا يُغلق بهذا القرار.
 
-**الدليل:** `test/edge-d1.test.js` (12 اختبارًا): لا دوام بلا ربط · تطابق الرمز يمنح `true` · قاعدة معطوبة
-تعطي `false` وسببها · الدوران والتَّرقيم ورفض القيمة الكبيرة والمفتاح الفاسد · كسر السلسلة يُكتشف عند الرابط
-المكسور · السجل لا يحوي القيمة · 401 بلا رمز · 503 عند غياب D1 · ربط D1 لا يظهر في البيانات إلا عند وجوده.
+**الدليل:** `test/edge-d1.test.js` (12 اختبارًا) ثم توسعته في PR `#69` المدموج في `main@44532f4` إلى **23 اختبارًا** مع
+إثبات حي من تشغيلة `Deploy (Cloudflare Edge)` رقم `40706047781`: `d1: { ok: true, id: "f63ccd9f-49b1-4eca-861b-fd478c433518", name: "celia-edge-state", migrations: { statements: 4 } }`
+و`storage: { mode: "d1", durable: true, latencyMs: 106 }`.
+
+## DEC-036 — الخطة التنفيذية لإكمال البنود وسد الفجوات وتدوير مفاتيح التشفير (`v2.<keyId>`) وتحصين الحافة وSSRF
+
+- **التاريخ:** 2026-10-28 · **الحالة:** منفَّذ ومُختبر محليًا وموثّق عبر الموصلات الخاصة للمالك · **المهمة:** `PLAN-001`، `SEC-001`، `SEC-002`، `SEC-003`، `SEC-005`، `DOC-002`، `QA-005`، `QA-006`، `OPS-005` · **يعتمد على:** DEC-025, DEC-031, DEC-035
+
+- **السياق:** بعد دمج PR `#69` (`main@44532f4552c20b8fb51402e14cff8fc15356b97c`) وثبوت دوام قاعدة Cloudflare D1 الحية (`storage.durable: true`) ووصول المسابر الحية إلى `12/12 = 100%` (`40680228320`)، طلب المالك خطة تنفيذية شاملة لإكمال البنود الناقصة وسد الفجوات والثغرات مع تفعيل جميع الأدوات والموصلات الـ11 المتصلة دون المساس بقيود `AGENTS.md` (صفر بطاقة دفع، صفر نشر مفاتيح سرية، عدم حذف أو كسر العقود القائمة).
+
+- **القرار:**
+  1. **تدوير مفاتيح تشفير رموز OAuth (`SEC-005` في `src/security.js` + `src/{config,google,celia-mcp,celia-ui}.js`):**
+     - دعم صيغة المغلف المختوم `v2.<keyId>.<iv>.<tag>.<ciphertext>` مع ربط معرف المفتاح في `Additional Authenticated Data` (`celia-token-envelope:v2:<keyId>`) لمنع خلط المفاتيح أو استبدال المعرّف.
+     - الإبقاء على التوافق التام مع المغلفات القديمة `v1.<iv>.<tag>.<ciphertext>`: تظل كتابة المفتاح المفرد بلا `keyId` تنتج `v1.*` حفاظًا على عقود الإصدارات السابقة، بينما تدعم `parseEncryptionKeyring` (سواء بصيغة المعاملين أو الكائن) و`decryptJson` فك تشفير أي مفتاح مسمّى أو مفتاح قديم، وتتيح `rotateEncryptedJson` إعادة التشفير الآمن مع إرجاع `{ rotated, previousVersion, keyId, payload }`.
+     - جعل متغيري `TOKEN_ENCRYPTION_KEY_ID` و`TOKEN_ENCRYPTION_KEYRING` اختياريين بالكامل دون كسر `render.yaml` أو عقود الإقلاع.
+  2. **تحصين حارس SSRF الشامل (`SEC-003` في `src/ai-providers.js` و`workers/celia-edge/worker.js`):**
+     - تصدير دالة `isDisallowedHost(hostname)` بعد توسيعها لحجب جميع نطاقات IPv4 الخاصة والمحجوزة (`0.0.0.0/8`، `10/8`، `100.64/10` CGNAT، `127/8`، `169.254/16` metadata، `172.16/12`، `192.168/16`، `198.18/15`، `>=224`) ونطاقات IPv6 المحلية والخاصة (`::1`، `::`، `fc00::/7` ULA، `fe80::/10`، وعناوين `::ffff:` المدمجة بنمط عشري أو سداسي عشري) ونطاقات `.local`/`.internal`/`.localhost`.
+     - فرض نفس الحارس داخل `validateCronJobPayload` على الحافة بحيث يُرفض أي هدف داخلي أو غير `https://` برمز `422 Unprocessable Entity` قبل وصول الطلب إلى `api.cron-job.org`.
+  3. **تحصين بوابة الحافة وعقد التدقيق (`SEC-001`, `SEC-002`, `OPS-005`):**
+     - مقارنة رمز المالك بزمن ثابت آمن للطول عبر تجزئة `SHA-256` للجانبين قبل المقارنة الثابتة، وتحديد سقف جسم JSON عند `8 KiB` (`413`)، وإرجاع `405` مع ترويسة `Allow`، وفصل `/health` الخامل عن `/readyz` الفاحص لدوام `env.DB`، واعتماد مهلة اتصال صريحة (`504`/`502`) وترويسات أمنية (`X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, `Cache-Control: no-store`) ودعم أصليْ الواجهة (`https://celiaelazamey-arch.github.io,http://localhost:3000`).
+     - إضافة `wiredInEdgeOrReadinessNames` في `src/secrets-hub.js` لتوضيح الأسرار الموصولة فعليًا في الحافة وفحص الجاهزية مع الحفاظ على `presentUnwiredNames` للتوافق الخلفي مع اختبارات حزمة التدقيق.
+  4. **مطابقة المسارات بين Express وGitHub Pages (`DOC-002`, `QA-005`):**
+     - توصيل مسارات `/computer` و`/computer.html` و`/computer-permissions` و`/computer-permissions.html` و`/computer.css` في `src/celia-ui.js`، ورفع فحص النشر الحي في `.github/workflows/pages.yml` إلى `12/12` مسارًا.
+  5. **مزامنة منظومة الموصلات الخاصة بالمالك دون أي أسرار:**
+     - تدوين الخطة التنفيذية في `docs/executive-completion-plan.md`، وإنشاء مشروع ومهام التتبع في `Linear` (فريق `CEL`)، وصفحة المرجع التنفيذي في `Notion`، وحزمة المجلد الخاص في `Google Drive` (`Google Docs` + `Google Sheets` + `Google Slides`)، ونسخة مرجعية منقّاة في `Dropbox`، مع الإبقاء على `Supabase` و`Vercel` و`Gmail` دون أي تعديل إنتاجي أو مراسلة خارجية.
+
+- **البدائل المرفوضة:** (أ) فرض صيغة `v2` إجباريًا على كل استدعاء مفرد لـ`encryptJson` بدون `keyId` — يكسر توافق البيانات المشفرة وعقود الاختبار؛ (ب) تشغيل مشروع Supabase المتوقف أو إنشاء مشروع Vercel جديد دون تفويض صريح — يخالف مبدأ عدم إحداث أثر إنتاجي غير مفوض؛ (ج) إغلاق `HOST-003` استنادًا إلى دوام D1 وحده — مرفوض لأن محرك Express/MySQL الكامل ما زال غير منشور.
+
+- **الأثر:** تحديث `src/{security,config,google,celia-mcp,celia-ui,ai-providers,secrets-hub}.js`، و`workers/celia-edge/{worker.js,wrangler.toml}`، و`scripts/{deploy-cloudflare-edge,service-reality}.mjs`، و`.github/workflows/pages.yml`، وإضافة `test/security-surface-audit.test.js` وتوسيع اختبارات الحافة وصفحة الكمبيوتر ومخزن المعرفة، وإصدار `docs/executive-completion-plan.md`. **لا تغيير في `schema 1` ولا في الإصدار `0.2.1` ولا في قائمة الأسرار الـ18 الإلزامية.**
+
+## DEC-037 — المسار الإنتاجي الكامل لسيليا مجانًا 100% بدون بطاقة دفع (بدون فيزا) على Cloudflare Workers + Cloudflare D1 + GitHub Pages
+
+- **التاريخ:** 2026-10-28 · **الحالة:** منفَّذ ومُختبر على SQLite الحقيقي وجاهز للنشر التلقائي فور دمج PR `#70` · **المهمة:** `OPS-001`، `SEC-001`، `SEC-005`، `QA-005` · **يعتمد على:** DEC-034, DEC-035, DEC-036
+
+- **السياق:** طلب المالك التحقق أولًا ثم تطبيق كل ما يحتاجه النظام ليُنشَر مجانًا **بدون فيزا (`paymentCardAuthorized: false`)**. أثبت التحقق الميداني:
+  1. `Render` يفرض تفويض بطاقة بقيمة `1$` (`DEC-034`)، و`Vercel AI Gateway` يطلب بطاقة ائتمان (`403`)، و`Hugging Face Docker Spaces` يتطلب خطة مدفوعة.
+  2. مشروع `Supabase Free` (`yqzhgogmtscoqejuxplv`) مجاني بلا بطاقة لكنه متوقف تلقائيًا (`INACTIVE`) بعد الخمول ويستخدم PostgreSQL بدل مخطط المشروع.
+  3. في المقابل، حساب **Cloudflare Workers + Cloudflare D1 (`celia-edge-state` / `f63ccd9f-49b1-4eca-861b-fd478c433518`) + GitHub Pages** يعمل حيًّا بالفعل في حساب المالك مجانًا `0$` بلا أي بطاقة فيزا وبلا نوم (`0 ms cold sleep`) ومع `18/18` سرًّا مربوطة آليًا من GitHub Actions، لكن العامل المنشور لم يكن يضم سوى بوابة حالة مصغّرة دون محرك MCP أو Google OAuth أو WhatsApp Webhook.
+
+- **القرار:**
+  1. **توسيع قاعدة Cloudflare D1 (`workers/celia-edge/migrations/0002_runtime.sql`):** إضافة الجداول الإنتاجية المطابقة لـ`schema 1` (`app_users`، `oauth_states`، `google_credentials`، `whatsapp_contacts`، `whatsapp_messages`، `edge_idempotency` — 8 عبارات idempotent تضاف إلى 4 في `0001_state.sql` = **12 عبارة SQL**) وتطبيقها آليًا عبر `loadAllMigrationsSql()` في `scripts/deploy-cloudflare-edge.mjs`.
+  2. **تشفير رموز OAuth وتوقيع التذاكر وHMAC الخام بمعيار WebCrypto (`workers/celia-edge/crypto.js`):** تشفير وفك تشفير رموز Google بصيغة `v2.<keyId>.*` المربوطة بـAAD عبر `TOKEN_ENCRYPTION_KEY` أو اشتقاق مفتاح معزول بـ`HKDF-SHA-256` من `CELIA_MCP_API_TOKEN` عند غيابه، مع توافق كامل لفك تشفير مغلفات `v1.*` الصادرة عن `src/security.js`، وتذاكر ربط متصفح قصيرة العمر (`10` دقائق)، والتحقق من توقيع Meta `X-Hub-Signature-256` على البايتات الخام بزمن ثابت.
+  3. **تشغيل خادم سيليا الكامل على الحافة (`workers/celia-edge/runtime.js` + `worker.js`):**
+     - **بروتوكول MCP الكامل (`POST /mcp` و`GET /mcp`):** تنفيذ الأدوات الـ12 الرسمية جميعًا بمصادقة `Bearer CELIA_MCP_API_TOKEN`.
+     - **تكامل Google OAuth2 وWorkspace:** `/auth/google`، `/auth/google/link`، `/auth/google/callback` (مع `state` أحادي الاستخدام وتجديد تلقائي لـ`access_token` وسجل تدقيق مشفّر في `edge_audit`)، ومسارات البحث في Gmail وDrive وContacts وأحداث Calendar المحمية بـ`Idempotency-Key`.
+     - **تكامل WhatsApp Cloud API + Gemini AI:** `/webhooks/whatsapp` (التحدي + التوقيع الخام + منع التكرار في D1 + أوامر المالك بالعربية: «اربط جوجل»، «لخص آخر إيميل»، «هات جدولي» + الرد التلقائي للعملاء الموافقين ضمن نافذة الـ24 ساعة عبر `GEMINI_API_KEY` مع بديل محلي آمن)، ومسارات `/api/whatsapp/{contacts,consent,messages}` و`/api/{live,skills,ai/reply}` و`/healthz`.
+  4. **أتمتة النشر والفحص الحيّ وربط الواجهة:**
+     - رفع الوحدات الأربع (`worker.js`، `state.js`، `crypto.js`، `runtime.js`) في `scripts/deploy-cloudflare-edge.mjs` وتمرير متغيرات WhatsApp الاختيارية.
+     - إضافة وضع `--mode edge` في `scripts/verify-live.mjs` وأمر `npm run verify:edge` وتشغيله تلقائيًا بعد كل نشر في `.github/workflows/cloudflare-deploy.yml`، وضبط `CELIA_REAL_SERVICE_URL=https://celia-phone-google.celiaelazamey.workers.dev` أثناء بناء `.github/workflows/pages.yml`.
+     - توثيق المسار الكامل في [docs/no-visa-deployment.md](../no-visa-deployment.md) مع الإبقاء على `render.yaml` و`deploy/free-always-on/README.md` دون مساس للتوافق العقدي.
+
+- **الدليل:** `test/edge-full-runtime.test.js` (6 اختبارات تكامل شاملة فوق محرك `node:sqlite` الحقيقي لـ12 عبارة SQL في D1، وتطابق الأدوات الـ12 مع `MCP_TOOLS`، وتوافق مغلف `v1.*`، وأوامر واتساب العربية، ونجاح `verifyLive --mode edge`).
+
+

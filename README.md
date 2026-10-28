@@ -4,32 +4,23 @@
 
 ## روابط النشر (ما هو حي فعلًا، وبأي دليل)
 
-| الوجهة | الرابط | الدليل (GitHub API، `main@1a11810`، 2026-10-28 00:53 UTC) |
+| الوجهة | الرابط | الدليل (GitHub API، `main@44532f4`، 2026-10-28) |
 |---|---|---|
-| الواجهة الثابتة — GitHub Pages | <https://celiaelazamey-arch.github.io/phone-google/> | deployment `7374226427` بحالة `success`؛ التشغيلة `40611588083` تحققت من 10/10 مسارات (`/`, `/protocol.html`, `/agent.html`, `/kb.html`, `/system.html`, `/deploy.html`, `/live.html`, `/skills.html`, `/api/protocol-benchmark.json`, `/api/live.json`) |
-| بوابة الحافة — Cloudflare Worker | <https://celia-phone-google.celiaelazamey.workers.dev> | التشغيلة `40611588035`: `status: deployed`، `liveReady: true` (`/readyz`)، 18/18 سرًا مربوطًا؛ النقاط العامة `/readyz` `/health` `/version` `/api/system` `/api/deployment` `/api/protocol-benchmark.json` |
-| الإصدار الموقّع | <https://github.com/celiaelazamey-arch/phone-google/releases/tag/v0.2.1> | التشغيلة `40611588118`: مُزامَن وموثق OIDC عند `1a11810` (site/source tar + SBOM + SHA256SUMS + release.json) |
+| الواجهة الثابتة — GitHub Pages | <https://celiaelazamey-arch.github.io/phone-google/> | التشغيلة `40706047514` بحالة `success` على `main@44532f4`؛ وتوسعت بوابة `pages.yml` للتحقق الحي من **12/12 مسارًا** (`/`, `/protocol.html`, `/agent.html`, `/kb.html`, `/system.html`, `/deploy.html`, `/live.html`, `/skills.html`, `/computer.html`, `/computer-permissions.html`, `/api/protocol-benchmark.json`, `/api/live.json`) |
+| بوابة الحافة + قاعدة D1 الدائمة — Cloudflare Worker | <https://celia-phone-google.celiaelazamey.workers.dev> | التشغيلة `40706047781` على `main@44532f4`: `status: deployed`، `liveReady: true` (`/readyz`)، 18/18 سرًا مربوطًا، وقاعدة **Cloudflare D1 (`celia-edge-state`) متحققة بدوام حي `storage.mode: "d1"`, `storage.durable: true`** وسلسلة تدقيق SHA-256 على `/api/state` و`/api/audit` |
+| الإصدار الموقّع | <https://github.com/celiaelazamey-arch/phone-google/releases/tag/v0.2.1> | موثق OIDC (site/source tar + SBOM + SHA256SUMS + release.json) مع نشر idempotent في `40674752228` |
 | صورة الحاوية (الخادم الكامل) | `ghcr.io/celiaelazamey-arch/phone-google:v0.2.1` — [صفحة الحزمة](https://github.com/celiaelazamey-arch/phone-google/pkgs/container/phone-google) | الحزمة **عامة**، `linux/amd64`، digest في `release.json` |
 
-**غير منشور بعد (لا رابط له ولا يُدَّعى):** الخادم الكامل Express + MySQL (حلقة الوكيل، Google/WhatsApp) — يحتاج خدمة
-Render Free + قاعدة Aiven MySQL Free ينشئهما المالك من لوحتيهما بلا بطاقة، ثم `npm run verify:live -- --url https://<service>.onrender.com`
-بنتيجة PASS تُلصق في سجل جلسة ([الخطة التنفيذية](deploy/free-always-on/README.md)). Pages لقطة ثابتة (`/api/agent` غير متاح
-عليها)، والـWorker بوابة حافة للحالة والأسرار لا تشغّل حلقة الوكيل. **ما بعد إنشاء الحسابين آلي:** أضف المتغيّر
-`CELIA_LIVE_URL` والسرّ `RENDER_API_KEY` + `RENDER_SERVICE_ID` (أو `RENDER_DEPLOY_HOOK_URL`) فيتولى
-`deploy-render.yml` النشر والتحقق (`verify:live`) وإبقاء الخدمة مستيقظة عبر cron-job.org عند كل دمج
-([التفاصيل §4.2](deploy/free-always-on/README.md)).
+**غير منشور بعد (لا رابط له ولا يُدَّعى):** الخادم الكامل Express + MySQL (حلقة الوكيل، Google/WhatsApp) — حُجب إنشاء خدمة Render بطلب تفويض بطاقة بقيمة `1$` (`DEC-034`)؛ لذا نُقل دوام الحافة فعليًا إلى **Cloudflare D1 المجاني بلا بطاقة (`durable: true`)**، بينما يبقى تشغيل الحاوية الكاملة رهن اختيار مضيف بلا بطاقة أو قرار المالك ([الخطة التنفيذية لإكمال البنود وسد الفجوات](docs/executive-completion-plan.md)).
 
 **واقع الخدمات (لا أسماء ولا «مواكب»):** [docs/service-reality.md](docs/service-reality.md) — تدقيق حقيقي بالأسرار الفعلية من
-داخل GitHub Actions (run `40649403028`، 2026-10-28): 324/324 اختبارًا، MySQL حقيقي 11/11، **10 خدمات متحققة فعلًا**
-(Gemini، cron-job.org، Cloudflare API، Google OAuth client، رمز المالك، Worker، Pages، GHCR، الإصدار، رقم الهاتف)،
-**4 خدمات متقاعدة صراحةً في Git** لأن اعتماداتها ميتة أو تتطلب بطاقة (AI Gateway، DeepSeek، AgentRouter، R2 —
-`docs/deployment-profile.json → serviceRetirements`، قابلة للتراجع)، وعطلان بانتظار لوحة المالك: ElevenLabs (المفتاح يولّد
-صوتًا فعلًا؛ `CELIA_VOICE_ID` يشير إلى صوت غير موجود) وFigma (401) → نسبة العمل 83.3% < 95%. إعادة التدقيق: commit يحمل
-`[reality]` أو `npm run reality`.
+داخل GitHub Actions (run `40680228320` + دوام الحافة `40706047781`، 2026-10-28): MySQL حقيقي 11/11، **12/12 خدمة مهيأة متحققة فعلًا بنسبة 100% (`workingRate: 1`, `failed: []`)**
+(Gemini، cron-job.org، Cloudflare API، Figma، ElevenLabs TTS، Google OAuth client، رمز المالك، Worker + D1، Pages، GHCR، الإصدار، رقم الهاتف)،
+و**4 خدمات متقاعدة صراحةً في Git** لأن اعتماداتها ميتة أو تتطلب بطاقة (AI Gateway، DeepSeek، AgentRouter، R2 —
+`docs/deployment-profile.json → serviceRetirements`، قابلة للتراجع). إعادة التدقيق: commit يحمل `[reality]` أو `npm run reality`.
 
-**خطة المحافظة على ما وصلنا إليه:** [docs/preservation-plan.md](docs/preservation-plan.md) (DEC-031) — جرد بالدليل، تدقيق
-أسبوعي آلي مع issue تتبّع واحدة تصل إلى المالك وتُغلق وحدها، أرضية تغطية في CI (80/65/78)، جدول موت الأسرار الـ18 وكشفها،
-ودليل إعادة البناء من الصفر؛ وما لا يملكه غير المالك (حماية `main`، السرّان المتبقيان، PRs القديمة).
+**خطة المحافظة والخطة التنفيذية والنشر بدون فيزا:** [docs/no-visa-deployment.md](docs/no-visa-deployment.md) (`DEC-037` — **النشر الكامل مجانًا 100% بدون فيزا على Cloudflare Workers + D1 + GitHub Pages**: أدوات MCP الـ12 + Google OAuth2 + WhatsApp Webhook + Gemini)، و[docs/preservation-plan.md](docs/preservation-plan.md) (`DEC-031`)، و[docs/executive-completion-plan.md](docs/executive-completion-plan.md) (`DEC-036`) — جرد بالدليل، تدقيق
+أسبوعي آلي مع issue تتبّع واحدة تصل إلى المالك وتُغلق وحدها، أرضية تغطية مفروضة في CI (`89/71/82`)، تدوير مفاتيح تشفير `AES-256-GCM` (`v2.<keyId>`)، تحصين SSRF وترويسات الحافة، وفصل صريح لبنود لوحة المالك المتبقية.
 
 ## خطة 2026 والاستمرارية بين الجلسات
 

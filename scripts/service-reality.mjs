@@ -442,7 +442,13 @@ export function buildProbes({ config, env, fetchImpl = fetch, timeoutMs, publica
         if (!workerUrl) return { verdict: 'unverifiable', detail: 'no edge URL' };
         const ready = await probeJson(fetchImpl, `${workerUrl}/readyz`, {}, timeoutMs);
         const ok = ready.status === 200 && ready.json?.ok === true;
-        return { verdict: ok ? 'verified' : 'failed', detail: ok ? `readyz 200, release ${ready.json.release?.version} @ ${String(ready.json.release?.commit || '').slice(0, 7)}` : `readyz ${ready.status}`, latencyMs: ready.latencyMs };
+        const storageNote = ready.json?.storage?.mode
+          ? `; storage ${ready.json.storage.mode} (durable=${Boolean(ready.json.storage.durable)})`
+          : '';
+        const capsNote = ready.json?.capabilities?.mcp
+          ? `; runtime=mcp(${ready.json.capabilities.mcpToolsCount || 12})+oauth+whatsapp`
+          : '';
+        return { verdict: ok ? 'verified' : 'failed', detail: ok ? `readyz 200, release ${ready.json.release?.version} @ ${String(ready.json.release?.commit || '').slice(0, 7)}${storageNote}${capsNote}` : `readyz ${ready.status}`, latencyMs: ready.latencyMs };
       }
     },
     {

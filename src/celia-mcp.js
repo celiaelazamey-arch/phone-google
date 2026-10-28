@@ -31,7 +31,7 @@ import {
   inspectFigmaFile,
   synthesizeCeliaSpeech
 } from './secrets-hub.js';
-import { decryptJson, encryptJson, isValidE164, isWithinCustomerWindow, safeEqual } from './security.js';
+import { decryptJson, encryptJson, isValidE164, isWithinCustomerWindow, parseEncryptionKeyring, safeEqual } from './security.js';
 import { sendWhatsAppText } from './whatsapp.js';
 import { createIdempotencyStore, extractIdempotencyKey, isValidIdempotencyKey } from './idempotency.js';
 
@@ -89,6 +89,12 @@ export function loadCeliaMcpConfig(env = process.env, { requireToken = true } = 
         ? 'PHONE_NUMBER'
         : null,
     encryptionKey: hasValidEncryptionKey ? rawEncryptionKey : '',
+    encryptionKeyring: hasValidEncryptionKey
+      ? parseEncryptionKeyring(rawEncryptionKey, {
+          primaryKeyId: env.TOKEN_ENCRYPTION_KEY_ID || '',
+          keyringSpec: env.TOKEN_ENCRYPTION_KEYRING || ''
+        })
+      : null,
     envDisableMysql: env.CELIA_MCP_DISABLE_MYSQL === 'true',
     landingRoot: env.CELIA_LANDING_ROOT === 'true',
     celia: Object.freeze({
@@ -155,13 +161,14 @@ async function getGoogleClient(pool, config) {
     throw Object.assign(new Error('google_not_connected'), { status: 409 });
   }
   const client = new google.auth.OAuth2({ clientId: config.google.clientId, clientSecret: config.google.clientSecret, redirectUri: config.google.redirectUri, transporterOptions: { timeout: config.resilience?.timeoutMs || 8000, retry: false } });
-  const tokens = decryptJson(rows[0].encrypted_tokens, config.encryptionKey);
+  const keyTarget = config.encryptionKeyring || config.encryptionKey;
+  const tokens = decryptJson(rows[0].encrypted_tokens, keyTarget);
   client.setCredentials(tokens);
   client.on('tokens', (fresh) => {
     const merged = { ...tokens, ...fresh, refresh_token: fresh.refresh_token || tokens.refresh_token };
     pool.execute(
       'UPDATE google_credentials SET encrypted_tokens = ? WHERE user_id = ?',
-      [encryptJson(merged, config.encryptionKey), config.userId]
+      [encryptJson(merged, keyTarget), config.userId]
     ).catch(() => {});
   });
   return client;

@@ -42,7 +42,8 @@
     "google:doctor": "node scripts/google-doctor.mjs",
     "check:continuity": "node scripts/check-continuity.mjs",
     "check:secrets": "node scripts/check-secrets-wiring.mjs",
-    "verify:live": "node scripts/verify-live.mjs"
+    "verify:live": "node scripts/verify-live.mjs",
+    "verify:edge": "node scripts/verify-live.mjs --mode edge --url https://celia-phone-google.celiaelazamey.workers.dev"
   },
   "dependencies": {
     "dotenv": "^18.0.9",

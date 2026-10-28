@@ -1,15 +1,15 @@
 # خطة 100% — نظام منشور بلا أخطاء وبلا بطاقة دفع
 
-**التاريخ:** 28 أكتوبر 2026 · **الفرع:** `arena/6b68cfb2-phone-google` (متفرع من `main@fc4d60f`) · **الإصدار:** 0.2.1 /
-`schema 1` · **المرجع التشغيلي:** [go-live-plan](go-live-plan.md) · **جدول واقع الخدمات:**
+**التاريخ:** 28 أكتوبر 2026 · **الفرع:** `arena/83dde20a-phone-google` (متفرع من `main@44532f4552c20b8fb51402e14cff8fc15356b97c`) · **الإصدار:** 0.2.1 /
+`schema 1` · **المرجع التشغيلي:** [go-live-plan](go-live-plan.md) · **الخطة التنفيذية لسد الفجوات:**
+[executive-completion-plan](executive-completion-plan.md) · **جدول واقع الخدمات:**
 [service-reality](service-reality.md) · **حالة المهام:** [BACKLOG](continuity/BACKLOG.md) هو المرجع الوحيد، وهذه الوثيقة
 ترتيبٌ وبوابات لا حالات.
 
 > **السؤال الذي تجيبه هذه الوثيقة:** «كيف نصل إلى 100% — نظام متكامل، منشور، بلا أخطاء، بلا فيزا/بطاقة دفع؟»
-> **الجواب المختصر:** الكود والتشغيل الآلي يمكن أن يصلا إلى 100% *بأدلّة* في هذه الجلسة، والنشر الكامل يحتاج **خمس
-> إجراءات حسابية يملكها المالك وحده** (Render + Aiven + خادم Meta + ربط Google + سرّ `CELIA_VOICE_ID`). لا يوجد في
-> المشروع عمل برمجي متبقٍ يمنع النشر؛ المتبقي أماكن فارغة في لوحات accounts، وهذه الوثيقة تحوّلها إلى خطوات قابلة للتنفيذ
-> مع دليل قبول لكل خطوة.
+> **الجواب المختصر:** وصلت الشيفرة والاختبارات والأمن وخدمات الإنتاج المهيأة (`12/12 = 100%` في run `40680228320`) ودوام
+> الحافة على قاعدة Cloudflare D1 (`storage.durable: true` في run `40706047781`) إلى **100% بأدلّة حية**؛ وبقيت فقط قرارات
+> لوحة المالك الخارجية (حماية `main`، بديل الخادم الكامل بعد قيد بطاقة Render `DEC-034`، تطبيق Meta الاختياري، وربط Google الحي).
 
 ---
 
@@ -22,9 +22,9 @@
 | 1 | **الشيفرة** | `check` + `release:check` + `check:continuity` + `npm audit` خضراء | annotations الـworkflow نفسها | الوكيل ✅ |
 | 2 | **الاختبارات والتغطية** | اختبارات كلها خضراء على Node 22 و24، وتغطية أسطر ≥89 (المقاس الآن 90.29) | ملخص `test:coverage` + annotation | الوكيل ✅ |
 | 3 | **الأنبوب (CI/CD)** | كل workflows التي تُشغَّل على `main` تنتهي `success` أو `skipped` بمسوّغ مُعلن — لا `failure` | `gh run list` لكل commit دمج | الوكيل ✅ (بعد إصلاح REL-002) |
-| 4 | **الخدمات الحية** | نسبة الخدمات المهيأة العاملة ≥95% (عتبة QA-005) | run `Service reality audit` على نفس commit الدمج | الوكيل ينفّذ، **المالك يصلح سرًّا واحدًا** |
-| 5 | **الإصدار** | `v0.2.1` بأصوله الخمسة + إعادة تشغيل لا تفشل (idempotent) | `gh release view` + run أخضر | الوكيل ✅ |
-| 6 | **النشر الكامل** | `verify:live` PASS على رابط `onrender.com` عام مع MySQL دائم | تقرير `verify:live` بصيغة PASS ولصقه في سجل جلسة | **المالك** (حساب Render + Aiven) |
+| 4 | **الخدمات الحية** | نسبة الخدمات المهيأة العاملة ≥95% (عتبة QA-005) | run `Service reality audit` `40680228320` (**12/12 = 100%**، `verdict: pass`) | مكتمل ✅ |
+| 5 | **الإصدار والحافة الدائمة** | `v0.2.1` بأصوله الخمسة + Worker الحافة بقاعدة Cloudflare D1 (`durable: true`) | `40674752228` + `40706047781` على `main@44532f4` | الوكيل ✅ |
+| 6 | **النشر الكامل للخادم الخلفي** | `verify:live` PASS على رابط عام مع MySQL دائم (بعد حجب Render بالبطاقة في `DEC-034`) | تقرير `verify:live` بصيغة PASS ولصقه في سجل جلسة | **قرار المالك** ([executive-completion-plan.md](executive-completion-plan.md)) |
 | 7 | **القنوات** | Google مربوط ويعمل من رقم Owner · WhatsApp يستقبل ويوقّع | أمر مالك حقيقي + webhook موقّع من Meta | المالك (Google/Meta) |
 | 8 | **الحماية والاستعادة** | نسخة `mysqldump` مستعادة فعليًا + حماية `main` + تنبيه فشل | RPO/RTO مكتوبان + لقطة قواعد الحماية | المالك (قرار/لوحة) |
 
@@ -41,8 +41,8 @@
 | التغطية | **أسطر 90.29% · فروع 73.20% · دوال 83.79%** (كانت 85.72/71.79/83.83) | `npm run test:coverage` |
 | أرضية التغطية في CI | صارت **89/71/82** بدل 80/65/78 | `package.json` + `COVERAGE_FLOOR` في `scripts/service-reality.mjs` |
 | فحوص البوابة | `check` 114 ملفًا ✓ · `release:check` ✓ · `npm audit --omit=dev` 0 ثغرة | محليًا |
-| الخدمات الحية | **11 متحققة / 1 فاشلة من 12 مهيأة = 91.7%** (ElevenLabs) | run [`40663707956`](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40663707956) |
-| النشر | Pages ✅ · Worker ✅ · GHCR ✅ · Release ✅ · **Render ✗ (لا حساب)** | annotations الـruns |
+| الخدمات الحية | **12 متحققة / 0 فاشلة من 12 مهيأة = 100%** (`verdict: pass`, `workingRate: 1`) | run [`40680228320`](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40680228320) |
+| النشر والدوام | Pages (`12/12` مسارًا) ✅ · Worker + Cloudflare D1 (`storage.durable: true`) ✅ · GHCR ✅ · Release ✅ · **Render محجوب ببطاقة (`DEC-034`)** | تشغيلة `40706047514` + `40706047781` على `main@44532f4` |
 | فشل واحد على `main@fc4d60f` | `Publish verified release` فشل في خطوة تحقق **مدموجة** بلا تسمية البوابة | run `40665130469` |
 | **بعد الدمج (PLAN-001/REL-002/QA-006)** على `main@5709bad` | **كل الـworkflows ناجحة**: الجودة `40674752264` · الإصدار `40674752228` (بواباته الأربع مسمّاة كلها ✅) · Pages `40674752288` · Worker `40674752211` · Render `40674873835` | `gh run list --branch main` |
 
@@ -60,8 +60,8 @@
 
 | # | العائق | الأثر | الخطوة الدقيقة (بلا بطاقة) | دليل الإغلاق |
 |---|---|---|---|---|
-| O1 | `CELIA_VOICE_ID` غير مطابق لصوت مرئي | يمنع 95% (91.7% الآن) | GitHub → Settings → Secrets and variables → **Actions → تبويب Secrets** → **Repository secrets** (لا Variables، لا Codespaces، لا سرّ بيئة) → `CELIA_VOICE_ID` → Update → `AnsOWV53Mdx5fcIanRBB` → Update secret | تشغيل `Service reality audit` مع `live_only` → `elevenlabs verified` |
-| O2 | لا خدمة Render ولا قاعدة Aiven | يمنع النشر الكامل (الركن 6) | (1) Aiven → MySQL Free → قاعدة فارغة → حفظ المضيف/المستخدم/كلمة المرور. (2) Render → New → **Blueprint** → مستودع `celiaelazamey-arch/phone-google` → `render.yaml` → تعبئة متغيرات MySQL في لوحة Render. (3) نسخ رابط `https://<service>.onrender.com` | `deploy-render.yml` يخرج من `not-configured` ويطبع `deployed`، ثم `verify:live` PASS |
+| O1 | ~~`CELIA_VOICE_ID` غير مطابق لصوت مرئي~~ | **✅ أُغلق بالكامل (12/12 = 100%)** | حُدِّث السر وجرى التحقق الحي منه بتوليف صوتي فعلي | run `40680228320` (`elevenlabs verified`, `verdict: pass`) |
+| O2 | حجب إنشاء خدمة Render بطلب تفويض بطاقة بقيمة `1$` (`DEC-034`) | يمنع الخادم الخلفي الكامل (الركن 6)؛ وتم تعويض دوام الحافة فعليًا بـCloudflare D1 المجاني (`durable: true`) | اختيار مسار بديل بلا بطاقة من [executive-completion-plan.md](executive-completion-plan.md) (الإبقاء على Pages + Worker + D1، أو نشر حاوية GHCR على مضيف مجاني بلا بطاقة + Aiven MySQL Free) | `verify:live` بحكم `PASS` عند اعتماد مضيف حاويات مجاني |
 | O3 | لا متغيّر `CELIA_LIVE_URL` ولا أسرار Render | نفس ما سبق — الأنبوب جاهز وينتظر الاسمين | Actions → Secrets and variables → **Variables** → `CELIA_LIVE_URL` = رابط Render؛ **Secrets** → `RENDER_API_KEY` (Account Settings → API Keys) + `RENDER_SERVICE_ID` (`srv-…`) أو `RENDER_DEPLOY_HOOK_URL` | run `Render full backend (free)` بحالة `deployed` و`liveReady` |
 | O4 | لا تطبيق Meta ولا رقم WhatsApp | يمنع القناة 3ب | Meta for Developers → Create App → WhatsApp → رقم تجريبي → webhook = `https://<service>/webhooks/whatsapp` + `WHATSAPP_VERIFY_TOKEN` + `WHATSAPP_APP_SECRET` في Render | webhook يتحقق حيًا + `whatsapp_cloud_api verified` في التدقيق |
 | O5 | لا حساب Google مربوط | يمنع «لخص آخر إيميل / هات جدولي» | Google Cloud → OAuth client (Web) بـredirect `https://<service>/auth/google/callback` → `npm run google:doctor` بلا مانع → رابط الموافقة من المالك | `200` حي + أمر مالك حقيقي يصل من رقمه |

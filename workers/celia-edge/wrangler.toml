@@ -4,7 +4,7 @@ compatibility_date = "2025-01-01"
 workers_dev = true
 
 [vars]
-ALLOWED_ORIGIN = "https://celiaelazamey-arch.github.io"
+ALLOWED_ORIGIN = "https://celiaelazamey-arch.github.io,https://celia-phone-google-ui.pages.dev"
 CELIA_VERSION = "0.2.1"
 
 # Durable state (DEC-035) is bound at deploy time by scripts/deploy-cloudflare-edge.mjs, which creates the

@@ -1,21 +1,21 @@
-# خطة المحافظة على ما وصلنا إليه — `main@715060a` (28 أكتوبر 2026)
+# خطة المحافظة على ما وصلنا إليه — `main@44532f4` (28 أكتوبر 2026)
 
 **المبدأ:** الشيء المحفوظ هو ما له دليل قابل لإعادة التشغيل، لا ما كُتب أنه يعمل. لذلك تتكوّن الخطة من (أ) جرد بما
 وصلنا إليه مع دليله، (ب) ما يمكن أن يضيع وكيف، (ج) ضوابط تعمل وحدها وتُبلّغ المالك، (د) ما لا يملكه غير المالك،
-(هـ) كيف نعيد البناء من الصفر، (و) إيقاع صيانة ومؤشرات «ما زلنا محافظين». القرار: DEC-031 · المهمة: OPS-005.
+(هـ) كيف نعيد البناء من الصفر، (و) إيقاع صيانة ومؤشرات «ما زلنا محافظين». القرارات: DEC-031 · DEC-035 · DEC-036 · المهمة: OPS-005 · الخطة التنفيذية المكملة: [executive-completion-plan.md](executive-completion-plan.md).
 
 ## أ) الجرد — ما نحافظ عليه ودليله
 
 | المكوّن | الحالة | الدليل |
 |---|---|---|
-| الشيفرة والاختبارات | 324/324 بلا شبكة، تغطية أسطر 85.8% / فروع 72% / دوال 84% | `Celia quality & resilience` run `40650636307` على `715060a`؛ تدقيق `40649403028` |
+| الشيفرة والاختبارات والأمن | جميع الاختبارات خضراء بلا شبكة، أرضية التغطية مفروضة في CI (`89%` أسطر / `71%` فروع / `82%` دوال)، مع تدوير مفاتيح `v2.<keyId>` وحراس SSRF والحافة | `Celia quality & resilience` run `40706047968` على `main@44532f4` + هذا الفرع |
 | MySQL حقيقي | 11/11 (`test:mysql` على MySQL 8.4 داخل الـrunner) | الـrun نفسه |
-| الواجهة الثابتة | <https://celiaelazamey-arch.github.io/phone-google/> | `Deploy (GitHub Pages)` run `40650636259` ✅ |
-| بوابة الحافة (Worker) | <https://celia-phone-google.celiaelazamey.workers.dev> — `liveReady: true`، 18/18 bindings + مفاتيح التقاعد | `Deploy (Cloudflare Edge)` run `40650636104` ✅ (commit `715060a`) |
-| الإصدار الموقّع | `v0.2.1`، 5 أصول، OIDC | `Publish verified release` run `40650636330` ✅ |
+| الواجهة الثابتة | <https://celiaelazamey-arch.github.io/phone-google/> (`12/12` مسارًا متطابقًا مع Express) | `Deploy (GitHub Pages)` run `40706047514` ✅ على `main@44532f4` |
+| بوابة الحافة + دوام D1 | <https://celia-phone-google.celiaelazamey.workers.dev> — `liveReady: true`، 18/18 bindings + قاعدة **Cloudflare D1 (`celia-edge-state`) بدوام فعلي `storage.durable: true`** | `Deploy (Cloudflare Edge)` run `40706047781` ✅ على `main@44532f4` |
+| الإصدار الموقّع | `v0.2.1`، 5 أصول، OIDC (idempotent) | `Publish verified release` run `40706047877` ✅ |
 | صورة الحاوية | `ghcr.io/celiaelazamey-arch/phone-google:v0.2.1` (عامة) | مسبار `ghcr_image` متحقق في التدقيق |
-| الخدمات الحقيقية | **10 متحققة** (Gemini، cron-job.org، Cloudflare API، Google OAuth client، رمز المالك، رقم الهاتف، Worker، Pages، GHCR، الإصدار) · **4 متقاعدة في Git** (AI Gateway، R2، DeepSeek، AgentRouter) · **2 بانتظار سرّ مالك** (ElevenLabs `CELIA_VOICE_ID`، Figma) | [service-reality.md](service-reality.md) |
-| الذاكرة بين الجلسات | STATE/BACKLOG/DECISIONS (DEC-001…DEC-031)/سجلات الجلسات/CHANGELOG، `check:continuity` في CI | `docs/continuity/` |
+| الخدمات الحقيقية | **12/12 متحققة (`100%`, `workingRate: 1`, `failed: []`)** (Gemini، cron-job.org، Cloudflare API، Figma، ElevenLabs TTS، Google OAuth client، رمز المالك، رقم الهاتف، Worker + D1، Pages، GHCR، الإصدار) · **4 متقاعدة في Git** (AI Gateway، R2، DeepSeek، AgentRouter) | run `40680228320` + [service-reality.md](service-reality.md) |
+| الذاكرة بين الجلسات | STATE/BACKLOG/DECISIONS (DEC-001…DEC-036)/سجلات الجلسات/CHANGELOG، `check:continuity` في CI | `docs/continuity/` |
 | شبكة المعرفة والتعلم المحكوم | سجلات CSV موثقة + مانيفست + سجلات مصادر التعلم | `data/kb/`, `data/learning/` واختباراتها |
 | ما **ليس** محفوظًا لأنه غير موجود بعد | الخادم الكامل (Render + Aiven MySQL)، WhatsApp Meta، ربط حساب Google | HOST-003 — لا بيانات إنتاج تُنسخ احتياطيًا لأنها لا توجد |
 
@@ -38,7 +38,7 @@
 |---|---|---|---|
 | **التدقيق الأسبوعي** `Service reality audit` | كل اثنين 06:00 UTC (08:00 القاهرة) + يدوي + `[reality]` | عمل الخدمات العشر، الحافة، Pages، الإصدار، GHCR، التغطية، MySQL | annotations الـrun؛ Step Summary؛ artifact 90 يومًا |
 | **issue تتبّع واحدة** (label `service-reality`) | عند فشل run مجدول/يدوي على `main`؛ تُغلق وحدها عند النجاح | إيصال الإنذار إلى المالك (إشعارات الجدولة لا تصل لأحد وإلا) | Issues |
-| **أرضية التغطية** `npm run test:coverage` (أسطر 80 / فروع 65 / دوال 78) | كل push/PR في `Celia quality & resilience` | ألّا تتآكل الاختبارات تدريجيًا | فشل CI برسالة `does not meet threshold` |
+| **أرضية التغطية** `npm run test:coverage` (أسطر 89 / فروع 71 / دوال 82) | كل push/PR في `Celia quality & resilience` | ألّا تتآكل الاختبارات تدريجيًا | فشل CI برسالة `does not meet threshold` |
 | البوابات القائمة | كل push/PR | `check` (صياغة 114 ملفًا)، `release:check`، `check:continuity`، `npm audit --audit-level=moderate`، `celia:mcp:verify` (عقد N/N−1)، `check:secrets` 18/18، `build:pages`، متصفح RTL/WCAG، MySQL 8.4 استمرارية/استرجاع نسخة | CI |
 | نشر من `main` فقط | كل دمج | Pages وWorker والإصدار وGHCR تُعاد من الشيفرة نفسها؛ Render بعد حسابي المالك (DEC-028) | runs الأربعة |
 | مانيفست التقاعد | كل اختبار | `serviceRetirements` = bindings الـWorker = `render.yaml` (اختبار يمنع الانحراف) | `test/service-reality.test.js` |
@@ -51,9 +51,8 @@
    restore`، `RTL dashboard · desktop / mobile / accessibility`، `Node 24 container smoke test`، `Python 3.11 · Celia Google
    Spider tests`) · Block force pushes · Do not allow deletions. (التكامل الحالي يتلقى 403 على هذه الإعدادات.)
 2. **الإشعارات:** Watch → Custom → Actions، أو الاكتفاء بـissue `service-reality` (تنشئها الأتمتة وتذكرك أسبوعيًا).
-3. **السرّان المتبقيان للوصول إلى 100%:** `CELIA_VOICE_ID` = صوت مرئي للمفتاح (المفتاح يولّد صوتًا فعلًا)؛ توكن Figma جديد
-   أو سطر `figma` في `serviceRetirements`. بعد أي تغيير سرّ يُستخدم في الحافة: شغّل `Deploy (Cloudflare Edge)` أو ادفع إلى `main`.
-4. **PRs القديمة:** #34 revert **لا يُدمج** (يزيل الـoutbox)؛ #38 و#39 إمّا إغلاق أو إعادة تأسيس على `main` الحالي ثم CI أخضر.
+3. **السرّان اللذان كانا متبقيين (`CELIA_VOICE_ID` و`FIGMA_ACCESS_TOKEN`):** جُدِّدا بالفعل وتحققا حيًا بنسبة **12/12 = 100%** في run `40680228320`. بعد أي تغيير مستقبلي لسرّ يُستخدم في الحافة: شغّل `Deploy (Cloudflare Edge)` أو ادفع إلى `main`.
+4. **PRs القديمة:** أُغلقت بتوثيق صريح كل من `#67` (مكرر) و`#39` (مسودة متجاوزة) و`#34` (revert خطر يزيل `agent_outbox`)؛ وبقي **#38** وحده مفتوحًا لقرار المالك (إغلاق نهائي أو استخلاص صفحتي `/cron` و`/google-map` في PR نظيف).
 5. **Dependabot security updates** (Settings → Code security): تشغيلها قرار مالك؛ CI سيقيّم كل PR منها بالبوابات نفسها.
 6. **تدوير الأسرار:** جدول البند هـ. لا تدوير صامت: كل تدوير يتبعه run `[reality]`.
 
@@ -92,13 +91,13 @@
 
 | المؤشر | القيمة الآن | الحد |
 |---|---|---|
-| خدمات متحققة في آخر تدقيق | 10 | ≥ 10 (و12 بعد السرّين) |
-| نسبة العمل بين المهيأ | 83.3% | ≥ 95% بعد السرّين؛ أي هبوط = issue |
-| اختبارات بلا شبكة | 324/324 | 0 فشل |
-| التغطية | 85.8 / 72 / 84 | ≥ 80 / 65 / 78 (CI يفشل دونها) |
-| `/readyz` للـWorker | `liveReady: true` عند `715060a` | commit الحافة = رأس `main` |
-| issue `service-reality` مفتوحة | لا (لم يُجدول بعد) | صفر بعد السرّين |
-| PRs قديمة مفتوحة | 3 (#34 revert، #38، #39) | قرار مالك موثق |
+| خدمات متحققة في آخر تدقيق | **12 / 12** (`40680228320`) | 12 / 12 (≥ 95%؛ أي هبوط يفتح issue تتبّع آليًا) |
+| نسبة العمل بين المهيأ | **100% (`workingRate: 1`)** | ≥ 95%؛ أي هبوط = issue |
+| اختبارات بلا شبكة | 100% خضراء شاملة اختبارات التحصين الأمني | 0 فشل |
+| التغطية | تتجاوز 90% أسطر / 73% فروع / 84% دوال | ≥ 89 / 71 / 82 (CI يفشل دونها) |
+| `/readyz` للـWorker + دوام D1 | `liveReady: true` و`storage.durable: true` عند `main@44532f4` (`40706047781`) | commit الحافة = رأس `main` + `durable: true` |
+| issue `service-reality` مفتوحة | لا (`verdict: pass`) | صفر |
+| PRs قديمة مفتوحة | 1 فقط (`#38` بانتظار قرار المالك بعد إغلاق `#67` و`#39` و`#34`) | قرار مالك موثق |
 
 ## ط) ما لا تحميه هذه الخطة (بصراحة)
 
