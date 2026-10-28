@@ -152,7 +152,9 @@ export function buildProbes({ config, env, fetchImpl = fetch, timeoutMs, publica
     try {
       const models = await probeJson(fetchImpl, `${cfg.baseUrl}/models`, { headers: { accept: 'application/json', authorization: `Bearer ${cfg.apiKey}` } }, timeoutMs);
       const ids = (Array.isArray(models.json?.data) ? models.json.data : []).map((entry) => String(entry?.id || '')).filter(Boolean);
-      return models.status === 200 ? `/models 200 (${ids.length} models${ids.length ? `, e.g. ${ids.slice(0, 4).join(', ')}` : ''})` : `/models ${models.status}`;
+      if (models.status !== 200) return `/models ${models.status}`;
+      const listed = ids.includes(String(cfg.model || ''));
+      return `/models 200 (${ids.length} models${ids.length ? `, e.g. ${ids.slice(0, 4).join(', ')}` : ''}; configured model ${listed ? 'listed' : 'NOT listed'})`;
     } catch (error) { return `/models unreachable (${error?.cause?.code || error?.name || 'error'})`; }
   };
   const aiProbe = (id, cfg) => async () => {
@@ -164,9 +166,10 @@ export function buildProbes({ config, env, fetchImpl = fetch, timeoutMs, publica
       return { verdict: ok ? 'verified' : 'failed', detail: ok ? `model ${result.model} answered (content not logged)` : `provider returned ${result?.provider || 'nothing'}`, latencyMs: Date.now() - started };
     } catch (error) {
       const upstream = Number(error?.upstreamStatus);
-      const meaning = upstreamMeaning[upstream] || (upstream ? `upstream ${upstream}` : String(error?.message || error?.code || 'error').slice(0, 200));
+      const meaning = upstreamMeaning[upstream] || (upstream ? `upstream ${upstream}` : String(error?.message || error?.code || 'error').slice(0, 260));
+      const providerText = error?.upstreamDetail ? `provider says: ${String(error.upstreamDetail).slice(0, 160)}` : null;
       const diagnostics = id === 'gemini' ? null : await listModels(cfg);
-      return { verdict: 'failed', detail: [`model ${cfg.model}: ${meaning}`, diagnostics].filter(Boolean).join('; '), latencyMs: Date.now() - started };
+      return { verdict: 'failed', detail: [`model ${cfg.model}: ${meaning}`, providerText, diagnostics].filter(Boolean).join('; '), latencyMs: Date.now() - started };
     }
   };
   const workerUrl = publication.edgeUrl?.replace(/\/+$/, '');
@@ -189,11 +192,13 @@ export function buildProbes({ config, env, fetchImpl = fetch, timeoutMs, publica
         } catch (error) {
           // Split "key is wrong" from "voice id is wrong" so the owner fixes the right secret.
           const headers = { accept: 'application/json', 'xi-api-key': config.elevenlabs.apiKey };
-          const user = await probeJson(fetchImpl, `${config.elevenlabs.baseUrl}/user`, { headers }, timeoutMs).catch(() => ({ status: 0 }));
-          const voices = await probeJson(fetchImpl, `${config.elevenlabs.baseUrl}/voices`, { headers }, timeoutMs).catch(() => ({ status: 0 }));
+          const reason = (probe) => (probe.json?.detail?.status || probe.json?.detail?.message || probe.json?.detail || '').toString().slice(0, 80);
+          const voice = await probeJson(fetchImpl, `${config.elevenlabs.baseUrl}/voices/${encodeURIComponent(config.elevenlabs.voiceId)}`, { headers }, timeoutMs).catch(() => ({ status: 0, json: {} }));
+          const user = await probeJson(fetchImpl, `${config.elevenlabs.baseUrl}/user`, { headers }, timeoutMs).catch(() => ({ status: 0, json: {} }));
+          const voices = await probeJson(fetchImpl, `${config.elevenlabs.baseUrl}/voices`, { headers }, timeoutMs).catch(() => ({ status: 0, json: {} }));
           const ids = (Array.isArray(voices.json?.voices) ? voices.json.voices : []).map((entry) => String(entry?.voice_id || ''));
           const keyValid = user.status === 200;
-          const detail = `GET /voices/{CELIA_VOICE_ID} → ${error?.upstreamStatus || error?.message || 'error'}; API key ${keyValid ? 'valid (/user 200)' : `rejected (/user ${user.status})`}; ${voices.status === 200 ? `${ids.length} voices visible, configured voice id ${ids.includes(config.elevenlabs.voiceId) ? 'listed' : 'NOT among them'}` : `/voices ${voices.status}`}`;
+          const detail = `GET /voices/{CELIA_VOICE_ID} → ${voice.status || error?.upstreamStatus || 'error'}${reason(voice) ? ` (${reason(voice)})` : ''}; API key ${keyValid ? 'valid (/user 200)' : `rejected (/user ${user.status}${reason(user) ? ` ${reason(user)}` : ''})`}; ${voices.status === 200 ? `${ids.length} voices visible, configured voice id ${ids.includes(config.elevenlabs.voiceId) ? 'listed' : 'NOT among them'}` : `/voices ${voices.status}`}`;
           return { verdict: 'failed', detail, latencyMs: Date.now() - started };
         }
       }
@@ -277,6 +282,7 @@ export function buildProbes({ config, env, fetchImpl = fetch, timeoutMs, publica
               hint = `; canonical endpoint derived from CLOUDFLARE_ACCOUNT_ID answers (${alt.verdict}: ${alt.detail}) — fix CLOUDFLARE_R2_S3_ENDPOINT to https://<account-id>.r2.cloudflarestorage.com`;
             } catch (altError) { hint = `; canonical endpoint also unreachable (${altError?.cause?.code || altError?.name || 'error'})`; }
           }
+          if (!hint && /SSL|TLS|HANDSHAKE/i.test(String(cause))) hint = ` — TLS refused for ${configuredHost}: typical when R2 is not enabled on this Cloudflare account (no bucket ever created) or the account id does not own these R2 keys`;
           return { verdict: 'failed', detail: `configured endpoint host unreachable (${cause})${hint}`, latencyMs: Date.now() - started };
         }
       }

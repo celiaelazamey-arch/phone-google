@@ -141,6 +141,7 @@ test('failure diagnostics name the broken secret (402 balance, wrong voice id, u
     const target = String(url);
     const reply = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
     if (target === 'https://api.deepseek.com/v1/models') return reply(200, { data: [{ id: 'deepseek-chat' }, { id: 'deepseek-reasoner' }] });
+    if (target === 'https://api.elevenlabs.io/v1/voices/voiceXYZ') return reply(400, { detail: { status: 'voice_not_found' } });
     if (target === 'https://api.elevenlabs.io/v1/user') return reply(200, { subscription: { tier: 'free' } });
     if (target === 'https://api.elevenlabs.io/v1/voices') return reply(200, { voices: [{ voice_id: 'other1' }, { voice_id: 'other2' }] });
     if (target.startsWith('https://typo-host.example.net/')) throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ENOTFOUND' } });
@@ -158,9 +159,9 @@ test('failure diagnostics name the broken secret (402 balance, wrong voice id, u
   const byId = Object.fromEntries(results.map((entry) => [entry.id, entry]));
   assert.equal(byId.deepseek.verdict, 'failed');
   assert.match(byId.deepseek.detail, /payment required \/ no balance \(402\)/);
-  assert.match(byId.deepseek.detail, /\/models 200 \(2 models, e\.g\. deepseek-chat, deepseek-reasoner\)/);
+  assert.match(byId.deepseek.detail, /\/models 200 \(2 models, e\.g\. deepseek-chat, deepseek-reasoner; configured model listed\)/);
   assert.equal(byId.elevenlabs.verdict, 'failed');
-  assert.match(byId.elevenlabs.detail, /API key valid \(\/user 200\)/);
+  assert.match(byId.elevenlabs.detail, /GET \/voices\/\{CELIA_VOICE_ID\} → 400 \(voice_not_found\); API key valid \(\/user 200\)/);
   assert.match(byId.elevenlabs.detail, /2 voices visible, configured voice id NOT among them/);
   assert.equal(byId.cloudflare_r2.verdict, 'failed');
   assert.match(byId.cloudflare_r2.detail, /unreachable \(ENOTFOUND\)/);

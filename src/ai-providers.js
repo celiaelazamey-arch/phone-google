@@ -224,7 +224,13 @@ export async function generateOpenAiCompatibleReply({
   });
 
   const result = await response.json().catch(() => ({}));
-  if (!response.ok) throw new UpstreamError(serviceName, response.status);
+  if (!response.ok) {
+    const error = new UpstreamError(serviceName, response.status);
+    // Provider error text (never the key, never the prompt) so operators learn *why*: balance, scope, model.
+    const upstreamMessage = result?.error?.message || result?.error?.code || result?.message || result?.detail?.status || result?.detail;
+    if (upstreamMessage) error.upstreamDetail = String(typeof upstreamMessage === 'string' ? upstreamMessage : JSON.stringify(upstreamMessage)).slice(0, 160);
+    throw error;
+  }
   const choice = result?.choices?.[0];
   const content = choice?.message?.content;
   const text = (Array.isArray(content)
@@ -237,7 +243,10 @@ export async function generateOpenAiCompatibleReply({
     if (result?.error) reasons.push(`provider error: ${String(result.error.message || result.error.code || result.error).slice(0, 120)}`);
     if (choice?.finish_reason) reasons.push(`finish_reason=${choice.finish_reason}`);
     if (choice?.message?.reasoning_content || choice?.message?.reasoning) reasons.push('reasoning-only output — raise max_tokens or pick a non-reasoning model');
-    if (!choice) reasons.push('no choices in response');
+    if (!choice) {
+      const message = result?.message || result?.msg || result?.detail;
+      reasons.push(`no choices in response (keys: ${Object.keys(result || {}).slice(0, 6).join(',') || 'none'}${message ? `; message: ${String(typeof message === 'string' ? message : JSON.stringify(message)).slice(0, 120)}` : ''})`);
+    }
     throw new Error(`${serviceName} returned no usable reply${reasons.length ? ` (${reasons.join('; ')})` : ''}`);
   }
   return text.slice(0, 1000);
