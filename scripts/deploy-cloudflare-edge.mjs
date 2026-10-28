@@ -61,20 +61,49 @@ export async function ensureD1Database({ accountId, apiToken, fetchImpl = fetch,
 export async function applyMigrations({ accountId, apiToken, databaseId, sql, fetchImpl = fetch, log = () => {} }) {
   const baseUrl = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}`;
   const headers = { authorization: `Bearer ${apiToken}`, 'content-type': 'application/json' };
+  // Comment lines are stripped before the statement is sent: the D1 query endpoint takes SQL, not a script,
+  // and a leading `--` block is the most likely reason the first attempt came back as HTTP 400.
   const statements = String(sql)
     .split(';')
-    .map((part) => part.trim())
-    .filter((part) => part && part.split('\n').some((line) => line.trim() && !line.trim().startsWith('--')));
+    .map((part) =>
+      part
+        .split('\n')
+        .filter((line) => !line.trim().startsWith('--'))
+        .join('\n')
+        .trim()
+    )
+    .filter(Boolean);
+
   let applied = 0;
-  for (const statement of statements) {
-    const response = await fetchImpl(`${baseUrl}/d1/database/${encodeURIComponent(databaseId)}/query`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ sql: statement })
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok || payload?.success === false) throw new Error(`d1_migration_${response.status}`);
-    applied += 1;
+  for (const [index, statement] of statements.entries()) {
+    let lastDetail = `status_unknown`;
+    // A database created seconds ago is not always queryable immediately; one short retry covers that.
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const response = await fetchImpl(`${baseUrl}/d1/database/${encodeURIComponent(databaseId)}/query`, {
+        method: 'POST',
+        headers,
+        // `params` is sent explicitly: an omitted field is accepted by the dashboard but has produced 400s here.
+        body: JSON.stringify({ sql: statement, params: [] })
+      });
+      const payload = await response.json().catch(() => ({}));
+      const detail = payload?.errors?.[0]?.message || `status_${response.status}`;
+      // Re-running the deploy must not fail on tables that already exist.
+      if (/already exists/i.test(detail)) {
+        applied += 1;
+        lastDetail = null;
+        break;
+      }
+      if (response.ok && payload?.success !== false) {
+        applied += 1;
+        lastDetail = null;
+        break;
+      }
+      lastDetail = detail;
+      await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
+    }
+    if (lastDetail) {
+      throw new Error(`d1_migration_failed:statement_${index + 1}:${String(lastDetail).slice(0, 160)}`);
+    }
   }
   log(`D1 migrations applied: ${applied} statement(s)`);
   return { statements: applied };
@@ -140,13 +169,23 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
   const commit = String(env.GITHUB_SHA || 'main').trim();
 
   let d1 = { ok: false, reason: 'dry_run' };
+  let database = null;
+  // Bound even when the DDL fails: a bound-but-empty database makes /readyz say *why* (no such table) instead
+  // of "not bound", which is the difference between a diagnosis and a shrug.
+  let d1BindingId = null;
   if (!dryRun) {
     try {
-      const database = await ensureD1Database({ accountId, apiToken, fetchImpl, log });
+      database = await ensureD1Database({ accountId, apiToken, fetchImpl, log });
+      d1BindingId = database.id;
       const migrations = await applyMigrations({ accountId, apiToken, databaseId: database.id, sql: migrationSql, fetchImpl, log });
       d1 = { ok: true, id: database.id, name: database.name, created: database.created, migrations };
     } catch (error) {
-      d1 = { ok: false, reason: String(error?.message || error).slice(0, 200) };
+      d1 = {
+        ok: false,
+        reason: String(error?.message || error).slice(0, 240),
+        databaseId: database?.id || null,
+        databaseCreated: database?.created ?? null
+      };
       log(`::warning title=Celia D1::${d1.reason} — deploying without the binding; the worker will report storage.durable=false`);
     }
   }
@@ -155,7 +194,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
     env,
     version: pkg.version,
     commit,
-    d1DatabaseId: d1.ok ? d1.id : null
+    d1DatabaseId: d1BindingId
   });
   const secretBindingsCount = metadata.bindings.filter((b) => b.type === 'secret_text').length;
 
@@ -314,7 +353,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
         workerUrl ? `- Live Edge URL: ${workerUrl}` : '- Live Edge URL: subdomain not enabled yet',
         `- Secrets Injected: **${secretBindingsCount} / ${SECRET_KEYS.length}**`,
         `- Live \`/readyz\` check: **${liveReady ? 'PASS' : 'pending propagation'}**`,
-        `- Durable storage (D1 \`${D1_DATABASE_NAME}\`): **${d1.ok ? `${d1.id}${d1.created ? ' (created)' : ''}` : `unavailable — ${d1.reason}`}**`,
+        `- Durable storage (D1 \`${D1_DATABASE_NAME}\`): **${d1.ok ? `${d1.id}${d1.created ? ' (created)' : ''}` : `degraded — ${d1.reason}${d1BindingId ? ' (binding applied, check /readyz)' : ' (no binding)'}`}**`,
         ''
       ].join('\n'),
       'utf8'
