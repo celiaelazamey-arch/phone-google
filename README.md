@@ -2,6 +2,20 @@
 
 سيليا: مساعد عربي يربط Google وWhatsApp، مع أدوات MCP وواجهة استوديو، وتخزين MySQL مشفّر للرموز وموافقات صريحة للعملاء.
 
+## روابط النشر (ما هو حي فعلًا، وبأي دليل)
+
+| الوجهة | الرابط | الدليل (GitHub API، `main@1a11810`، 2026-10-28 00:53 UTC) |
+|---|---|---|
+| الواجهة الثابتة — GitHub Pages | <https://celiaelazamey-arch.github.io/phone-google/> | deployment `7374226427` بحالة `success`؛ التشغيلة `40611588083` تحققت من 10/10 مسارات (`/`, `/protocol.html`, `/agent.html`, `/kb.html`, `/system.html`, `/deploy.html`, `/live.html`, `/skills.html`, `/api/protocol-benchmark.json`, `/api/live.json`) |
+| بوابة الحافة — Cloudflare Worker | <https://celia-phone-google.celiaelazamey.workers.dev> | التشغيلة `40611588035`: `status: deployed`، `liveReady: true` (`/readyz`)، 18/18 سرًا مربوطًا؛ النقاط العامة `/readyz` `/health` `/version` `/api/system` `/api/deployment` `/api/protocol-benchmark.json` |
+| الإصدار الموقّع | <https://github.com/celiaelazamey-arch/phone-google/releases/tag/v0.2.1> | التشغيلة `40611588118`: مُزامَن وموثق OIDC عند `1a11810` (site/source tar + SBOM + SHA256SUMS + release.json) |
+| صورة الحاوية (الخادم الكامل) | `ghcr.io/celiaelazamey-arch/phone-google:v0.2.1` — [صفحة الحزمة](https://github.com/celiaelazamey-arch/phone-google/pkgs/container/phone-google) | الحزمة **عامة**، `linux/amd64`، digest في `release.json` |
+
+**غير منشور بعد (لا رابط له ولا يُدَّعى):** الخادم الكامل Express + MySQL (حلقة الوكيل، Google/WhatsApp) — يحتاج خدمة
+Render Free + قاعدة Aiven MySQL Free ينشئهما المالك من لوحتيهما بلا بطاقة، ثم `npm run verify:live -- --url https://<service>.onrender.com`
+بنتيجة PASS تُلصق في سجل جلسة ([الخطة التنفيذية](deploy/free-always-on/README.md)). Pages لقطة ثابتة (`/api/agent` غير متاح
+عليها)، والـWorker بوابة حافة للحالة والأسرار لا تشغّل حلقة الوكيل.
+
 ## خطة 2026 والاستمرارية بين الجلسات
 
 [خطة التطوير الشاملة](docs/2026-development-plan.md) · [الحالة الحالية والخطوة التالية](docs/continuity/STATE.md) · [قائمة المهام](docs/continuity/BACKLOG.md) · [سجل القرارات](docs/continuity/DECISIONS.md) · [عقد التوافق](docs/compatibility-contract.md) · [نحو وكيل متكامل (خطة M1–M4)](docs/agent-runtime-plan.md) · [ربط حساب Google خطوة بخطوة](docs/google-connect.md) · [شبكة المعرفة](docs/knowledge-network.md).

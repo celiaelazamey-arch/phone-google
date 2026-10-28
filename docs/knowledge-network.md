@@ -35,12 +35,14 @@
 | `skills_registry.csv` | `id,name,level,category,source,evidence_url` | `projects,tools,aliases,notes` |
 | `projects_registry.csv` | `id,name,domain,status,priority,owner,repo_url` | `related,aliases,notes` |
 | `knowledge_registry.csv` | `id,title,type,description,source_url,license,updated_at,trust_level` | `related,tags,aliases,lang` |
+| `learned_registry.csv` (نفس عقد `knowledge`) | كما أعلاه؛ كل صف يحمل `source_url` للمصدر الخارجي ووسم `learn:<source-id>` ووسوم `segment:Sxx` | ثقة الملف `T1`؛ بروتوكول [learning-protocol.md](learning-protocol.md) (DEC-027) |
 
 **قواعد مفروضة في الكود (لا في التوثيق فقط):**
 
 | القاعدة | التنفيذ | الاختبار |
 |---|---|---|
 | لا سجل بلا ترخيص | `license` إلزامي ومن قائمة مسموحة (`ALLOWED_LICENSES`) | `validate: licences…` |
+| مصدر خارجي بحقوق محفوظة يُربط ولا يُنسخ | `reference-only` مسموح لصفوف `sources` فقط (`SOURCE_ONLY_LICENSES`)؛ نوع المصدر `video` مضاف | `LS-04` في `learning-protocol.test.js` |
 | لا سجل بلا مصدر | `items.source_id NOT NULL` + `FOREIGN KEY` | `ingest: dry-run…` |
 | لا كيان بلا دليل | `entities.evidence_item_id NOT NULL` | `store: entity detail…` |
 | لا حافة لكيان غير موجود | المرحلة الثانية ترفض وتُبلّغ | `ingest: duplicate ids and unresolved…` |

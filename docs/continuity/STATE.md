@@ -1,15 +1,35 @@
 # الحالة الحالية — ابدأ من هنا
 
-**آخر مراجعة:** 27 أكتوبر 2026 (مساءً) · **نوع الجلسة الحالية:** تنفيذ **دورة «خطّط، اعرض، انتظر، ثم نفّذ»
-(`PLAN_READY → WAITING_FOR_APPROVAL → EDITED | APPROVED | REJECTED → EXECUTING`) ومعمارية Agent Harness الـ10 مكونات
-وتشخيص Playwright Chromium (DEC-019) والقدرة الأصيلة `document_data_automation` (DEC-020) وبوابة الفهم والشرح المبسّط
-المدعوم بالأدلة `Comprehension Gate` (DEC-021)** على الفرع
-`arena/5fccc4e6-phone-google` · سجل الجلسة:
-[2026-10-27-agent-harness-plan-lifecycle](sessions/2026-10-27-agent-harness-plan-lifecycle.md) · سجل الجلسة السابقة:
-[2026-10-27-go-live-steps](sessions/2026-10-27-go-live-steps.md) ·
-الخطة: [docs/go-live-plan.md](../go-live-plan.md) · المرجع التشغيلي: [deploy/free-always-on/README.md](../../deploy/free-always-on/README.md)
+**آخر مراجعة:** 27 أكتوبر 2026 (ليلًا) · **نوع الجلسة الحالية:** تنفيذ **بروتوكول التعلم المحكوم `CELIA-LEARN-001`
+(DEC-027) على أول مصدر خارجي (YouTube `Cb3mBAH0IaY`) وتوثيق روابط النشر بالدليل** على الفرع
+`arena/f0f6f9f0-phone-google` · سجل الجلسة:
+[2026-10-27-learning-protocol-and-publish-links](sessions/2026-10-27-learning-protocol-and-publish-links.md) · سجل الجلسة السابقة:
+[2026-10-27-agent-harness-plan-lifecycle](sessions/2026-10-27-agent-harness-plan-lifecycle.md) ·
+البروتوكول: [docs/learning-protocol.md](../learning-protocol.md) · الخطة: [docs/go-live-plan.md](../go-live-plan.md) ·
+المرجع التشغيلي: [deploy/free-always-on/README.md](../../deploy/free-always-on/README.md)
 
-## الطلب الحالي (أعلى أولوية) — دورة الخطة والـAgent Harness وقدرة `document_data_automation` وبوابة `Comprehension Gate` (DEC-019، DEC-020، DEC-021)
+## الطلب الحالي (أعلى أولوية) — التعلم المحكوم من المصادر الخارجية وروابط النشر (DEC-027)
+
+- **روابط النشر الحية (دليل GitHub API عند `main@1a11810`، 2026-10-28 00:53 UTC):**
+  - GitHub Pages: `https://celiaelazamey-arch.github.io/phone-google/` — deployment `7374226427` ناجح + فحص 10/10 مسارات
+    (التشغيلة `40611588083`).
+  - Cloudflare Worker: `https://celia-phone-google.celiaelazamey.workers.dev` — `deployed`، `liveReady:true`، 18/18 سرًا
+    (التشغيلة `40611588035`).
+  - الإصدار `v0.2.1` موثق OIDC (التشغيلة `40611588118`)؛ صورة `ghcr.io/celiaelazamey-arch/phone-google:v0.2.1` **عامة**.
+  - **غير منشور:** الخادم الكامل (Express + MySQL): لا خدمة Render ولا قاعدة Aiven ولا `verify:live` PASS — يبقى
+    `not-verified` حتى يأذن المالك بإنشاء الحسابات المجانية. الصندوق الرملي لا يفتح `github.io`/`workers.dev`؛ الدليل من
+    حالات النشر وتعليقات التشغيلات.
+- **ما نُفِّذ (التعلم):** سجل مصدر `data/learning/sources/yt-Cb3mBAH0IaY/source.json` (SHA-256 للنص و12 مقطعًا؛ النص
+  نفسه خارج Git)، `scripts/learn-source.mjs`، عقود `video` + `reference-only` (مصادر فقط) في `validate.js`،
+  `data/kb/learned_registry.csv` بـ9 وحدات `T1` موسومة `learn:yt-Cb3mBAH0IaY`، بطارية `LS-01..LS-10` (10/10)،
+  `kb -- verify` 0 مرفوض و`unresolved: []`، `npm test` 295/295.
+- **متجه حالة المصدر:** `SOURCE=VERIFIED · EXTRACTION=PARTIAL (بلا طوابع زمنية) · COMPREHENSION=PARTIAL ·
+  KNOWLEDGE=CANDIDATE(9) · PROCEDURE=NONE · CAPABILITY=NONE · REGRESSION=PASS`. مواضيع NLP/CV/الروبوتات/AGI/ASI **UNKNOWN**.
+- **الخطوة التالية:** (1) المالك يراجع PR هذا الفرع ويدمجه (= بوابة الموافقة؛ الدمج ينشر Pages/Worker/Release تلقائيًا)؛
+  (2) إن أراد الاستخراج الكامل: لصق نص «إظهار النص» بصيغة `mm:ss نص` أو `.srt`؛ (3) HOST-003: إنشاء Render Free + Aiven
+  Free من لوحتي المالك ثم `verify:live`.
+
+## الطلب السابق — دورة الخطة والـAgent Harness وقدرة `document_data_automation` وبوابة `Comprehension Gate` (DEC-019، DEC-020، DEC-021)
 
 - **ما نُفِّذ في هذه الجلسة (`arena/5fccc4e6-phone-google`):**
   - **آلة حالات الخطة (`src/agent/harness.js` + `src/agent/runtime.js`):** انتقالات صريحة

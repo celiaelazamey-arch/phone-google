@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-10-27T12:07:27.462Z",
+  "generated_at": "2026-10-28T01:14:50.915Z",
   "files": [
     {
       "name": "sources_registry.csv",
@@ -12,7 +12,7 @@
       "trust": "T3",
       "stale_after_days": 365,
       "last_sync": "2026-10-27",
-      "sha256": "8d3439a2605f7e7abcfce02224394d4e957b7b3b539f50e06fc698711f0f7094"
+      "sha256": "66449a25a6eff4b33cd1e82d48d0adc82c06e9509beda4249b09dd9f99164214"
     },
     {
       "name": "tools_registry.csv",
@@ -61,6 +61,18 @@
       "stale_after_days": 90,
       "last_sync": "2026-10-27",
       "sha256": "18f4598036814375bc3d70bdd5d50c085868175bb9860ae7d925f3076faedc79"
+    },
+    {
+      "name": "learned_registry.csv",
+      "kind": "knowledge",
+      "sourceId": "src-learning-notes",
+      "sourceKind": "manual",
+      "uri": "repo://data/kb/learned_registry.csv",
+      "license": "internal-owner",
+      "trust": "T1",
+      "stale_after_days": 180,
+      "last_sync": "2026-10-27",
+      "sha256": "b2dadad9d9834b7500ae44bf47a65fabcabe9020b81994a6b1abcef6f5c06e2e"
     }
   ]
 }
