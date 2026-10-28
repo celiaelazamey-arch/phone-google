@@ -169,6 +169,22 @@ test('failure diagnostics name the broken secret (402 balance, wrong voice id, u
   for (const value of ['sk-deepseek-value', 'xi-key-value', 'r2-secret-value-77']) assert.ok(!JSON.stringify(results).includes(value), `${value} leaked`);
 });
 
+test('an owner-retired service is reported as disabled and excluded from the working rate', async () => {
+  const env = { AI_GATEWAY_API_KEY: 'gw-key-value', CELIA_DISABLE_AI_GATEWAY: 'true' };
+  const config = { gemini: {}, deepseek: {}, agentrouter: {}, elevenlabs: {}, figma: {}, codata: {}, cronjob: {}, cloudflare: {}, cloudflareR2: {}, aiGateway: { apiKey: env.AI_GATEWAY_API_KEY, baseUrl: 'https://ai-gateway.vercel.sh/v1', model: 'google/gemini-2.5-flash' }, features: { ai_gateway: false } };
+  const modules = { generateCeliaReply: async () => { throw new Error('must not be called for a retired service'); }, probeCeliaVoice: async () => ({}), fetchFigmaProfile: async () => ({}), getCodataStatus: async () => ({}), getCronjobStatus: async () => ({}), planDeployment: () => ({ ok: false, missing: ['x'] }) };
+  const probes = buildProbes({ config, env, fetchImpl: async () => { throw new Error('offline'); }, timeoutMs: 1000, publication: {}, version: '0.2.1', modules }).filter((probe) => ['ai_gateway', 'deepseek'].includes(probe.id));
+  const results = await runProbes(probes, { env, timeoutMs: 1000, features: config.features });
+  const byId = Object.fromEntries(results.map((entry) => [entry.id, entry]));
+  assert.equal(byId.ai_gateway.verdict, 'disabled');
+  assert.match(byId.ai_gateway.detail, /CELIA_DISABLE_AI_GATEWAY=true/);
+  assert.equal(byId.deepseek.verdict, 'not-configured');
+  const score = scoreServices(results);
+  assert.equal(score.disabled, 1);
+  assert.equal(score.configured, 0);
+  assert.equal(score.workingRate, null);
+});
+
 test('service-reality workflow wires all 18 secrets, a real MySQL service, and never a Render/MySQL production credential', () => {
   const workflow = fs.readFileSync(path.join(root, '.github/workflows/service-reality.yml'), 'utf8');
   for (const name of ['AGENETROUTERAPI_KEY', 'AI_GATEWAY_API_KEY', 'CELIAOS_CRONJOB_ORG_API_KEY', 'CELIA_MCP_API_TOKEN', 'CELIA_VOICE_ID', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_R2_ACCESS_KEY_ID', 'CLOUDFLARE_R2_S3_ENDPOINT', 'CLOUDFLARE_R2_SECRET_ACCESS_KEY', 'DEEPSEEK_API_KEY', 'ELEVENLABS_API_KEY', 'FIGMA_ACCESS_TOKEN', 'GEMINI_API_KEY', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'PHONE_NUMBER', 'YOUR_CODATA_API_KEY']) {
@@ -178,4 +194,7 @@ test('service-reality workflow wires all 18 secrets, a real MySQL service, and n
   assert.ok(workflow.includes("contains(github.event.head_commit.message, '[reality]')"));
   assert.ok(workflow.includes('contents: read'));
   assert.ok(!/MYSQL_PASSWORD:|MYSQL_SSL_CA_BASE64|TOKEN_ENCRYPTION_KEY/.test(workflow));
+  for (const flag of ['AI_GATEWAY', 'DEEPSEEK', 'AGENTROUTER', 'ELEVENLABS', 'FIGMA', 'CODATA', 'CLOUDFLARE_R2']) {
+    assert.ok(workflow.includes(`CELIA_DISABLE_${flag}: \${{ vars.CELIA_DISABLE_${flag} }}`), `${flag} retirement switch missing`);
+  }
 });

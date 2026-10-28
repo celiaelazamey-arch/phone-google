@@ -77,6 +77,18 @@ jobs:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
           RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          # Owner retirement switches (repository *variables*, value `true`): a retired service is reported as
+          # `disabled` and excluded from the working rate instead of lingering as a dead "configured" name.
+          CELIA_DISABLE_AI_GATEWAY: ${{ vars.CELIA_DISABLE_AI_GATEWAY }}
+          CELIA_DISABLE_DEEPSEEK: ${{ vars.CELIA_DISABLE_DEEPSEEK }}
+          CELIA_DISABLE_AGENTROUTER: ${{ vars.CELIA_DISABLE_AGENTROUTER }}
+          CELIA_DISABLE_ELEVENLABS: ${{ vars.CELIA_DISABLE_ELEVENLABS }}
+          CELIA_DISABLE_FIGMA: ${{ vars.CELIA_DISABLE_FIGMA }}
+          CELIA_DISABLE_CODATA: ${{ vars.CELIA_DISABLE_CODATA }}
+          CELIA_DISABLE_CLOUDFLARE_R2: ${{ vars.CELIA_DISABLE_CLOUDFLARE_R2 }}
+          DEEPSEEK_MODEL: ${{ vars.DEEPSEEK_MODEL }}
+          AGENTROUTER_MODEL: ${{ vars.AGENTROUTER_MODEL }}
+          AI_GATEWAY_MODEL: ${{ vars.AI_GATEWAY_MODEL }}
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/service-reality.mjs --min-rate ${{ inputs.min_rate || '0.95' }}
       - name: Upload sanitized reality report

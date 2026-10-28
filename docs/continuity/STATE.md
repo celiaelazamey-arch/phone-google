@@ -1,13 +1,28 @@
 # الحالة الحالية — ابدأ من هنا
 
-**آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** **أتمتة ما بعد حسابي المالك للخادم الكامل (DEC-028) + أوامر Gmail/Calendar للمالك عبر واتساب (DEC-029)** على الفرع
-`arena/bf717032-phone-google` · سجل الجلسة:
-[2026-10-28-render-release-automation](sessions/2026-10-28-render-release-automation.md) · سجل الجلسة السابقة:
-[2026-10-27-learning-protocol-and-publish-links](sessions/2026-10-27-learning-protocol-and-publish-links.md) ·
+**آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** **تدقيق واقع الخدمات بالأسرار الحقيقية (DEC-030، QA-005)** بعد
+أتمتة Render (DEC-028) وأوامر Gmail/Calendar للمالك (DEC-029) على الفرع `arena/bf717032-phone-google` · سجل الجلسة:
+[2026-10-28-service-reality-audit](sessions/2026-10-28-service-reality-audit.md) · السجل السابق:
+[2026-10-28-render-release-automation](sessions/2026-10-28-render-release-automation.md) ·
 البروتوكول: [docs/learning-protocol.md](../learning-protocol.md) · الخطة: [docs/go-live-plan.md](../go-live-plan.md) ·
 المرجع التشغيلي: [deploy/free-always-on/README.md](../../deploy/free-always-on/README.md)
 
-## الطلب الحالي (أعلى أولوية) — «هنربط جوجل بالواتساب: لخص آخر إيميل / هات جدولي» (DEC-029، GOOG-003)
+## الطلب الحالي (أعلى أولوية) — «لا خدمة مجرد اسم أو موكب؛ خدمات حقيقية مختبرة ≥95%» (DEC-030، QA-005)
+
+- **ما نُفِّذ:** `scripts/service-reality.mjs` (`npm run reality`) + `.github/workflows/service-reality.yml` (يعمل عند commit
+  يحمل `[reality]` أو `workflow_dispatch` من `main`) + `test/service-reality.test.js` (9) + `test/ai-providers.test.js` (3).
+  أربع تشغيلات حقيقية بالأسرار الـ18 من داخل Actions؛ **الأخيرة run `40646881277`**: 322/322 بلا شبكة (تغطية أسطر 85.79%)،
+  MySQL 8.4 حقيقي 11/11، مسابر حية: **10 متحققة · 6 فاشلة · 1 غير مهيأة · 2 لا يمكن التحقق · 1 غير منشورة → 62.5% < 95%**.
+- **الحقيقة الصريحة:** الست الفاشلة أسباب **حساب لا شيفرة**: AI Gateway 403 «يتطلب بطاقة» (يتعارض مع قيد «لا بطاقة»)،
+  DeepSeek 402 بلا رصيد، AgentRouter 0 نماذج، ElevenLabs مفتاح مقيّد (`missing_permissions`) ومعرّف صوت `voice_not_found`،
+  Figma 401، R2 TLS مرفوض (غير مفعّل). الجدول الكامل: [docs/service-reality.md](../service-reality.md).
+- **ما أصلحه الدليل:** `/readyz` للـWorker لم يعد يدّعي `durable: true`؛ افتراضي DeepSeek `deepseek-flash`؛ رسائل رفض المزوّد
+  تحمل سببها بلا مفتاح؛ `CELIA_DISABLE_<SERVICE>` كمتغير مستودع يتقاعد الخدمة ويُبلَّغ `disabled`.
+- **الخطوة التالية (المالك):** لكل خدمة فاشلة: تجديد/تمويل **أو** تقاعد صريح (`CELIA_DISABLE_*=true`)؛ ثم commit `[reality]`
+  أو dispatch من `main` بعد دمج PR #46 → النسبة تُقرأ من الـrun لا من وعد. التوصية: تقاعد AI Gateway وR2 (بطاقة)،
+  تجديد Figma وElevenLabs (مفتاح كامل + معرّف صوت من الحساب)، قرار DeepSeek/AgentRouter.
+
+## الطلب السابق في الجلسة نفسها — «هنربط جوجل بالواتساب: لخص آخر إيميل / هات جدولي» (DEC-029، GOOG-003)
 
 - **ما طلبه المالك (بلصق إرشاد من محادثة أخرى):** ربط Google بواتساب بمسار Python `InstalledAppFlow` + `credentials.json` +
   `token.json`، وإصلاح «مافيش إيميلات جديدة» بـ`q=""`. **الحكم:** لا يُنسخ (خادم بلا متصفح، عميل Desktop ≠ Web، توكن خام في ملف)؛
@@ -427,6 +442,8 @@ pass/warn/fail، بلا شبكة وبلا طباعة أي سر) · `npm run goog
 3. **بعدها من هنا (الركن 7):** `backup:verify` (DATA-001)، موصل WhatsApp في الـoutbox (AGENT-002)، ثم AI-001/AI-002
    بعد قرار المزوّد. التفاصيل والبوابات في [docs/go-live-plan.md](../go-live-plan.md).
 4. **بقية الخطة** كما هي في BACKLOG دون ادعاء إغلاقها.
+5. **واقع الخدمات (QA-005):** قبل أي ادعاء «يعمل»، شغّل `[reality]` واقرأ annotations الـrun؛ الست الفاشلة في
+   [docs/service-reality.md](../service-reality.md) لا تُصلحها شيفرة — تجديد أو تقاعد صريح بـ`CELIA_DISABLE_*`.
 
 ## التحقق من الحفظ في الجلسة التالية
 

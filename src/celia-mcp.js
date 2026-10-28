@@ -415,7 +415,7 @@ export async function buildStatusSummary(pool, config, { probeOllama = false, se
       },
       deepseek: {
         configured: Boolean(config.deepseek?.apiKey),
-        model: config.deepseek?.model || 'deepseek-chat'
+        model: config.deepseek?.model || 'deepseek-flash'
       },
       agentrouter: {
         configured: Boolean(config.agentrouter?.apiKey),

@@ -6,6 +6,7 @@
  *   verified        a real request with the real credential did what the service is for
  *   failed          the credential is configured but the real request was rejected / unreachable
  *   not-configured  the credential is absent in this environment
+ *   disabled        the owner retired the service with CELIA_DISABLE_<SERVICE>=true (not counted)
  *   unverifiable    nothing can be sent without an owner action (linked account, unknown endpoint, no host)
  *   not-deployed    the component exists in code and tests but has no live instance
  *
@@ -124,7 +125,7 @@ export function classifyGoogleTokenResponse(status, body = {}) {
 }
 
 export function scoreServices(services) {
-  const counts = { verified: 0, failed: 0, 'not-configured': 0, unverifiable: 0, 'not-deployed': 0 };
+  const counts = { verified: 0, failed: 0, 'not-configured': 0, disabled: 0, unverifiable: 0, 'not-deployed': 0 };
   for (const service of services) counts[service.verdict] = (counts[service.verdict] || 0) + 1;
   const configured = counts.verified + counts.failed;
   return { ...counts, configured, workingRate: configured ? Number((counts.verified / configured).toFixed(4)) : null };
@@ -196,9 +197,11 @@ export function buildProbes({ config, env, fetchImpl = fetch, timeoutMs, publica
           const voice = await probeJson(fetchImpl, `${config.elevenlabs.baseUrl}/voices/${encodeURIComponent(config.elevenlabs.voiceId)}`, { headers }, timeoutMs).catch(() => ({ status: 0, json: {} }));
           const user = await probeJson(fetchImpl, `${config.elevenlabs.baseUrl}/user`, { headers }, timeoutMs).catch(() => ({ status: 0, json: {} }));
           const voices = await probeJson(fetchImpl, `${config.elevenlabs.baseUrl}/voices`, { headers }, timeoutMs).catch(() => ({ status: 0, json: {} }));
-          const ids = (Array.isArray(voices.json?.voices) ? voices.json.voices : []).map((entry) => String(entry?.voice_id || ''));
+          const catalogue = Array.isArray(voices.json?.voices) ? voices.json.voices : [];
+          const ids = catalogue.map((entry) => String(entry?.voice_id || ''));
+          const suggestions = catalogue.slice(0, 3).map((entry) => `${String(entry?.name || '?').slice(0, 24)}=${String(entry?.voice_id || '')}`).join(', ');
           const keyValid = user.status === 200;
-          const detail = `GET /voices/{CELIA_VOICE_ID} → ${voice.status || error?.upstreamStatus || 'error'}${reason(voice) ? ` (${reason(voice)})` : ''}; API key ${keyValid ? 'valid (/user 200)' : `rejected (/user ${user.status}${reason(user) ? ` ${reason(user)}` : ''})`}; ${voices.status === 200 ? `${ids.length} voices visible, configured voice id ${ids.includes(config.elevenlabs.voiceId) ? 'listed' : 'NOT among them'}` : `/voices ${voices.status}`}`;
+          const detail = `GET /voices/{CELIA_VOICE_ID} → ${voice.status || error?.upstreamStatus || 'error'}${reason(voice) ? ` (${reason(voice)})` : ''}; API key ${keyValid ? 'valid (/user 200)' : `rejected (/user ${user.status}${reason(user) ? ` ${reason(user)}` : ''})`}; ${voices.status === 200 ? `${ids.length} voices visible, configured voice id ${ids.includes(config.elevenlabs.voiceId) ? 'listed' : `NOT among them${suggestions ? ` (visible e.g. ${suggestions})` : ''}`}` : `/voices ${voices.status}`}`;
           return { verdict: 'failed', detail, latencyMs: Date.now() - started };
         }
       }
@@ -383,10 +386,23 @@ export function buildProbes({ config, env, fetchImpl = fetch, timeoutMs, publica
   ];
 }
 
-export async function runProbes(probes, { env, timeoutMs }) {
+/** probe id → feature flag name understood by loadFeatures() (CELIA_DISABLE_<NAME>=true retires the service). */
+export const PROBE_FEATURE = Object.freeze({
+  gemini: 'gemini', ai_gateway: 'ai_gateway', deepseek: 'deepseek', agentrouter: 'agentrouter', elevenlabs: 'elevenlabs', figma: 'figma',
+  codata: 'codata', cronjob: 'cronjob', cloudflare_api: 'cloudflare', cloudflare_r2: 'cloudflare_r2', whatsapp_cloud_api: 'whatsapp',
+  google_oauth_client: 'google', google_workspace: 'google'
+});
+
+export async function runProbes(probes, { env, timeoutMs, features = null }) {
   const results = [];
   for (const probe of probes) {
     const started = Date.now();
+    const feature = PROBE_FEATURE[probe.id];
+    if (feature && features && features[feature] === false) {
+      // An owner-retired service is neither a façade nor a failure: it is explicitly out of the product.
+      results.push({ id: probe.id, label: probe.label, category: probe.category, secret: probe.secret, verdict: 'disabled', detail: `retired by the owner (CELIA_DISABLE_${feature.toUpperCase()}=true) — not counted`, latencyMs: 0 });
+      continue;
+    }
     try {
       const result = await Promise.race([
         probe.run(),
@@ -421,7 +437,7 @@ export function runMysqlSuite({ cwd = root, env = process.env } = {}) {
 
 // ---------- report ----------
 
-const VERDICT_ICON = { verified: '✅', failed: '❌', 'not-configured': '⚪', unverifiable: '🟡', 'not-deployed': '🚫' };
+const VERDICT_ICON = { verified: '✅', failed: '❌', 'not-configured': '⚪', disabled: '⏸️', unverifiable: '🟡', 'not-deployed': '🚫' };
 
 export function renderMarkdown(report) {
   const lines = ['## Service reality — ما هو حقيقي فعلًا', ''];
@@ -433,7 +449,7 @@ export function renderMarkdown(report) {
   else if (report.mysql) lines.push(`- **Real MySQL suite:** not run — ${report.mysql.reason}`);
   if (report.live) {
     const s = report.score;
-    lines.push(`- **Live probes:** ${s.verified} verified · ${s.failed} failed · ${s['not-configured']} not configured · ${s.unverifiable} unverifiable · ${s['not-deployed']} not deployed → working rate of configured services **${s.workingRate === null ? 'n/a' : `${Math.round(s.workingRate * 100)}%`}** (threshold ${Math.round(report.minRate * 100)}%)`);
+    lines.push(`- **Live probes:** ${s.verified} verified · ${s.failed} failed · ${s['not-configured']} not configured · ${s.disabled || 0} disabled by owner · ${s.unverifiable} unverifiable · ${s['not-deployed']} not deployed → working rate of configured services **${s.workingRate === null ? 'n/a' : `${Math.round(s.workingRate * 100)}%`}** (threshold ${Math.round(report.minRate * 100)}%)`);
     lines.push('', '| | Service | Credential | Result | ms |', '|---|---|---|---|---|');
     for (const service of report.live) lines.push(`| ${VERDICT_ICON[service.verdict] || '•'} | ${service.label} | \`${service.secret}\` | **${service.verdict}** — ${service.detail} | ${service.latencyMs ?? ''} |`);
   }
@@ -462,7 +478,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
     const token = String(env.CELIA_MCP_API_TOKEN || '').trim().length >= 32 ? env.CELIA_MCP_API_TOKEN : crypto.randomBytes(32).toString('hex');
     const config = loadCeliaMcpConfig({ ...env, CELIA_MCP_API_TOKEN: token, CELIA_MCP_DISABLE_MYSQL: 'true', CELIA_DISABLE_OLLAMA: 'true', CELIA_SERVICE_TIMEOUT_MS: env.CELIA_SERVICE_TIMEOUT_MS || String(Math.min(Math.max(options.timeoutMs, 50), 60_000)) });
     const probes = buildProbes({ config, env, fetchImpl, timeoutMs: options.timeoutMs, publication, version: pkg.version, modules: { generateCeliaReply, planDeployment, ...hub } });
-    report.live = await runProbes(probes, { env, timeoutMs: options.timeoutMs });
+    report.live = await runProbes(probes, { env, timeoutMs: options.timeoutMs, features: config.features });
     report.score = scoreServices(report.live);
   }
 

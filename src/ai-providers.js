@@ -140,7 +140,7 @@ export function loadExtendedIntegrationsConfig(env = process.env) {
     deepseek: Object.freeze({
       apiKey: deepseekKey,
       baseUrl: normalizeHttpsApiUrl(env.DEEPSEEK_BASE_URL, 'https://api.deepseek.com', 'DEEPSEEK_BASE_URL'),
-      model: (env.DEEPSEEK_MODEL || 'deepseek-chat').trim() || 'deepseek-chat'
+      model: (env.DEEPSEEK_MODEL || 'deepseek-flash').trim() || 'deepseek-flash'
     }),
     agentrouter: Object.freeze({
       apiKey: agentrouterKey,

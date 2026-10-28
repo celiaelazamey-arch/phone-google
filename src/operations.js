@@ -54,7 +54,7 @@ export function createOperations({
         },
         deepseek: {
           configured: Boolean(config.deepseek?.apiKey),
-          model: config.deepseek?.model || "deepseek-chat",
+          model: config.deepseek?.model || "deepseek-flash",
         },
         agentrouter: {
           configured: Boolean(config.agentrouter?.apiKey),

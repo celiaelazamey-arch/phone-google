@@ -19,6 +19,13 @@ Render Free + قاعدة Aiven MySQL Free ينشئهما المالك من لو�
 `deploy-render.yml` النشر والتحقق (`verify:live`) وإبقاء الخدمة مستيقظة عبر cron-job.org عند كل دمج
 ([التفاصيل §4.2](deploy/free-always-on/README.md)).
 
+**واقع الخدمات (لا أسماء ولا «مواكب»):** [docs/service-reality.md](docs/service-reality.md) — تدقيق حقيقي بالأسرار الفعلية من
+داخل GitHub Actions (run `40646881277`، 2026-10-28): 322/322 اختبارًا، MySQL حقيقي 11/11، **10 خدمات متحققة فعلًا**
+(Gemini، cron-job.org، Cloudflare API، Google OAuth client، رمز المالك، Worker، Pages، GHCR، الإصدار، رقم الهاتف)
+و**6 أسرار تشير إلى حسابات ميتة/غير ممولة/غير مفعّلة** (AI Gateway يطلب بطاقة، DeepSeek بلا رصيد، AgentRouter بلا
+نماذج، ElevenLabs مفتاح مقيّد وصوت غير موجود، Figma 401، R2 غير مفعّل) → نسبة العمل 62.5% < 95% حتى يجدد المالك أو
+يتقاعد الخدمة صراحةً بـ`CELIA_DISABLE_<SERVICE>=true`. إعادة التدقيق: commit يحمل `[reality]` أو `npm run reality`.
+
 ## خطة 2026 والاستمرارية بين الجلسات
 
 [خطة التطوير الشاملة](docs/2026-development-plan.md) · [الحالة الحالية والخطوة التالية](docs/continuity/STATE.md) · [قائمة المهام](docs/continuity/BACKLOG.md) · [سجل القرارات](docs/continuity/DECISIONS.md) · [عقد التوافق](docs/compatibility-contract.md) · [نحو وكيل متكامل (خطة M1–M4)](docs/agent-runtime-plan.md) · [ربط حساب Google خطوة بخطوة](docs/google-connect.md) · [شبكة المعرفة](docs/knowledge-network.md).

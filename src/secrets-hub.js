@@ -159,7 +159,7 @@ export function buildSecretsReadiness(config = {}, services = null) {
       boundary: 'deepseek',
       enabled: config.features?.deepseek !== false,
       circuitState: stateOf('deepseek'),
-      model: config.deepseek?.model || 'deepseek-chat'
+      model: config.deepseek?.model || 'deepseek-flash'
     },
     {
       secretName: 'ELEVENLABS_API_KEY',
