@@ -146,6 +146,23 @@ export function scoreServices(services) {
 
 function withTimeout(ms) { return AbortSignal.timeout(ms); }
 
+/** Levenshtein distance (small strings only) — used to hint at typos without echoing a configured value. */
+export function editDistance(a, b) {
+  const s = String(a); const t = String(b);
+  if (s === t) return 0;
+  if (!s.length) return t.length;
+  if (!t.length) return s.length;
+  let prev = Array.from({ length: t.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= s.length; i += 1) {
+    const cur = [i];
+    for (let j = 1; j <= t.length; j += 1) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (s[i - 1] === t[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[t.length];
+}
+
 async function probeJson(fetchImpl, url, init, timeoutMs) {
   const started = Date.now();
   const response = await fetchImpl(url, { ...init, signal: withTimeout(timeoutMs) });
@@ -235,12 +252,25 @@ export function buildProbes({ config, env, fetchImpl = fetch, timeoutMs, publica
           // Shape of the configured id without revealing it: ElevenLabs voice ids are 20 alphanumerics.
           const configuredId = String(config.elevenlabs.voiceId || '');
           const shape = `configured id: ${configuredId.length} chars${/^[A-Za-z0-9]{20}$/.test(configuredId) ? '' : ' — ElevenLabs voice ids are 20 alphanumeric characters (not a name, URL or UUID)'}`;
+          // Nearest listed voice without revealing the configured value: catches wrong letter case, a typo, or "the
+          // repository secret was never actually updated" (no listed id anywhere near).
+          const nearest = catalogue
+            .map((entry) => ({ name: String(entry?.name || '?').slice(0, 24), id: String(entry?.voice_id || ''), distance: editDistance(configuredId, String(entry?.voice_id || '')) }))
+            .sort((a, b) => a.distance - b.distance)[0];
+          const caseMatch = catalogue.find((entry) => String(entry?.voice_id || '').toLowerCase() === configuredId.toLowerCase());
+          const nearestHint = caseMatch
+            ? `; configured id equals ${String(caseMatch.name || '?').slice(0, 24)}'s id except for letter CASE — ids are case-sensitive, paste it exactly`
+            : nearest && nearest.distance <= 4
+              ? `; configured id is ${nearest.distance} character(s) away from ${nearest.name}=${nearest.id} — likely a typo`
+              : nearest
+                ? `; configured id is not close to any visible id (nearest: ${nearest.name}, ${nearest.distance} edits) — check that the *repository secret* CELIA_VOICE_ID (Settings → Secrets and variables → Actions → Secrets tab, not Variables, not an environment) was actually updated`
+                : '';
           const keyValid = user.status === 200;
           // Can this key speak at all? Try one visible voice so the owner knows whether to fix the key or only the voice id.
           const sample = catalogue[0]?.voice_id ? await synthesize(String(catalogue[0].voice_id)).catch((cause) => ({ ok: false, status: 0, reason: cause?.cause?.code || cause?.name || 'request failed' })) : null;
           const synthesis = sample ? (sample.ok ? `key CAN synthesize with visible voice ${String(catalogue[0]?.name || '?').slice(0, 24)} (${sample.bytes} bytes) → only CELIA_VOICE_ID needs fixing` : `key cannot synthesize even with a visible voice (text-to-speech → ${sample.status}${sample.reason ? ` ${sample.reason}` : ''}) → the key itself needs replacing`) : 'synthesis not attempted (no visible voice)';
           const notListedHint = ' — a library or cloned voice must first be added to "My Voices" of the account this key belongs to; otherwise paste one of the listed ids';
-          const detail = `GET /voices/{CELIA_VOICE_ID} → ${voice.status || error?.upstreamStatus || 'error'}${reason(voice) ? ` (${reason(voice)})` : ''}; ${shape}; API key ${keyValid ? 'valid (/user 200)' : `rejected (/user ${user.status}${reason(user) ? ` ${reason(user)}` : ''})`}; ${voices.status === 200 ? `${ids.length} voices visible, configured voice id ${ids.includes(config.elevenlabs.voiceId) ? 'listed' : `NOT among them${notListedHint}${suggestions ? ` (visible: ${suggestions})` : ''}`}` : `/voices ${voices.status}`}; ${synthesis}`;
+          const detail = `GET /voices/{CELIA_VOICE_ID} → ${voice.status || error?.upstreamStatus || 'error'}${reason(voice) ? ` (${reason(voice)})` : ''}; ${shape}${nearestHint}; API key ${keyValid ? 'valid (/user 200)' : `rejected (/user ${user.status}${reason(user) ? ` ${reason(user)}` : ''})`}; ${voices.status === 200 ? `${ids.length} voices visible, configured voice id ${ids.includes(config.elevenlabs.voiceId) ? 'listed' : `NOT among them${notListedHint}${suggestions ? ` (visible: ${suggestions})` : ''}`}` : `/voices ${voices.status}`}; ${synthesis}`;
           return { verdict: 'failed', detail, latencyMs: Date.now() - started };
         }
       }
