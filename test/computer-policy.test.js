@@ -194,6 +194,16 @@ test('infographic: it states the limits before it shows any capability', async (
   assert.ok(page.includes(COMPETITIVE_FEATURE.ar));
 });
 
+test('infographic: nothing renders as undefined — every column has its note', async () => {
+  const page = await readFile(PAGE_PATH, 'utf8');
+  const docs = await readFile(DOCS_PATH, 'utf8');
+  assert.doesNotMatch(page.replace(/<script[\s\S]*?<\/script>/g, ''), /\bundefined\b/, 'the page prints undefined');
+  assert.doesNotMatch(docs, /\bundefined\b/, 'the markdown prints undefined');
+  for (const status of Object.values(STATUS)) {
+    assert.ok(buildHtml().includes(`data-status="${status}"`), `column ${status} missing from the page`);
+  }
+});
+
 test('infographic: no third-party request and no unlabelled motion', async () => {
   const page = await readFile(PAGE_PATH, 'utf8');
   assert.deepEqual([...page.matchAll(/(?:src|href)="https?:\/\/[^"]+"/g)].map((m) => m[0]), []);

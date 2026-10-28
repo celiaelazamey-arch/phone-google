@@ -32,12 +32,17 @@ export const PAGE_PATH = path.join(ROOT, 'public', 'computer-permissions.html');
 export const DOCS_PATH = path.join(ROOT, 'docs', 'computer-permissions', 'README.md');
 
 const STATUS_ORDER = [STATUS.allowed, STATUS.approval, STATUS.restricted, STATUS.denied];
+// Keyed by the STATUS constants, not by literal strings: the first draft used a colloquial key and printed
+// "undefined" under one column — the test below now refuses that class of bug outright.
 const STATUS_NOTE = {
-  allowed: 'داخل النطاق المحدد، وبلا أثر خارجي',
-  approval: 'تتوقف حتى قرار بشري مسجَّل',
-  restricted: 'إذن صريح لهذا الهدف تحديدًا',
-  denied: 'مرفوضة بالسياسة، لا استثناء'
+  [STATUS.allowed]: 'داخل النطاق المحدد، وبلا أثر خارجي',
+  [STATUS.approval]: 'تتوقف حتى قرار بشري مسجَّل',
+  [STATUS.restricted]: 'إذن صريح لهذا الهدف تحديدًا',
+  [STATUS.denied]: 'مرفوضة بالسياسة، لا استثناء'
 };
+for (const status of STATUS_ORDER) {
+  if (!STATUS_NOTE[status]) throw new Error(`render: no column note for status ${status}`);
+}
 
 const esc = (value) =>
   String(value)
