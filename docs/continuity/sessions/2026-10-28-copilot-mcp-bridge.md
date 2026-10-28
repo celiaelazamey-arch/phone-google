@@ -29,7 +29,13 @@
 
 ## 3. الأدلة المقاسة
 
-- `Celia quality & resilience` محليًا: **401/401** اختبارًا، تغطية أسطر **90.51%** وفروع 73.24 ودوال 83.88 (الأرضية 89/71/82).
+- **في CI على `d324be1`:** `Celia quality & resilience` ✅
+  [`40678857568`](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40678857568) — Node 22 و24 + Python + حاوية +
+  RTL + MySQL 8.4 كلها ناجحة. و`Service reality audit`
+  [`40678857684`](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40678857684): offline **401/401**، تغطية
+  **90.49/73.31/83.88**، MySQL **11/11**، والحي **11 متحققة / 1 فاشلة = 91.7%** — الفشل الوحيد ما زال `CELIA_VOICE_ID`
+  (18 تعديلًا عن أقرب صوت مرئي)، وهو إجراء مالك لا كود.
+- محليًا: **401/401** اختبارًا، تغطية أسطر **90.51%** وفروع 73.24 ودوال 83.88 (الأرضية 89/71/82).
 - الجسر: تغطية **88.31%** أسطر، والمولّد **95.63%**.
 - E2E على الخادم الحقيقي يثبت: الأدوات الأربع فقط، `readOnlyHint` على كل واحدة، `storage: memory`، رفض
   `whatsapp_send_text` و`prompts/list` و`resources/read`، وفلترة `find_skills` (`policyFiltered: true`).
