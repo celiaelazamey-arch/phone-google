@@ -16,12 +16,20 @@ export const ALLOWED_LICENSES = Object.freeze([
   'PDDL-1.0',
   'OGL-3.0',
   'internal-owner',
-  'public-domain'
+  'public-domain',
+  'reference-only'
 ]);
+
+/**
+ * Licences that only describe an EXTERNAL source we may link to and take our own notes
+ * from (video, article, talk) — never content we may copy. They are valid on `sources`
+ * rows only; a knowledge/skill/tool row carrying one is rejected (CELIA-LEARN-001).
+ */
+export const SOURCE_ONLY_LICENSES = Object.freeze(['reference-only']);
 
 export const TRUST_LEVELS = Object.freeze(['T1', 'T2', 'T3']);
 export const RISK_LEVELS = Object.freeze(['read', 'internal_write', 'external_effect', 'irreversible']);
-export const SOURCE_KINDS = Object.freeze(['drive', 'sheet', 'csv', 'github', 'open_data', 'api', 'manual']);
+export const SOURCE_KINDS = Object.freeze(['drive', 'sheet', 'csv', 'github', 'open_data', 'api', 'manual', 'video']);
 
 const ID = /^[a-z0-9][a-z0-9_.-]{2,63}$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?Z?)?$/;
@@ -119,6 +127,9 @@ export function validateRow(kind, values, { canonicalRisk } = {}) {
   if (!ID.test(id)) return fail('invalid_id', 'id');
   if (!values.license && SCHEMAS[kind].required.includes('license')) return fail('license_missing', 'license');
   if (values.license && !ALLOWED_LICENSES.includes(values.license)) return fail('license_not_allowed', 'license');
+  if (values.license && SOURCE_ONLY_LICENSES.includes(values.license) && kind !== 'sources') {
+    return fail('license_not_allowed', 'license');
+  }
   if (values.trust_level && !TRUST_LEVELS.includes(values.trust_level)) return fail('invalid_trust_level', 'trust_level');
 
   if (kind === 'knowledge') {

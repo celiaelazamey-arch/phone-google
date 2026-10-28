@@ -14,3 +14,8 @@ playwright-report/
 test-results/
 
 .validation-artifacts/
+
+# CELIA-LEARN-001: third-party transcripts stay local; only source.json (hashes) is committed
+data/learning/sources/*/transcript*.txt
+data/learning/sources/*/*.srt
+data/learning/sources/*/*.vtt

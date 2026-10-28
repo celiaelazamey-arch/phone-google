@@ -512,6 +512,35 @@
 - **السبب:** إثبات التفوق بالأدلة القابلة للقياس وإعادة التشغيل بدل الادعاءات التسويقية العامة.
 - **الأثر:** إضافة [src/agent/automation/benchmark.js](../../src/agent/automation/benchmark.js)، [public/protocol.html](../../public/protocol.html)، [public/protocol.css](../../public/protocol.css)، [public/protocol.js](../../public/protocol.js)، [docs/user-switch-protocol.md](../user-switch-protocol.md)، و[test/agent-benchmark-20.test.js](../../test/agent-benchmark-20.test.js).
 
+## DEC-027 — بروتوكول التعلم المحكوم من المصادر الخارجية (`CELIA-LEARN-001`): سجل مصدر ببصمة، بوابة فهم حتمية، ملاحظات `T1` في شبكة المعرفة، وروابط النشر الموثقة
+
+- **التاريخ:** 27 أكتوبر 2026 (ليلًا) · **الحالة:** منفذ ومتحقق محليًا (الدمج بانتظار المالك) · **المهمة:** LEARN-001، HOST-003، DOC-001
+- **السياق:** طلب المالك «تعلّم من هذا الفيديو ما يهمنا» ثم «أعطني تم النشر 100%». المصدر فيديو YouTube بحقوق محفوظة؛
+  شبكة الصندوق الرملي تمنع `youtube.com`، وقارئ الصفحات المستضاف أعاد نصًا جزئيًا بلا طوابع زمنية. كان يلزم مسار يتعلم
+  دون نسخ المصدر ودون نسب ما لم يُستخرج، ودون المساس بالأدوات أو النموذج.
+- **البدائل المرفوضة:** (أ) لصق النص في المستودع — ينتهك حقوق المصدر؛ (ب) كتابة وحدات عن كل مواضيع الوصف — نسب بلا دليل؛
+  (ج) رفع الثقة إلى `T2/T3` — مصدر واحد غير متقاطع؛ (د) ادعاء «تم النشر 100%» للخادم الكامل — لا توجد خدمة Render ولا MySQL.
+- **القرار:**
+  1. **سجل مصدر ملتزم به** في `data/learning/sources/<id>/source.json` (هوية، قناة الاستخراج ومحاولاتها، SHA-256 للنص
+     و12 مقطعًا، `topics_unknown`، `claims`، متجه حالة)؛ **النص نفسه خارج Git** (`.gitignore`). الأداة: `scripts/learn-source.mjs`.
+  2. **عقود السجلات:** `video` نوع مصدر جديد؛ ترخيص `reference-only` مسموح **لصفوف `sources` فقط** (`SOURCE_ONLY_LICENSES`)
+     ويُرفض على أي صف معرفة/مهارة/أداة.
+  3. **سجل معرفة منفصل** `data/kb/learned_registry.csv` بمصدر ملف `src-learning-notes` (يدوي، `internal-owner`، **`T1`**)
+     وصفوف تحمل `source_url` للمصدر ووسم `learn:<source-id>` ووسوم `segment:Sxx`؛ 9 وحدات من `yt-Cb3mBAH0IaY`، صفر إجراءات
+     وصفر قدرات.
+  4. **بوابة الموافقة = PR المالك؛ الرجوع = `git revert` + `kb import --apply`.** لا كتابة في `tool-policy.js` ولا في الأدوات.
+  5. **بطارية `LS-01..LS-10`** (`test/learning-protocol.test.js`) حتمية بلا شبكة: عقد السجل، ربط الادعاء بالمقطع، UNKNOWN
+     للمعلن غير المستخرج، عقود الترخيص/النوع، عدم تتبع النص، سلامة البصمات، فحص حقن التعليمات، الاسترجاع بالبحث العادي
+     مع `minTrust`، صرامة التقسيم، لا صف بلا مصدر.
+  6. **روابط النشر تُوثق بالدليل لا بالاستنتاج:** GitHub Pages والـWorker والإصدار وصورة GHCR مع معرفات التشغيلات التي تحققت
+     منها (`README.md` §روابط النشر، `docs/deployment-profile.json`)؛ الخادم الكامل (Render + Aiven) يبقى `not-verified`
+     حتى يأذن المالك بإنشاء الحسابات ويُنفَّذ `verify:live` بنتيجة PASS.
+- **السبب:** «كل حقيقة لها مصدر، كل تغيير له سجل ورجوع» مع احترام حقوق الطرف الثالث وعدم الادعاء.
+- **الأثر:** إضافة [docs/learning-protocol.md](../learning-protocol.md)، [scripts/learn-source.mjs](../../scripts/learn-source.mjs)،
+  [data/learning/sources/yt-Cb3mBAH0IaY/source.json](../../data/learning/sources/yt-Cb3mBAH0IaY/source.json)،
+  [data/kb/learned_registry.csv](../../data/kb/learned_registry.csv)، [test/learning-protocol.test.js](../../test/learning-protocol.test.js)؛
+  تعديل `src/knowledge/validate.js`، `data/kb/sources_registry.csv`، `data/kb/descriptors.json`، `data/kb/manifest.json`، `.gitignore`.
+
 ## إضافة قرار لاحق
 
 استخدم معرفًا جديدًا، والتاريخ والحالة والسياق والبدائل والقرار والسبب والأثر ومرجع المهمة، واذكر صراحة القرار المستبدل إن وجد. لا تنسخ أسرارًا أو مخطط إنتاج يحوي بيانات شخصية إلى سجل القرار.

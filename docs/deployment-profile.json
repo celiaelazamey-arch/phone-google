@@ -30,7 +30,16 @@
   },
   "publication": {
     "permanentPublicUrl": null,
+    "permanentPublicUrlNote": "The full Express + MySQL service has no public URL yet: no Render service and no Aiven database exist (owner accounts required).",
+    "staticSiteUrl": "https://celiaelazamey-arch.github.io/phone-google/",
+    "staticSiteVerifiedBy": "GitHub Pages deployment 7374226427 (success) + workflow run 40611588083 live probe 10/10 routes, commit 1a11810685075868a6c1c6148fc4346de2b7d1a9, 2026-10-28T00:53Z",
+    "edgeUrl": "https://celia-phone-google.celiaelazamey.workers.dev",
+    "edgeVerifiedBy": "workflow run 40611588035: status deployed, liveReady true, 18/18 secret bindings, commit 1a11810685075868a6c1c6148fc4346de2b7d1a9",
+    "containerImage": "ghcr.io/celiaelazamey-arch/phone-google:v0.2.1",
+    "containerImageVisibility": "public",
+    "release": "https://github.com/celiaelazamey-arch/phone-google/releases/tag/v0.2.1",
     "externallyVerified": false,
+    "externallyVerifiedNote": "Static site and edge gateway are verified by GitHub Actions probes; the full backend is not deployed, so verify:live has never passed on a public URL.",
     "googleLiveConnectionVerified": false,
     "whatsappLiveConnectionVerified": false,
     "productionBackupRestored": false,
@@ -46,5 +55,5 @@
     "githubActionsSecretsValuesExposed": false,
     "databaseSchemaChanges": false
   },
-  "remainingOwnerAction": "Sign in and approve the selected FREE services in their own dashboards; configure credentials there only. Never paste credentials or payment information into chat."
+  "remainingOwnerAction": "Create the FREE Render web service (Blueprint from render.yaml) and a dedicated Aiven MySQL Free database in your own dashboards, paste the MySQL credentials into Render only, then run `npm run verify:live -- --url https://<service>.onrender.com --expect-commit <sha>` and record the PASS report in a session file. Never paste credentials or payment information into chat."
 }

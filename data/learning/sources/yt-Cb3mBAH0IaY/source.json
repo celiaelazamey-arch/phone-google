@@ -1,0 +1,338 @@
+{
+  "schema_version": "1.0",
+  "protocol": "CELIA-LEARN-001",
+  "id": "yt-Cb3mBAH0IaY",
+  "kind": "video",
+  "url": "https://www.youtube.com/watch?v=Cb3mBAH0IaY",
+  "shared_url": "https://youtu.be/Cb3mBAH0IaY",
+  "title": "شرح جميع أنواع الذكاء الاصطناعي في 25 دقيقة | الدليل الكامل من Machine Learning إلى AGI وASI",
+  "channel": "خلف القصة",
+  "channel_url": "https://www.youtube.com/channel/UCJcnxpzqgV65sUTpbkIFPCg",
+  "uploaded_at": "2026-08-04",
+  "length": "25:04",
+  "language": "ar",
+  "licence": "reference-only",
+  "licence_note": "محتوى خارجي بحقوق محفوظة لصاحب القناة: يُربط بالرابط فقط، ولا يُنسخ النص إلى المستودع؛ كل ما يُلتزم به هو ملاحظات بصياغة المالك/الوكيل تشير إلى المصدر.",
+  "recorded_at": "2026-10-28T01:05:00Z",
+  "recorded_by": "arena-agent · session 2026-10-27-learning-protocol-and-publish-links",
+  "extraction": {
+    "channel": "hosted page reader (fetch_page) over the public watch page: title, channel, upload date, length, description, and caption text WITHOUT timestamps",
+    "coverage": "partial",
+    "coverage_estimate": "≈ النصف الأول من الفيديو تقريبًا (ينتهي داخل مقطع التعلم العميق عند «وتفهم الكلام وتترج…»)؛ الحد الدقيق UNKNOWN",
+    "timestamps": "unavailable",
+    "attempts": [
+      {
+        "target": "web_search youtube Cb3mBAH0IaY",
+        "result": "no match"
+      },
+      {
+        "target": "https://www.youtube.com/watch?v=Cb3mBAH0IaY",
+        "result": "metadata + description + partial caption text (same bytes on two separate fetches)"
+      },
+      {
+        "target": "https://www.youtube.com/api/timedtext?v=Cb3mBAH0IaY&lang=ar&fmt=json3",
+        "result": "HTTP 500"
+      },
+      {
+        "target": "https://pipedapi.kavin.rocks/streams/Cb3mBAH0IaY",
+        "result": "fetch failed"
+      },
+      {
+        "target": "https://inv.nadeko.net/api/v1/captions/Cb3mBAH0IaY?lang=ar",
+        "result": "HTTP 500"
+      },
+      {
+        "target": "https://yewtu.be/api/v1/captions/Cb3mBAH0IaY?lang=ar",
+        "result": "anti-bot challenge"
+      },
+      {
+        "target": "sandbox curl youtube.com",
+        "result": "network denied by allow-list"
+      }
+    ],
+    "to_complete": "الصق نص «إظهار النص» (Show transcript) الكامل من YouTube بصيغة mm:ss نص، أو ارفع ملف .srt؛ عندها تُعاد المرحلة 2 بطوابع زمنية ويُحدَّث source_url لكل وحدة إلى #t=<ثانية>."
+  },
+  "transcript": {
+    "file": "transcript.txt",
+    "committed": false,
+    "chars": 6395,
+    "lines": 180,
+    "sha256": "c7747dbc4b2cb3b7cef998d3d6a962435f78f5d45d69eac430d17e7ac57a55d6"
+  },
+  "segments": [
+    {
+      "id": "S01",
+      "lines": [
+        1,
+        27
+      ],
+      "topic": "مقدمة: الذكاء الاصطناعي ليس شيئًا واحدًا؛ أنواع بأهداف وقدرات وحدود مختلفة",
+      "chars": 995,
+      "sha256": "a7778e610ccd7176af03df7fbb12973070881dc4e6362dafad1979e1e8c78d14"
+    },
+    {
+      "id": "S02",
+      "lines": [
+        28,
+        39
+      ],
+      "topic": "ورشة دارتموث 1956 وولادة المصطلح؛ البداية كانت قواعد إذا/فافعل",
+      "chars": 404,
+      "sha256": "a5d870bb4215ea74ed4dd9271d8bbd22ea0bc043aa7c6a3229421e9abec15a2a"
+    },
+    {
+      "id": "S03",
+      "lines": [
+        40,
+        58
+      ],
+      "topic": "الذكاء الضيق القائم على القواعد: مثال الشطرنج، الصراف الآلي، المصانع؛ يتوقف أمام الجديد",
+      "chars": 646,
+      "sha256": "d7b089277e57c69abc34a3fa765cd3c4ccbb22795e7505423d9cea655dfced47"
+    },
+    {
+      "id": "S04",
+      "lines": [
+        59,
+        78
+      ],
+      "topic": "التعلم الآلي: اكتشاف القواعد من الأمثلة (قطط/كلاب)",
+      "chars": 625,
+      "sha256": "5e36847c51a1414aadaf099cb1bddff71c15779e622c23feb61200c5863bb442"
+    },
+    {
+      "id": "S05",
+      "lines": [
+        79,
+        90
+      ],
+      "topic": "قاعدة البيانات: البيانات أهم من الخوارزمية؛ البيانات المنحازة أو الخاطئة تنتج نظامًا منحازًا أو خاطئًا",
+      "chars": 382,
+      "sha256": "8458b930537414f633612b944e4927e5b7c9903878778edab800ecbf8fd4ed1e"
+    },
+    {
+      "id": "S06",
+      "lines": [
+        91,
+        107
+      ],
+      "topic": "التعلم الخاضع للإشراف: إجابات مسبقة؛ أمثلة: الوجوه، البريد المزعج، أسعار المنازل، الأمراض",
+      "chars": 639,
+      "sha256": "2185085e675b91177d8411d905e10f3f7ba6a11fa6197c32493e4ef6b15ce30f"
+    },
+    {
+      "id": "S07",
+      "lines": [
+        108,
+        119
+      ],
+      "topic": "التعلم غير الخاضع للإشراف: اكتشاف التشابهات بلا إجابات؛ تقسيم العملاء؛ تحليل أنماط لا سحر",
+      "chars": 458,
+      "sha256": "51176c2659a53299818498304594a41bb9618eccf744281901a60af7eaa2745b"
+    },
+    {
+      "id": "S08",
+      "lines": [
+        120,
+        136
+      ],
+      "topic": "التعلم بالتعزيز: التعلم من الخطأ عبر مكافآت وعقوبات (الدراجة، المتاهة)",
+      "chars": 562,
+      "sha256": "7769ad1e3d07eb3167f93207b4c2453124db911034be4778f4c24d28a8042289"
+    },
+    {
+      "id": "S09",
+      "lines": [
+        137,
+        155
+      ],
+      "topic": "إنجازات التعزيز: التفوق في الشطرنج وجو؛ حركات لم يفكر فيها البشر؛ الآلة قد تكتشف حلولًا جديدة",
+      "chars": 711,
+      "sha256": "0b5c65604eff64603dce89983f7bfaf579416dc6ba327948c1bd81befe9b5b72"
+    },
+    {
+      "id": "S10",
+      "lines": [
+        156,
+        160
+      ],
+      "topic": "حد التعلم الآلي التقليدي: تعقيد الخوارزميات مع ازدياد البيانات",
+      "chars": 194,
+      "sha256": "efc2967ffcc34b8e7ef0181cfd2500596b1752ee591ea2851c9e884e32ac278f"
+    },
+    {
+      "id": "S11",
+      "lines": [
+        161,
+        173
+      ],
+      "topic": "التعلم العميق: شبكات عصبية اصطناعية متعددة الطبقات مستوحاة من الدماغ",
+      "chars": 502,
+      "sha256": "53c86e053bb2b84a8c2da020319ee6cd297a2df3ee52b14ce98b5f13cefc2dde"
+    },
+    {
+      "id": "S12",
+      "lines": [
+        174,
+        180
+      ],
+      "topic": "لماذا نجح التعلم العميق متأخرًا: الإنترنت والحوسبة السحابية وبطاقات الرسومات (النص مبتور هنا)",
+      "chars": 265,
+      "sha256": "4fe074399c0482f2580682239d5e6330124c12b16d400dfd3799772a297b0e0e"
+    }
+  ],
+  "description_topics_announced": [
+    "ما هو الذكاء الاصطناعي؟",
+    "الذكاء المحدود (ANI)",
+    "التعلم الآلي (Machine Learning)",
+    "التعلم العميق (Deep Learning)",
+    "التعلم المعزز (Reinforcement Learning)",
+    "معالجة اللغة الطبيعية (NLP)",
+    "الرؤية الحاسوبية (Computer Vision)",
+    "الروبوتات الذكية",
+    "الذكاء العام (AGI)",
+    "الذكاء الفائق (ASI)",
+    "تطبيقات في الطب والتعليم والصناعة والأمن والسيارات ذاتية القيادة",
+    "هل يمكن أن يتفوق الذكاء الاصطناعي على الإنسان؟",
+    "أثر الذكاء الاصطناعي على الوظائف ومستقبل العالم"
+  ],
+  "topics_extracted": [
+    "ما هو الذكاء الاصطناعي؟",
+    "الذكاء المحدود (ANI)",
+    "التعلم الآلي (Machine Learning)",
+    "التعلم المعزز (Reinforcement Learning)",
+    "التعلم العميق (Deep Learning) — جزئيًا"
+  ],
+  "topics_unknown": [
+    "معالجة اللغة الطبيعية (NLP)",
+    "الرؤية الحاسوبية (Computer Vision)",
+    "الروبوتات الذكية",
+    "الذكاء العام (AGI)",
+    "الذكاء الفائق (ASI)",
+    "تطبيقات في الطب والتعليم والصناعة والأمن والسيارات ذاتية القيادة",
+    "هل يمكن أن يتفوق الذكاء الاصطناعي على الإنسان؟",
+    "أثر الذكاء الاصطناعي على الوظائف ومستقبل العالم"
+  ],
+  "claims": [
+    {
+      "unit": "kb-learn-ai-not-one-thing",
+      "segments": [
+        "S01"
+      ],
+      "status": "supported"
+    },
+    {
+      "unit": "kb-learn-ai-term-dartmouth-1956",
+      "segments": [
+        "S02"
+      ],
+      "status": "supported",
+      "note": "حقيقة تاريخية من مصدر واحد؛ T1 حتى تُقابَل بمصدر مستقل"
+    },
+    {
+      "unit": "kb-learn-rule-based-narrow-ai",
+      "segments": [
+        "S02",
+        "S03"
+      ],
+      "status": "supported"
+    },
+    {
+      "unit": "kb-learn-ml-learns-from-examples",
+      "segments": [
+        "S04"
+      ],
+      "status": "supported"
+    },
+    {
+      "unit": "kb-learn-data-over-algorithm",
+      "segments": [
+        "S05"
+      ],
+      "status": "supported"
+    },
+    {
+      "unit": "kb-learn-supervised-learning",
+      "segments": [
+        "S06"
+      ],
+      "status": "supported"
+    },
+    {
+      "unit": "kb-learn-unsupervised-learning",
+      "segments": [
+        "S07"
+      ],
+      "status": "supported"
+    },
+    {
+      "unit": "kb-learn-reinforcement-learning",
+      "segments": [
+        "S08",
+        "S09"
+      ],
+      "status": "supported"
+    },
+    {
+      "unit": "kb-learn-deep-learning-neural-networks",
+      "segments": [
+        "S10",
+        "S11",
+        "S12"
+      ],
+      "status": "supported",
+      "note": "المقطع S12 مبتور؛ لا يُنسب للمصدر ما بعد «وتفهم الكلام»"
+    },
+    {
+      "unit": null,
+      "topic": "NLP / Computer Vision / الروبوتات / AGI / ASI / التطبيقات / الوظائف",
+      "segments": [],
+      "status": "unknown",
+      "note": "أعلن عنها وصف الفيديو فقط؛ لم يُستخرج نصها فلا تُنسب للمصدر ولا تُكتب وحدات لها"
+    }
+  ],
+  "units": {
+    "knowledge": {
+      "registry": "data/kb/learned_registry.csv",
+      "tag": "learn:yt-Cb3mBAH0IaY",
+      "count": 9,
+      "trust_level": "T1",
+      "license": "internal-owner"
+    },
+    "procedures": {
+      "count": 0,
+      "reason": "المصدر مفاهيمي؛ لا خطوات قابلة للتنفيذ بشروط"
+    },
+    "capabilities": {
+      "count": 0,
+      "reason": "لا قدرة جديدة؛ لا تغيير في tool-policy ولا في الأدوات"
+    }
+  },
+  "relevance_to_celiaos": [
+    "طبقات CeliaOS الحتمية (tool-policy، verifier، بوابات KB) هي ذكاء ضيق قائم على القواعد بالتصميم: متوقع، لكنه يتوقف أمام الجديد؛ لذلك الجديد يُحال UNKNOWN/موافقة المالك لا تخمينًا.",
+    "«البيانات أهم من الخوارزمية» = بوابات المصدر والترخيص والثقة والقِدَم في شبكة المعرفة تسبق أي تعلم؛ مصدر رديء يصنع مساعدًا رديئًا.",
+    "التعلم بالتعزيز في المصدر تعلم من مكافآت وعقوبات؛ مقابله في CeliaOS (المرحلة 7) تغذية راجعة محكومة من نتائج التنفيذ تُسجَّل كأدلة — دون أي تعديل لأوزان نموذج.",
+    "التعلم العميق يحتاج بيانات وحوسبة ضخمة؛ طبقة النموذج في CeliaOS خارجية عبر Model Router ولا تُدرَّب داخل النظام."
+  ],
+  "approval": {
+    "gate": "PR review and merge by the repository owner (registry rows are code-governed; `kb import --apply` is idempotent)",
+    "stage": "candidate",
+    "promoted_by": null,
+    "promoted_at": null
+  },
+  "rollback": "git revert <merge-commit> && npm run kb:manifest && npm run kb -- import --apply",
+  "status": {
+    "SOURCE": "VERIFIED",
+    "EXTRACTION": "PARTIAL",
+    "COMPREHENSION": "PARTIAL",
+    "KNOWLEDGE": "CANDIDATE",
+    "PROCEDURE": "NONE",
+    "CAPABILITY": "NONE",
+    "REGRESSION": "PASS"
+  },
+  "injection_scan": {
+    "patterns": 7,
+    "findings": []
+  },
+  "regression_evidence": "test/learning-protocol.test.js LS-01..LS-10 (10/10) + npm test 295/295 on 2026-10-27 (full git history required for the N/N-1 MCP baseline test)"
+}

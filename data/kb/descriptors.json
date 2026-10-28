@@ -56,6 +56,17 @@
       "trust": "T2",
       "stale_after_days": 90,
       "last_sync": "2026-10-27"
+    },
+    {
+      "name": "learned_registry.csv",
+      "kind": "knowledge",
+      "sourceId": "src-learning-notes",
+      "sourceKind": "manual",
+      "uri": "repo://data/kb/learned_registry.csv",
+      "license": "internal-owner",
+      "trust": "T1",
+      "stale_after_days": 180,
+      "last_sync": "2026-10-27"
     }
   ]
 }
