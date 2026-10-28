@@ -1,9 +1,12 @@
 # واقع الخدمات — ما هو حقيقي ومختبر، وما هو اسم فقط
 
 **آخر تدقيق حقيقي:** 28 أكتوبر 2026 · workflow `Service reality audit` · run
-[`40649403028`](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40649403028) على الفرع
-`arena/bf717032-phone-google` (commit `0ea7600`) · الأداة: `scripts/service-reality.mjs` (`npm run reality`). التشخيص
-التفصيلي للأعطال الستة جاء من run [`40646881277`](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40646881277).
+[`40660546276`](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40660546276) على الفرع
+`arena/3d9557b5-phone-google` (commit `5a72033`؛ أُعيد بتشخيص أوسع في run
+[`40661486530`](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40661486530)، commit `34b58da`، نفس النتيجة)
+بعد تحديث المالك للسرّين `CELIA_VOICE_ID` و`FIGMA_ACCESS_TOKEN` · الأداة:
+`scripts/service-reality.mjs` (`npm run reality`). التشخيص التفصيلي للأعطال الأصلية جاء من run
+[`40646881277`](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40646881277).
 
 القاعدة: **لا تُحسب خدمة «تعمل» إلا إذا أجابت فعلًا من داخل GitHub Actions بالأسرار الحقيقية**. وجود السر ≠ عمل
 الخدمة. كل سطر أدناه له دليل في الـrun المذكور (التعليقات التوضيحية `Service Reality · <id>` على الـjob)، والتقرير
@@ -14,17 +17,17 @@
 
 | الطبقة | النتيجة | الدليل |
 |---|---|---|
-| الاختبارات بلا شبكة | **324/324** ناجحة · تغطية أسطر **85.82%** | annotation `Service Reality · offline` |
+| الاختبارات بلا شبكة | **326/326** ناجحة · تغطية أسطر **85.65%** (فوق الأرضية 80/65/78) | annotation `Service Reality · offline` |
 | MySQL 8.4 حقيقي (خدمة في الـrunner) | **11/11** ناجحة (`test:mysql`) | annotation `Service Reality · mysql` |
-| المسابر الحية (20 خدمة) | **10 متحققة · 2 فاشلة · 4 متقاعدة صراحةً · 1 غير مهيأة · 2 لا يمكن التحقق منها · 1 غير منشورة** | annotations per service |
-| نسبة العمل بين الخدمات المهيأة | **83.3%** (10 من 12) — **أقل من عتبة 95%** (كانت 62.5% قبل التقاعد الصريح) | annotation `Service Reality` |
+| المسابر الحية (20 خدمة) | **11 متحققة · 1 فاشلة · 4 متقاعدة صراحةً · 1 غير مهيأة · 2 لا يمكن التحقق منها · 1 غير منشورة** | annotations per service |
+| نسبة العمل بين الخدمات المهيأة | **91.7%** (11 من 12) — **أقل من عتبة 95%** (62.5% → 83.3% → 91.7%) | annotation `Service Reality` |
 
 **الحكم بصراحة:** الشيفرة والاختبارات والبنية المنشورة (Pages، Worker، GHCR، Release) حقيقية ومتحققة. أربع خدمات
-كانت اعتماداتها ميتة أو تتطلب بطاقة **تقاعدت صراحةً في Git** (لم تعد تُحسب ولا تُعرض كقدرة). بقي عطلان لا تصلحهما
-شيفرة ولا أملك صلاحية سرّهما: **ElevenLabs** (المفتاح يولّد صوتًا فعلًا — 17,597 بايت أثبتها الـrun — لكن `CELIA_VOICE_ID`
-يشير إلى صوت غير موجود في الحساب) و**Figma** (توكن 401). إصلاحهما خطوتان من لوحة المالك → 100%.
+كانت اعتماداتها ميتة أو تتطلب بطاقة **تقاعدت صراحةً في Git**. **Figma صار متحققًا** بالتوكن الجديد. بقي عطل واحد:
+**ElevenLabs** — المفتاح (الجديد) صالح بالكامل (`/user` 200) ويولّد صوتًا فعلًا (15,925 بايت بصوت مرئي)، لكن قيمة
+`CELIA_VOICE_ID` الجديدة **ليست بين 22 صوتًا مرئيًا لهذا المفتاح** (`voice_not_found`). خطوة واحدة → 100%.
 
-## جدول الحقيقة (run `40649403028`؛ التشخيص من `40646881277`)
+## جدول الحقيقة (run `40660546276`؛ التشخيص الأصلي من `40646881277`)
 
 | # | الخدمة | السر | الحكم | ما حدث فعلًا | من يصلحه |
 |---|---|---|---|---|---|
@@ -41,8 +44,8 @@
 | 11 | Vercel AI Gateway | `AI_GATEWAY_API_KEY` | ⏸️ متقاعدة في Git | المفتاح صالح (`/models` يسرد 498 نموذجًا) لكن الطلب **403**: «AI Gateway requires a valid credit card on file» — **يتعارض مع قيد «لا بطاقة»** | المالك: بطاقة أو **تقاعد** (`CELIA_DISABLE_AI_GATEWAY=true`) |
 | 12 | DeepSeek | `DEEPSEEK_API_KEY` | ⏸️ متقاعدة في Git | المفتاح صالح لكن **402 Insufficient Balance**؛ كما أن `/models` يسرد `deepseek-flash` و`deepseek-v4-pro` فقط — الافتراضي القديم `deepseek-chat` لم يعد مدرجًا (**أُصلح الافتراضي إلى `deepseek-flash`**) | المالك: شحن رصيد أو تقاعد |
 | 13 | AgentRouter | `AGENETROUTERAPI_KEY` | ⏸️ متقاعدة في Git | المفتاح يُقبل لكن `/models` يعيد **0 نماذج** و`chat/completions` يعيد 200 بجسم فارغ — حساب بلا حصة/نماذج | المالك: مراجعة حساب agentrouter أو تقاعد |
-| 14 | ElevenLabs (صوت سيليا) | `ELEVENLABS_API_KEY` + `CELIA_VOICE_ID` | ❌ فاشلة | **المفتاح يولّد صوتًا فعلًا** (توليف حقيقي بصوت مرئي → 17,597 بايت) لكنه مقيّد (`/user` 401 `missing_permissions`) و`/voices/{CELIA_VOICE_ID}` → 400 `voice_not_found`: المعرّف ليس بين 34 صوتًا مرئيًا | المالك: ضبط `CELIA_VOICE_ID` على صوت مرئي للمفتاح، مثلًا `EXAVITQu4vr4xnSDxMaL` (Sarah) أو `FGY2WhTYpPnrIDTdsKH5` (Laura) أو `CwhRBWXzGAHq8TQ4Fs17` (Roger)، أو إعادة إنشاء صوت سيليا في هذا الحساب |
-| 15 | Figma | `FIGMA_ACCESS_TOKEN` | ❌ فاشلة | **401** — التوكن منتهٍ/ملغى | المالك: توكن جديد أو تقاعد |
+| 14 | ElevenLabs (صوت سيليا) | `ELEVENLABS_API_KEY` + `CELIA_VOICE_ID` | ❌ فاشلة (الوحيدة) | بعد التحديث: المفتاح صالح (`/user` 200) و**يولّد صوتًا فعلًا** (15,925 بايت بصوت مرئي)، لكن `/voices/{CELIA_VOICE_ID}` → 400 `voice_not_found`: القيمة الجديدة ليست بين 22 صوتًا مرئيًا لهذا المفتاح — صوت من المكتبة أو مستنسخ يجب إضافته أولًا إلى «My Voices» في الحساب الذي يخصه المفتاح | المالك: `CELIA_VOICE_ID` = `AnsOWV53Mdx5fcIanRBB` — **الصوت المخصص باسم `cela` الموجود فعلًا في الحساب** (ظهر في قائمة الـrun `40661486530`)، أو أي معرّف آخر من القائمة (مثلًا `EXAVITQu4vr4xnSDxMaL` Sarah) |
+| 15 | Figma | `FIGMA_ACCESS_TOKEN` | ✅ متحققة (بعد التجديد) | كان 401؛ التوكن الجديد يجيب على `/v1/me` | — |
 | 16 | Cloudflare R2 (تخزين) | `CLOUDFLARE_R2_*` ×3 | ⏸️ متقاعدة في Git | `ListBuckets` موقّع SigV4 لم يصل: **TLS handshake مرفوض** على `<account>.r2.cloudflarestorage.com` — النمط المعتاد عندما لا يكون R2 مفعّلًا على الحساب (لم يُنشأ bucket قط) أو عندما لا يملك هذا الحساب هذه المفاتيح | المالك: تفعيل R2 وإنشاء bucket (قد يتطلب وسيلة دفع لدى Cloudflare) أو تقاعد |
 | 17 | Codata | `YOUR_CODATA_API_KEY` | 🟡 لا يمكن التحقق | لا `CODATA_BASE_URL` معروفًا؛ `getCodataStatus` حضور فقط | المالك: الرابط الرسمي أو تقاعد |
 | 18 | Google Workspace (Gmail/Calendar) | يحتاج ربط حساب | 🟡 لا يمكن التحقق | العميل صحيح (#4) لكن لا حساب مربوط ولا خادم كامل | بعد HOST-003 → «اربط جوجل» |
