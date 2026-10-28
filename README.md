@@ -27,6 +27,10 @@ Render Free + قاعدة Aiven MySQL Free ينشئهما المالك من لو�
 صوتًا فعلًا؛ `CELIA_VOICE_ID` يشير إلى صوت غير موجود) وFigma (401) → نسبة العمل 83.3% < 95%. إعادة التدقيق: commit يحمل
 `[reality]` أو `npm run reality`.
 
+**خطة المحافظة على ما وصلنا إليه:** [docs/preservation-plan.md](docs/preservation-plan.md) (DEC-031) — جرد بالدليل، تدقيق
+أسبوعي آلي مع issue تتبّع واحدة تصل إلى المالك وتُغلق وحدها، أرضية تغطية في CI (80/65/78)، جدول موت الأسرار الـ18 وكشفها،
+ودليل إعادة البناء من الصفر؛ وما لا يملكه غير المالك (حماية `main`، السرّان المتبقيان، PRs القديمة).
+
 ## خطة 2026 والاستمرارية بين الجلسات
 
 [خطة التطوير الشاملة](docs/2026-development-plan.md) · [الحالة الحالية والخطوة التالية](docs/continuity/STATE.md) · [قائمة المهام](docs/continuity/BACKLOG.md) · [سجل القرارات](docs/continuity/DECISIONS.md) · [عقد التوافق](docs/compatibility-contract.md) · [نحو وكيل متكامل (خطة M1–M4)](docs/agent-runtime-plan.md) · [ربط حساب Google خطوة بخطوة](docs/google-connect.md) · [شبكة المعرفة](docs/knowledge-network.md).

@@ -235,6 +235,16 @@ test('service-reality workflow wires all 18 secrets, a real MySQL service, and n
   assert.ok(workflow.includes('image: mysql:8.4'));
   assert.ok(workflow.includes("contains(github.event.head_commit.message, '[reality]')"));
   assert.ok(workflow.includes('contents: read'));
+  // Preservation cadence (DEC-031): weekly schedule, one tracking issue on main only, never on feature pushes.
+  assert.match(workflow, /schedule:\n\s+- cron: '0 6 \* \* 1'/);
+  assert.ok(workflow.includes('issues: write'));
+  assert.match(workflow, /github\.event_name == 'schedule' \|\| github\.event_name == 'workflow_dispatch' \|\| contains\(github\.event\.head_commit\.message, '\[reality\]'\)/);
+  assert.match(workflow, /if: always\(\) && github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'schedule' \|\| github\.event_name == 'workflow_dispatch'\)[^\n]*\n\s+env:\n\s+GH_TOKEN: \$\{\{ github\.token \}\}/);
+  assert.ok(workflow.includes('run: node scripts/reality-notify.mjs'));
+  const quality = fs.readFileSync(path.join(root, '.github/workflows/celia-mcp.yml'), 'utf8');
+  assert.ok(quality.includes('npm run test:coverage'), 'CI enforces the coverage floor');
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  assert.match(pkg.scripts['test:coverage'], /--test-coverage-lines=80 --test-coverage-branches=65 --test-coverage-functions=78/);
   assert.ok(!/MYSQL_PASSWORD:|MYSQL_SSL_CA_BASE64|TOKEN_ENCRYPTION_KEY/.test(workflow));
   for (const flag of ['AI_GATEWAY', 'DEEPSEEK', 'AGENTROUTER', 'ELEVENLABS', 'FIGMA', 'CODATA', 'CLOUDFLARE_R2']) {
     assert.ok(workflow.includes(`CELIA_DISABLE_${flag}: \${{ vars.CELIA_DISABLE_${flag} }}`), `${flag} retirement switch missing`);

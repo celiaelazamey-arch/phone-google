@@ -125,6 +125,16 @@ export function classifyGoogleTokenResponse(status, body = {}) {
   return { verdict: 'failed', detail: `unexpected token endpoint response ${status}${error ? ` ${error}` : ''}` };
 }
 
+/** Regression floor for the offline suite (DEC-031). Current: ~85.8 / 72 / 84 — headroom is deliberate. */
+export const COVERAGE_FLOOR = Object.freeze({ lines: 80, branches: 65, functions: 78 });
+
+export function coverageShortfalls(coverage, floor = COVERAGE_FLOOR) {
+  if (!coverage) return [];
+  return Object.entries(floor)
+    .filter(([metric, minimum]) => typeof coverage[metric] === 'number' && coverage[metric] < minimum)
+    .map(([metric, minimum]) => `${metric} ${coverage[metric]}% < ${minimum}%`);
+}
+
 export function scoreServices(services) {
   const counts = { verified: 0, failed: 0, 'not-configured': 0, disabled: 0, unverifiable: 0, 'not-deployed': 0 };
   for (const service of services) counts[service.verdict] = (counts[service.verdict] || 0) + 1;
@@ -515,6 +525,8 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
 
   const reasons = [];
   if (report.offline && (report.offline.fail || report.offline.exitCode !== 0)) reasons.push(`offline suite failed (${report.offline.fail} failing)`);
+  const shortfalls = coverageShortfalls(report.offline?.coverage);
+  if (shortfalls.length) reasons.push(`coverage below floor (${shortfalls.join(', ')})`);
   if (report.mysql?.ran && (report.mysql.fail || report.mysql.exitCode !== 0)) reasons.push('real MySQL suite failed');
   if (report.score && report.score.workingRate !== null && report.score.workingRate < options.minRate) reasons.push(`only ${Math.round(report.score.workingRate * 100)}% of configured services work (${report.live.filter((s) => s.verdict === 'failed').map((s) => s.id).join(', ')})`);
   report.verdict = reasons.length ? 'fail' : 'pass';

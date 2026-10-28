@@ -1,13 +1,26 @@
 # الحالة الحالية — ابدأ من هنا
 
-**آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** **تدقيق واقع الخدمات بالأسرار الحقيقية (DEC-030، QA-005)** بعد
-أتمتة Render (DEC-028) وأوامر Gmail/Calendar للمالك (DEC-029) على الفرع `arena/bf717032-phone-google` · سجل الجلسة:
-[2026-10-28-service-reality-audit](sessions/2026-10-28-service-reality-audit.md) · السجل السابق:
-[2026-10-28-render-release-automation](sessions/2026-10-28-render-release-automation.md) ·
-البروتوكول: [docs/learning-protocol.md](../learning-protocol.md) · الخطة: [docs/go-live-plan.md](../go-live-plan.md) ·
+**آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** **خطة المحافظة على `main@715060a` (DEC-031، OPS-005)** على الفرع
+`arena/828764c2-phone-google` (متفرع من دمج PR #46) · سجل الجلسة:
+[2026-10-28-preservation-plan](sessions/2026-10-28-preservation-plan.md) · السجل السابق:
+[2026-10-28-service-reality-audit](sessions/2026-10-28-service-reality-audit.md) ·
+الخطة: [docs/preservation-plan.md](../preservation-plan.md) · واقع الخدمات: [docs/service-reality.md](../service-reality.md) ·
 المرجع التشغيلي: [deploy/free-always-on/README.md](../../deploy/free-always-on/README.md)
 
-## الطلب الحالي (أعلى أولوية) — «لا خدمة مجرد اسم أو موكب؛ خدمات حقيقية مختبرة ≥95%» (DEC-030، QA-005)
+## الطلب الحالي (أعلى أولوية) — «خطط للمحافظة لما وصلنا له حتى الآن» (DEC-031، OPS-005)
+
+- **ما وصلنا إليه (مدموج في `main@715060a`):** 324/324 اختبارًا (تغطية 85.8/72/84)، MySQL حقيقي 11/11، Pages ✅ `40650636259`،
+  Worker ✅ `40650636104` (`liveReady`، 18/18 + مفاتيح التقاعد)، Release ✅ `40650636330`، 10 خدمات متحققة / 4 متقاعدة في Git /
+  2 بانتظار سرّ مالك (83.3%).
+- **ما نُفِّذ للمحافظة:** `docs/preservation-plan.md` (جرد بالدليل، مخاطر، ضوابط، أسرار، إعادة بناء، إيقاع، مؤشرات)؛
+  `service-reality.yml` يعمل أسبوعيًا (اثنين 06:00 UTC) ويشغّل `scripts/reality-notify.mjs` على `main`: issue واحدة
+  `service-reality` تُفتح/يُعلَّق عليها عند الفشل وتُغلق وحدها عند النجاح؛ CI يفرض أرضية تغطية `npm run test:coverage`
+  (80/65/78) و`COVERAGE_FLOOR` في التدقيق؛ اختبارات `test/reality-notify.test.js` (2) + توسيع `test/service-reality.test.js`.
+- **بنود المالك (لا تُنفَّذ من هنا — 403):** حماية `main` بأسماء الفحوص المذكورة في الخطة §د؛ Watch → Actions أو الاكتفاء
+  بالـissue؛ `CELIA_VOICE_ID` وتوكن Figma؛ قرار PRs #34 (revert — لا يُدمج) و#38/#39؛ Dependabot security updates.
+- **الخطوة التالية:** أول run مجدول (الاثنين القادم) يجب أن يفتح issue صحيحة (83.3%) أو يمرّ بعد السرّين؛ ثم تحديث OPS-005.
+
+## الطلب السابق — «لا خدمة مجرد اسم أو موكب؛ خدمات حقيقية مختبرة ≥95%» (DEC-030، QA-005) — مدموج في PR #46
 
 - **ما نُفِّذ:** `scripts/service-reality.mjs` (`npm run reality`) + `.github/workflows/service-reality.yml` (يعمل عند commit
   يحمل `[reality]` أو `workflow_dispatch` من `main`) + `test/service-reality.test.js` (10) + `test/ai-providers.test.js` (3).
