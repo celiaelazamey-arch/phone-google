@@ -36,7 +36,17 @@
 - إنشاء مشروع التتبع التنفيذي في `Linear` (`55a2e8fd-c1fe-4253-9485-efc0b76cc95e` على فريق `CEL`) و7 مهام مهيكلة (`CEL-5`..`CEL-8` بحالة `Done` و`CEL-9`..`CEL-11` لبنود المالك بحالة `Todo`)، ومجلد `Google Drive` الخاص (`1ZhVmTDGam2i_EixiwI0bGPxbJ4gShOPo`) الذي يضم مستند الخطة في `Google Docs` (`1HEv5hkdaYfGu8akZkR3fFcyis3sJrstF2jwiikQE0PA`) ومصفوفة الـ3 تبويبات في `Google Sheets` (`18cXH45gVKC8QALyvHRAFddW_0EoZXY7gaSXts4yeNhw`) والعرض التنفيذي من 5 شرائح في `Google Slides` (`1MLHKJx0Ukr3DB5jn6dmNUpkQ4_Hv__atDEjnbwRzios`)، ونسخة الخطة في `Dropbox` (`/CeliaOS-Executive-Plan-2026/executive-completion-plan.md`).
 - تشخيص حالة الموصلات القرائية بأمان: `Google Calendar` مضبوط حالياً على `UTC` (بينما التوقيت المحلي للمالك `Africa/Cairo`)، و`Supabase` يضم المشروع `yqzhgogmtscoqejuxplv` (`INACTIVE`, Postgres `17.6`)، و`Vercel` يضم `0` مشاريع، و`Notion` لا يشارك حالياً مع التكامل سوى دليل `People` المُدار من النظام (`restricted_resource`)، مع عدم إرسال أي رسائل عبر `Gmail` (`celiaelazamey@gmail.com`).
 
-## 4. ما لم يُثبت وبقي لقرار المالك
+## 4. المرحلة الثانية في نفس الجلسة — تطبيق النشر الإنتاجي الكامل مجانًا بدون فيزا (`DEC-037`)
 
+1. **التحقق الأولي (`تحقق في البداية`):** فحص قيود البطاقة في المنصات الحية والموصلات (`Render` محجوب ببوابة `1$`، `Vercel AI Gateway` محجوب بـ`403`، `Supabase` متوقف بالخمول `INACTIVE`، بينما `Cloudflare Workers + D1 + GitHub Pages` يعمل حيًّا بلا بطاقة ومع `18/18` سرًّا مربوطة تلقائيًا).
+2. **ترقية `workers/celia-edge/` إلى خادم إنتاجي متكامل فوق Cloudflare D1:**
+   - إنشاء `workers/celia-edge/migrations/0002_runtime.sql` (8 عبارات SQLite idempotent تُضاف إلى `0001_state.sql` ليصبح المجموع 12 عبارة تشمل جداول المستخدمين ورموز Google المشفرة وحالات OAuth وجهات اتصال ورسائل واتساب ومفاتيح منع التكرار).
+   - إنشاء `workers/celia-edge/crypto.js` (`AES-256-GCM` بصيغة `v2.<keyId>` عبر `TOKEN_ENCRYPTION_KEY` أو اشتقاق `HKDF-SHA-256` مع توافق `v1.*`، وتوقيع تذاكر المتصفح، وفحص `X-Hub-Signature-256` الخام).
+   - إنشاء `workers/celia-edge/runtime.js` وربطه بـ`worker.js` لتشغيل جميع أدوات MCP الـ12 (`POST /mcp`)، وربط Google OAuth2 (Gmail / Drive / Calendar / Contacts)، وWebhook واتساب الرسمي وأوامر المالك العربية («اربط جوجل»، «لخص آخر إيميل»، «هات جدولي») والرد الذكي بـGemini.
+   - تحديث `scripts/deploy-cloudflare-edge.mjs` لرفع الوحدات الأربع وتطبيق كل الترحيلات وتمرير إعدادات واتساب الاختيارية، وإضافة `--mode edge` في `scripts/verify-live.mjs` (`npm run verify:edge`) وتشغيله آليًا في `.github/workflows/cloudflare-deploy.yml`، وضبط `CELIA_REAL_SERVICE_URL` في `.github/workflows/pages.yml`، وتوثيق الدليل الكامل في [docs/no-visa-deployment.md](../../no-visa-deployment.md)، والتحقق بجناح `test/edge-full-runtime.test.js` فوق `node:sqlite`.
+
+## 5. ما لم يُثبت وبقي لقرار المالك
+
+- دمج PR `#70` في `main` لينطلق نشر الـWorker المحدّث وتتحقق `verify:edge` على الرابط العام، وإضافة `https://celia-phone-google.celiaelazamey.workers.dev/auth/google/callback` في Google Cloud Console لإتمام ربط `GOOG-001`.
 - تفعيل حماية الفرع `main` في إعدادات GitHub (`Settings → Branches`).
-- قرار المالك بشأن بديل استضافة الخادم الكامل (`HOST-003`) بعد قيد بطاقة Render (`DEC-034`)، وحسم مصير PR `#38`، وربط Google الحي (`GOOG-001`) وMeta WhatsApp الاختياري (`WA-005`) وبيانات `SPDR-002` وسياسات `DATA-004`/`GOV-001`/`REL-001`.
+- قرار المالك بشأن حسم مصير PR `#38`، وتطبيق Meta WhatsApp الاختياري (`WA-005`) وبيانات `SPDR-002` وسياسات `DATA-004`/`GOV-001`/`REL-001` (ويبقى `HOST-003` لخادم حاوية MySQL المستقل خيارًا ثانويًا غير ملزم بعد اكتمال مسار Workers + D1 بلا بطاقة).

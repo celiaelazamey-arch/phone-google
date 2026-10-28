@@ -1,7 +1,30 @@
 import { createStateStore, isD1Bound, probeDurability } from './state.js';
+import {
+  EDGE_MCP_TOOLS,
+  buildEdgeLiveStatus,
+  createEdgeGoogleAuthUrl,
+  disconnectEdgeGoogle,
+  edgeCalendarCreate,
+  edgeCalendarList,
+  edgeContactsSearch,
+  edgeDriveSearch,
+  edgeGmailSearch,
+  edgeWhatsAppConsentUpsert,
+  edgeWhatsAppContactsList,
+  edgeWhatsAppSendText,
+  generateEdgeAiReply,
+  getEdgeGoogleStatus,
+  handleEdgeMcpRpc,
+  handleGoogleOAuthCallback,
+  handleWhatsAppWebhookGet,
+  handleWhatsAppWebhookPost,
+  searchEdgeSkills,
+  verifyEdgeConsentTicket
+} from './runtime.js';
 
 const CRONJOB_ORIGIN = 'https://api.cron-job.org';
 const MAX_BODY_BYTES = 8192;
+const MAX_MCP_BODY_BYTES = 32_768;
 const UPSTREAM_TIMEOUT_MS = 15_000;
 const DEFAULT_ALLOWED_ORIGINS = [
   'https://celiaelazamey-arch.github.io',
@@ -37,6 +60,16 @@ const TRACKED_SECRETS = Object.freeze([
   ['YOUR_CODATA_API_KEY', 'workspace-connector', 'codata']
 ]);
 
+export const EDGE_CAPABILITIES = Object.freeze({
+  mcp: true,
+  mcpToolsCount: EDGE_MCP_TOOLS.length,
+  googleOAuth: true,
+  whatsappWebhook: true,
+  aiReply: true,
+  stateStore: true,
+  cronScheduler: true
+});
+
 function hasSecret(env, name) {
   const val = String(env?.[name] || '').trim();
   return Boolean(val && !/^replace-with-/i.test(val));
@@ -46,17 +79,20 @@ function utf8ByteLength(text) {
   return new TextEncoder().encode(String(text || '')).byteLength;
 }
 
-function constantTimeEqual(a, b) {
+async function constantTimeEqualHashed(a, b) {
+  const strA = String(a || '');
+  const strB = String(b || '');
+  if (!strA || !strB) return false;
   const enc = new TextEncoder();
-  const bytesA = enc.encode(String(a || ''));
-  const bytesB = enc.encode(String(b || ''));
-  if (bytesA.length === 0 || bytesB.length === 0) return false;
-  const maxLen = Math.max(bytesA.length, bytesB.length);
-  let diff = bytesA.length ^ bytesB.length;
-  for (let i = 0; i < maxLen; i += 1) {
-    const byteA = i < bytesA.length ? bytesA[i] : 0;
-    const byteB = bytesB[i % bytesB.length];
-    diff |= byteA ^ byteB;
+  const [digestA, digestB] = await Promise.all([
+    crypto.subtle.digest('SHA-256', enc.encode(strA)),
+    crypto.subtle.digest('SHA-256', enc.encode(strB))
+  ]);
+  const bytesA = new Uint8Array(digestA);
+  const bytesB = new Uint8Array(digestB);
+  let diff = strA.length === strB.length ? 0 : 1;
+  for (let i = 0; i < bytesA.length; i += 1) {
+    diff |= bytesA[i] ^ bytesB[i];
   }
   return diff === 0;
 }
@@ -114,6 +150,22 @@ function methodNotAllowedResponse(allowedMethods, baseHeaders = {}) {
   });
 }
 
+async function readBoundedJson(request, maxBytes = MAX_BODY_BYTES) {
+  const declared = Number(request.headers.get('content-length') || 0);
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    return { ok: false, status: 413, error: 'payload_too_large' };
+  }
+  const raw = await request.text();
+  if (utf8ByteLength(raw) > maxBytes) {
+    return { ok: false, status: 413, error: 'payload_too_large' };
+  }
+  try {
+    return { ok: true, data: raw ? JSON.parse(raw) : {} };
+  } catch {
+    return { ok: false, status: 400, error: 'invalid_json' };
+  }
+}
+
 /** Maps a state-store call to HTTP, including the honest 503 when D1 is not bound. */
 async function stateResult(run) {
   try {
@@ -135,7 +187,7 @@ async function stateResult(run) {
   }
 }
 
-function verifyBearer(request, env) {
+async function verifyBearer(request, env) {
   const expected = String(env?.CELIA_MCP_API_TOKEN || '').trim();
   if (!expected || expected.length < 32) {
     return { ok: false, status: 503, error: 'owner_token_not_configured' };
@@ -145,7 +197,7 @@ function verifyBearer(request, env) {
     return { ok: false, status: 401, error: 'unauthorized' };
   }
   const token = auth.slice(7).trim();
-  if (!constantTimeEqual(token, expected)) {
+  if (!(await constantTimeEqualHashed(token, expected))) {
     return { ok: false, status: 401, error: 'unauthorized' };
   }
   return { ok: true };
@@ -273,8 +325,14 @@ export function validateCronJobPayload(payload, { partial = false } = {}) {
   return { ok: true, job };
 }
 
+function runtimeErrorResponse(error, baseHeaders) {
+  const status = Number.isInteger(error?.status) ? error.status : 500;
+  return jsonResponse({ error: String(error?.message || 'runtime_error') }, status, baseHeaders);
+}
+
 export default {
   async fetch(request, env = {}) {
+    const fetchImpl = typeof env?.__FETCH_IMPL === 'function' ? env.__FETCH_IMPL : globalThis.fetch;
     const baseHeaders = corsHeaders(request, env);
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: baseHeaders });
@@ -285,10 +343,11 @@ export default {
     const release = {
       name: 'celia-phone-google-edge',
       version: String(env.CELIA_VERSION || '0.2.1'),
-      commit: String(env.CELIA_BUILD_SHA || 'main')
+      commit: String(env.CELIA_BUILD_SHA || 'main'),
+      database: { schema: 1 }
     };
 
-    if (pathname === '/' || pathname === '/health' || pathname === '/readyz') {
+    if (pathname === '/' || pathname === '/health' || pathname === '/healthz' || pathname === '/readyz') {
       if (request.method !== 'GET') {
         return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
       }
@@ -298,10 +357,10 @@ export default {
           hasSecret(env, 'CLOUDFLARE_R2_SECRET_ACCESS_KEY') &&
           hasSecret(env, 'CLOUDFLARE_R2_S3_ENDPOINT')
       );
-      // `/health` is a passive liveness probe that never writes to D1 on public traffic; `/readyz` (and `/`)
-      // earn `durable: true` only by writing a fresh token to D1 and reading it back.
+      // `/health` and `/healthz` are passive liveness probes that never write to D1 on public traffic;
+      // `/readyz` (and `/`) earn `durable: true` only by writing a fresh token to D1 and reading it back.
       const durabilityReport =
-        pathname === '/health'
+        pathname === '/health' || pathname === '/healthz'
           ? {
               mode: isD1Bound(env) ? 'd1' : 'cloudflare-edge',
               durable: false,
@@ -321,6 +380,9 @@ export default {
           ok: true,
           ready: true,
           service: 'celia-phone-google-edge',
+          cardFreeHosting: true,
+          fullEdgeRuntimeMounted: true,
+          capabilities: EDGE_CAPABILITIES,
           release,
           storage,
           secretsConfiguredCount: readiness.configuredCount,
@@ -386,9 +448,16 @@ export default {
       return jsonResponse(
         {
           scope: 'cloudflare-edge',
+          cardFreeHosting: true,
+          fullEdgeRuntimeMounted: true,
+          capabilities: EDGE_CAPABILITIES,
           release,
           generatedAt: new Date().toISOString(),
           coreReady: true,
+          storage: {
+            mode: isD1Bound(env) ? 'd1' : 'cloudflare-edge',
+            durable: isD1Bound(env)
+          },
           secretsConfiguredCount: readiness.configuredCount,
           totalSecretsTracked: readiness.totalSecretsTracked,
           r2Configured: Boolean(
@@ -403,17 +472,322 @@ export default {
       );
     }
 
-    // All /api/secrets/*, /api/cron/*, /api/storage/*, /api/state/* and /api/audit routes require the owner token.
-    if (
+    if (pathname === '/api/live') {
+      if (request.method !== 'GET') {
+        return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
+      }
+      const live = await buildEdgeLiveStatus({ env, origin: url.origin, release });
+      return jsonResponse(live, 200, baseHeaders);
+    }
+
+    if (pathname === '/api/skills') {
+      if (request.method !== 'GET') {
+        return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
+      }
+      const skills = await searchEdgeSkills({
+        env,
+        query: url.searchParams.get('q') || '',
+        category: url.searchParams.get('category') || 'all'
+      });
+      return jsonResponse(skills, 200, baseHeaders);
+    }
+
+    // Meta WhatsApp Cloud API Webhook (public route protected by hub.verify_token & raw-bytes HMAC-SHA256).
+    if (pathname === '/webhooks/whatsapp') {
+      if (request.method === 'GET') {
+        return handleWhatsAppWebhookGet({ url, env });
+      }
+      if (request.method === 'POST') {
+        try {
+          const result = await handleWhatsAppWebhookPost({ request, env, origin: url.origin, fetchImpl });
+          return jsonResponse(result.body, result.status, baseHeaders);
+        } catch (err) {
+          return runtimeErrorResponse(err, baseHeaders);
+        }
+      }
+      return methodNotAllowedResponse(['GET', 'POST', 'OPTIONS'], baseHeaders);
+    }
+
+    // Google OAuth2 callback (public route protected by single-use D1 `oauth_states` + state cookie).
+    if (pathname === '/auth/google/callback') {
+      if (request.method !== 'GET') {
+        return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
+      }
+      try {
+        const result = await handleGoogleOAuthCallback({ request, url, env, fetchImpl });
+        if (result.html) {
+          return new Response(result.html, {
+            status: result.status,
+            headers: {
+              ...baseHeaders,
+              'content-type': 'text/html; charset=utf-8',
+              ...(result.clearCookie ? { 'set-cookie': result.clearCookie } : {})
+            }
+          });
+        }
+        return jsonResponse(result.body, result.status, baseHeaders);
+      } catch (err) {
+        return runtimeErrorResponse(err, baseHeaders);
+      }
+    }
+
+    // Google OAuth2 browser start: accepts either Bearer owner token OR a short-lived signed `ticket` query param.
+    if (pathname === '/auth/google') {
+      if (request.method !== 'GET') {
+        return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
+      }
+      const ticket = url.searchParams.get('ticket') || '';
+      let authorizedUserId = 'owner';
+      if (ticket) {
+        const verified = await verifyEdgeConsentTicket(env, ticket);
+        if (!verified.ok) {
+          return jsonResponse({ error: verified.reason }, 401, baseHeaders);
+        }
+        authorizedUserId = verified.userId;
+      } else {
+        const auth = await verifyBearer(request, env);
+        if (!auth.ok) {
+          return jsonResponse({ error: auth.error }, auth.status, baseHeaders);
+        }
+      }
+      try {
+        const consent = await createEdgeGoogleAuthUrl({ env, origin: url.origin, userId: authorizedUserId });
+        return new Response(null, {
+          status: 302,
+          headers: {
+            ...baseHeaders,
+            location: consent.url,
+            'set-cookie': `celia_oauth_state=${encodeURIComponent(consent.state)}; Max-Age=600; Path=/auth/google; HttpOnly; Secure; SameSite=Lax`
+          }
+        });
+      } catch (err) {
+        return runtimeErrorResponse(err, baseHeaders);
+      }
+    }
+
+    // Owner-protected surface: MCP, Google OAuth link & Workspace APIs, WhatsApp REST, AI Reply, Secrets, Cron, State, Audit.
+    const requiresOwnerAuth =
+      pathname === '/mcp' ||
+      pathname === '/auth/google/link' ||
+      pathname.startsWith('/api/google') ||
+      pathname.startsWith('/api/whatsapp') ||
+      pathname.startsWith('/api/ai') ||
       pathname.startsWith('/api/secrets') ||
       pathname.startsWith('/api/cron') ||
       pathname.startsWith('/api/storage') ||
       pathname.startsWith('/api/state') ||
-      pathname.startsWith('/api/audit')
-    ) {
-      const auth = verifyBearer(request, env);
+      pathname.startsWith('/api/audit');
+
+    if (requiresOwnerAuth) {
+      const auth = await verifyBearer(request, env);
       if (!auth.ok) {
         return jsonResponse({ error: auth.error }, auth.status, baseHeaders);
+      }
+    }
+
+    // JSON-RPC 2.0 MCP Server (all 12 official Celia tools over D1 + Gemini + Google + WhatsApp).
+    if (pathname === '/mcp') {
+      if (request.method === 'GET') {
+        return jsonResponse(
+          {
+            service: 'celia-phone-google-mcp',
+            runtime: 'cloudflare-workers-d1',
+            version: release.version,
+            toolsCount: EDGE_MCP_TOOLS.length
+          },
+          200,
+          baseHeaders
+        );
+      }
+      if (request.method === 'POST') {
+        const bodyCheck = await readBoundedJson(request, MAX_MCP_BODY_BYTES);
+        if (!bodyCheck.ok) {
+          return jsonResponse({ error: bodyCheck.error }, bodyCheck.status, baseHeaders);
+        }
+        const rpc = await handleEdgeMcpRpc({
+          body: bodyCheck.data,
+          env,
+          origin: url.origin,
+          release,
+          fetchImpl
+        });
+        if (rpc.status === 202 || rpc.payload === null) {
+          return new Response(null, { status: 202, headers: baseHeaders });
+        }
+        return jsonResponse(rpc.payload, rpc.status, baseHeaders);
+      }
+      return methodNotAllowedResponse(['GET', 'POST', 'OPTIONS'], baseHeaders);
+    }
+
+    if (pathname === '/auth/google/link') {
+      if (request.method !== 'POST' && request.method !== 'GET') {
+        return methodNotAllowedResponse(['GET', 'POST', 'OPTIONS'], baseHeaders);
+      }
+      try {
+        const consent = await createEdgeGoogleAuthUrl({ env, origin: url.origin, userId: 'owner' });
+        return jsonResponse(
+          {
+            ok: true,
+            url: consent.url,
+            redirectUri: consent.redirectUri,
+            expiresAt: consent.expiresAt
+          },
+          200,
+          baseHeaders
+        );
+      } catch (err) {
+        return runtimeErrorResponse(err, baseHeaders);
+      }
+    }
+
+    if (pathname === '/api/google/status') {
+      if (request.method !== 'GET') return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
+      return jsonResponse(await getEdgeGoogleStatus(env), 200, baseHeaders);
+    }
+
+    if (pathname === '/api/google/disconnect') {
+      if (request.method !== 'POST') return methodNotAllowedResponse(['POST', 'OPTIONS'], baseHeaders);
+      try {
+        return jsonResponse(await disconnectEdgeGoogle({ env }), 200, baseHeaders);
+      } catch (err) {
+        return runtimeErrorResponse(err, baseHeaders);
+      }
+    }
+
+    if (pathname === '/api/google/gmail/search') {
+      if (request.method !== 'GET') return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
+      try {
+        return jsonResponse(await edgeGmailSearch({ env, q: url.searchParams.get('q') || '', fetchImpl }), 200, baseHeaders);
+      } catch (err) {
+        return runtimeErrorResponse(err, baseHeaders);
+      }
+    }
+
+    if (pathname === '/api/google/drive/search') {
+      if (request.method !== 'GET') return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
+      try {
+        return jsonResponse(await edgeDriveSearch({ env, q: url.searchParams.get('q') || '', fetchImpl }), 200, baseHeaders);
+      } catch (err) {
+        return runtimeErrorResponse(err, baseHeaders);
+      }
+    }
+
+    if (pathname === '/api/google/calendar/events') {
+      if (request.method === 'GET') {
+        try {
+          return jsonResponse(
+            await edgeCalendarList({ env, days: url.searchParams.get('days') || 7, fetchImpl }),
+            200,
+            baseHeaders
+          );
+        } catch (err) {
+          return runtimeErrorResponse(err, baseHeaders);
+        }
+      }
+      if (request.method === 'POST') {
+        const parsed = await readBoundedJson(request, MAX_BODY_BYTES);
+        if (!parsed.ok) return jsonResponse({ error: parsed.error }, parsed.status, baseHeaders);
+        try {
+          const idem = request.headers.get('idempotency-key') || parsed.data?.idempotencyKey || null;
+          return jsonResponse(
+            await edgeCalendarCreate({
+              env,
+              summary: parsed.data?.summary,
+              start: parsed.data?.start,
+              end: parsed.data?.end,
+              timeZone: parsed.data?.timeZone,
+              idempotencyKey: idem,
+              fetchImpl
+            }),
+            201,
+            baseHeaders
+          );
+        } catch (err) {
+          return runtimeErrorResponse(err, baseHeaders);
+        }
+      }
+      return methodNotAllowedResponse(['GET', 'POST', 'OPTIONS'], baseHeaders);
+    }
+
+    if (pathname === '/api/google/contacts/search') {
+      if (request.method !== 'GET') return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
+      try {
+        return jsonResponse(await edgeContactsSearch({ env, q: url.searchParams.get('q') || '', fetchImpl }), 200, baseHeaders);
+      } catch (err) {
+        return runtimeErrorResponse(err, baseHeaders);
+      }
+    }
+
+    if (pathname === '/api/whatsapp/contacts') {
+      if (request.method !== 'GET') return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
+      try {
+        return jsonResponse(await edgeWhatsAppContactsList({ env }), 200, baseHeaders);
+      } catch (err) {
+        return runtimeErrorResponse(err, baseHeaders);
+      }
+    }
+
+    if (pathname === '/api/whatsapp/consent') {
+      if (request.method !== 'POST') return methodNotAllowedResponse(['POST', 'OPTIONS'], baseHeaders);
+      const parsed = await readBoundedJson(request, MAX_BODY_BYTES);
+      if (!parsed.ok) return jsonResponse({ error: parsed.error }, parsed.status, baseHeaders);
+      try {
+        return jsonResponse(
+          await edgeWhatsAppConsentUpsert({
+            env,
+            phone: parsed.data?.phone,
+            optedIn: parsed.data?.optedIn,
+            aiOptedIn: parsed.data?.aiOptedIn,
+            source: parsed.data?.source
+          }),
+          200,
+          baseHeaders
+        );
+      } catch (err) {
+        return runtimeErrorResponse(err, baseHeaders);
+      }
+    }
+
+    if (pathname === '/api/whatsapp/messages') {
+      if (request.method !== 'POST') return methodNotAllowedResponse(['POST', 'OPTIONS'], baseHeaders);
+      const parsed = await readBoundedJson(request, MAX_BODY_BYTES);
+      if (!parsed.ok) return jsonResponse({ error: parsed.error }, parsed.status, baseHeaders);
+      try {
+        const idem = request.headers.get('idempotency-key') || parsed.data?.idempotencyKey || null;
+        return jsonResponse(
+          await edgeWhatsAppSendText({
+            env,
+            phone: parsed.data?.phone,
+            text: parsed.data?.text,
+            idempotencyKey: idem,
+            fetchImpl
+          }),
+          200,
+          baseHeaders
+        );
+      } catch (err) {
+        return runtimeErrorResponse(err, baseHeaders);
+      }
+    }
+
+    if (pathname === '/api/ai/reply') {
+      if (request.method !== 'POST') return methodNotAllowedResponse(['POST', 'OPTIONS'], baseHeaders);
+      const parsed = await readBoundedJson(request, MAX_BODY_BYTES);
+      if (!parsed.ok) return jsonResponse({ error: parsed.error }, parsed.status, baseHeaders);
+      try {
+        return jsonResponse(
+          await generateEdgeAiReply({
+            env,
+            customerMessage: parsed.data?.customerMessage,
+            provider: parsed.data?.provider || 'auto',
+            businessContext: parsed.data?.businessContext || '',
+            fetchImpl
+          }),
+          200,
+          baseHeaders
+        );
+      } catch (err) {
+        return runtimeErrorResponse(err, baseHeaders);
       }
     }
 
@@ -551,7 +925,7 @@ export default {
 
       let upstreamRes;
       try {
-        upstreamRes = await fetch(`${CRONJOB_ORIGIN}${subPath}`, {
+        upstreamRes = await fetchImpl(`${CRONJOB_ORIGIN}${subPath}`, {
           method: upstreamMethod,
           headers: {
             accept: 'application/json',

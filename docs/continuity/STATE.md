@@ -25,10 +25,20 @@
 4. **سد فجوة التوجيه وفحوص الصفحات والوثائق (`DOC-002`, `QA-005`, `QA-006`, `PLAN-001`):** ربط مسارات `/computer` و`/computer.html` و`/computer-permissions` و`/computer-permissions.html` و`/computer.css` في `src/celia-ui.js`، ورفع فحص `pages.yml` إلى `12/12` مسارًا حيًا، وتحديث `docs/{deployment-profile.json,service-reality.md,plan-100-percent.md,preservation-plan.md}` و`README.md` وإصدار [docs/executive-completion-plan.md](../executive-completion-plan.md)، مع إضافة `test/security-surface-audit.test.js` وتوسيع اختبارات الحافة والكمبيوتر ومخزن المعرفة.
 5. **مزامنة الموصلات الـ11 المتصلة بنطاق خاص للمالك وصفر أسرار:** توثيق وتتبع الخطة التنفيذية عبر مشروع `Linear` (`55a2e8fd-c1fe-4253-9485-efc0b76cc95e` ومهام `CEL-5`..`CEL-11` على فريق `CEL`)، ومجلد `Google Drive` الخاص (`1ZhVmTDGam2i_EixiwI0bGPxbJ4gShOPo` شاملاً مستند `Google Docs` `1HEv5hkdaYfGu8akZkR3fFcyis3sJrstF2jwiikQE0PA` وجدول `Google Sheets` `18cXH45gVKC8QALyvHRAFddW_0EoZXY7gaSXts4yeNhw` وعرض `Google Slides` `1MLHKJx0Ukr3DB5jn6dmNUpkQ4_Hv__atDEjnbwRzios` من 5 شرائح)، ونسخة `Dropbox` (`/CeliaOS-Executive-Plan-2026/executive-completion-plan.md`)، مع التحقق القرائي من `Google Calendar` (`timezone: UTC`) و`Gmail` (`celiaelazamey@gmail.com` دون إرسال أي بريد) و`Supabase` (`yqzhgogmtscoqejuxplv` `INACTIVE`) و`Vercel` (`0` مشاريع) و`Notion` (المتاح للتكامل حالياً هو دليل `People` المُدار من Notion فقط — مشاركة صفحة عادية تتيح إنشاء صفحات فرعية).
 
-### 3. ما يتبقى حصريًا لقرار أو لوحة المالك (لا يُغلق بكود)
+### 3. تطبيق مسار النشر الإنتاجي الكامل مجانًا 100% بدون فيزا (`DEC-037`)
 
-- تفعيل حماية الفرع `main` في إعدادات GitHub (`Settings → Branches` — حالياً `protected: false`).
-- حسم مسار الخادم الخلفي الكامل (`HOST-003`) بعد قيد بطاقة Render (`DEC-034`)، وقرار PR `#38` المفتوح، وربط Google الحي (`GOOG-001`) وتطبيق Meta الاختياري (`WA-005`) وبيانات `SPDR-002` وسياسات `DATA-004`/`GOV-001`/`REL-001`.
+استجابةً لطلب المالك («طبق ما يحتاجه نظامي ليتم نشره مجانا بدون فيزا تحقق في البداية»):
+- **التحقق الأولي:** تأكيد حجب `Render` ببوابة بطاقة `1$` (`DEC-034`) وتوقف `Supabase` المجاني بالخمول (`INACTIVE`) مقابل عمل **Cloudflare Workers + Cloudflare D1 (`celia-edge-state`) + GitHub Pages** حيًّا بلا أي بطاقة دفع ومع `18/18` سرًّا مربوطة آليًا.
+- **التنفيذ الكامل على الحافة + D1 ([docs/no-visa-deployment.md](../no-visa-deployment.md)):**
+  - ترحيل `workers/celia-edge/migrations/0002_runtime.sql` (إجمالي `12` جملة SQL idempotent تشمل `app_users`، `oauth_states`، `google_credentials`، `whatsapp_contacts`، `whatsapp_messages`، `edge_idempotency`).
+  - وحدة التشفير `workers/celia-edge/crypto.js` (`AES-256-GCM` بصيغة `v2.<keyId>` عبر `TOKEN_ENCRYPTION_KEY` أو اشتقاق `HKDF-SHA-256` مع توافق `v1.*`، وتذاكر ربط المتصفح، وHMAC الخام لـMeta).
+  - محرك التشغيل الكامل `workers/celia-edge/runtime.js` المربوط في `worker.js` و`scripts/deploy-cloudflare-edge.mjs`: جميع أدوات MCP الـ12 (`POST /mcp`)، وربط Google OAuth2 + Gmail/Drive/Calendar/Contacts، وWebhook واتساب + أوامر المالك العربية («اربط جوجل»، «لخص آخر إيميل»، «هات جدولي») + رد Gemini الذكي، وبوابة القبول الحية `npm run verify:edge` في `cloudflare-deploy.yml` وربط `CELIA_REAL_SERVICE_URL` في `pages.yml`.
+
+### 4. ما يتبقى حصريًا لقرار أو لوحة المالك (لا يُغلق بكود)
+
+- دمج PR `#70` في `main` لينطلق النشر التلقائي لـCloudflare Edge + D1 (الـ12 أداة كاملة) وGitHub Pages بلا أي بطاقة دفع.
+- إضافة رابط الاستدعاء `https://celia-phone-google.celiaelazamey.workers.dev/auth/google/callback` في Google Cloud Console لإتمام ربط `GOOG-001` الحي، وإضافة أسرار Meta الأربعة عند الرغبة بتشغيل `WA-005`.
+- تفعيل حماية الفرع `main` في إعدادات GitHub (`Settings → Branches` — حالياً `protected: false`)، وقرار PR `#38` المفتوح، وبيانات `SPDR-002` وسياسات `DATA-004`/`GOV-001`/`REL-001` (ويظل `HOST-003` لخادم حاوية MySQL المستقل اختياريًا فقط بعد توفر البديل الكامل على Workers + D1).
 
 ## الطلب السابق — «إتمام دوام D1 الفعلي على الحافة وتنظيف الـPRs المفتوحة»
 

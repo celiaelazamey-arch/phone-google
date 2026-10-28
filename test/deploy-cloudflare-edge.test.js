@@ -140,7 +140,7 @@ test('edge deploy: a failing /readyz probe keeps liveReady false instead of thro
   assert.equal(report.liveReady, false);
 });
 
-test('edge deploy: full D1 migration applies all 4 statements and records live /readyz storage durability', async () => {
+test('edge deploy: full D1 migration applies all 12 statements (0001_state + 0002_runtime) and records live /readyz storage durability', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'celia-edge-ok-'));
   const summaryPath = path.join(directory, 'summary.md');
   const lines = [];
@@ -180,8 +180,8 @@ test('edge deploy: full D1 migration applies all 4 statements and records live /
   assert.equal(report.status, 'deployed');
   assert.equal(report.d1.ok, true);
   assert.equal(report.d1.id, 'db-live-1');
-  assert.equal(report.d1.migrations.statements, 4);
-  assert.equal(queriedStatements.length, 4);
+  assert.equal(report.d1.migrations.statements, 12);
+  assert.equal(queriedStatements.length, 12);
   assert.equal(queriedStatements.some((stmt) => stmt.includes('every statement is')), false);
   assert.equal(report.liveReady, true);
   assert.equal(report.storage?.durable, true);

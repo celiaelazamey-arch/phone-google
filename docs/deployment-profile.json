@@ -26,7 +26,16 @@
     "web": "Render Free, one combined Node web service",
     "database": "Aiven Free MySQL, a dedicated empty database",
     "url": "provider-assigned HTTPS onrender.com subdomain, not yet created",
-    "accountAuthorizationAvailable": false
+    "accountAuthorizationAvailable": false,
+    "cardFreePrimaryRuntime": {
+      "decision": "DEC-037",
+      "guide": "docs/no-visa-deployment.md",
+      "web": "Cloudflare Workers Free (https://celia-phone-google.celiaelazamey.workers.dev) — full MCP 12 tools + Google OAuth2/Workspace + WhatsApp Cloud API + Gemini AI",
+      "database": "Cloudflare D1 Free SQLite (celia-edge-state / f63ccd9f-49b1-4eca-861b-fd478c433518, 12 idempotent statements)",
+      "ui": "GitHub Pages Free (https://celiaelazamey-arch.github.io/phone-google/)",
+      "visaRequired": false,
+      "monthlyCostUsd": 0
+    }
   },
   "publication": {
     "permanentPublicUrl": null,

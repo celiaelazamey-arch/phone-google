@@ -765,3 +765,27 @@
 
 - **الأثر:** تحديث `src/{security,config,google,celia-mcp,celia-ui,ai-providers,secrets-hub}.js`، و`workers/celia-edge/{worker.js,wrangler.toml}`، و`scripts/{deploy-cloudflare-edge,service-reality}.mjs`، و`.github/workflows/pages.yml`، وإضافة `test/security-surface-audit.test.js` وتوسيع اختبارات الحافة وصفحة الكمبيوتر ومخزن المعرفة، وإصدار `docs/executive-completion-plan.md`. **لا تغيير في `schema 1` ولا في الإصدار `0.2.1` ولا في قائمة الأسرار الـ18 الإلزامية.**
 
+## DEC-037 — المسار الإنتاجي الكامل لسيليا مجانًا 100% بدون بطاقة دفع (بدون فيزا) على Cloudflare Workers + Cloudflare D1 + GitHub Pages
+
+- **التاريخ:** 2026-10-28 · **الحالة:** منفَّذ ومُختبر على SQLite الحقيقي وجاهز للنشر التلقائي فور دمج PR `#70` · **المهمة:** `OPS-001`، `SEC-001`، `SEC-005`، `QA-005` · **يعتمد على:** DEC-034, DEC-035, DEC-036
+
+- **السياق:** طلب المالك التحقق أولًا ثم تطبيق كل ما يحتاجه النظام ليُنشَر مجانًا **بدون فيزا (`paymentCardAuthorized: false`)**. أثبت التحقق الميداني:
+  1. `Render` يفرض تفويض بطاقة بقيمة `1$` (`DEC-034`)، و`Vercel AI Gateway` يطلب بطاقة ائتمان (`403`)، و`Hugging Face Docker Spaces` يتطلب خطة مدفوعة.
+  2. مشروع `Supabase Free` (`yqzhgogmtscoqejuxplv`) مجاني بلا بطاقة لكنه متوقف تلقائيًا (`INACTIVE`) بعد الخمول ويستخدم PostgreSQL بدل مخطط المشروع.
+  3. في المقابل، حساب **Cloudflare Workers + Cloudflare D1 (`celia-edge-state` / `f63ccd9f-49b1-4eca-861b-fd478c433518`) + GitHub Pages** يعمل حيًّا بالفعل في حساب المالك مجانًا `0$` بلا أي بطاقة فيزا وبلا نوم (`0 ms cold sleep`) ومع `18/18` سرًّا مربوطة آليًا من GitHub Actions، لكن العامل المنشور لم يكن يضم سوى بوابة حالة مصغّرة دون محرك MCP أو Google OAuth أو WhatsApp Webhook.
+
+- **القرار:**
+  1. **توسيع قاعدة Cloudflare D1 (`workers/celia-edge/migrations/0002_runtime.sql`):** إضافة الجداول الإنتاجية المطابقة لـ`schema 1` (`app_users`، `oauth_states`، `google_credentials`، `whatsapp_contacts`، `whatsapp_messages`، `edge_idempotency` — 8 عبارات idempotent تضاف إلى 4 في `0001_state.sql` = **12 عبارة SQL**) وتطبيقها آليًا عبر `loadAllMigrationsSql()` في `scripts/deploy-cloudflare-edge.mjs`.
+  2. **تشفير رموز OAuth وتوقيع التذاكر وHMAC الخام بمعيار WebCrypto (`workers/celia-edge/crypto.js`):** تشفير وفك تشفير رموز Google بصيغة `v2.<keyId>.*` المربوطة بـAAD عبر `TOKEN_ENCRYPTION_KEY` أو اشتقاق مفتاح معزول بـ`HKDF-SHA-256` من `CELIA_MCP_API_TOKEN` عند غيابه، مع توافق كامل لفك تشفير مغلفات `v1.*` الصادرة عن `src/security.js`، وتذاكر ربط متصفح قصيرة العمر (`10` دقائق)، والتحقق من توقيع Meta `X-Hub-Signature-256` على البايتات الخام بزمن ثابت.
+  3. **تشغيل خادم سيليا الكامل على الحافة (`workers/celia-edge/runtime.js` + `worker.js`):**
+     - **بروتوكول MCP الكامل (`POST /mcp` و`GET /mcp`):** تنفيذ الأدوات الـ12 الرسمية جميعًا بمصادقة `Bearer CELIA_MCP_API_TOKEN`.
+     - **تكامل Google OAuth2 وWorkspace:** `/auth/google`، `/auth/google/link`، `/auth/google/callback` (مع `state` أحادي الاستخدام وتجديد تلقائي لـ`access_token` وسجل تدقيق مشفّر في `edge_audit`)، ومسارات البحث في Gmail وDrive وContacts وأحداث Calendar المحمية بـ`Idempotency-Key`.
+     - **تكامل WhatsApp Cloud API + Gemini AI:** `/webhooks/whatsapp` (التحدي + التوقيع الخام + منع التكرار في D1 + أوامر المالك بالعربية: «اربط جوجل»، «لخص آخر إيميل»، «هات جدولي» + الرد التلقائي للعملاء الموافقين ضمن نافذة الـ24 ساعة عبر `GEMINI_API_KEY` مع بديل محلي آمن)، ومسارات `/api/whatsapp/{contacts,consent,messages}` و`/api/{live,skills,ai/reply}` و`/healthz`.
+  4. **أتمتة النشر والفحص الحيّ وربط الواجهة:**
+     - رفع الوحدات الأربع (`worker.js`، `state.js`، `crypto.js`، `runtime.js`) في `scripts/deploy-cloudflare-edge.mjs` وتمرير متغيرات WhatsApp الاختيارية.
+     - إضافة وضع `--mode edge` في `scripts/verify-live.mjs` وأمر `npm run verify:edge` وتشغيله تلقائيًا بعد كل نشر في `.github/workflows/cloudflare-deploy.yml`، وضبط `CELIA_REAL_SERVICE_URL=https://celia-phone-google.celiaelazamey.workers.dev` أثناء بناء `.github/workflows/pages.yml`.
+     - توثيق المسار الكامل في [docs/no-visa-deployment.md](../no-visa-deployment.md) مع الإبقاء على `render.yaml` و`deploy/free-always-on/README.md` دون مساس للتوافق العقدي.
+
+- **الدليل:** `test/edge-full-runtime.test.js` (6 اختبارات تكامل شاملة فوق محرك `node:sqlite` الحقيقي لـ12 عبارة SQL في D1، وتطابق الأدوات الـ12 مع `MCP_TOOLS`، وتوافق مغلف `v1.*`، وأوامر واتساب العربية، ونجاح `verifyLive --mode edge`).
+
+

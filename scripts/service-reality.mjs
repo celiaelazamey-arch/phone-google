@@ -445,7 +445,10 @@ export function buildProbes({ config, env, fetchImpl = fetch, timeoutMs, publica
         const storageNote = ready.json?.storage?.mode
           ? `; storage ${ready.json.storage.mode} (durable=${Boolean(ready.json.storage.durable)})`
           : '';
-        return { verdict: ok ? 'verified' : 'failed', detail: ok ? `readyz 200, release ${ready.json.release?.version} @ ${String(ready.json.release?.commit || '').slice(0, 7)}${storageNote}` : `readyz ${ready.status}`, latencyMs: ready.latencyMs };
+        const capsNote = ready.json?.capabilities?.mcp
+          ? `; runtime=mcp(${ready.json.capabilities.mcpToolsCount || 12})+oauth+whatsapp`
+          : '';
+        return { verdict: ok ? 'verified' : 'failed', detail: ok ? `readyz 200, release ${ready.json.release?.version} @ ${String(ready.json.release?.commit || '').slice(0, 7)}${storageNote}${capsNote}` : `readyz ${ready.status}`, latencyMs: ready.latencyMs };
       }
     },
     {

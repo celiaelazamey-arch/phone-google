@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { appendFile, readFile } from 'node:fs/promises';
+import { appendFile, readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { applyRetirementsToEnv, flagNameFor, loadServiceRetirements, RETIRABLE_FEATURES } from '../src/service-retirements.js';
@@ -7,7 +7,9 @@ import { applyRetirementsToEnv, flagNameFor, loadServiceRetirements, RETIRABLE_F
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const workerPath = path.join(root, 'workers/celia-edge/worker.js');
 const statePath = path.join(root, 'workers/celia-edge/state.js');
-const migrationPath = path.join(root, 'workers/celia-edge/migrations/0001_state.sql');
+const cryptoPath = path.join(root, 'workers/celia-edge/crypto.js');
+const runtimePath = path.join(root, 'workers/celia-edge/runtime.js');
+const migrationsDir = path.join(root, 'workers/celia-edge/migrations');
 const pkgPath = path.join(root, 'package.json');
 
 const SECRET_KEYS = [
@@ -216,11 +218,52 @@ export function buildWorkerMetadata({ env = process.env, version = '0.2.1', comm
     }
   }
 
+  for (const optionalSecret of [
+    'WHATSAPP_ACCESS_TOKEN',
+    'WHATSAPP_PHONE_NUMBER_ID',
+    'WHATSAPP_APP_SECRET',
+    'WHATSAPP_VERIFY_TOKEN',
+    'TOKEN_ENCRYPTION_KEY'
+  ]) {
+    const val = String(env[optionalSecret] || '').trim();
+    if (val && !/^replace-with-/i.test(val)) {
+      bindings.push({
+        type: 'secret_text',
+        name: optionalSecret,
+        text: val
+      });
+    }
+  }
+
+  for (const [plainName, fallback] of [
+    ['CELIA_TIMEZONE', 'Africa/Cairo'],
+    ['WHATSAPP_API_VERSION', 'v26.0'],
+    ['WHATSAPP_AUTO_REPLY_ENABLED', 'false'],
+    ['APP_OWNER_EMAIL', ''],
+    ['GOOGLE_REDIRECT_URI', ''],
+    ['TOKEN_ENCRYPTION_KEY_ID', '']
+  ]) {
+    const val = String(env[plainName] ?? fallback).trim();
+    if (val) {
+      bindings.push({
+        type: 'plain_text',
+        name: plainName,
+        text: val
+      });
+    }
+  }
+
   return {
     main_module: 'worker.js',
     compatibility_date: '2025-01-01',
     bindings
   };
+}
+
+export async function loadAllMigrationsSql(dir = migrationsDir) {
+  const entries = (await readdir(dir)).filter((name) => name.endsWith('.sql')).sort();
+  const chunks = await Promise.all(entries.map((name) => readFile(path.join(dir, name), 'utf8')));
+  return chunks.join('\n\n');
 }
 
 export async function main({ argv = process.argv.slice(2), env = process.env, fetchImpl = fetch, retryDelayMs = 400, log = console.log } = {}) {
@@ -230,9 +273,13 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
   const dryRun = argv.includes('--dry-run') || !accountId || !apiToken;
 
   const pkg = JSON.parse(await readFile(pkgPath, 'utf8'));
-  const workerSource = await readFile(workerPath, 'utf8');
-  const stateSource = await readFile(statePath, 'utf8');
-  const migrationSql = await readFile(migrationPath, 'utf8');
+  const [workerSource, stateSource, cryptoSource, runtimeSource, migrationSql] = await Promise.all([
+    readFile(workerPath, 'utf8'),
+    readFile(statePath, 'utf8'),
+    readFile(cryptoPath, 'utf8'),
+    readFile(runtimePath, 'utf8'),
+    loadAllMigrationsSql()
+  ]);
   const commit = String(env.GITHUB_SHA || 'main').trim();
 
   let d1 = { ok: false, reason: 'dry_run' };
@@ -267,7 +314,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
     commit,
     d1DatabaseId: d1BindingId
   });
-  const secretBindingsCount = metadata.bindings.filter((b) => b.type === 'secret_text').length;
+  const secretBindingsCount = metadata.bindings.filter((b) => b.type === 'secret_text' && SECRET_KEYS.includes(b.name)).length;
 
   if (dryRun) {
     const report = {
@@ -300,11 +347,21 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
       new Blob([workerSource], { type: 'application/javascript+module' }),
       'worker.js'
     );
-    // `worker.js` imports `./state.js`; both modules must travel in the same upload or the deploy fails.
+    // `worker.js` imports `./state.js` and `./runtime.js` (which imports `./crypto.js`); all modules must travel in the same upload.
     form.append(
       'state.js',
       new Blob([stateSource], { type: 'application/javascript+module' }),
       'state.js'
+    );
+    form.append(
+      'crypto.js',
+      new Blob([cryptoSource], { type: 'application/javascript+module' }),
+      'crypto.js'
+    );
+    form.append(
+      'runtime.js',
+      new Blob([runtimeSource], { type: 'application/javascript+module' }),
+      'runtime.js'
     );
     return form;
   };

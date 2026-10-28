@@ -19,7 +19,7 @@
 و**4 خدمات متقاعدة صراحةً في Git** لأن اعتماداتها ميتة أو تتطلب بطاقة (AI Gateway، DeepSeek، AgentRouter، R2 —
 `docs/deployment-profile.json → serviceRetirements`، قابلة للتراجع). إعادة التدقيق: commit يحمل `[reality]` أو `npm run reality`.
 
-**خطة المحافظة والخطة التنفيذية لسد الفجوات:** [docs/preservation-plan.md](docs/preservation-plan.md) (`DEC-031`) و[docs/executive-completion-plan.md](docs/executive-completion-plan.md) (`DEC-036`) — جرد بالدليل، تدقيق
+**خطة المحافظة والخطة التنفيذية والنشر بدون فيزا:** [docs/no-visa-deployment.md](docs/no-visa-deployment.md) (`DEC-037` — **النشر الكامل مجانًا 100% بدون فيزا على Cloudflare Workers + D1 + GitHub Pages**: أدوات MCP الـ12 + Google OAuth2 + WhatsApp Webhook + Gemini)، و[docs/preservation-plan.md](docs/preservation-plan.md) (`DEC-031`)، و[docs/executive-completion-plan.md](docs/executive-completion-plan.md) (`DEC-036`) — جرد بالدليل، تدقيق
 أسبوعي آلي مع issue تتبّع واحدة تصل إلى المالك وتُغلق وحدها، أرضية تغطية مفروضة في CI (`89/71/82`)، تدوير مفاتيح تشفير `AES-256-GCM` (`v2.<keyId>`)، تحصين SSRF وترويسات الحافة، وفصل صريح لبنود لوحة المالك المتبقية.
 
 ## خطة 2026 والاستمرارية بين الجلسات

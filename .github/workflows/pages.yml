@@ -39,6 +39,8 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - name: Build current source
         if: inputs.release_tag == ''
+        env:
+          CELIA_REAL_SERVICE_URL: https://celia-phone-google.celiaelazamey.workers.dev
         run: npm run check && npm run release:check && npm test && npm run build:pages
       - name: Restore an existing, attested release (upgrade or rollback)
         if: inputs.release_tag != ''
