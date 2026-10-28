@@ -1,8 +1,15 @@
 # الحالة الحالية — ابدأ من هنا
 
-**آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** **تنفيذ الخطة التنفيذية لإكمال البنود الناقصة وسد الفجوات والثغرات ومزامنة الموصلات الـ11 (DEC-036، PLAN-001، SEC-001/002/003/005، DOC-002، QA-005/006، OPS-005)**
+> **تحديث 2026-10-28 (جلسة النشر الحي — `DEC-038`):** دُمج PR `#70` في `main` (`0ebf8cac86faaea67e6f969c273549b2f8b33220`)
+> فانتشر محرك الحافة الكامل بلا فيزا تلقائيًا وتحقق حيًّا على الرابط العام في التشغيلة **`40719074394`**
+> (`verify:live --mode edge` PASS، D1 بـ12 عبارة SQL، `durable: true`، 18/18 سرًا) مع Pages `40719074587` (12/12 مسارًا)
+> والإصدار `40719074453` والجودة `40719074375`. المتبقي حصرًا لإجراء المالك: رابط استدعاء Google، وأسرار Meta الاختيارية.
+> انظر [سجل جلسة النشر الحي](sessions/2026-10-28-live-edge-publication.md). ما يلي توثيق الجلسة السابقة كما كُتب، محفوظ بلا حذف.
+
+**آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** **تنفيذ الخطة التنفيذية لإكمال البنود الناقصة وسد الفجوات والثغرات ومزامنة الموصلات الـ11 (DEC-036، PLAN-001، SEC-001/002/003/005، DOC-002، QA-005/006، OPS-005)** — أُنجزت ودُمجت في `main` عبر PR `#70`، ثم تلاها نشر حي موثّق في `DEC-038`
 على الفرع `arena/83dde20a-phone-google` (متفرع من `main@44532f4552c20b8fb51402e14cff8fc15356b97c` بعد دمج PR `#69`) ·
 سجل الجلسة الحالي: [2026-10-28-executive-gap-closure](sessions/2026-10-28-executive-gap-closure.md) ·
+سجل النشر الحي: [2026-10-28-live-edge-publication](sessions/2026-10-28-live-edge-publication.md) ·
 الخطة التنفيذية الشاملة: [docs/executive-completion-plan.md](../executive-completion-plan.md) ·
 سجل D1 السابق: [2026-10-28-edge-d1-sql-splitter-and-pr-hygiene](sessions/2026-10-28-edge-d1-sql-splitter-and-pr-hygiene.md) ·
 الدليل: [docs/computer-permissions](../computer-permissions/README.md) · صفحة الكمبيوتر:
@@ -36,8 +43,13 @@
 
 ### 4. ما يتبقى حصريًا لقرار أو لوحة المالك (لا يُغلق بكود)
 
-- دمج PR `#70` في `main` لينطلق النشر التلقائي لـCloudflare Edge + D1 (الـ12 أداة كاملة) وGitHub Pages بلا أي بطاقة دفع.
-- إضافة رابط الاستدعاء `https://celia-phone-google.celiaelazamey.workers.dev/auth/google/callback` في Google Cloud Console لإتمام ربط `GOOG-001` الحي، وإضافة أسرار Meta الأربعة عند الرغبة بتشغيل `WA-005`.
+- ~~دمج PR `#70` في `main` لينطلق النشر التلقائي لـCloudflare Edge + D1 (الـ12 أداة كاملة) وGitHub Pages بلا أي بطاقة دفع.~~
+  **✅ أُنجز في 2026-10-28:** دُمج PR `#70` في `main@0ebf8cac86faaea67e6f969c273549b2f8b33220`، وانتشر محرك الحافة الكامل
+  (MCP 12 أداة + Google OAuth2 + WhatsApp + Gemini) على `https://celia-phone-google.celiaelazamey.workers.dev` مع قاعدة D1
+  الدائمة، ونجحت بوابة `verify:live --mode edge` داخل التشغيلة `40719074394`، و Pages `40719074587` (12/12 مسارًا) والإصدار
+  `40719074453` والجودة `40719074375` كلها خضراء (`DEC-038`).
+- إضافة رابط الاستدعاء `https://celia-phone-google.celiaelazamey.workers.dev/auth/google/callback` في Google Cloud Console لإتمام ربط `GOOG-001` الحي، وإضافة أسرار Meta الأربعة عند الرغبة بتشغيل `WA-005` (خطوتان بلا أي بطاقة؛ التفاصيل في [docs/no-visa-deployment.md](../no-visa-deployment.md)).
+- مضيف حاويات مجاني بلا بطاقة لمحرك Express + MySQL الكامل (`HOST-003`) ونسخة إنتاجية مستعادة (`DATA-001`) — القراران الوحيدان اللذان لا يزالان يمنعان اكتمال الركنين 6 و8 من [docs/plan-100-percent.md](../plan-100-percent.md).
 - تفعيل حماية الفرع `main` في إعدادات GitHub (`Settings → Branches` — حالياً `protected: false`)، وقرار PR `#38` المفتوح، وبيانات `SPDR-002` وسياسات `DATA-004`/`GOV-001`/`REL-001` (ويظل `HOST-003` لخادم حاوية MySQL المستقل اختياريًا فقط بعد توفر البديل الكامل على Workers + D1).
 
 ## الطلب السابق — «إتمام دوام D1 الفعلي على الحافة وتنظيف الـPRs المفتوحة»
@@ -668,17 +680,34 @@ pass/warn/fail، بلا شبكة وبلا طباعة أي سر) · `npm run goog
 
 ## الخطوة التالية بالضبط
 
-1. **المالك — إنشاء ما لا يمكن إنشاؤه من الجلسة (بلا بطاقة):** Render → New → Blueprint من `render.yaml`
+> **مُحدَّث 2026-10-28 بعد النشر الحي (`DEC-038`):** البندان 1 و2 أدناه يخصّان **محرك Express + MySQL الكامل فقط** ولم
+> يَعُدا عائقًا أمام النظام العامل: محرك الحافة الكامل منشور ومتحقَّق حيًّا بلا فيزا على
+> `https://celia-phone-google.celiaelazamey.workers.dev` (التشغيلة `40719074394`). الخطوة التالية الفعلية الآن هي
+> البندان 0.أ و0.ب (إجراءان في لوحات المالك، بلا أي بطاقة).
+
+0. **المالك — الإجراءان المتبقيان للمسار بلا فيزا (دقيقتان، بلا بطاقة):**
+   1. **ربط Google (`GOOG-001`):** Google Cloud Console → Credentials → عميل OAuth → إضافة Authorized redirect URI
+      `https://celia-phone-google.celiaelazamey.workers.dev/auth/google/callback`، ثم
+      `curl -sS -X POST https://celia-phone-google.celiaelazamey.workers.dev/auth/google/link -H "Authorization: Bearer $CELIA_MCP_API_TOKEN"`
+      وفتح الرابط والموافقة. دليل الإغلاق: `GET /api/google/status` → `"connected": true`.
+   2. **واتساب (`WA-005`, اختياري):** webhook تطبيق Meta على
+      `https://celia-phone-google.celiaelazamey.workers.dev/webhooks/whatsapp` + الأسرار الأربعة `WHATSAPP_*` في GitHub
+      Secrets، ثم إعادة تشغيل workflow **Deploy (Cloudflare Edge)**. دليل الإغلاق: تحدي Meta ينجح + `whatsapp_cloud_api verified`.
+
+1. **المالك — المحرك الكامل بـMySQL (مؤجَّل، لا يعطّل النظام):** Render → New → Blueprint من `render.yaml`
    (تير Free) ← Aiven MySQL Free ← إدخال الستة `MYSQL_*` في Render Environment ← نسخ رابط الخدمة إلى `APP_BASE_URL`
-   وإعادة النشر ← `npm run migrate -- --apply` مرة واحدة.
-2. **المالك — تشغيل النشر المتحقَّق:** GitHub → Settings → Secrets and variables → Actions:
+   وإعادة النشر ← `npm run migrate -- --apply` مرة واحدة. **محجوب حاليًا ببوابة تفويض بطاقة `1$` (`DEC-034`)؛ البديل هو
+   اختيار مضيف حاويات مجاني بلا بطاقة لحاوية GHCR.**
+2. **المالك — تشغيل النشر المتحقَّق (خاص بمحرك MySQL):** GitHub → Settings → Secrets and variables → Actions:
    Variable `CELIA_LIVE_URL=https://<service>.onrender.com` · Secrets `RENDER_API_KEY` و`RENDER_SERVICE_ID`
    (أو `RENDER_DEPLOY_HOOK_URL`). أول push على `main` بعدها يشغّل `deploy-render.yml` تلقائيًا (نشر ← انتظار `/readyz`
-   بـ`storage.mode=mysql` ← `verify:live --expect-commit` ← keep-alive كل 10 دقائق). **حينها فقط** يُكتب «منشور».
+   بـ`storage.mode=mysql` ← `verify:live --expect-commit` ← keep-alive كل 10 دقائق). **حينها فقط** يُكتب «منشور» عن
+   المحرك الكامل؛ أما محرك الحافة فمنشور بالفعل بدليل `verify:live --mode edge` في `40719074394`.
 3. **بعد النشر:** لصق تقرير `verify:live` في سجل جلسة جديد وتحديث HOST-003 إلى «متحقق»، ثم `backup:verify` (DATA-001)،
    ثم موصل WhatsApp في الـoutbox (AGENT-002)، ثم AI-001/AI-002 بعد قرار المزوّد
    ([docs/go-live-plan.md](../go-live-plan.md)).
-4. **أي ادعاء «يعمل»:** شغّل `[reality]` واقرأ annotations الـrun؛ لا يُستبدل بدليل محلي أو محاكاة.
+4. **أي ادعاء «يعمل»:** شغّل `[reality]` واقرأ annotations الـrun؛ ولا يُكتب «منشور» عن أي نشر إلا ببوابة حية ناجحة على
+   الرابط العام داخل نفس التشغيلة (`verify:live` للمحرك الكامل، و`verify:live --mode edge` للحافة)؛ لا يُستبدل بدليل محلي أو محاكاة.
 
 ## التحقق من الحفظ في الجلسة التالية
 

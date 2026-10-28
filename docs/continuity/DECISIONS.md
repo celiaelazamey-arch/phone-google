@@ -788,4 +788,27 @@
 
 - **الدليل:** `test/edge-full-runtime.test.js` (6 اختبارات تكامل شاملة فوق محرك `node:sqlite` الحقيقي لـ12 عبارة SQL في D1، وتطابق الأدوات الـ12 مع `MCP_TOOLS`، وتوافق مغلف `v1.*`، وأوامر واتساب العربية، ونجاح `verifyLive --mode edge`).
 
+## DEC-038 — النشر الحي الفعلي للمسار بلا فيزا على `main@0ebf8ca` (دمج PR `#70` + بوابة القبول الحية `verify:edge`)
+
+- **التاريخ:** 2026-10-28 · **الحالة:** **منشور ومتحقَّق حيًّا على رابط عام** · **المهمة:** `OPS-001`، `QA-005`، `DOC-002` · **يعتمد على:** DEC-035, DEC-036, DEC-037
+
+- **السياق:** ظلّت كل من `docs/deployment-profile.json` و`README.md` و`docs/plan-100-percent.md` حتى دمج PR `#70` تقول إن «الخادم الكامل غير منشور، و`verify:live` لم ينجح قط على رابط عام»، وأن رفع هذا القيد رهن حسابات Render/Aiven المحجوبة ببطاقة (`DEC-034`). بعد أن طلب المالك النشر الكامل (`انشر بالكامل`) صار هذا الوصف غير مطابق للواقع، فكان لزامًا تحويل `DEC-037` من «جاهز للنشر» إلى «منشور ومتحقَّق» وتصحيح كل عبارة تصف الحالة الحية.
+
+- **القرار:**
+  1. **دمج PR `#70` في `main` (`0ebf8cac86faaea67e6f969c273549b2f8b33220`)** ليطلق الأنبوب الكامل تلقائيًا: `cloudflare-deploy.yml` (ترحيل D1 + رفع الوحدات الأربع + بوابة `verify:edge`) و`pages.yml` (بناء الواجهة وربطها بالخادم الحي عبر `CELIA_REAL_SERVICE_URL`) و`release.yml` (إصدار موثّق OIDC) و`celia-mcp.yml` (الجودة).
+  2. **اعتماد بوابة القبول الحية مصدرًا وحيدًا لادعاء «النشر»:** لا يُكتب «منشور» إلا بـ`verify:live --mode edge` ناجح داخل نفس تشغيلة النشر على الرابط العام، ثم بمسابر ما بعد النشر (`/health`، `/readyz`، `/version`، وبوابة `401` على `/mcp`).
+  3. **تصحيح ملف الحالة النشرية (`docs/deployment-profile.json`):** `permanentPublicUrl` صار رابط العامل، و`externallyVerified: true` مع حقل جديد `edgeFullRuntime` يحمل الأدلة الحية، و`remainingOwnerAction` حُدِّث ليعكس أن الإجراء المتبقي حصرًا هو رابط الاستدعاء في Google Console وأسرار Meta الاختيارية — لا إنشاء حسابات مدفوعة.
+  4. **الإبقاء على `HOST-003` مفتوحًا:** العامل بلا فيزا يغطي الـ12 أداة وGoogle وواتساب وGemini، لكنه **ليس** خادم Express + MySQL؛ فأي ادعاء عن المحرك الكامل أو عن استعادة نسخة إنتاج (`DATA-001`) يظل غير مثبت حتى يتوفر مضيف حاويات بلا بطاقة.
+
+- **الدليل (قياسي، من خارج البيئة المحلية):**
+  - تشغيلة `Deploy (Cloudflare Edge)` **`40719074394`**: `status: "deployed"`، `liveReady: true`، `secretBindingsInjected: 18/18`، `version 0.2.1`، `commit 0ebf8cac86faaea67e6f969c273549b2f8b33220`، `d1: { ok: true, id: "f63ccd9f-49b1-4eca-861b-fd478c433518", name: "celia-edge-state", migrations: { statements: 12 } }`، و`storage: { mode: "d1", durable: true, latencyMs: 50 }`، مع نجاح خطوة `verify:live --mode edge`.
+  - تشغيلة `Deploy (GitHub Pages)` **`40719074587`**: **12/12** مسارًا حيًّا يعيد `HTTP 200` على `https://celiaelazamey-arch.github.io/phone-google`.
+  - تشغيلة `Publish verified release` **`40719074453`**: `Release v0.2.1 synced and OIDC-attested` على نفس الالتزام.
+  - تشغيلة `Celia quality & resilience` **`40719074375`**: كل الوظائف خضراء على `main`.
+  - مسابر حية بعد النشر: `/health` → `fullEdgeRuntimeMounted: true`، `capabilities.mcpToolsCount: 12`، `secretsConfiguredCount: 18`؛ `/readyz` → `durable: true`, `latencyMs: 423`؛ `/version` → `0ebf8cac…`؛ `/mcp` بلا رمز → `401 {"error":"unauthorized"}`.
+
+- **البدائل المرفوضة:** (أ) اعتبار نجاح اختبارات التكامل المحلية (`test/edge-full-runtime.test.js`) دليل نشر — محظور بلا فحص حي على الرابط العام؛ (ب) تعطيل بوابة `verify:edge` لتسريع النشر؛ (ج) إغلاق `HOST-003` أو `DATA-001` استنادًا إلى نجاح الحافة — مرفوض لأنهما يخصّان محرك MySQL الكامل والنسخ الإنتاجية.
+
+- **الأثر:** تحديث `docs/deployment-profile.json`، `README.md`، `docs/no-visa-deployment.md`، `docs/plan-100-percent.md`، `docs/continuity/STATE.md`، `CHANGELOG.md`، وإنشاء سجل الجلسة `docs/continuity/sessions/2026-10-28-live-edge-publication.md`. **لا تغيير في الكود ولا في `schema 1` ولا في الإصدار `0.2.1` ولا في الأسرار الـ18.**
+
 
