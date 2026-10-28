@@ -235,4 +235,25 @@ test('migrations run statement by statement and skip comments', async () => {
   assert.equal(posted.length, 2);
   assert.match(posted[0], /CREATE TABLE IF NOT EXISTS a/);
   assert.match(posted[1], /CREATE INDEX IF NOT EXISTS i/);
+  assert.equal(posted[0].startsWith('--'), false, 'comment lines are stripped before the statement is sent');
+});
+
+test('an already-existing table is not a failure, and a real rejection names the statement', async () => {
+  const already = async () =>
+    new Response(JSON.stringify({ success: false, errors: [{ message: 'table edge_state already exists: SQLITE_ERROR' }] }), {
+      status: 400,
+      headers: { 'content-type': 'application/json' }
+    });
+  const tolerated = await applyMigrations({ accountId: 'acc', apiToken: 'tok', databaseId: 'db-1', sql: 'CREATE TABLE IF NOT EXISTS a (id TEXT);', fetchImpl: already });
+  assert.equal(tolerated.statements, 1);
+
+  const rejected = async () =>
+    new Response(JSON.stringify({ success: false, errors: [{ message: 'near "CREAT": syntax error' }] }), {
+      status: 400,
+      headers: { 'content-type': 'application/json' }
+    });
+  await assert.rejects(
+    () => applyMigrations({ accountId: 'acc', apiToken: 'tok', databaseId: 'db-1', sql: 'CREAT TABLE a (id TEXT);', fetchImpl: rejected }),
+    /d1_migration_failed:statement_1:near "CREAT": syntax error/
+  );
 });
