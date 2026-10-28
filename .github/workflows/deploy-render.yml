@@ -1,0 +1,72 @@
+name: Render full backend (free) — deploy & verify
+
+# Activates by itself the moment the owner adds the Render inputs; until then every run ends green with a
+# `not-configured` notice that names exactly what is missing. Nothing here creates accounts or costs money.
+#
+#   Repository VARIABLE  CELIA_LIVE_URL          https://<service>.onrender.com  (Render → service → URL)
+#   Repository SECRET    RENDER_API_KEY          Render → Account Settings → API Keys
+#   Repository SECRET    RENDER_SERVICE_ID       srv-… (Render → service → Settings → Service ID)
+#   — or instead of the two above —
+#   Repository SECRET    RENDER_DEPLOY_HOOK_URL  Render → service → Settings → Deploy Hook
+#   (already present)    CELIA_MCP_API_TOKEN, CELIAOS_CRONJOB_ORG_API_KEY — owner checks + 10-minute keep-alive
+#
+# The service itself is created once from `render.yaml` (Render Dashboard → New → Blueprint) with the six
+# Aiven MySQL inputs typed into Render — never into GitHub. See deploy/free-always-on/README.md §4.
+
+on:
+  workflow_run:
+    workflows: ['Celia quality & resilience']
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      plan_only:
+        description: 'Only print the plan and the missing inputs (no network calls)'
+        type: boolean
+        default: false
+      skip_keepalive:
+        description: 'Do not create/update the cron-job.org keep-alive job'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: render-full-backend
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Trigger Render deploy, wait, run verify:live, ensure keep-alive
+        env:
+          CELIA_LIVE_URL: ${{ vars.CELIA_LIVE_URL }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          CELIA_MCP_API_TOKEN: ${{ secrets.CELIA_MCP_API_TOKEN }}
+          CELIAOS_CRONJOB_ORG_API_KEY: ${{ secrets.CELIAOS_CRONJOB_ORG_API_KEY }}
+          CELIA_EXPECT_COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: >
+          node scripts/deploy-render.mjs
+          ${{ inputs.plan_only && '--plan' || '' }}
+          ${{ inputs.skip_keepalive && '--skip-keepalive' || '' }}
+      - name: Upload live acceptance report (token-free by construction)
+        if: always() && hashFiles('.validation-artifacts/live-acceptance.json') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: live-acceptance-${{ github.event.workflow_run.head_sha || github.sha }}
+          path: .validation-artifacts/live-acceptance.json
+          retention-days: 30

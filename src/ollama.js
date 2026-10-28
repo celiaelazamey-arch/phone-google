@@ -144,7 +144,7 @@ export async function generateCeliaReply({ config, customerMessage, provider, bu
     return { reply, provider: serviceName, model, degraded: failures.length > 0, policyEnforced: true };
   };
   const callAiGateway = () => callOpenAiProvider('ai_gateway', config.aiGateway, 'google/gemini-2.5-flash');
-  const callDeepseek = () => callOpenAiProvider('deepseek', config.deepseek, 'deepseek-chat');
+  const callDeepseek = () => callOpenAiProvider('deepseek', config.deepseek, 'deepseek-flash');
   const callAgentRouter = () => callOpenAiProvider('agentrouter', config.agentrouter, 'deepseek-chat');
   const callOllama = async () => {
     const model = config.ollama?.model || 'qwen2.5:7b';

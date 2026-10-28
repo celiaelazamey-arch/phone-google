@@ -2,6 +2,7 @@
 import { appendFile, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { applyRetirementsToEnv, flagNameFor, loadServiceRetirements, RETIRABLE_FEATURES } from '../src/service-retirements.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const workerPath = path.join(root, 'workers/celia-edge/worker.js');
@@ -28,8 +29,15 @@ const SECRET_KEYS = [
   'YOUR_CODATA_API_KEY'
 ];
 
-export function buildWorkerMetadata({ env = process.env, version = '0.2.1', commit = 'main' } = {}) {
+export function buildWorkerMetadata({ env = process.env, version = '0.2.1', commit = 'main', retirements = loadServiceRetirements() } = {}) {
+  // Retired services (DEC-030) travel to the edge as plain_text flags so /api/secrets/status tells the same truth as Git.
+  const effectiveEnv = applyRetirementsToEnv(env, retirements);
+  const retirementBindings = RETIRABLE_FEATURES
+    .map((feature) => flagNameFor(feature))
+    .filter((flag) => String(effectiveEnv[flag] || '').trim() === 'true')
+    .map((flag) => ({ type: 'plain_text', name: flag, text: 'true' }));
   const bindings = [
+    ...retirementBindings,
     {
       type: 'plain_text',
       name: 'ALLOWED_ORIGIN',

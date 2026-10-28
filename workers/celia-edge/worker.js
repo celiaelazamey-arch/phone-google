@@ -88,22 +88,31 @@ function verifyBearer(request, env) {
   return { ok: true };
 }
 
+function isRetired(env, boundary) {
+  return String(env?.[`CELIA_DISABLE_${String(boundary).toUpperCase()}`] || '').trim() === 'true';
+}
+
 export function buildEdgeSecretsReport(env = {}) {
   const secrets = TRACKED_SECRETS.map(([secretName, role, boundary]) => ({
     secretName,
     configured: hasSecret(env, secretName),
+    // `retired` = the owner explicitly took this service out of the product (CELIA_DISABLE_<boundary>=true,
+    // DEC-030): a present-but-dead credential is reported as such instead of parading as capability.
+    retired: isRetired(env, boundary),
     role,
     boundary
   }));
   const configuredCount = secrets.filter((item) => item.configured).length;
+  const retired = [...new Set(secrets.filter((item) => item.retired).map((item) => item.boundary))];
   return {
     scope: 'cloudflare-edge',
     totalSecretsTracked: secrets.length,
     configuredCount,
     allConfigured: configuredCount === secrets.length,
+    retiredServices: retired,
     secrets,
     notice:
-      'Sanitized readiness only: secret values are never exposed or logged, and configuration is not proof of live external connectivity.'
+      'Sanitized readiness only: secret values are never exposed or logged, and configuration is not proof of live external connectivity. Services listed in retiredServices are explicitly out of the product (see docs/service-reality.md).'
   };
 }
 
@@ -155,11 +164,15 @@ export default {
           release,
           storage: {
             mode: 'cloudflare-edge',
-            durable: Boolean(
+            // Presence of R2 credentials is not durability: nothing here writes or reads R2, so this
+            // endpoint never claims `durable: true`. The service-reality audit exercises R2 for real.
+            durable: false,
+            r2CredentialsPresent: Boolean(
               hasSecret(env, 'CLOUDFLARE_R2_ACCESS_KEY_ID') &&
                 hasSecret(env, 'CLOUDFLARE_R2_SECRET_ACCESS_KEY') &&
                 hasSecret(env, 'CLOUDFLARE_R2_S3_ENDPOINT')
-            )
+            ),
+            durabilityVerifiedBy: 'service-reality audit (not this endpoint)'
           },
           secretsConfiguredCount: readiness.configuredCount,
           totalSecretsTracked: readiness.totalSecretsTracked

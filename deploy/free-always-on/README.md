@@ -70,8 +70,10 @@
    - بعد أول إقلاع ناجح اضبط `CELIA_DB_INITIALIZE=false` (التهيئة ليست أداة ترحيل).
    - ثم: `npm run migrate -- --apply` من جهازك على نفس القاعدة لإنشاء جداول `agent_*` (ما لم تفعلها
      `CELIA_DB_INITIALIZE=empty-only` لأول قاعدة فارغة).
-3. **المُشغّل الدوري:** أضف نداء `GET https://<service>.onrender.com/readyz` كل 10 دقائق. الهدف الوحيد منع
-   النوم؛ ولا يُستخدم لادعاء uptime.
+3. **المُشغّل الدوري:** نداء `GET https://<service>.onrender.com/readyz` كل 10 دقائق. الهدف الوحيد منع
+   النوم؛ ولا يُستخدم لادعاء uptime. **لم يعد يدويًا:** الـworkflow في §4.2 ينشئه/يحدّثه بنفسه على
+   cron-job.org بالسر الموجود `CELIAOS_CRONJOB_ORG_API_KEY` (عنوان الوظيفة `celia-keepalive:<host>`) بعد أول
+   `verify:live` ناجح — إن فضّلت إنشاءه بيدك فهذا هو المقصود.
 4. **الواجهة الثابتة:** إما Pages أو Render Static Site. **تحديث 27 أكتوبر (مساءً):** `GET /repos/…/pages`
    يعيد الآن موقعًا موجودًا بـ`build_type: workflow` و`https_enforced: true` على
    `https://celiaelazamey-arch.github.io/phone-google/` — أي أن التفعيل (Settings → Pages → Source: GitHub
@@ -80,7 +82,9 @@
    بعد التفعيل هي ما سينشر الموقع فعلًا؛ تحقق بعدها من الرابط بنفسك. عند البناء مرّر
    `CELIA_REAL_SERVICE_URL=https://<service>.onrender.com` ليظهر الرابط في `/api/deployment/hosting`
    بحالة **`verified:false`** حتى تتحقق بنفسك.
-5. **التحقق (الخطوة التي تُغلق المهمة):** نفّذ قائمة §5 بيدك. حتى ذلك الحين تبقى الحالة `not-verified`.
+5. **التحقق (الخطوة التي تُغلق المهمة):** نفّذ قائمة §5 بيدك — أو دع `deploy-render.yml` (§4.2) يشغّل
+   `verify:live` على الرابط العام عند كل دمج ويرفع التقرير كـartifact؛ البنود `manual` في §5 تبقى عليك.
+   حتى ذلك الحين تبقى الحالة `not-verified`.
 
 ### 4.1 جدول المتغيّرات (مطابق لـ`render.yaml` — اختبار يفشل عند أي انحراف)
 
@@ -106,6 +110,34 @@
 تُسوّي العملية الصاعدة النوايا المهجورة `unknown` بلا إرسال وتستأنف التشغيلات المركونة من آخر خطوة مؤكدة.
 بدونه (الافتراضي `false`) يبقى كل تشغيل انقطع أثناء النوم بانتظار إنسان. **المتغيّرات الاختيارية للمزوّدين** (Gemini/DeepSeek/
 Figma/ElevenLabs/Coda/WhatsApp) موجودة في التصميم بـ`sync: false` ولا تُملأ إلا عند الرغبة بتشغيلها.
+
+### 4.2 الأتمتة بعد النقرتين (`deploy-render.yml` + `scripts/deploy-render.mjs`) — DEC-028
+
+أسرار المستودع الثمانية عشر كلها موصولة (Worker 18/18، مسابر CI، `check:secrets`) لكن **لا سرّ منها يمنح مضيف
+Node ولا قاعدة MySQL** — هذان حسابان ينشئهما المالك (الخطوتان 1 و2). ما بعدهما صار آليًا:
+
+| ما تضيفه في GitHub (Settings → Secrets and variables → Actions) | النوع | من أين |
+|---|---|---|
+| `CELIA_LIVE_URL` | **Variable** | رابط الخدمة في Render: `https://<service>.onrender.com` |
+| `RENDER_API_KEY` + `RENDER_SERVICE_ID` | Secret | Render → Account Settings → API Keys، وService ID (`srv-…`) من Settings الخدمة |
+| أو بدلًا منهما `RENDER_DEPLOY_HOOK_URL` | Secret | Render → الخدمة → Settings → Deploy Hook |
+
+ما يفعله الـworkflow (`on: workflow_run` بعد نجاح «Celia quality & resilience» على `main`، أو يدويًا):
+
+1. إن غاب أي مدخل أعلاه ينتهي **أخضر** بإشعار `Render Live Status: not-configured` يسمّي الناقص حرفيًا — لا
+   يدّعي نشرًا ولا يفشل CI.
+2. يطلق نشرًا على Render (`POST /v1/services/{id}/deploys` أو الـhook)، وينتظر حتى `live` أو حتى يعيد `/version`
+   نفس الـcommit (مهلة 20 دقيقة).
+3. يشغّل `npm run verify:live -- --url $CELIA_LIVE_URL --expect-commit <sha>` مع `CELIA_MCP_API_TOKEN` من البيئة
+   (الفحوص المالكة `ready_durable` و`agent_status` و`restart_persistence` و`approval_reconcile_roundtrip` تدخل تلقائيًا)،
+   ويرفع `.validation-artifacts/live-acceptance.json` كـartifact (السكربت يرفض كتابة تقرير يحوي الرمز).
+4. بعد PASS فقط: ينشئ/يحدّث وظيفة cron-job.org `celia-keepalive:<host>` على `/readyz` كل 10 دقائق بالسر
+   `CELIAOS_CRONJOB_ORG_API_KEY` (idempotent بعنوان الوظيفة).
+5. أي فشل في النشر أو التحقق يُسقط التشغيلة بإشعار `::error` منقّح من كل الأسرار. `render.yaml` يبقى
+   `autoDeployTrigger: off` فلا ينشر Render شيئًا لم يجتز CI.
+
+ما **لا** يفعله: لا ينشئ خدمة Render ولا قاعدة Aiven ولا يضيف بطاقة، ولا يضع `MYSQL_*` أو `TOKEN_ENCRYPTION_KEY`
+في GitHub (اختبار `test/deploy-render.test.js` يفشل إن ظهرت)، ولا يشغّل الوضع التجريبي بلا MySQL.
 
 ## 5. قبول قابل للقياس (لا يُغلق بأي شيء أقل)
 
@@ -149,3 +181,10 @@ CELIA_MCP_API_TOKEN=… npm run verify:live -- --url https://<service>.onrender.
 لا حساب ولا نشر ولا ترحيل على قاعدة حقيقية ولا مفتاح تشفير ولا بطاقة. تفعيل Pages حدث من جهة المالك
 (القسم 4 البند 4) لكن أول نشر فعلي لم يحدث بعد ولم يُتحقق من الرابط. الملفات والاختبارات والدليل جاهزة؛
 الخطوة الحاسمة تحتاج نقرة المالك، ثم `npm run verify:live` لتحويل القائمة إلى دليل.
+
+## الخدمات المتقاعدة في التصميم (DEC-030)
+
+`render.yaml` يضبط افتراضيًا `CELIA_DISABLE_AI_GATEWAY`، `CELIA_DISABLE_DEEPSEEK`، `CELIA_DISABLE_AGENTROUTER`،
+`CELIA_DISABLE_CLOUDFLARE_R2` على `'true'` لأن تدقيق الواقع (`docs/service-reality.md`) أثبت أن اعتماداتها ميتة أو تتطلب
+بطاقة. المصدر: `docs/deployment-profile.json → serviceRetirements`. لا تقلبها إلى `'false'` إلا بعد إصلاح الحساب وتشغيلة
+`[reality]` خضراء لتلك الخدمة.
