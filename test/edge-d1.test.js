@@ -2,10 +2,16 @@
 // after a fresh token survives a write-and-read-back, and every state write leaves a verifiable hash chain.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { DatabaseSync } from 'node:sqlite';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import worker from '../workers/celia-edge/worker.js';
 import { createStateStore, probeDurability, verifyAuditChain } from '../workers/celia-edge/state.js';
-import { applyMigrations, buildWorkerMetadata, ensureD1Database } from '../scripts/deploy-cloudflare-edge.mjs';
+import { applyMigrations, buildWorkerMetadata, ensureD1Database, splitSqlStatements } from '../scripts/deploy-cloudflare-edge.mjs';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const OWNER_TOKEN = 'test-owner-token-'.padEnd(48, 'x');
 
@@ -256,4 +262,121 @@ test('an already-existing table is not a failure, and a real rejection names the
     () => applyMigrations({ accountId: 'acc', apiToken: 'tok', databaseId: 'db-1', sql: 'CREAT TABLE a (id TEXT);', fetchImpl: rejected }),
     /d1_migration_failed:statement_1:near "CREAT": syntax error/
   );
+
+  const itemRejected = async () =>
+    new Response(JSON.stringify({ success: true, result: [{ success: false, error: 'SQLITE_ERROR: syntax error' }] }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' }
+    });
+  await assert.rejects(
+    () => applyMigrations({ accountId: 'acc', apiToken: 'tok', databaseId: 'db-1', sql: 'SELECT 1;', fetchImpl: itemRejected }),
+    /d1_migration_failed:statement_1:SQLITE_ERROR: syntax error/
+  );
+});
+
+test('splitSqlStatements ignores semicolons inside -- comments, /* */ comments and quoted literals', () => {
+  const sql = [
+    '-- Applied through the D1 query API; every statement is',
+    '-- idempotent; even with multiple; semicolons.',
+    'CREATE TABLE t (',
+    '  id TEXT PRIMARY KEY, -- inline comment; must not split here',
+    "  note TEXT DEFAULT 'semi;colon -- not a comment ''escaped''; ok',",
+    '  /* block comment; across',
+    '     lines; still ignored */',
+    '  "weird;col" INTEGER DEFAULT 0',
+    ');',
+    'CREATE INDEX idx_t ON t (`id`);'
+  ].join('\n');
+
+  const statements = splitSqlStatements(sql);
+  assert.equal(statements.length, 2);
+  assert.match(statements[0], /^CREATE TABLE t/);
+  assert.equal(statements[0].includes('every statement is'), false);
+  assert.equal(statements[0].includes('must not split here'), false);
+  assert.equal(statements[0].includes('still ignored'), false);
+  assert.match(statements[0], /'semi;colon -- not a comment ''escaped''; ok'/);
+  assert.match(statements[0], /"weird;col" INTEGER DEFAULT 0/);
+  assert.equal(statements[1], 'CREATE INDEX idx_t ON t (`id`)');
+});
+
+test('real 0001_state.sql migrates cleanly on real SQLite and powers worker /readyz, /api/state and /api/audit', async () => {
+  const migrationSql = await readFile(path.join(ROOT, 'workers/celia-edge/migrations/0001_state.sql'), 'utf8');
+  const sqlite = new DatabaseSync(':memory:');
+
+  const d1QueryFetch = async (_url, init = {}) => {
+    const { sql, params } = JSON.parse(init.body);
+    assert.deepEqual(params, []);
+    try {
+      sqlite.exec(sql);
+      return new Response(JSON.stringify({ success: true, result: [{ success: true, results: [] }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      });
+    } catch (error) {
+      return new Response(
+        JSON.stringify({ success: false, errors: [{ code: 7500, message: `${error.message}: SQLITE_ERROR` }] }),
+        { status: 400, headers: { 'content-type': 'application/json' } }
+      );
+    }
+  };
+
+  const firstRun = await applyMigrations({ accountId: 'acc', apiToken: 'tok', databaseId: 'db-real', sql: migrationSql, fetchImpl: d1QueryFetch });
+  assert.equal(firstRun.statements, 4);
+
+  // Re-running on an already-migrated database must stay 100% idempotent.
+  const secondRun = await applyMigrations({ accountId: 'acc', apiToken: 'tok', databaseId: 'db-real', sql: migrationSql, fetchImpl: d1QueryFetch });
+  assert.equal(secondRun.statements, 4);
+
+  const realD1Binding = {
+    prepare(sql) {
+      let bound = [];
+      const stmt = sqlite.prepare(sql);
+      const wrapper = {
+        bind(...args) {
+          bound = args;
+          return wrapper;
+        },
+        async run() {
+          stmt.run(...bound);
+          return { success: true };
+        },
+        async first() {
+          return stmt.get(...bound) ?? null;
+        },
+        async all() {
+          return { results: stmt.all(...bound) };
+        }
+      };
+      return wrapper;
+    }
+  };
+
+  const env = { DB: realD1Binding, CELIA_MCP_API_TOKEN: OWNER_TOKEN };
+  const headers = { authorization: `Bearer ${OWNER_TOKEN}` };
+
+  const ready = await worker.fetch(new Request('https://edge.test/readyz'), env);
+  const readyBody = await ready.json();
+  assert.equal(readyBody.storage.durable, true);
+  assert.equal(readyBody.storage.mode, 'd1');
+
+  const put1 = await worker.fetch(new Request('https://edge.test/api/state/mode', { method: 'PUT', headers, body: JSON.stringify({ value: 'cautious' }) }), env);
+  assert.equal(put1.status, 200);
+  assert.equal((await put1.json()).revision, 1);
+
+  const put2 = await worker.fetch(new Request('https://edge.test/api/state/mode', { method: 'PUT', headers, body: JSON.stringify({ value: 'verified' }) }), env);
+  assert.equal(put2.status, 200);
+  assert.equal((await put2.json()).revision, 2);
+
+  const getMode = await worker.fetch(new Request('https://edge.test/api/state/mode', { headers }), env);
+  assert.equal((await getMode.json()).value, 'verified');
+
+  const listed = await worker.fetch(new Request('https://edge.test/api/state', { headers }), env);
+  assert.equal((await listed.json()).count, 1);
+
+  const audit = await worker.fetch(new Request('https://edge.test/api/audit', { headers }), env);
+  const auditBody = await audit.json();
+  assert.equal(auditBody.count, 2);
+  assert.equal(auditBody.chain.ok, true);
+
+  sqlite.close();
 });
