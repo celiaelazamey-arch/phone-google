@@ -129,6 +129,45 @@ test('probes classify a fake Cloudflare/R2/Google/edge world without touching th
   for (const value of ['cf-token-value', 'GOCSPX-secret-value', 'o'.repeat(48)]) assert.ok(!JSON.stringify(results).includes(value) && !markdown.includes(value), `${value} leaked`);
 });
 
+test('failure diagnostics name the broken secret (402 balance, wrong voice id, unreachable R2 host) without leaking values', async () => {
+  const env = { DEEPSEEK_API_KEY: 'sk-deepseek-value', ELEVENLABS_API_KEY: 'xi-key-value', CELIA_VOICE_ID: 'voiceXYZ', CLOUDFLARE_ACCOUNT_ID: 'acc1', CLOUDFLARE_R2_ACCESS_KEY_ID: 'AKID', CLOUDFLARE_R2_SECRET_ACCESS_KEY: 'r2-secret-value-77' };
+  const config = {
+    gemini: {}, aiGateway: {}, agentrouter: {}, figma: {}, codata: {}, cronjob: {}, cloudflare: { accountId: 'acc1' },
+    deepseek: { apiKey: env.DEEPSEEK_API_KEY, baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
+    elevenlabs: { apiKey: env.ELEVENLABS_API_KEY, voiceId: 'voiceXYZ', baseUrl: 'https://api.elevenlabs.io/v1' },
+    cloudflareR2: { accessKeyId: 'AKID', secretAccessKey: 'r2-secret-value-77', s3Endpoint: 'https://typo-host.example.net' }
+  };
+  const fetchImpl = async (url, init = {}) => {
+    const target = String(url);
+    const reply = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+    if (target === 'https://api.deepseek.com/v1/models') return reply(200, { data: [{ id: 'deepseek-chat' }, { id: 'deepseek-reasoner' }] });
+    if (target === 'https://api.elevenlabs.io/v1/user') return reply(200, { subscription: { tier: 'free' } });
+    if (target === 'https://api.elevenlabs.io/v1/voices') return reply(200, { voices: [{ voice_id: 'other1' }, { voice_id: 'other2' }] });
+    if (target.startsWith('https://typo-host.example.net/')) throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ENOTFOUND' } });
+    if (target.startsWith('https://acc1.r2.cloudflarestorage.com/')) return new Response('<Error><Code>InvalidAccessKeyId</Code></Error>', { status: 403, headers: { 'content-type': 'application/xml' } });
+    throw new Error(`unexpected ${target}`);
+  };
+  const upstream = (service, status) => Object.assign(new Error(`${service} API rejected the request (${status})`), { upstreamStatus: status, code: 'UPSTREAM_ERROR' });
+  const modules = {
+    generateCeliaReply: async ({ provider }) => { throw upstream(provider, 402); },
+    probeCeliaVoice: async () => { throw upstream('elevenlabs', 400); },
+    fetchFigmaProfile: async () => ({}), getCodataStatus: async () => ({}), getCronjobStatus: async () => ({}), planDeployment: () => ({ ok: false, missing: ['x'] })
+  };
+  const probes = buildProbes({ config, env, fetchImpl, timeoutMs: 5000, publication: {}, version: '0.2.1', modules }).filter((probe) => ['deepseek', 'elevenlabs', 'cloudflare_r2'].includes(probe.id));
+  const results = await runProbes(probes, { env, timeoutMs: 5000 });
+  const byId = Object.fromEntries(results.map((entry) => [entry.id, entry]));
+  assert.equal(byId.deepseek.verdict, 'failed');
+  assert.match(byId.deepseek.detail, /payment required \/ no balance \(402\)/);
+  assert.match(byId.deepseek.detail, /\/models 200 \(2 models, e\.g\. deepseek-chat, deepseek-reasoner\)/);
+  assert.equal(byId.elevenlabs.verdict, 'failed');
+  assert.match(byId.elevenlabs.detail, /API key valid \(\/user 200\)/);
+  assert.match(byId.elevenlabs.detail, /2 voices visible, configured voice id NOT among them/);
+  assert.equal(byId.cloudflare_r2.verdict, 'failed');
+  assert.match(byId.cloudflare_r2.detail, /unreachable \(ENOTFOUND\)/);
+  assert.match(byId.cloudflare_r2.detail, /canonical endpoint derived from CLOUDFLARE_ACCOUNT_ID answers \(failed: /);
+  for (const value of ['sk-deepseek-value', 'xi-key-value', 'r2-secret-value-77']) assert.ok(!JSON.stringify(results).includes(value), `${value} leaked`);
+});
+
 test('service-reality workflow wires all 18 secrets, a real MySQL service, and never a Render/MySQL production credential', () => {
   const workflow = fs.readFileSync(path.join(root, '.github/workflows/service-reality.yml'), 'utf8');
   for (const name of ['AGENETROUTERAPI_KEY', 'AI_GATEWAY_API_KEY', 'CELIAOS_CRONJOB_ORG_API_KEY', 'CELIA_MCP_API_TOKEN', 'CELIA_VOICE_ID', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_R2_ACCESS_KEY_ID', 'CLOUDFLARE_R2_S3_ENDPOINT', 'CLOUDFLARE_R2_SECRET_ACCESS_KEY', 'DEEPSEEK_API_KEY', 'ELEVENLABS_API_KEY', 'FIGMA_ACCESS_TOKEN', 'GEMINI_API_KEY', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'PHONE_NUMBER', 'YOUR_CODATA_API_KEY']) {

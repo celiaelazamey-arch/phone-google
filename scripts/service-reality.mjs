@@ -146,12 +146,28 @@ async function probeJson(fetchImpl, url, init, timeoutMs) {
 export function buildProbes({ config, env, fetchImpl = fetch, timeoutMs, publication, version, modules }) {
   const { generateCeliaReply, probeCeliaVoice, fetchFigmaProfile, getCodataStatus, getCronjobStatus, planDeployment } = modules;
   const synthetic = 'مرحبا، كيف أتواصل مع موظف؟';
+  const upstreamMeaning = { 401: 'credential rejected (401)', 402: 'authenticated but payment required / no balance (402)', 403: 'forbidden (403) — key invalid for this endpoint or plan', 404: 'endpoint or model not found (404)', 429: 'rate limited or quota exhausted (429) — key accepted' };
+  const listModels = async (cfg) => {
+    if (!cfg?.baseUrl) return null;
+    try {
+      const models = await probeJson(fetchImpl, `${cfg.baseUrl}/models`, { headers: { accept: 'application/json', authorization: `Bearer ${cfg.apiKey}` } }, timeoutMs);
+      const ids = (Array.isArray(models.json?.data) ? models.json.data : []).map((entry) => String(entry?.id || '')).filter(Boolean);
+      return models.status === 200 ? `/models 200 (${ids.length} models${ids.length ? `, e.g. ${ids.slice(0, 4).join(', ')}` : ''})` : `/models ${models.status}`;
+    } catch (error) { return `/models unreachable (${error?.cause?.code || error?.name || 'error'})`; }
+  };
   const aiProbe = (id, cfg) => async () => {
     if (!cfg?.apiKey) return { verdict: 'not-configured', detail: 'API key absent' };
     const started = Date.now();
-    const result = await generateCeliaReply({ config, customerMessage: synthetic, provider: id });
-    const ok = result?.provider === id && typeof result.reply === 'string' && result.reply.trim().length > 0;
-    return { verdict: ok ? 'verified' : 'failed', detail: ok ? `model ${result.model} answered (content not logged)` : `provider returned ${result?.provider || 'nothing'}`, latencyMs: Date.now() - started };
+    try {
+      const result = await generateCeliaReply({ config, customerMessage: synthetic, provider: id });
+      const ok = result?.provider === id && typeof result.reply === 'string' && result.reply.trim().length > 0;
+      return { verdict: ok ? 'verified' : 'failed', detail: ok ? `model ${result.model} answered (content not logged)` : `provider returned ${result?.provider || 'nothing'}`, latencyMs: Date.now() - started };
+    } catch (error) {
+      const upstream = Number(error?.upstreamStatus);
+      const meaning = upstreamMeaning[upstream] || (upstream ? `upstream ${upstream}` : String(error?.message || error?.code || 'error').slice(0, 200));
+      const diagnostics = id === 'gemini' ? null : await listModels(cfg);
+      return { verdict: 'failed', detail: [`model ${cfg.model}: ${meaning}`, diagnostics].filter(Boolean).join('; '), latencyMs: Date.now() - started };
+    }
   };
   const workerUrl = publication.edgeUrl?.replace(/\/+$/, '');
   const pagesUrl = publication.staticSiteUrl?.replace(/\/+$/, '');
@@ -167,8 +183,19 @@ export function buildProbes({ config, env, fetchImpl = fetch, timeoutMs, publica
         if (!config.elevenlabs?.apiKey) return { verdict: 'not-configured', detail: 'API key absent' };
         if (!config.elevenlabs?.voiceId) return { verdict: 'failed', detail: 'CELIA_VOICE_ID missing or malformed' };
         const started = Date.now();
-        const voice = await probeCeliaVoice({ config, timeoutMs });
-        return { verdict: voice.reachable ? 'verified' : 'failed', detail: voice.reachable ? `voice found (category ${voice.category || 'n/a'})` : 'voice not reachable', latencyMs: Date.now() - started };
+        try {
+          const voice = await probeCeliaVoice({ config, timeoutMs });
+          return { verdict: voice.reachable ? 'verified' : 'failed', detail: voice.reachable ? `voice found (category ${voice.category || 'n/a'})` : 'voice not reachable', latencyMs: Date.now() - started };
+        } catch (error) {
+          // Split "key is wrong" from "voice id is wrong" so the owner fixes the right secret.
+          const headers = { accept: 'application/json', 'xi-api-key': config.elevenlabs.apiKey };
+          const user = await probeJson(fetchImpl, `${config.elevenlabs.baseUrl}/user`, { headers }, timeoutMs).catch(() => ({ status: 0 }));
+          const voices = await probeJson(fetchImpl, `${config.elevenlabs.baseUrl}/voices`, { headers }, timeoutMs).catch(() => ({ status: 0 }));
+          const ids = (Array.isArray(voices.json?.voices) ? voices.json.voices : []).map((entry) => String(entry?.voice_id || ''));
+          const keyValid = user.status === 200;
+          const detail = `GET /voices/{CELIA_VOICE_ID} → ${error?.upstreamStatus || error?.message || 'error'}; API key ${keyValid ? 'valid (/user 200)' : `rejected (/user ${user.status})`}; ${voices.status === 200 ? `${ids.length} voices visible, configured voice id ${ids.includes(config.elevenlabs.voiceId) ? 'listed' : 'NOT among them'}` : `/voices ${voices.status}`}`;
+          return { verdict: 'failed', detail, latencyMs: Date.now() - started };
+        }
       }
     },
     {
@@ -229,13 +256,29 @@ export function buildProbes({ config, env, fetchImpl = fetch, timeoutMs, publica
         const r2 = config.cloudflareR2 || {};
         if (!r2.accessKeyId || !r2.secretAccessKey) return { verdict: 'not-configured', detail: 'access key / secret absent' };
         if (!r2.s3Endpoint) return { verdict: 'failed', detail: r2.rawEndpointConfigured ? 'CLOUDFLARE_R2_S3_ENDPOINT malformed' : 'CLOUDFLARE_R2_S3_ENDPOINT absent' };
-        const url = `${r2.s3Endpoint.replace(/\/+$/, '')}/`;
-        const signed = signAwsV4({ method: 'GET', url, headers: { 'x-amz-content-sha256': EMPTY_SHA256 }, region: 'auto', service: 's3', accessKeyId: r2.accessKeyId, secretAccessKey: r2.secretAccessKey });
-        const { host, ...requestHeaders } = signed.headers;
+        const listBuckets = async (endpoint) => {
+          const url = `${endpoint.replace(/\/+$/, '')}/`;
+          const signed = signAwsV4({ method: 'GET', url, headers: { 'x-amz-content-sha256': EMPTY_SHA256 }, region: 'auto', service: 's3', accessKeyId: r2.accessKeyId, secretAccessKey: r2.secretAccessKey });
+          const { host, ...requestHeaders } = signed.headers;
+          const response = await fetchImpl(url, { method: 'GET', headers: requestHeaders, signal: withTimeout(timeoutMs) });
+          return classifyS3Response(response.status, await response.text());
+        };
         const started = Date.now();
-        const response = await fetchImpl(url, { method: 'GET', headers: requestHeaders, signal: withTimeout(timeoutMs) });
-        const body = await response.text();
-        return { ...classifyS3Response(response.status, body), latencyMs: Date.now() - started };
+        try {
+          return { ...(await listBuckets(r2.s3Endpoint)), latencyMs: Date.now() - started };
+        } catch (error) {
+          const cause = error?.cause?.code || error?.cause?.message || error?.name || 'error';
+          const configuredHost = new URL(r2.s3Endpoint).host;
+          const canonical = config.cloudflare?.accountId ? `https://${config.cloudflare.accountId}.r2.cloudflarestorage.com` : null;
+          let hint = '';
+          if (canonical && new URL(canonical).host !== configuredHost) {
+            try {
+              const alt = await listBuckets(canonical);
+              hint = `; canonical endpoint derived from CLOUDFLARE_ACCOUNT_ID answers (${alt.verdict}: ${alt.detail}) — fix CLOUDFLARE_R2_S3_ENDPOINT to https://<account-id>.r2.cloudflarestorage.com`;
+            } catch (altError) { hint = `; canonical endpoint also unreachable (${altError?.cause?.code || altError?.name || 'error'})`; }
+          }
+          return { verdict: 'failed', detail: `configured endpoint host unreachable (${cause})${hint}`, latencyMs: Date.now() - started };
+        }
       }
     },
     {
@@ -346,7 +389,8 @@ export async function runProbes(probes, { env, timeoutMs }) {
       results.push({ id: probe.id, label: probe.label, category: probe.category, secret: probe.secret, verdict: result.verdict, detail: sanitize(result.detail, env), latencyMs: result.latencyMs ?? Date.now() - started });
     } catch (error) {
       const status = Number.isInteger(error?.status) ? error.status : null;
-      results.push({ id: probe.id, label: probe.label, category: probe.category, secret: probe.secret, verdict: 'failed', detail: sanitize(`${error?.code || error?.name || 'error'}${status ? ` ${status}` : ''}: ${String(error?.message || '').slice(0, 160)}`, env), latencyMs: Date.now() - started });
+      const cause = error?.cause?.code ? ` [${error.cause.code}]` : '';
+      results.push({ id: probe.id, label: probe.label, category: probe.category, secret: probe.secret, verdict: 'failed', detail: sanitize(`${error?.code || error?.name || 'error'}${status ? ` ${status}` : ''}${cause}: ${String(error?.message || '').slice(0, 160)}`, env), latencyMs: Date.now() - started });
     }
   }
   return results;

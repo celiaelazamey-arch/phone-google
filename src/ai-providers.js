@@ -225,11 +225,20 @@ export async function generateOpenAiCompatibleReply({
 
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new UpstreamError(serviceName, response.status);
-  const content = result?.choices?.[0]?.message?.content;
+  const choice = result?.choices?.[0];
+  const content = choice?.message?.content;
   const text = (Array.isArray(content)
     ? content.map((part) => (typeof part === 'string' ? part : part?.text || '')).join('')
     : String(content || '')
   ).trim();
-  if (!text) throw new Error(`${serviceName} returned no usable reply`);
+  if (!text) {
+    // Say *why* nothing usable came back (never echoes the key or the model output itself).
+    const reasons = [];
+    if (result?.error) reasons.push(`provider error: ${String(result.error.message || result.error.code || result.error).slice(0, 120)}`);
+    if (choice?.finish_reason) reasons.push(`finish_reason=${choice.finish_reason}`);
+    if (choice?.message?.reasoning_content || choice?.message?.reasoning) reasons.push('reasoning-only output — raise max_tokens or pick a non-reasoning model');
+    if (!choice) reasons.push('no choices in response');
+    throw new Error(`${serviceName} returned no usable reply${reasons.length ? ` (${reasons.join('; ')})` : ''}`);
+  }
   return text.slice(0, 1000);
 }

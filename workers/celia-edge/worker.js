@@ -155,11 +155,15 @@ export default {
           release,
           storage: {
             mode: 'cloudflare-edge',
-            durable: Boolean(
+            // Presence of R2 credentials is not durability: nothing here writes or reads R2, so this
+            // endpoint never claims `durable: true`. The service-reality audit exercises R2 for real.
+            durable: false,
+            r2CredentialsPresent: Boolean(
               hasSecret(env, 'CLOUDFLARE_R2_ACCESS_KEY_ID') &&
                 hasSecret(env, 'CLOUDFLARE_R2_SECRET_ACCESS_KEY') &&
                 hasSecret(env, 'CLOUDFLARE_R2_S3_ENDPOINT')
-            )
+            ),
+            durabilityVerifiedBy: 'service-reality audit (not this endpoint)'
           },
           secretsConfiguredCount: readiness.configuredCount,
           totalSecretsTracked: readiness.totalSecretsTracked
