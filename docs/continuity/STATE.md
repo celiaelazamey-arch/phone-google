@@ -1,25 +1,39 @@
 # الحالة الحالية — ابدأ من هنا
 
-**آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** **طبقة حماية Copilot + مخططها البصري (AGENT-005)** على الفرع
-`arena/9946d4aa-phone-google` (من `main@be2710b`) · سجل الجلسة:
-[2026-10-28-copilot-mcp-bridge](sessions/2026-10-28-copilot-mcp-bridge.md) · الدليل: [docs/copilot-mcp](../copilot-mcp/README.md) ·
-خطة 100%: [docs/plan-100-percent.md](../plan-100-percent.md) · واقع الخدمات: [docs/service-reality.md](../service-reality.md)
+**آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** **تحقق `CELIA_VOICE_ID` حيًّا + حصار النشر المجاني** ·
+الفرع `arena/0deef5d8-phone-google` (من `main@8dc3c0e`) · سجل الجلسة:
+[2026-10-28-voice-verified-deploy-blocked](sessions/2026-10-28-voice-verified-deploy-blocked.md) ·
+واقع الخدمات: [docs/service-reality.md](../service-reality.md) · خطة 100%: [docs/plan-100-percent.md](../plan-100-percent.md) ·
+دليل Copilot: [docs/copilot-mcp](../copilot-mcp/README.md)
 
-## الطلب الحالي (أعلى أولوية) — «مخطط بصري لمعمارية طبقة حماية Copilot، تحقق من 100%» (AGENT-005)
+## الطلب الحالي (أعلى أولوية) — «تحقق `CELIA_VOICE_ID` + تنفيذ النشر المجاني بمعدل 100% نجاح»
 
-- **لماذا جسر لا إعداد JSON:** Copilot يستدعي أدوات MCP المفعّلة **دون موافقة لكل استدعاء**، فالقيد يوضع في شيفرة أمام
-  الخادم. `scripts/celia-copilot-mcp-bridge.mjs` (stdio أمام `src/celia-mcp.js`) يفرض أربع بوابات: قائمة سماح بأربع أدوات
-  قراءة، `readOnlyHint` مفروض من الجسر، قدرات `tools` فقط (رفض prompts/resources)، وتنقية نتائج مع حجب أي قيمة سرّية.
-- **الفرق عن الحزمة السابقة:** الجسر والإعداد صارا **داخل Git** ولهما اختبارات؛ والاختبار الحاسم صار E2E على **الخادم
-  الحقيقي** (16 أداة) لا على خادم اصطناعي — وهو ما كشف أن الخادم لا يُعلن `celia_secrets_status` إلا بـ
-  `CELIA_EXTENDED_MCP_TOOLS`، فأصبح الجسر يضبطها ويُفلتر بعدها.
-- **المخطط:** `docs/copilot-mcp/architecture.svg` (+ `.html` وMermaid) مُولَّد من ثوابت السياسة نفسها عبر
-  `npm run copilot:diagram`، و`--check` يفشل عند أي قدم أو تجاوز نصي (`lintLayout`).
-- **التحقق على `d324be1`:** `Celia quality & resilience` ✅ `40678857568` · تدقيق `40678857684`: **401/401**، تغطية
-  **90.49/73.31/83.88**، MySQL **11/11**، حي **11/12 = 91.7%** (فشل `CELIA_VOICE_ID` وحده) · والجسر **16/16** اختبارًا.
-- **لم يُثبت:** الاتصال الفعلي ببيئة Copilot المستضافة (لا صلاحية إعدادات MCP في حساب المالك).
+- **الصوت: ✅ متحقَّق بدليل حي.** تدقيق `40680228320` (commit `b708056`، `verdict: pass`): حي **12/12**،
+  `workingRate: 1`، `failed: []`، offline 401/401، تغطية 90.49/73.32/83.88، MySQL 11/11. الـrun السابق
+  `40678857684` كان 11/12 بسبب `elevenlabs — voice_not_found` وحده. الشاهد أن `verified` لذلك المزوّد لا يُمنح إلا بعد
+  `POST /text-to-speech/<CELIA_VOICE_ID>` يعيد `audio/*` (6 حروف، لا تُخزَّن) — أي أن السرّ صار صوتًا فعليًا.
+- **النشر: ❌ لم يُنفَّذ، ولا يُنفَّذ من الجلسة.** `deploy-render.yml` run `40679651805` = success لكن
+  `status: not-configured` و`missing: [CELIA_LIVE_URL, RENDER_API_KEY + RENDER_SERVICE_ID (أو RENDER_DEPLOY_HOOK_URL)]`
+  — وأُعيد التحقق محليًا بـ`node scripts/deploy-render.mjs --plan` بنفس النتيجة. العوائق صلاحية مالك:
+  `gh workflow run` و`gh secret list` و`gh api …/actions/variables` كلها **403**، والـworkflow يعمل فقط على
+  `workflow_run` من `main` أو dispatch، والجلسة لا تدفع إلى `main`.
+- **إصلاح جوهري في هذه الجلسة:** `render.yaml` لم يكن يعلن `APP_BASE_URL` ولا `GOOGLE_*`، فكان `redirectUri` سيُبنى على
+  `http://localhost:PORT` ويرسل «اربط جوجل» رابط موافقة لا يعمل. أُضيف `APP_BASE_URL` (`sync: false`)،
+  `GOOGLE_CLIENT_ID/SECRET/REDIRECT_URI`، و`CELIA_TIMEZONE=Africa/Cairo`؛ وحُمي بـ`test/deployment-blueprint.test.js`
+  (**7/7**) الذي يربط `render.yaml` بـ`src/config.js` و`docs/deployment-profile.json`.
+- **البوابات المحلية:** `test:coverage` **408/408** (90.51/73.24/83.88) · `check` 128 ملفًا · `copilot:diagram:check` نظيف ·
+  `check:continuity` 39 وثيقة/138 رابطًا.
+- **لم يُثبت:** لا خدمة Render ولا Aiven ولا URL حي؛ ولا اتصال بيئة Copilot المستضافة بالجسر. 12 متحققة = 12 مزوّدًا
+  ردّوا من CI، وليست دليلًا على تشغيل التطبيق كاملًا على مضيف عام.
 
-## الطلب الحالي (أعلى أولوية) — «خطة تنفيذية للوصول إلى 100% منشور بلا أخطاء وبلا فيزا» (PLAN-001، REL-002، QA-006)
+## الطلب السابق — طبقة حماية Copilot ومخططها (AGENT-005، PR #54 مدموج في `main@8dc3c0e`)
+
+- **جسر مفروض لا إعداد JSON:** Copilot يستدعي أدوات MCP المفعّلة دون موافقة لكل استدعاء، فالقيد في شيفرة أمام الخادم.
+  `scripts/celia-copilot-mcp-bridge.mjs` يفرض: قائمة سماح بأربع أدوات قراءة، `readOnlyHint` مثبتًا من الجسر، قدرات
+  `tools` فقط (رفض prompts/resources)، وتنقية نتائج تحجب أي قيمة سرّية. الاختبار الحاسم E2E على **الخادم الحقيقي** (16 أداة).
+- **المخطط:** `docs/copilot-mcp/architecture.svg` (+`.html` وMermaid) مُولَّد من ثوابت السياسة نفسها، و`--check` يفشل عند
+  أي قدم أو تجاوز نصي — وصار خطوة في CI.
+- **لم يُثبت:** اتصال بيئة Copilot المستضاف بالجسر (لا صلاحية لوحة المالك).
 
 ## الطلب السابق — WhatsApp مجاني-أولًا (DEC-032، PR #51، مدموج في `main@b70f914`)
 
@@ -526,7 +540,7 @@ pass/warn/fail، بلا شبكة وبلا طباعة أي سر) · `npm run goog
 
 ## حدود لا يجوز نسيانها
 
-- فرع الجلسة الحالية `arena/0220ec0b-phone-google` هو الوحيد للعمل والدفع (يحوي فرع PR #36 مدمجًا)؛ أسماء الفروع المذكورة في الأقسام التاريخية تخص جلسات منتهية بعد الدمج ولا يُعمل عليها.
+- فرع الجلسة الحالية `arena/0deef5d8-phone-google` هو الوحيد للعمل والدفع؛ أسماء الفروع في الأقسام التاريخية تخص جلسات منتهية بعد الدمج ولا يُعمل عليها. لا دفع إلى `main` ولا `workflow_dispatch` من الجلسة (403).
 - أسرار المستودع التسعة لا تُقرأ ولا تُطبع ولا تُضاف لملفات الحزمة؛ و`credentials.json` و`token.json` ممنوعان من Git مهما طُلب من التوثيق.
 - الحزمة ليست موصلة ChatGPT (خارج النطاق صراحةً) ولا تدّعي بحثًا دلاليًا ولا حذفًا تلقائيًا، ولا يُعلن نشرها كمكوّن من النظام قبل قبول المالك (SPDR-002).
 - لا مستودع GitHub جديد ولا دفع خارج فرع الجلسة الحالي؛ لا releases ولا دمج/إغلاق PR من هذه الجلسة دون طلب صريح (ينطبق على #34 و#36).
@@ -536,17 +550,17 @@ pass/warn/fail، بلا شبكة وبلا طباعة أي سر) · `npm run goog
 
 ## الخطوة التالية بالضبط
 
-1. **المالك (الركن 0):** دمج PR #36 ثم هذا الفرع (أو هذا الفرع وحده)، وإغلاق PR #34 بلا دمج. بعد الدمج تأكد أن
-   وظيفة `deploy` في `pages.yml` **لم تُتخطَّ** وأن `https://celiaelazamey-arch.github.io/phone-google/` يفتح.
-2. **المالك (الركن 1 — HOST-003):** Aiven Free ← Render Blueprint ← أسرار ← `empty-only` ثم `false` ←
-   `npm run migrate -- --apply` ← `CELIA_AGENT_RUNTIME=mysql` + `CELIA_AGENT_RESUME_ON_BOOT=true` ← cron-job.org
-   كل 10 دقائق على `/readyz` ← `CELIA_MCP_API_TOKEN=… npm run verify:live -- --url … --expect-commit …` ⇒ PASS
-   يُلصق في سجل جلسة جديد ويُحدَّث HOST-003 إلى «متحقق».
-3. **بعدها من هنا (الركن 7):** `backup:verify` (DATA-001)، موصل WhatsApp في الـoutbox (AGENT-002)، ثم AI-001/AI-002
-   بعد قرار المزوّد. التفاصيل والبوابات في [docs/go-live-plan.md](../go-live-plan.md).
-4. **بقية الخطة** كما هي في BACKLOG دون ادعاء إغلاقها.
-5. **واقع الخدمات (QA-005):** قبل أي ادعاء «يعمل»، شغّل `[reality]` واقرأ annotations الـrun؛ الست الفاشلة في
-   [docs/service-reality.md](../service-reality.md) لا تُصلحها شيفرة — تجديد أو تقاعد صريح بـ`CELIA_DISABLE_*`.
+1. **المالك — إنشاء ما لا يمكن إنشاؤه من الجلسة (بلا بطاقة):** Render → New → Blueprint من `render.yaml`
+   (تير Free) ← Aiven MySQL Free ← إدخال الستة `MYSQL_*` في Render Environment ← نسخ رابط الخدمة إلى `APP_BASE_URL`
+   وإعادة النشر ← `npm run migrate -- --apply` مرة واحدة.
+2. **المالك — تشغيل النشر المتحقَّق:** GitHub → Settings → Secrets and variables → Actions:
+   Variable `CELIA_LIVE_URL=https://<service>.onrender.com` · Secrets `RENDER_API_KEY` و`RENDER_SERVICE_ID`
+   (أو `RENDER_DEPLOY_HOOK_URL`). أول push على `main` بعدها يشغّل `deploy-render.yml` تلقائيًا (نشر ← انتظار `/readyz`
+   بـ`storage.mode=mysql` ← `verify:live --expect-commit` ← keep-alive كل 10 دقائق). **حينها فقط** يُكتب «منشور».
+3. **بعد النشر:** لصق تقرير `verify:live` في سجل جلسة جديد وتحديث HOST-003 إلى «متحقق»، ثم `backup:verify` (DATA-001)،
+   ثم موصل WhatsApp في الـoutbox (AGENT-002)، ثم AI-001/AI-002 بعد قرار المزوّد
+   ([docs/go-live-plan.md](../go-live-plan.md)).
+4. **أي ادعاء «يعمل»:** شغّل `[reality]` واقرأ annotations الـrun؛ لا يُستبدل بدليل محلي أو محاكاة.
 
 ## التحقق من الحفظ في الجلسة التالية
 
