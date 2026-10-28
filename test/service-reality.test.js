@@ -10,6 +10,7 @@ import {
   editDistance,
   parseArgs,
   parseTestSummary,
+  probeWhatsAppCloudApi,
   renderMarkdown,
   runProbes,
   sanitize,
@@ -61,6 +62,49 @@ test('scoring counts only configured services in the working rate', () => {
   assert.equal(score.configured, 3);
   assert.equal(score.workingRate, 0.6667);
   assert.equal(scoreServices([{ verdict: 'not-configured' }]).workingRate, null);
+});
+
+test('WhatsApp read-only probe authenticates the phone-number ID and never sends a message', async () => {
+  const env = {
+    WHATSAPP_ACCESS_TOKEN: 'meta-access-token-test',
+    WHATSAPP_PHONE_NUMBER_ID: '123456789012345',
+    WHATSAPP_APP_SECRET: 'meta-app-secret-test',
+    WHATSAPP_VERIFY_TOKEN: 'meta-verify-token-test',
+    WHATSAPP_API_VERSION: 'v26.0'
+  };
+  const calls = [];
+  const result = await probeWhatsAppCloudApi({
+    env,
+    timeoutMs: 1000,
+    fetchImpl: async (url, init = {}) => {
+      calls.push({ url: String(url), method: init.method || 'GET', authorization: init.headers?.authorization });
+      return new Response(JSON.stringify({ id: env.WHATSAPP_PHONE_NUMBER_ID, display_phone_number: '+15551234567', verified_name: 'Celia Test' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      });
+    }
+  });
+  assert.equal(result.verdict, 'verified');
+  assert.match(result.detail, /read-only phone-number lookup passed/);
+  assert.match(result.detail, /no message sent/);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].method, 'GET');
+  assert.match(calls[0].url, /^https:\/\/graph\.facebook\.com\/v26\.0\/123456789012345\?/);
+  assert.equal(calls[0].authorization, 'Bearer meta-access-token-test');
+  assert.equal(JSON.stringify(result).includes('meta-access-token-test'), false);
+});
+
+test('WhatsApp read-only probe refuses malformed configuration and never calls Meta', async () => {
+  let calls = 0;
+  const missing = await probeWhatsAppCloudApi({ env: {}, fetchImpl: async () => { calls += 1; throw new Error('unexpected_network_call'); } });
+  assert.equal(missing.verdict, 'not-configured');
+  const invalidId = await probeWhatsAppCloudApi({
+    env: { WHATSAPP_ACCESS_TOKEN: 'meta-access-token-test', WHATSAPP_PHONE_NUMBER_ID: '+201012345678' },
+    fetchImpl: async () => { calls += 1; throw new Error('unexpected_network_call'); }
+  });
+  assert.equal(invalidId.verdict, 'failed');
+  assert.match(invalidId.detail, /numeric Meta phone-number ID/);
+  assert.equal(calls, 0);
 });
 
 test('sanitize removes every configured secret value and args parse strictly', () => {
@@ -233,11 +277,17 @@ test('retirement manifest: validated, reversible, and told identically by the au
   assert.deepEqual(blueprintFlags, Object.keys(retirementFlags(retirements)).sort());
 });
 
-test('service-reality workflow wires all 18 secrets, a real MySQL service, and never a Render/MySQL production credential', () => {
+test('service-reality workflow wires existing secrets plus optional WhatsApp credentials, and never a Render/MySQL production credential', () => {
   const workflow = fs.readFileSync(path.join(root, '.github/workflows/service-reality.yml'), 'utf8');
-  for (const name of ['AGENETROUTERAPI_KEY', 'AI_GATEWAY_API_KEY', 'CELIAOS_CRONJOB_ORG_API_KEY', 'CELIA_MCP_API_TOKEN', 'CELIA_VOICE_ID', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_R2_ACCESS_KEY_ID', 'CLOUDFLARE_R2_S3_ENDPOINT', 'CLOUDFLARE_R2_SECRET_ACCESS_KEY', 'DEEPSEEK_API_KEY', 'ELEVENLABS_API_KEY', 'FIGMA_ACCESS_TOKEN', 'GEMINI_API_KEY', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'PHONE_NUMBER', 'YOUR_CODATA_API_KEY']) {
+  for (const name of ['AGENETROUTERAPI_KEY', 'AI_GATEWAY_API_KEY', 'CELIAOS_CRONJOB_ORG_API_KEY', 'CELIA_MCP_API_TOKEN', 'CELIA_VOICE_ID', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_R2_ACCESS_KEY_ID', 'CLOUDFLARE_R2_S3_ENDPOINT', 'CLOUDFLARE_R2_SECRET_ACCESS_KEY', 'DEEPSEEK_API_KEY', 'ELEVENLABS_API_KEY', 'FIGMA_ACCESS_TOKEN', 'GEMINI_API_KEY', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'PHONE_NUMBER', 'YOUR_CODATA_API_KEY', 'WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_APP_SECRET', 'WHATSAPP_VERIFY_TOKEN']) {
     assert.ok(workflow.includes(`\${{ secrets.${name} }}`), `${name} must be wired`);
   }
+  assert.ok(workflow.includes('WHATSAPP_API_VERSION: ${{ vars.WHATSAPP_API_VERSION }}'));
+  const renderBlueprint = fs.readFileSync(path.join(root, 'render.yaml'), 'utf8');
+  for (const name of ['APP_OWNER_PHONE_E164', 'WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_APP_SECRET', 'WHATSAPP_VERIFY_TOKEN', 'WHATSAPP_API_VERSION']) {
+    assert.ok(renderBlueprint.includes(`- key: ${name}`), `${name} must be declared for the runtime`);
+  }
+  assert.ok(renderBlueprint.includes("- key: WHATSAPP_AUTO_REPLY_ENABLED\n        value: 'false'"), 'auto replies stay disabled until separately approved');
   assert.ok(workflow.includes('image: mysql:8.4'));
   assert.ok(workflow.includes("contains(github.event.head_commit.message, '[reality]')"));
   assert.ok(workflow.includes('contents: read'));
