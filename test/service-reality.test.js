@@ -169,8 +169,9 @@ test('failure diagnostics name the broken secret (402 balance, wrong voice id, u
   assert.match(byId.deepseek.detail, /payment required \/ no balance \(402\)/);
   assert.match(byId.deepseek.detail, /\/models 200 \(2 models, e\.g\. deepseek-chat, deepseek-reasoner; configured model listed\)/);
   assert.equal(byId.elevenlabs.verdict, 'failed');
-  assert.match(byId.elevenlabs.detail, /GET \/voices\/\{CELIA_VOICE_ID\} → 400 \(voice_not_found\); API key valid \(\/user 200\)/);
-  assert.match(byId.elevenlabs.detail, /2 voices visible, configured voice id NOT among them \(visible e\.g\. Aria=other1, Roger=other2\)/);
+  assert.match(byId.elevenlabs.detail, /GET \/voices\/\{CELIA_VOICE_ID\} → 400 \(voice_not_found\); configured id: 8 chars[^;]*; API key valid \(\/user 200\)/);
+  assert.match(byId.elevenlabs.detail, /configured id: 8 chars — ElevenLabs voice ids are 20 alphanumeric characters/);
+  assert.match(byId.elevenlabs.detail, /2 voices visible, configured voice id NOT among them — a library or cloned voice must first be added to "My Voices"[^(]*\(visible: Aria=other1, Roger=other2\)/);
   assert.match(byId.elevenlabs.detail, /key CAN synthesize with visible voice Aria \(1200 bytes\) → only CELIA_VOICE_ID needs fixing/);
   assert.equal(byId.cloudflare_r2.verdict, 'failed');
   assert.match(byId.cloudflare_r2.detail, /unreachable \(ENOTFOUND\)/);
