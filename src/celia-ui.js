@@ -5,6 +5,7 @@ import express from 'express';
 import { DEFAULT_POLICY } from './gemini.js';
 import { createMemoryPool } from './memory-pool.js';
 import { decryptJson, encryptJson, hashOAuthState, isValidE164, isWithinCustomerWindow, verifyWhatsAppSignature } from './security.js';
+import { runDocumentAutomationBenchmark } from './agent/automation/index.js';
 
 const PUBLIC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../public');
 
@@ -84,6 +85,13 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, oper
   router.get(['/agent', '/agent.html'], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'agent.html')));
   router.get('/agent.css', (_req, res) => res.type('text/css').sendFile(path.join(PUBLIC_DIR, 'agent.css')));
   router.get('/agent.js', (_req, res) => res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'agent.js')));
+
+  router.get(['/protocol', '/protocol.html'], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'protocol.html')));
+  router.get('/protocol.css', (_req, res) => res.type('text/css').sendFile(path.join(PUBLIC_DIR, 'protocol.css')));
+  router.get('/protocol.js', (_req, res) => res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'protocol.js')));
+  router.get(['/api/protocol/benchmark', '/api/protocol-benchmark.json'], async (_req, res) => {
+    res.set('Cache-Control', 'no-store').json(await runDocumentAutomationBenchmark());
+  });
 
   router.get(['/system', '/system.html'], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'system.html')));
   router.get('/system.css', (_req, res) => res.type('text/css').sendFile(path.join(PUBLIC_DIR, 'system.css')));

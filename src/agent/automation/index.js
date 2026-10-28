@@ -27,6 +27,10 @@ import {
   buildComprehensionExplanation,
   buildAutomationReport
 } from './validator.js';
+import {
+  BENCHMARK_CASES_20,
+  runDocumentAutomationBenchmark
+} from './benchmark.js';
 
 export {
   CAPABILITY_NAME,
@@ -51,7 +55,9 @@ export {
   explainValidationOutcome,
   evaluateComprehensionGate,
   buildComprehensionExplanation,
-  buildAutomationReport
+  buildAutomationReport,
+  BENCHMARK_CASES_20,
+  runDocumentAutomationBenchmark
 };
 
 /**

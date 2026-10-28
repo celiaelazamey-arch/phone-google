@@ -64,11 +64,11 @@ const INJECTION_PATTERNS = [
   },
   {
     id: 'ignore_instructions_en',
-    pattern: /ignore\s+(?:all\s+|previous\s+|prior\s+|system\s+)?(?:instructions|policies|rules|approvals)/i
+    pattern: /ignore\s+(?:all\s+|previous\s+|prior\s+|system\s+)*(?:instructions|policies|rules|approvals)/i
   },
   {
     id: 'privilege_escalation',
-    pattern: /\b(?:sandbox\.exec|CELIA_MCP_API_TOKEN|TOKEN_ENCRYPTION_KEY|GEMINI_API_KEY|system\s*prompt|bypass\s+approval)\b/i
+    pattern: /\b(?:sandbox\.exec|CELIA_MCP_API_TOKEN|TOKEN_ENCRYPTION_KEY|GEMINI_API_KEY|system\s*prompt|system\s+override|bypass\s+(?:owner\s+)?approval)\b/i
   }
 ];
 

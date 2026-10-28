@@ -52,6 +52,8 @@
   - **توظيف الأسرار الـ18 جميعًا وبوابة Cloudflare Worker والنشر الآلي الموقّع ([DEC-025](DECISIONS.md#dec-025--توظيف-جميع-أسرار-المستودع-الـ18-وبوابة-cloudflare-worker-والنشر-الآلي-الموقع-1818-secrets-wiring--edge-release)):**
     - توسيع `buildSecretsReadiness` و`scripts/check-secrets-wiring.mjs` و`.github/workflows/celia-mcp.yml` لتتبع وفحص **18/18 سرًا** مع صفر تسريب، وإضافة `GET /api/cron/status` و`POST /api/cron/probe` و`GET /api/storage/r2/status`.
     - إضافة خادم الحافة `workers/celia-edge/worker.js` وسكربت `scripts/deploy-cloudflare-edge.mjs` وسير عمل `.github/workflows/cloudflare-deploy.yml` وتفعيل نشر الإصدار الموقّع `v0.2.1` في `.github/workflows/release.yml`.
+  - **بروتوكول التفوق واكتساب المستخدمين وحزمة Benchmark الـ20 حالة وإنفوجرافيك `/protocol` ([DEC-026](DECISIONS.md#dec-026--بروتوكول-التفوق-واكتساب-المستخدمين-user-switch--product-superiority-protocol-benchmark-الـ20-حالة-وإنفوجرافيك-protocol)):**
+    - إضافة [src/agent/automation/benchmark.js](../../src/agent/automation/benchmark.js) (`BM-01..BM-20` بـ20/20 PASS وصفر قبول/رفض خاطئ وثبات إعادة تشغيل 100%)، وصفحة الإنفوجرافيك المعماري العربي التفاعلي [public/protocol.html](../../public/protocol.html) (`/protocol`)، ووثيقة [docs/user-switch-protocol.md](../user-switch-protocol.md)، واختبارات [test/agent-benchmark-20.test.js](../../test/agent-benchmark-20.test.js).
   - **الفحوص المحلية وفحوص GitHub Actions CI الفعلية (`Verification Closure`):**
     - محليًا: `npm test` **268/268** ناجحة (منها 7 اختبارات في `test/agent-document-automation.test.js` و10 اختبارات
       `CL-01..CL-10` في `test/agent-comprehension-gate.test.js`)، و`check` و`release:check` و`check:continuity`
