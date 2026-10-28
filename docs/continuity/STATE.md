@@ -1,6 +1,7 @@
 # الحالة الحالية — ابدأ من هنا
 
 
+
 **آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** **خطة 100% — نظام منشور بلا أخطاء وبلا بطاقة (PLAN-001)**
 على الفرع `arena/6b68cfb2-phone-google` (من `main@fc4d60f`) · سجل الجلسة:
 [2026-10-28-plan-100-percent](sessions/2026-10-28-plan-100-percent.md) · السجل السابق:
@@ -10,6 +11,22 @@
 المرجع التشغيلي: [deploy/free-always-on/README.md](../../deploy/free-always-on/README.md)
 
 ## الطلب الحالي (أعلى أولوية) — «خطة تنفيذية للوصول إلى 100% منشور بلا أخطاء وبلا فيزا» (PLAN-001، REL-002، QA-006)
+
+## الطلب السابق — WhatsApp مجاني-أولًا (DEC-032، PR #51، مدموج في `main@b70f914`)
+
+- PR #51 أضاف حقول تشغيل WhatsApp إلى `render.yaml`، وجعل إصدار Graph الافتراضي `v26.0`، وأضاف مسبار `whatsapp_cloud_api`
+  للقراءة فقط (GET فقط، لا إرسال) مع اختبارات وتوثيق؛ سجل الجلسة:
+  [2026-10-28-whatsapp-free-first-setup](sessions/2026-10-28-whatsapp-free-first-setup.md).
+- **بعد دمج #51 صار الإصدار أخضر على `main`:** جودة `40673821757`، Pages `40673821758`، Worker `40673821848`، وإصدار
+  `v0.2.1` بأصوله `40673821824` — أي أن فشل `Publish verified release` الذي عالجه هذا الفرع **لم يتكرر بعد إصلاح PR #49**.
+- **Render ما زال غير منشور:** run `40673950617` انتهى `not-configured` وينقص `CELIA_LIVE_URL` و`RENDER_API_KEY` +
+  `RENDER_SERVICE_ID` (أو `RENDER_DEPLOY_HOOK_URL`) وإنشاء خادم Render وقاعدة Aiven.
+- الأسرار الأربعة `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` / `WHATSAPP_APP_SECRET` / `WHATSAPP_VERIFY_TOKEN`
+  لم تظهر في قائمة الأسرار؛ `PHONE_NUMBER` هو رقم المالك لا Phone Number ID ولا توكن. الرد الآلي باقٍ `false`، ولم يُشغَّل
+  تدقيق حي لـMeta بعد الدمج (لا يوجد دليل على اتصال WhatsApp حقيقي).
+- `main` غير محمي في آخر قراءة (`protected=false`) — إجراء مالك مستقل.
+
+
 
 - **ما نُفِّذ في هذه الجلسة (على الفرع، قبل الدمج):** فصل بوابات الإصدار الأربع في خطوات مسمّاة داخل
   `.github/workflows/release.yml` (الفشل الوحيد على `main@fc4d60f` كان «exit code 1» بلا اسم بوابة، والـjob توقف بعد 20
@@ -24,8 +41,11 @@
 - **النشر الكامل:** لم يُنفَّذ ولا يُدّعى — `deploy-render.yml` يخرج `not-configured` ويسمّي الناقص:
   `CELIA_LIVE_URL` (variable) + `RENDER_API_KEY`/`RENDER_SERVICE_ID` أو `RENDER_DEPLOY_HOOK_URL`، والحسابان (Render Free،
   Aiven MySQL Free) غير موجودين.
+- **حالة `main` الآن (`b70f914`):** الإصدار صار أخضر بعد PR #49 (`40673821824`) فدليل REL-002 على `main` متوفر، وWhatsApp
+  صار له حقول تشغيل ومسبار قراءة فقط (DEC-032)، وRender ما زال `not-configured`.
 - **الخطوة التالية (المالك، خمس لوحات في [plan-100-percent](../plan-100-percent.md) §2):** `CELIA_VOICE_ID` في Repository
-  secrets → «تم»؛ ثم Aiven + Render Blueprint + `CELIA_LIVE_URL` وأسرار Render → `verify:live` PASS؛ ثم Meta وGoogle.
+  secrets → «تم»؛ ثم Aiven + Render Blueprint + `CELIA_LIVE_URL` وأسرار Render → `verify:live` PASS؛ ثم أسرار Meta الأربعة
+  وتحدي Webhook؛ ثم عميل Google OAuth.
 
 ## الطلب السابق — «خطط للمحافظة لما وصلنا له حتى الآن» (DEC-031، OPS-005)
 

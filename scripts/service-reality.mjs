@@ -35,6 +35,7 @@ const SECRET_ENV_NAMES = [
   'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_R2_ACCESS_KEY_ID', 'CLOUDFLARE_R2_S3_ENDPOINT',
   'CLOUDFLARE_R2_SECRET_ACCESS_KEY', 'DEEPSEEK_API_KEY', 'ELEVENLABS_API_KEY', 'FIGMA_ACCESS_TOKEN', 'GEMINI_API_KEY',
   'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'PHONE_NUMBER', 'YOUR_CODATA_API_KEY',
+  'WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_APP_SECRET', 'WHATSAPP_VERIFY_TOKEN',
   'RENDER_API_KEY', 'RENDER_DEPLOY_HOOK_URL', 'GITHUB_TOKEN', 'MYSQL_TEST_PASSWORD'
 ];
 const EMPTY_SHA256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
@@ -170,6 +171,42 @@ async function probeJson(fetchImpl, url, init, timeoutMs) {
   let json = null;
   try { json = JSON.parse(text); } catch { /* not json */ }
   return { status: response.status, json, text, latencyMs: Date.now() - started };
+}
+
+/**
+ * Read-only WhatsApp credential probe. It never sends a message and cannot prove
+ * the Meta webhook subscription; that requires a separate signed end-to-end test.
+ */
+export async function probeWhatsAppCloudApi({ env = process.env, fetchImpl = fetch, timeoutMs = 5000 } = {}) {
+  const token = String(env.WHATSAPP_ACCESS_TOKEN || '').trim();
+  const phoneNumberId = String(env.WHATSAPP_PHONE_NUMBER_ID || '').trim();
+  if (!token || !phoneNumberId) {
+    return { verdict: 'not-configured', detail: 'WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID are required; no message sent' };
+  }
+  const apiVersion = String(env.WHATSAPP_API_VERSION || 'v26.0').trim();
+  if (!/^v\d{1,3}\.0$/.test(apiVersion)) {
+    return { verdict: 'failed', detail: 'WHATSAPP_API_VERSION must use a version such as v26.0; no message sent' };
+  }
+  if (!/^\d{5,30}$/.test(phoneNumberId)) {
+    return { verdict: 'failed', detail: 'WHATSAPP_PHONE_NUMBER_ID must be the numeric Meta phone-number ID, not a phone number; no message sent' };
+  }
+  try {
+    const query = new URLSearchParams({ fields: 'id,display_phone_number,verified_name' });
+    const response = await probeJson(
+      fetchImpl,
+      `https://graph.facebook.com/${apiVersion}/${encodeURIComponent(phoneNumberId)}?${query}`,
+      { headers: { accept: 'application/json', authorization: `Bearer ${token}` } },
+      timeoutMs
+    );
+    const matched = response.status === 200 && String(response.json?.id || '') === phoneNumberId;
+    if (matched) {
+      return { verdict: 'verified', detail: 'Meta read-only phone-number lookup passed; no message sent; webhook remains a separate acceptance test', latencyMs: response.latencyMs };
+    }
+    const code = String(response.json?.error?.code || response.json?.error?.type || response.status).slice(0, 40);
+    return { verdict: 'failed', detail: `Meta read-only phone-number lookup rejected (HTTP ${response.status}, ${code}); no message sent`, latencyMs: response.latencyMs };
+  } catch (error) {
+    return { verdict: 'failed', detail: `Meta read-only phone-number lookup unreachable (${error?.cause?.code || error?.name || 'network_error'}); no message sent` };
+  }
 }
 
 export function buildProbes({ config, env, fetchImpl = fetch, timeoutMs, publication, version, modules }) {
@@ -375,12 +412,8 @@ export function buildProbes({ config, env, fetchImpl = fetch, timeoutMs, publica
       run: async () => ({ verdict: 'unverifiable', detail: 'no Google account is linked (no refresh token exists anywhere); the owner links once via «اربط جوجل» on the live backend — code paths are covered by offline tests only' })
     },
     {
-      id: 'whatsapp_cloud_api', label: 'WhatsApp Cloud API (send/receive)', secret: 'WHATSAPP_ACCESS_TOKEN + WHATSAPP_PHONE_NUMBER_ID (absent)', category: 'messaging',
-      run: async () => {
-        const configured = Boolean(String(env.WHATSAPP_ACCESS_TOKEN || '').trim() && String(env.WHATSAPP_PHONE_NUMBER_ID || '').trim());
-        if (!configured) return { verdict: 'not-configured', detail: 'no Meta access token / phone number id in the repository secrets — outbound WhatsApp cannot work until the owner creates the Meta app; webhook + commands are offline-tested only' };
-        return { verdict: 'unverifiable', detail: 'sending a real message is not a synthetic probe; verify via the webhook on the live backend' };
-      }
+      id: 'whatsapp_cloud_api', label: 'WhatsApp Cloud API credentials (read-only)', secret: 'WHATSAPP_ACCESS_TOKEN + WHATSAPP_PHONE_NUMBER_ID', category: 'messaging',
+      run: () => probeWhatsAppCloudApi({ env, fetchImpl, timeoutMs })
     },
     {
       id: 'owner_token_edge', label: 'Owner token on the live edge Worker', secret: 'CELIA_MCP_API_TOKEN', category: 'auth',
