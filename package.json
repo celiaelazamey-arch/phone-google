@@ -26,6 +26,8 @@
     "deploy:release": "node scripts/deploy-release.mjs",
     "deploy:render": "node scripts/deploy-render.mjs",
     "reality": "node scripts/service-reality.mjs",
+    "triage": "node scripts/issue-triage.mjs",
+    "triage:verify": "node scripts/issue-triage-verify.mjs",
     "release:check": "node scripts/release.mjs check",
     "release:bundle": "node scripts/release.mjs bundle",
     "release:verify": "node scripts/release.mjs verify",

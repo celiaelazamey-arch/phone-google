@@ -1,0 +1,58 @@
+name: Issue triage self-test (governed)
+
+# Proof harness for AGENT-006. It runs the *same* command the production workflow runs, against real issues in
+# this repository, using the workflow's own GITHUB_TOKEN (issues:write) — a token that, unlike the assistant's
+# installation token, can actually comment and label.
+#
+# Manual only: the bootstrap `push` trigger was removed after the first proof runs (40682911724, 40683251035)
+# succeeded, so this harness can no longer fire on its own. Run it when a policy change needs re-proving.
+
+on:
+  workflow_dispatch:
+    inputs:
+      issues:
+        description: 'Comma-separated issue numbers to triage'
+        required: true
+        default: '61'
+        type: string
+      mode:
+        description: 'propose (record only) or cautious (apply allowlisted labels above 0.90)'
+        type: choice
+        options: [cautious, propose]
+        default: cautious
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  prove:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      - name: Triage the self-test issue (cautious)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          TRIAGE_MODE: ${{ inputs.mode || 'cautious' }}
+          TRIAGE_REVIEWER: triage-selftest
+        run: |
+          set -euo pipefail
+          for n in $(echo "${{ inputs.issues || '61' }}" | tr ',' ' '); do
+            echo "::group::issue #$n"
+            node scripts/issue-triage.mjs --issue "$n" --mode "$TRIAGE_MODE" --apply
+            echo "::endgroup::"
+          done
+
+      - name: Read the ledger back and verify the hash chain
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/issue-triage-verify.mjs
