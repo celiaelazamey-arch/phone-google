@@ -10,9 +10,22 @@
  * Exits 1 if the chain is broken (edited, reordered or deleted entries).
  */
 import { pathToFileURL } from 'node:url';
-import { readLedger, repository, resolveLedger } from './issue-triage.mjs';
+import { ROLLBACK_MARKER, readLedger, repository, resolveLedger } from './issue-triage.mjs';
 
-export function summarize({ ledger, records, chain }) {
+export function parseRollbacks(comments) {
+  return (comments || [])
+    .map((comment) => String(comment?.body ?? '').match(new RegExp(`<!--\\s*${ROLLBACK_MARKER}\\s*(\\{.*?\\})\\s*-->`, 's')))
+    .filter(Boolean)
+    .map((match) => {
+      try {
+        return JSON.parse(match[1]);
+      } catch {
+        return { unparsable: true };
+      }
+    });
+}
+
+export function summarize({ ledger, records, chain, rollbacks = [] }) {
   const routes = { auto: 0, human: 0, reject: 0 };
   for (const record of records) {
     const route = record?.decision?.route;
@@ -23,6 +36,7 @@ export function summarize({ ledger, records, chain }) {
     records: records.length,
     chain: chain.ok ? `ok (${chain.count} entries, head ${String(chain.head).slice(0, 12)})` : `BROKEN at seq ${chain.brokenSeq}: ${chain.reason}`,
     routes,
+    rollbacks,
     issues: records.map((record) => ({
       issue: record?.issue?.number,
       route: record?.decision?.route,
@@ -41,8 +55,8 @@ function main() {
     console.log(JSON.stringify({ ledger: null, records: 0, chain: 'no ledger yet' }, null, 2));
     return;
   }
-  const { records, chain } = readLedger(repo, ledger);
-  const summary = summarize({ ledger, records, chain });
+  const { comments, records, chain } = readLedger(repo, ledger);
+  const summary = summarize({ ledger, records, chain, rollbacks: parseRollbacks(comments) });
   console.log(JSON.stringify(summary, null, 2));
   if (!chain.ok) process.exit(1);
 }

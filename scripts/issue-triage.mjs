@@ -93,20 +93,45 @@ export function repository(explicit) {
   return repo;
 }
 
-/** Find the single ledger issue, creating it (and its label) on first use. */
+/**
+ * Find the ledger issue. Resolution is deterministic and race-safe:
+ *   1. an explicit number (--ledger or TRIAGE_LEDGER) wins;
+ *   2. otherwise the *oldest* issue carrying the ledger label or title, chosen by creation order and filtered
+ *      client-side — a freshly created issue can take a second or two to appear in a label-filtered query, and
+ *      that lag once produced a duplicate ledger during the first live run;
+ *   3. only when none exists is one created, and its number is read back before use.
+ */
+export function findLedgers(repo) {
+  const issues = ghLines(['api', `repos/${repo}/issues?state=all&per_page=100&sort=created&direction=asc`]);
+  return issues
+    .filter((issue) => !issue.pull_request)
+    .filter((issue) => issue.title === LEDGER_TITLE || (issue.labels || []).some((label) => (label.name || label) === LEDGER_LABEL))
+    .map((issue) => issue.number)
+    .sort((a, b) => a - b);
+}
+
 export function resolveLedger(repo, { existing = null, apply = false } = {}) {
-  if (existing) return existing;
-  const found = ghJson(['api', `repos/${repo}/issues?labels=${encodeURIComponent(LEDGER_LABEL)}&state=all&per_page=5`]);
-  if (Array.isArray(found) && found.length) return found[0].number;
+  const configured = existing ?? (process.env.TRIAGE_LEDGER ? Number(process.env.TRIAGE_LEDGER) : null);
+  if (Number.isInteger(configured) && configured > 0) return configured;
+
+  const found = findLedgers(repo);
+  if (found.length) {
+    if (found.length > 1) {
+      console.error(`::warning title=Ledger duplication::${found.length} ledger issues exist (${found.join(', ')}); using the oldest #${found[0]}. Close the others so the chain has one home.`);
+    }
+    return found[0];
+  }
   if (!apply) return null;
+
   ensureLabels(repo, [LEDGER_LABEL], { apply });
-  const created = ghJson([
-    'api', '-X', 'POST', `repos/${repo}/issues`,
-    '-f', `title=${LEDGER_TITLE}`,
-    '-f', 'body=Append-only audit trail for governed issue triage (AGENT-006). One comment per decision; each carries a hash-chained record. Maintained by the governed issue-triage workflow.',
-    '-f', `labels[]=${LEDGER_LABEL}`
+  gh([
+    'issue', 'create',
+    '--repo', repo,
+    '--title', LEDGER_TITLE,
+    '--label', LEDGER_LABEL,
+    '--body', 'Append-only audit trail for governed issue triage (AGENT-006). One comment per decision; each carries a hash-chained record. Maintained by the governed issue-triage workflow.'
   ]);
-  return created?.number ?? null;
+  return findLedgers(repo)[0] ?? null;
 }
 
 /** Labels must exist before they can be applied, otherwise the first real decision fails with HTTP 422. */
@@ -178,6 +203,8 @@ export function fetchIssue(repo, number) {
   return { number: issue.number, title: issue.title || '', body: issue.body || '', url: issue.html_url || null };
 }
 
+export const ROLLBACK_MARKER = 'celia-triage-rollback';
+
 export function readLedger(repo, ledgerNumber) {
   if (!ledgerNumber) return { comments: [], records: [], chain: { ok: true, count: 0 } };
   const comments = ghLines(['api', `repos/${repo}/issues/${ledgerNumber}/comments?per_page=100`]);
@@ -206,7 +233,13 @@ function main() {
     if (plan.removeLabels.length) {
       gh(['api', '-X', 'DELETE', `repos/${repo}/issues/${issueNumber}/labels/${encodeURIComponent(plan.removeLabels.join(','))}`]);
     }
-    gh(['api', '-X', 'POST', `repos/${repo}/issues/${issueNumber}/comments`, '-f', `body=↩️ **تم التراجع** عن القرار \`${record.id.slice(0, 12)}\` بواسطة ${options.reviewer}.${plan.removeLabels.length ? ` أُزيلت: ${plan.removeLabels.join(', ')}.` : ''}`]);
+    const humanNote = `↩️ **تم التراجع** عن القرار \`${record.id.slice(0, 12)}\` بواسطة ${options.reviewer}.${plan.removeLabels.length ? ` أُزيلت: ${plan.removeLabels.join(', ')}.` : ''}`;
+    gh(['api', '-X', 'POST', `repos/${repo}/issues/${issueNumber}/comments`, '-f', `body=${humanNote}`]);
+    const ledgerForRollback = options.ledger ?? resolveLedger(repo);
+    if (ledgerForRollback) {
+      const marker = JSON.stringify({ ref: record.id, at: new Date().toISOString(), actor: options.reviewer, issue: issueNumber, removedLabels: plan.removeLabels });
+      gh(['api', '-X', 'POST', `repos/${repo}/issues/${ledgerForRollback}/comments`, '-f', `body=<!-- celia-triage-rollback ${marker} -->\n${humanNote}`]);
+    }
     console.log(JSON.stringify({ rolledBack: record.id, issue: issueNumber, removed: plan.removeLabels }, null, 2));
     return;
   }
