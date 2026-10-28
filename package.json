@@ -23,6 +23,7 @@
     "build:pages": "node scripts/build-pages.mjs",
     "preview:pages": "node scripts/build-pages.mjs && node scripts/serve-pages.mjs",
     "deploy:release": "node scripts/deploy-release.mjs",
+    "deploy:render": "node scripts/deploy-render.mjs",
     "release:check": "node scripts/release.mjs check",
     "release:bundle": "node scripts/release.mjs bundle",
     "release:verify": "node scripts/release.mjs verify",

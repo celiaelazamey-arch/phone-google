@@ -55,7 +55,10 @@ test('خطة التشغيل المجاني تذكر كل متغيّر يحكم �
   }
   // Anything the document names must be a real key, so it cannot invent configuration.
   const mentioned = new Set(plan.match(/\b(?:CELIA|MYSQL|TOKEN|GOOGLE|WHATSAPP|APP)_[A-Z0-9_]+\b/g) || []);
-  const invented = [...mentioned].filter((name) => !keys.has(name) && !['CELIA_REAL_SERVICE_URL', 'CELIA_AGENT_RUNTIME', 'CELIA_AGENT_SQLITE_PATH', 'CELIA_AGENT_RESUME_ON_BOOT'].includes(name));
+  // Documented names that are deliberately NOT Render keys: build-time pointer, post-migration runtime switches,
+  // and the GitHub Actions repository variable read by `.github/workflows/deploy-render.yml` (DEC-028).
+  const NOT_RENDER_KEYS = ['CELIA_REAL_SERVICE_URL', 'CELIA_AGENT_RUNTIME', 'CELIA_AGENT_SQLITE_PATH', 'CELIA_AGENT_RESUME_ON_BOOT', 'CELIA_LIVE_URL'];
+  const invented = [...mentioned].filter((name) => !keys.has(name) && !NOT_RENDER_KEYS.includes(name));
   assert.deepEqual(invented, [], 'المستند لا يخترع متغيّرات غير موجودة في التصميم');
 });
 

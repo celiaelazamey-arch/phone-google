@@ -541,6 +541,34 @@
   [data/kb/learned_registry.csv](../../data/kb/learned_registry.csv)، [test/learning-protocol.test.js](../../test/learning-protocol.test.js)؛
   تعديل `src/knowledge/validate.js`، `data/kb/sources_registry.csv`، `data/kb/descriptors.json`، `data/kb/manifest.json`، `.gitignore`.
 
+## DEC-028 — ما بعد حسابي المالك آلي: `deploy-render.yml` ينشر الخادم الكامل على Render ويتحقق بـ`verify:live` ويبقيه مستيقظًا، ولا يدّعي شيئًا قبل اكتمال المدخلات
+
+- **التاريخ:** 28 أكتوبر 2026 · **الحالة:** منفذ ومتحقق محليًا (التفعيل الفعلي رهن إنشاء المالك للخدمة والقاعدة) · **المهمة:** HOST-003، HOST-002
+- **السياق:** المالك عرض صفحة أسرار Actions (18 سرًا) وقال «موجودين استخدمهم» طلبًا لـ«تم النشر 100%». الأسرار الثمانية عشر
+  موصولة كلها (Worker 18/18، مسابر CI، `check:secrets`)، لكن **لا سرّ منها يمثّل مضيف Node ولا قاعدة MySQL**؛ هذان حسابان
+  (Render Free، Aiven Free) لا يُنشآن إلا بتسجيل دخول المالك. كان الممكن تقليص ما بعدهما إلى صفر عمل يدوي.
+- **البدائل المرفوضة:** (أ) نشر الوضع التجريبي بلا MySQL لإظهار رابط — ينتهك قاعدة الديمومة (DEC-017)؛ (ب) D1/Supabase/Vercel —
+  تغيير لهجة أو خادم بلا خادم لا يناسب عامل الـoutbox، وقرار مالك؛ (ج) إنشاء خدمة Render عبر API من CI مع وضع `MYSQL_*` في
+  GitHub — يكسر مبدأ «أسرار القاعدة في Render فقط» ويحتاج حسابًا على أي حال؛ (د) الاكتفاء بالشرح — يترك خطوات يدوية قابلة للخطأ.
+- **القرار:**
+  1. **workflow جديد** `.github/workflows/deploy-render.yml`: يعمل بعد نجاح «Celia quality & resilience» على `main` (أو يدويًا)،
+     صلاحياته `contents: read`، ويقرأ **فقط**: المتغيّر `CELIA_LIVE_URL`، والسرّين `RENDER_API_KEY` + `RENDER_SERVICE_ID`
+     (أو البديل `RENDER_DEPLOY_HOOK_URL`)، مع إعادة استخدام `CELIA_MCP_API_TOKEN` و`CELIAOS_CRONJOB_ORG_API_KEY` الموجودين.
+  2. **السكربت** `scripts/deploy-render.mjs` (`npm run deploy:render`): إن غاب مدخل → ينتهي أخضر بإشعار `not-configured` يسمّي
+     الناقص (لا ادعاء ولا فشل)؛ وإلا يطلق النشر وينتظر `live`/تطابق `/version` (20 دقيقة)، ثم يشغّل `verify:live` بنفس
+     العقد (`--expect-commit`، الرمز من البيئة فقط)، ويرفع التقرير artifact، وبعد PASS فقط ينشئ/يحدّث وظيفة cron-job.org
+     `celia-keepalive:<host>` على `/readyz` كل 10 دقائق (idempotent بالعنوان). كل ما يُطبع يمرّ بـ`sanitize` يحذف قيم الأسرار.
+  3. **قائمة الأسرار المتتبعة تبقى 18** (DEC-025): مدخلات Render أسرار نشر لا أسرار تكامل؛ لا تدخل `TRACKED_SECRETS` ولا
+     Worker. اختبار `test/deploy-render.test.js` يمنع ظهور `MYSQL_*`/`TOKEN_ENCRYPTION_KEY` في الـworkflow.
+  4. **الحالة اللغوية ثابتة:** الخادم الكامل `not-verified` حتى يكتب الـworkflow `verified` بتقرير PASS؛ البنود `manual` في
+     §5 تبقى على المالك وتُسجَّل في سجل جلسة.
+- **السبب:** «أعلى أتمتة ممكنة دون تجاوز حدود المالك»: ما يمكن للأسرار الموجودة فعله يُفعل آليًا، وما يحتاج حسابًا يُسمّى
+  بدقة بدل تمثيله.
+- **الأثر:** إضافة [.github/workflows/deploy-render.yml](../../.github/workflows/deploy-render.yml)،
+  [scripts/deploy-render.mjs](../../scripts/deploy-render.mjs)، [test/deploy-render.test.js](../../test/deploy-render.test.js)؛
+  تعديل `deploy/free-always-on/README.md` (§4 و§4.2)، `README.md` §روابط النشر، `docs/deployment-profile.json`، `package.json`
+  (`deploy:render`). لا تغيير في `render.yaml` ولا الأدوات ولا المخطط ولا الأسرار الثمانية عشر.
+
 ## إضافة قرار لاحق
 
 استخدم معرفًا جديدًا، والتاريخ والحالة والسياق والبدائل والقرار والسبب والأثر ومرجع المهمة، واذكر صراحة القرار المستبدل إن وجد. لا تنسخ أسرارًا أو مخطط إنتاج يحوي بيانات شخصية إلى سجل القرار.

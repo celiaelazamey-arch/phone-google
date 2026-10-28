@@ -1,14 +1,33 @@
 # الحالة الحالية — ابدأ من هنا
 
-**آخر مراجعة:** 27 أكتوبر 2026 (ليلًا) · **نوع الجلسة الحالية:** تنفيذ **بروتوكول التعلم المحكوم `CELIA-LEARN-001`
-(DEC-027) على أول مصدر خارجي (YouTube `Cb3mBAH0IaY`) وتوثيق روابط النشر بالدليل** على الفرع
-`arena/f0f6f9f0-phone-google` · سجل الجلسة:
-[2026-10-27-learning-protocol-and-publish-links](sessions/2026-10-27-learning-protocol-and-publish-links.md) · سجل الجلسة السابقة:
-[2026-10-27-agent-harness-plan-lifecycle](sessions/2026-10-27-agent-harness-plan-lifecycle.md) ·
+**آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** **أتمتة ما بعد حسابي المالك للخادم الكامل (DEC-028)** على الفرع
+`arena/bf717032-phone-google` · سجل الجلسة:
+[2026-10-28-render-release-automation](sessions/2026-10-28-render-release-automation.md) · سجل الجلسة السابقة:
+[2026-10-27-learning-protocol-and-publish-links](sessions/2026-10-27-learning-protocol-and-publish-links.md) ·
 البروتوكول: [docs/learning-protocol.md](../learning-protocol.md) · الخطة: [docs/go-live-plan.md](../go-live-plan.md) ·
 المرجع التشغيلي: [deploy/free-always-on/README.md](../../deploy/free-always-on/README.md)
 
-## الطلب الحالي (أعلى أولوية) — التعلم المحكوم من المصادر الخارجية وروابط النشر (DEC-027)
+## الطلب الحالي (أعلى أولوية) — «الأسرار موجودة، استخدمها» → أتمتة النشر على Render والتحقق (DEC-028)
+
+- **الواقع عند `main@a930383` (دمج PR #45، 2026-10-28 01:31 UTC):** Pages `https://celiaelazamey-arch.github.io/phone-google/`
+  (deployment `7374774785`، 10/10 مسارات في `40615518798`)، Worker `https://celia-phone-google.celiaelazamey.workers.dev`
+  (`liveReady:true`، 18/18 سرًا في `40615518722`)، الإصدار `v0.2.1` موثق (`40615518730`)، صورة GHCR عامة.
+  **غير منشور:** الخادم الكامل Express + MySQL — لا خدمة Render ولا قاعدة Aiven ولا `verify:live` PASS.
+- **أسرار Actions الثمانية عشر:** كلها مستخدمة (مزوّدو الذكاء ×4، cron-job.org، رمز المالك، الصوت ×2، Cloudflare ×2،
+  R2 ×3، Figma، Google OAuth ×2، الهاتف، Coda) — ولا واحد منها مضيف Node أو قاعدة MySQL؛ هذان حسابان ينشئهما المالك فقط.
+- **ما نُفِّذ:** `.github/workflows/deploy-render.yml` (بعد نجاح CI على `main` أو يدويًا؛ `contents: read`) +
+  `scripts/deploy-render.mjs` (`npm run deploy:render`): `not-configured` أخضر مع تسمية الناقص → إطلاق نشر Render (API أو
+  hook) وانتظار `live`/تطابق `/version` → `verify:live --expect-commit` بالرمز من البيئة → artifact → keep-alive
+  cron-job.org `celia-keepalive:<host>` كل 10 دقائق بعد PASS فقط؛ `sanitize` لكل مخرجات. اختبارات
+  `test/deploy-render.test.js` (8). الوثائق: `deploy/free-always-on/README.md` §4.2، README §روابط النشر،
+  `docs/deployment-profile.json`.
+- **ما يبقى على المالك (≈10 دقائق، بلا بطاقة):** (1) Aiven → MySQL Free فارغة؛ (2) Render → New → Blueprint → هذا
+  المستودع (`render.yaml`) → لصق `MYSQL_*` الستة في Render فقط؛ (3) في GitHub: variable `CELIA_LIVE_URL` + secrets
+  `RENDER_API_KEY`/`RENDER_SERVICE_ID` (أو `RENDER_DEPLOY_HOOK_URL`). بعدها أول دمج/تشغيل يدوي لـ`deploy-render.yml`
+  يكتب `verified` أو سبب الفشل. البنود `manual` في §5 تبقى بسجل جلسة.
+- **الخطوة التالية:** مراجعة/دمج PR هذا الفرع (قرار المالك)، ثم الخطوات الثلاث أعلاه؛ لا نشر من هذه الجلسة.
+
+## الطلب السابق — التعلم المحكوم من المصادر الخارجية وروابط النشر (DEC-027)
 
 - **روابط النشر الحية (دليل GitHub API عند `main@1a11810`، 2026-10-28 00:53 UTC):**
   - GitHub Pages: `https://celiaelazamey-arch.github.io/phone-google/` — deployment `7374226427` ناجح + فحص 10/10 مسارات

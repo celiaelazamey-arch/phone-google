@@ -55,5 +55,11 @@
     "githubActionsSecretsValuesExposed": false,
     "databaseSchemaChanges": false
   },
-  "remainingOwnerAction": "Create the FREE Render web service (Blueprint from render.yaml) and a dedicated Aiven MySQL Free database in your own dashboards, paste the MySQL credentials into Render only, then run `npm run verify:live -- --url https://<service>.onrender.com --expect-commit <sha>` and record the PASS report in a session file. Never paste credentials or payment information into chat."
+  "remainingOwnerAction": "Create the FREE Render web service (Blueprint from render.yaml) and a dedicated Aiven MySQL Free database in your own dashboards, paste the MySQL credentials into Render only, then add the repository variable CELIA_LIVE_URL plus the secrets RENDER_API_KEY + RENDER_SERVICE_ID (or RENDER_DEPLOY_HOOK_URL). From then on .github/workflows/deploy-render.yml deploys after every green CI run on main, runs `npm run verify:live -- --url $CELIA_LIVE_URL --expect-commit <sha>`, uploads the token-free report, and keeps the instance awake via cron-job.org; manual §5 items still need a session record. Never paste credentials or payment information into chat.",
+  "automationAfterOwnerAccounts": {
+    "workflow": ".github/workflows/deploy-render.yml",
+    "script": "scripts/deploy-render.mjs",
+    "inputs": { "variable": ["CELIA_LIVE_URL"], "secrets": ["RENDER_API_KEY", "RENDER_SERVICE_ID", "RENDER_DEPLOY_HOOK_URL (alternative)"], "reused": ["CELIA_MCP_API_TOKEN", "CELIAOS_CRONJOB_ORG_API_KEY"] },
+    "untilConfigured": "every run ends green with a not-configured notice naming the missing inputs; no deployment is claimed"
+  }
 }

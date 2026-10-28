@@ -14,7 +14,10 @@
 **غير منشور بعد (لا رابط له ولا يُدَّعى):** الخادم الكامل Express + MySQL (حلقة الوكيل، Google/WhatsApp) — يحتاج خدمة
 Render Free + قاعدة Aiven MySQL Free ينشئهما المالك من لوحتيهما بلا بطاقة، ثم `npm run verify:live -- --url https://<service>.onrender.com`
 بنتيجة PASS تُلصق في سجل جلسة ([الخطة التنفيذية](deploy/free-always-on/README.md)). Pages لقطة ثابتة (`/api/agent` غير متاح
-عليها)، والـWorker بوابة حافة للحالة والأسرار لا تشغّل حلقة الوكيل.
+عليها)، والـWorker بوابة حافة للحالة والأسرار لا تشغّل حلقة الوكيل. **ما بعد إنشاء الحسابين آلي:** أضف المتغيّر
+`CELIA_LIVE_URL` والسرّ `RENDER_API_KEY` + `RENDER_SERVICE_ID` (أو `RENDER_DEPLOY_HOOK_URL`) فيتولى
+`deploy-render.yml` النشر والتحقق (`verify:live`) وإبقاء الخدمة مستيقظة عبر cron-job.org عند كل دمج
+([التفاصيل §4.2](deploy/free-always-on/README.md)).
 
 ## خطة 2026 والاستمرارية بين الجلسات
 
