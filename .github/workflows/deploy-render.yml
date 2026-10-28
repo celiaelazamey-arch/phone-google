@@ -52,7 +52,8 @@ jobs:
       - run: npm ci
       - name: Trigger Render deploy, wait, run verify:live, ensure keep-alive
         env:
-          CELIA_LIVE_URL: ${{ vars.CELIA_LIVE_URL }}
+          CELIA_LIVE_URL_VAR: ${{ vars.CELIA_LIVE_URL }}
+          CELIA_LIVE_URL_SECRET: ${{ secrets.CELIA_LIVE_URL }}
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
           RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}

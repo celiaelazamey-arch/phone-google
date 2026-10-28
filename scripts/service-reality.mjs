@@ -210,7 +210,7 @@ export async function probeWhatsAppCloudApi({ env = process.env, fetchImpl = fet
 }
 
 export function buildProbes({ config, env, fetchImpl = fetch, timeoutMs, publication, version, modules }) {
-  const { generateCeliaReply, probeCeliaVoice, fetchFigmaProfile, getCodataStatus, getCronjobStatus, planDeployment } = modules;
+  const { generateCeliaReply, probeCeliaVoice, fetchFigmaProfile, getCodataStatus, getCronjobStatus, planDeployment, renderServiceName = 'celia-phone-google' } = modules;
   const synthetic = 'مرحبا، كيف أتواصل مع موظف؟';
   const upstreamMeaning = { 401: 'credential rejected (401)', 402: 'authenticated but payment required / no balance (402)', 403: 'forbidden (403) — key invalid for this endpoint or plan', 404: 'endpoint or model not found (404)', 429: 'rate limited or quota exhausted (429) — key accepted' };
   const listModels = async (cfg) => {
@@ -480,6 +480,7 @@ export function buildProbes({ config, env, fetchImpl = fetch, timeoutMs, publica
       run: async () => {
         const plan = planDeployment(env);
         if (!plan.ok) return { verdict: 'not-deployed', detail: `no live instance; missing ${plan.missing.join(', ')} — deploy-render.yml activates once added` };
+        if (!plan.liveUrl) return { verdict: 'not-deployed', detail: `service not resolved yet; deploy-render.yml discovers ${renderServiceName} by name from RENDER_API_KEY on its next run` };
         const ready = await probeJson(fetchImpl, `${plan.liveUrl}/readyz`, {}, timeoutMs);
         const ok = ready.status === 200 && ready.json?.storage?.mode === 'mysql';
         return { verdict: ok ? 'verified' : 'failed', detail: ok ? 'readyz 200 with durable MySQL' : `readyz ${ready.status} mode ${ready.json?.storage?.mode || 'n/a'}`, latencyMs: ready.latencyMs };
@@ -581,12 +582,12 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
   if (!options.skipOffline) report.mysql = runMysqlSuite({ env });
 
   if (!options.skipLive) {
-    const [{ loadCeliaMcpConfig }, { generateCeliaReply }, hub, { planDeployment }] = await Promise.all([
+    const [{ loadCeliaMcpConfig }, { generateCeliaReply }, hub, { planDeployment, RENDER_SERVICE_NAME }] = await Promise.all([
       import('../src/celia-mcp.js'), import('../src/ollama.js'), import('../src/secrets-hub.js'), import('./deploy-render.mjs')
     ]);
     const token = String(env.CELIA_MCP_API_TOKEN || '').trim().length >= 32 ? env.CELIA_MCP_API_TOKEN : crypto.randomBytes(32).toString('hex');
     const config = loadCeliaMcpConfig({ ...env, CELIA_MCP_API_TOKEN: token, CELIA_MCP_DISABLE_MYSQL: 'true', CELIA_DISABLE_OLLAMA: 'true', CELIA_SERVICE_TIMEOUT_MS: env.CELIA_SERVICE_TIMEOUT_MS || String(Math.min(Math.max(options.timeoutMs, 50), 60_000)) });
-    const probes = buildProbes({ config, env, fetchImpl, timeoutMs: options.timeoutMs, publication, version: pkg.version, modules: { generateCeliaReply, planDeployment, ...hub } });
+    const probes = buildProbes({ config, env, fetchImpl, timeoutMs: options.timeoutMs, publication, version: pkg.version, modules: { generateCeliaReply, planDeployment, renderServiceName: RENDER_SERVICE_NAME, ...hub } });
     report.live = await runProbes(probes, { env, timeoutMs: options.timeoutMs, features: config.features, retirements });
     report.score = scoreServices(report.live);
   }

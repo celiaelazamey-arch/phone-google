@@ -6,10 +6,12 @@
  *   node scripts/deploy-render.mjs --plan     # print what would happen and what is missing, no network
  *
  * What it needs (all optional — missing pieces produce a clear `not-configured` report, never a fake deploy):
- *   CELIA_LIVE_URL           repository VARIABLE: public https URL of the Render service (https://<service>.onrender.com)
- *   RENDER_API_KEY           secret: Render API key   ─┐ preferred trigger (deploy status is polled on Render)
- *   RENDER_SERVICE_ID        secret: srv-…             ─┘
- *   RENDER_DEPLOY_HOOK_URL   secret: deploy hook        alternative trigger (then /version is polled for the commit)
+ *   RENDER_API_KEY           secret: Render API key — enough on its own: the service is discovered by name
+ *                            (`celia-phone-google` from render.yaml) and its public URL is read off the API
+ *   CELIA_LIVE_URL           public https URL — accepted from an Actions VARIABLE or a SECRET (either tab);
+ *                            optional when the API key is present, because the URL is discovered instead
+ *   RENDER_SERVICE_ID        secret: srv-… — optional; skips discovery
+ *   RENDER_DEPLOY_HOOK_URL   secret: deploy hook — alternative trigger when no API key (then /version is polled)
  *   CELIA_MCP_API_TOKEN      secret: enables the owner-only checks of verify:live (never printed)
  *   CELIAOS_CRONJOB_ORG_API_KEY  secret: creates/updates the 10-minute /readyz keep-alive job after a PASS
  *   GITHUB_SHA / CELIA_EXPECT_COMMIT  commit the live service must report on /version
@@ -26,6 +28,8 @@ import { runCli as runVerifyLive } from './verify-live.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const RENDER_API = 'https://api.render.com/v1';
+/** Service name declared in render.yaml — the only guess discovery is allowed to make. */
+export const RENDER_SERVICE_NAME = 'celia-phone-google';
 export const CRONJOB_API = 'https://api.cron-job.org';
 export const TERMINAL_DEPLOY_STATUSES = Object.freeze({
   live: 'success',
@@ -39,19 +43,62 @@ export const TERMINAL_DEPLOY_STATUSES = Object.freeze({
 const trim = (value) => String(value ?? '').trim();
 const isHttps = (value) => /^https:\/\/[a-z0-9.-]+(?::\d+)?(?:\/.*)?$/i.test(value);
 
+/**
+ * Pure: reads the public URL from wherever the owner actually put it. The first real run of this workflow sat
+ * at `not-configured` while the URL existed, because the workflow only looked at `vars` and the owner had
+ * stored it as a secret — so both tabs are accepted now, and the caller passes them separately.
+ */
+export function resolveLiveUrl(env = process.env) {
+  for (const value of [env.CELIA_LIVE_URL, env.CELIA_LIVE_URL_VAR, env.CELIA_LIVE_URL_SECRET]) {
+    const url = trim(value).replace(/\/+$/, '');
+    if (url) return url;
+  }
+  return '';
+}
+
+/** Pure: the service names the key can see — printed when discovery fails so the owner sees *why*. */
+export function serviceNames(payload) {
+  const rows = Array.isArray(payload) ? payload : payload?.services || payload?.items || [];
+  return rows
+    .map((row) => row?.service || row)
+    .map((entry) => trim(entry?.name))
+    .filter(Boolean)
+    .slice(0, 12);
+}
+
+/**
+ * Pure: `GET /v1/services` → the one service this repo deploys. Exact name wins; a single unrelated service is
+ * accepted; anything else returns null so the caller reports ambiguity instead of deploying the wrong service.
+ */
+export function pickService(payload, wanted = RENDER_SERVICE_NAME) {
+  const rows = Array.isArray(payload) ? payload : payload?.services || payload?.items || [];
+  const services = rows.map((row) => row?.service || row).filter((entry) => entry?.id);
+  if (!services.length) return null;
+  const exact = services.find((entry) => entry.name === wanted);
+  if (exact) return { id: exact.id, name: exact.name || null, url: trim(exact.serviceDetails?.url || exact.url) || null };
+  if (services.length === 1) {
+    const only = services[0];
+    return { id: only.id, name: only.name || null, url: trim(only.serviceDetails?.url || only.url) || null };
+  }
+  return null;
+}
+
 /** Pure: decides the mode and lists what the owner still has to provide. */
 export function planDeployment(env = process.env) {
-  const liveUrl = trim(env.CELIA_LIVE_URL).replace(/\/+$/, '');
+  const liveUrl = resolveLiveUrl(env);
   const apiKey = trim(env.RENDER_API_KEY);
   const serviceId = trim(env.RENDER_SERVICE_ID);
   const hook = trim(env.RENDER_DEPLOY_HOOK_URL);
   const missing = [];
-  if (!liveUrl) missing.push('CELIA_LIVE_URL (repository variable)');
-  else if (!isHttps(liveUrl)) missing.push('CELIA_LIVE_URL must be an https URL');
+  // With an API key the service can be looked up by name, so neither an id nor a URL has to be typed by hand.
+  const canDiscover = Boolean(apiKey);
+  const needsDiscovery = canDiscover && (!serviceId || !liveUrl);
   let trigger = null;
-  if (apiKey && serviceId) trigger = 'render-api';
+  if (!liveUrl && !canDiscover) missing.push('CELIA_LIVE_URL (Actions variable or secret)');
+  if (apiKey) trigger = 'render-api';
   else if (hook) trigger = 'deploy-hook';
-  else missing.push('RENDER_API_KEY + RENDER_SERVICE_ID (or RENDER_DEPLOY_HOOK_URL)');
+  else missing.push('RENDER_API_KEY (or RENDER_DEPLOY_HOOK_URL)');
+  if (liveUrl && !isHttps(liveUrl)) missing.push('CELIA_LIVE_URL must be an https URL');
   if (hook && !isHttps(hook)) missing.push('RENDER_DEPLOY_HOOK_URL must be an https URL');
   const expectCommit = trim(env.CELIA_EXPECT_COMMIT || env.GITHUB_SHA) || null;
   return {
@@ -59,11 +106,29 @@ export function planDeployment(env = process.env) {
     mode: missing.length === 0 ? trigger : 'not-configured',
     liveUrl: liveUrl || null,
     serviceId: serviceId || null,
+    needsDiscovery,
     expectCommit,
     ownerChecks: Boolean(trim(env.CELIA_MCP_API_TOKEN)),
     keepalive: Boolean(trim(env.CELIAOS_CRONJOB_ORG_API_KEY)),
     missing
   };
+}
+
+/** Runtime: fills the service id and the public URL from the Render API when the owner did not type them. */
+export async function resolveService(env, plan, { log = () => {} } = {}) {
+  if (!plan.needsDiscovery) return plan;
+  const payload = await renderRequest(env, 'GET', '/services?limit=100');
+  const found = pickService(payload);
+  if (!found) {
+    const names = serviceNames(payload);
+    throw new Error(`render_service_not_found:${RENDER_SERVICE_NAME}${names.length ? `(visible: ${names.join(', ')})` : '(no services visible to this key)'}`);
+  }
+  if (!plan.serviceId) log(`service ${found.id} discovered by name (${found.name})`);
+  if (!plan.liveUrl) {
+    if (!found.url || !isHttps(found.url)) throw new Error('render_service_url_missing:' + found.id);
+    log(`live URL ${found.url} read from the Render API`);
+  }
+  return { ...plan, serviceId: plan.serviceId || found.id, liveUrl: plan.liveUrl || found.url.replace(/\/+$/, ''), discovered: !plan.serviceId || !plan.liveUrl };
 }
 
 /** Pure: the cron-job.org job that keeps the free instance awake within its 750 h/month quota. */
@@ -174,14 +239,35 @@ async function writeSummary(env, lines) {
 }
 
 export async function main({ env = process.env, argv = process.argv.slice(2), log = (m) => console.error(sanitize(m, env)) } = {}) {
-  const plan = planDeployment(env);
+  let plan = planDeployment(env);
   const planOnly = argv.includes('--plan');
   const report = { status: 'not-configured', mode: plan.mode, liveUrl: plan.liveUrl, expectCommit: plan.expectCommit, missing: plan.missing };
 
+  // `--plan` stays offline by contract; a real run fills the gaps from the Render API before claiming anything.
+  if (plan.ok && plan.needsDiscovery && !planOnly) {
+    try {
+      plan = await resolveService(env, plan, { log });
+      report.liveUrl = plan.liveUrl;
+      report.serviceId = plan.serviceId;
+    } catch (error) {
+      plan = { ...plan, ok: false, mode: 'not-configured', missing: [...plan.missing, `service lookup failed: ${error?.message || 'render_api_error'}`] };
+      report.missing = plan.missing;
+    }
+  }
+  // A real run cannot verify anything without a URL; `--plan` reports the discovery it would do instead.
+  if (plan.ok && !plan.liveUrl && !planOnly) {
+    plan = { ...plan, ok: false, mode: 'not-configured', missing: [...plan.missing, 'CELIA_LIVE_URL (Actions variable or secret)'] };
+    report.missing = plan.missing;
+  }
+  report.mode = plan.mode;
+
   if (!plan.ok || planOnly) {
     report.status = plan.ok ? 'planned' : 'not-configured';
+    report.needsDiscovery = plan.ok ? plan.needsDiscovery : undefined;
     report.note = plan.ok
       ? 'All inputs present; rerun without --plan to deploy.'
+      : plan.missing.some((entry) => entry.startsWith('service lookup failed'))
+        ? 'RENDER_API_KEY is present but the service could not be resolved. Check that the Blueprint was created (Dashboard → New → Blueprint on render.yaml) and that the key belongs to the same account. No deployment is claimed.'
       : 'Owner action required: create the FREE Render service from render.yaml (Dashboard → New → Blueprint) and the Aiven MySQL Free database, then add the names listed under `missing` in Settings → Secrets and variables → Actions. No deployment is claimed.';
     await writeSummary(env, ['### Render full-backend release', `- Status: \`${report.status}\``, `- Missing: ${plan.missing.length ? plan.missing.map((m) => `\`${m}\``).join(', ') : 'nothing'}`, '']);
     console.log(`::notice title=Render Live Status::${sanitize(JSON.stringify(report), env)}`);

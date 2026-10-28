@@ -118,9 +118,17 @@ Node ولا قاعدة MySQL** — هذان حسابان ينشئهما الما
 
 | ما تضيفه في GitHub (Settings → Secrets and variables → Actions) | النوع | من أين |
 |---|---|---|
-| `CELIA_LIVE_URL` | **Variable** | رابط الخدمة في Render: `https://<service>.onrender.com` |
-| `RENDER_API_KEY` + `RENDER_SERVICE_ID` | Secret | Render → Account Settings → API Keys، وService ID (`srv-…`) من Settings الخدمة |
-| أو بدلًا منهما `RENDER_DEPLOY_HOOK_URL` | Secret | Render → الخدمة → Settings → Deploy Hook |
+| `RENDER_API_KEY` | Secret | Render → Account Settings → API Keys — **يكفي وحده** |
+| `CELIA_LIVE_URL` | Variable **أو** Secret (التبويبان مقبولان) | رابط الخدمة: `https://<service>.onrender.com` — اختياري مع وجود المفتاح |
+| `RENDER_SERVICE_ID` (`srv-…`) | Secret — **اختياري** | يُكتشف تلقائيًا من الـAPI باسم `celia-phone-google` في `render.yaml` |
+| `RENDER_DEPLOY_HOOK_URL` | Secret — بديل بلا مفتاح API | Render → الخدمة → Settings → Deploy Hook |
+
+**تحديث 28 أكتوبر (DEC-033):** التشغيل الحقيقي الأول وقع في `not-configured` ليس لأن السرّ غائب بل لأن الـworkflow
+كان يقرأ `vars.CELIA_LIVE_URL` وحده بينما المالك خزّنه كـ**secret**، وكان يطلب `RENDER_SERVICE_ID` بيد المالك.
+صار الآن: (1) الرابط يُقبل باسم `CELIA_LIVE_URL` من تبويب المتغيّرات **أو** تبويب الأسرار — والمتغيّر أولًا كي يستطيع المالك تجاوز قيمة قديمة في السرّ دون حذفها؛
+(2) إذا وُجد `RENDER_API_KEY` فقط، يقرأ الـworkflow `GET /v1/services` ويأخذ `id` و`serviceDetails.url` للخدمة
+المسمّاة `celia-phone-google` (أو الخدمة الوحيدة إن كانت واحدة) — ومع تعدّد الخدمات **يرفض التخمين** ويطبع أسماءها
+المرئية للمفتاح. بهذا لا يبقى على المالك سوى إنشاء Blueprint مرة واحدة، ثم نقرة تشغيل أو أول دمج على `main`.
 
 ما يفعله الـworkflow (`on: workflow_run` بعد نجاح «Celia quality & resilience» على `main`، أو يدويًا):
 
