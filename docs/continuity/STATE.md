@@ -41,8 +41,12 @@
 - **النشر الكامل:** لم يُنفَّذ ولا يُدّعى — `deploy-render.yml` يخرج `not-configured` ويسمّي الناقص:
   `CELIA_LIVE_URL` (variable) + `RENDER_API_KEY`/`RENDER_SERVICE_ID` أو `RENDER_DEPLOY_HOOK_URL`، والحسابان (Render Free،
   Aiven MySQL Free) غير موجودين.
-- **حالة `main` الآن (`b70f914`):** الإصدار صار أخضر بعد PR #49 (`40673821824`) فدليل REL-002 على `main` متوفر، وWhatsApp
-  صار له حقول تشغيل ومسبار قراءة فقط (DEC-032)، وRender ما زال `not-configured`.
+- **مدموج:** PR #50 ← `main@5709bad` (28 أكتوبر 2026). كل الـworkflows على commit الدمج ناجحة: الجودة `40674752264`
+  (Node 22/24 + Python + حاوية + RTL + MySQL)، `Publish verified release` `40674752228` بخطواته المسمّاة
+  `Gate 1/4 … Gate 4/4` ثم نشر موقّع OIDC، Pages `40674752288`، Worker `40674752211`، Render `40674873835`
+  (`not-configured` صريح) → **REL-002 وQA-006 «متحقق»**. WhatsApp صار له حقول تشغيل ومسبار قراءة فقط (DEC-032).
+- **ما زال ناقصًا (كله لوحات مالك):** `CELIA_VOICE_ID` (91.7% < 95%)، Render+Aiven (`not-configured`)، أسرار Meta الأربعة،
+  عميل Google OAuth، وحماية `main` (`protected=false`).
 - **الخطوة التالية (المالك، خمس لوحات في [plan-100-percent](../plan-100-percent.md) §2):** `CELIA_VOICE_ID` في Repository
   secrets → «تم»؛ ثم Aiven + Render Blueprint + `CELIA_LIVE_URL` وأسرار Render → `verify:live` PASS؛ ثم أسرار Meta الأربعة
   وتحدي Webhook؛ ثم عميل Google OAuth.
