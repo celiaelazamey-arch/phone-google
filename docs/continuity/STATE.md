@@ -1,6 +1,6 @@
 # الحالة الحالية — ابدأ من هنا
 
-**آخر مراجعة:** 28 أكتوبر 2026 · **التركيز الحالي:** تجهيز WhatsApp مجاني-أولًا على البنية القائمة في `main@8a9fc567c6c0f32fac7d75ccd8ed0a0bf637d1e7` ·
+**آخر مراجعة:** 28 أكتوبر 2026 · **التركيز الحالي:** تجهيز WhatsApp مجاني-أولًا على البنية القائمة في `main@b70f9149add3699090ac7874a51019e2dc2c345a` ·
 سجل الجلسة: [2026-10-28-whatsapp-free-first-setup](sessions/2026-10-28-whatsapp-free-first-setup.md) ·
 السجل السابق: [2026-10-28-knowledge-ingest-tie-fix](sessions/2026-10-28-knowledge-ingest-tie-fix.md) ·
 الخطة: [docs/preservation-plan.md](../preservation-plan.md) · واقع الخدمات: [docs/service-reality.md](../service-reality.md) ·
@@ -8,15 +8,18 @@
 
 ## الحالة التنفيذية الحالية — WhatsApp مجاني-أولًا (WA-005 / DEC-032)
 
-- `main` عند `8a9fc567c6c0f32fac7d75ccd8ed0a0bf637d1e7` بعد دمج PR #49 الذي أصلح ترتيب `lastRun` في شبكة المعرفة. تغييرات WhatsApp على فرع مستقل وتحتاج نجاح CI/مراجعة.
-- التنفيذ الحالي في `src/whatsapp.js` يحتوي بالفعل على Webhook/REST: HMAC على raw bytes، إزالة تكرار معرف رسالة Meta، أوامر مالك Google، الموافقة `opted_in` و`ai_opted_in`، وحد 24 ساعة؛ الرد الآلي افتراضيًا متوقف.
-- الفجوة كانت في إعداد التشغيل: `render.yaml` لم يعرّف متغيرات Meta المطلوبة، ومسبار `whatsapp_cloud_api` لا يجري طلب Graph API. الإضافة على الفرع تُضيف حقول Blueprint، ومسبار GET للقراءة فقط للتحقق من رقم Meta، وتغطية اختبارات ووثائق.
-- الأسرار المطلوبة لهذا التكامل غير موجودة ضمن القائمة التي تمت مراجعتها سابقًا: `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`. `PHONE_NUMBER` الموجود يخص رقم المالك ولا يحل محل معرّف رقم Meta أو access token.
-- GitHub Actions secrets لا تُنقل تلقائيًا إلى Render. يلزم إدخال أسرار التشغيل في Render Dashboard، وإضافة الأربعة إلى Repository Actions secrets فقط إذا رغبت بتشغيل المسبار الحي. لا تُرسلها في المحادثة ولا تحفظها في Git.
-- حد القبول المجاني: بدء الاختبار برقم Meta التجريبي؛ مسبار Graph API لا يرسل رسائل؛ اختبارات webhook تثبت challenge/HMAC/dedup؛ `WHATSAPP_AUTO_REPLY_ENABLED=false` حتى موافقة صاحب النظام واكتمال اختبار end-to-end. لا ادعاء أن الإنتاج مجاني بلا حدود أو أن اتصال Meta حي قبل فحصه.
-- القرار المعماري: إعادة استخدام Express + MySQL الموجودين. لا نضيف مسار D1 موازٍ لأن Worker الحالي لا يملك binding D1 ولأن سجل الرسائل/الموافقات الحالي في MySQL؛ إضافة مخزنين دون خطة هجرة ستقسم الحقيقة.
-- الحالة: تغييرات الكود والتوثيق موجودة على `feat/whatsapp-free-first-setup-20261028`؛ لم يُفتح PR ولم يُعلن اجتياز CI أو اتصال حي بعد.
-- الروابط: [خطة الاستضافة](../free-hosting.md)، [وثائق Meta](https://whatsappbusiness.com/developers/developer-hub/)، [تدقيق الخدمات](../service-reality.md).
+- **main الحالي:** `b70f9149add3699090ac7874a51019e2dc2c345a`; تم دمج PR #51 بعد نجاح وظائف CI المطلوبة على رأس PR [run 40673674333](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40673674333).
+- **بعد الدمج:** جودة `main` ناجحة [40673821757](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40673821757)، GitHub Pages ناجح [40673821758](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40673821758)، Cloudflare Worker ناجح [40673821848](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40673821848)، وإصدار v0.2.1 ومرفقاته نجحت [40673821824](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40673821824). الإصدار يشير إلى commit `b70f9149`.
+- **Render ليس منشورًا:** تشغيل [40673950617](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40673950617) نجح في التشخيص فقط وأعلن `not-configured`; ينقص `CELIA_LIVE_URL` و`RENDER_API_KEY` مع `RENDER_SERVICE_ID` (أو `RENDER_DEPLOY_HOOK_URL`)، وإنشاء الخادم/قاعدة Aiven بواسطة المالك. لم يُدّعَ نشر الخلفية.
+- التنفيذ الحالي في `src/whatsapp.js` يحتوي Webhook/REST: HMAC على raw bytes، إزالة تكرار معرف رسالة Meta، موافقات `opted_in` و`ai_opted_in`، وحد نافذة 24 ساعة؛ الرد الآلي افتراضيًا متوقف.
+- PR #51 أضاف حقول التشغيل إلى `render.yaml`, إصدار Graph API افتراضي `v26.0`, ومسبار `whatsapp_cloud_api` للقراءة فقط للتحقق من رقم Meta، واختبارات وتوثيق [PR #51](https://github.com/celiaelazamey-arch/phone-google/pull/51).
+- التدقيق الحي لخدمات Meta **لم يُشغّل** بعد الدمج؛ workflow `Service reality audit` تخطّى التشغيل لأنه لا توجد إشارة `[reality]` ولا dispatch يدوي. لا يوجد دليل حالي على اتصال WhatsApp الحقيقي أو استلام/إرسال رسالة.
+- الأسرار المطلوبة ولم تظهر في القائمة السابقة: `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`. `PHONE_NUMBER` هو رقم المالك وليس Meta Phone Number ID ولا access token.
+- GitHub Actions secrets لا تنتقل تلقائيًا إلى Render. أضف الأسرار الأربعة في Repository Actions secrets لتفعيل مسبار القراءة، وأدخل قيم التشغيل نفسها في Render Dashboard بعد إنشاء الخدمة. لا تُرسل الأسرار في المحادثة أو Git.
+- **ضابط أمان:** `WHATSAPP_AUTO_REPLY_ENABLED=false` باقٍ؛ المسبار ينفذ GET فقط ولا يرسل رسالة. ابدأ برقم Meta التجريبي. لا تعلن أن WhatsApp يعمل end-to-end حتى ينجح تحدي Webhook وتوقيع POST وdedup والقبول الحي.
+- **الحوكمة:** فرع `main` ما زال غير محمي في آخر قراءة (`protected=false`); إعداد الحماية إجراء مستقل للمالك.
+- القرار المعماري: إعادة استخدام Express + MySQL الموجودين وعدم إنشاء D1/Webhook موازٍ بلا خطة هجرة؛ Worker الحالي طبقة حالة/جدولة ولا يملك binding D1.
+- المرجع: [خطة الاستضافة](../free-hosting.md)، [وثائق Meta](https://whatsappbusiness.com/developers/developer-hub/)، [تدقيق الخدمات](../service-reality.md).
 
 ## سجل سابق — إصلاح فشل الإصدار (PR #49)
 
