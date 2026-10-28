@@ -85,13 +85,24 @@ export function pickService(payload, wanted = RENDER_SERVICE_NAME) {
 
 /** Pure: decides the mode and lists what the owner still has to provide. */
 export function planDeployment(env = process.env) {
-  const liveUrl = resolveLiveUrl(env);
+  let liveUrl = resolveLiveUrl(env);
   const apiKey = trim(env.RENDER_API_KEY);
   const serviceId = trim(env.RENDER_SERVICE_ID);
   const hook = trim(env.RENDER_DEPLOY_HOOK_URL);
   const missing = [];
+  const warnings = [];
   // With an API key the service can be looked up by name, so neither an id nor a URL has to be typed by hand.
   const canDiscover = Boolean(apiKey);
+  // A hand-typed URL that is not an https URL (no scheme, a token pasted by mistake) must not block discovery:
+  // it is dropped with a warning and the truth comes from the API instead of from a guess.
+  if (liveUrl && !isHttps(liveUrl)) {
+    if (canDiscover) {
+      warnings.push('CELIA_LIVE_URL is not an https URL — ignored; the Render API supplies the real one');
+      liveUrl = '';
+    } else {
+      missing.push('CELIA_LIVE_URL must be an https URL');
+    }
+  }
   const needsDiscovery = canDiscover && (!serviceId || !liveUrl);
   let trigger = null;
   if (!liveUrl && !canDiscover) missing.push('CELIA_LIVE_URL (Actions variable or secret)');
@@ -110,7 +121,8 @@ export function planDeployment(env = process.env) {
     expectCommit,
     ownerChecks: Boolean(trim(env.CELIA_MCP_API_TOKEN)),
     keepalive: Boolean(trim(env.CELIAOS_CRONJOB_ORG_API_KEY)),
-    missing
+    missing,
+    warnings
   };
 }
 
@@ -241,7 +253,7 @@ async function writeSummary(env, lines) {
 export async function main({ env = process.env, argv = process.argv.slice(2), log = (m) => console.error(sanitize(m, env)) } = {}) {
   let plan = planDeployment(env);
   const planOnly = argv.includes('--plan');
-  const report = { status: 'not-configured', mode: plan.mode, liveUrl: plan.liveUrl, expectCommit: plan.expectCommit, missing: plan.missing };
+  const report = { status: 'not-configured', mode: plan.mode, liveUrl: plan.liveUrl, expectCommit: plan.expectCommit, missing: plan.missing, warnings: plan.warnings };
 
   // `--plan` stays offline by contract; a real run fills the gaps from the Render API before claiming anything.
   if (plan.ok && plan.needsDiscovery && !planOnly) {
