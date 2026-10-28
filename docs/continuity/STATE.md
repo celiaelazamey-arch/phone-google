@@ -1,13 +1,14 @@
 # الحالة الحالية — ابدأ من هنا
 
-**آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** **صلاحيات وكيل الكمبيوتر + الميزة التنافسية (AGENT-007)**
-على الفرع `arena/2edb2881-phone-google` · سجل الجلسة:
-[2026-10-28-computer-permissions](sessions/2026-10-28-computer-permissions.md) ·
+**آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** **إصلاح محلل ترحيل D1 على الحافة + تنظيف الـPRs المتجاوزة (DEC-035، OPS-005)**
+على الفرع `arena/3f0d6498-phone-google` · سجل الجلسة:
+[2026-10-28-edge-d1-sql-splitter-and-pr-hygiene](sessions/2026-10-28-edge-d1-sql-splitter-and-pr-hygiene.md) ·
+سجل D1 السابق: [2026-10-28-edge-d1-durability](sessions/2026-10-28-edge-d1-durability.md) ·
 الدليل: [docs/computer-permissions](../computer-permissions/README.md) · صفحة الكمبيوتر:
 [docs/computer-use.md](../computer-use.md) · حوكمة المشكلات: [docs/issue-triage.md](../issue-triage.md) ·
 واقع الخدمات: [docs/service-reality.md](../service-reality.md)
 
-## الطلب الحالي (أعلى أولوية) — «مخطط صلاحيات وكيل الكمبيوتر في CeliaOS + الميزة التنافسية»
+## الطلب الحالي (أعلى أولوية) — «إتمام دوام D1 الفعلي على الحافة وتنظيف الـPRs المفتوحة»
 
 ### حجب Render بالبطاقة → الدوام على الحافة (2026-10-28، DEC-034/DEC-035)
 
@@ -18,13 +19,29 @@
   `scripts/deploy-cloudflare-edge.mjs`.
 - **قاعدة الصدق:** `storage.durable` تُقاس بكتابة رمز جديد وقراءته في كل نداء؛ لا تُعلن من وجود اعتماد. بلا ربط
   ⇒ `false` + `d1_not_bound`، وقاعدة معطوبة ⇒ `false` + سببها.
-- **الدليل:** `test/edge-d1.test.js` 12/12 · المجموع **493/493** · تغطية `90.59 / 73.27 / 84.42`.
 - **بعد دمج #66 نُشر الـWorker فعلًا** (`main@d46a816`): 18/18 سرًّا، والرابط الحقيقي أعلن الكود الجديد بصدق
-  `storage.durable:false` + `reason:d1_not_bound`، وبيانات النشر حملت `d1_migration_400` — أي أن القاعدة موجودة
-  لكن طلب الـDDL رُفض، فلم يُربط `DB`. الدوام بقي `false` كما يجب عند الفشل.
-- **أُصلح في #67:** تجريد أسطر التعليقات قبل إرسال كل عبارة، `params: []` صريحًا، ثلاث محاولات قصيرة، «already
-  exists» ليست فشلًا، ورسالة الفشل تسمّي العبارة (`d1_migration_failed:statement_N:…`)، والربط يُطبَّق حتى عند
-  فشل الـDDL كي يقول `/readyz` السبب الحقيقي بدل «غير مربوط». **الحد ما زال:** النشر على `main` فقط.
+  `storage.durable:false` + `reason:d1_not_bound`، وبيانات النشر حملت `d1_migration_400`.
+- **بعد دمج #68 (`main@202aa19`، التشغيلة `40700333139` / الوظيفة `122858095918`):** أثمرت ميزة التشخيص وكشفت السبب
+  الحرفي في annotations:
+  `d1_migration_failed:statement_1:near "every": syntax error at offset 0: SQLITE_ERROR`
+  على القاعدة `f63ccd9f-49b1-4eca-861b-fd478c433518`. السبب الجذري: `applyMigrations` كانت تقسم النص عبر `.split(';')`
+  **قبل** حذف أسطر التعليقات `--`، والسطر الثاني من `0001_state.sql` يحوي فاصلة منقوطة داخل التعليق
+  (`-- ... D1 query API; every statement is`) فبقي المقطع `every statement is` بلا `--` في مطلع العبارة الأولى.
+- **الإصلاح النهائي في هذا الفرع (`arena/3f0d6498-phone-google`):**
+  1. دالة `splitSqlStatements(sql)` المصدّرة تحذف تعليقات `--` وتعليقات الكتل `/* ... */` **قبل** التقسيم على `;`
+     مع صون النصوص والمعرّفات المقتبسة (`'...'` و`"..."` و`` `...` ``).
+  2. اختبار تكامل حقيقي في `test/edge-d1.test.js` يمرّر ملف `workers/celia-edge/migrations/0001_state.sql` الفعلي عبر
+     `applyMigrations` على محرك `node:sqlite` (`DatabaseSync(':memory:')`) مرتين لإثبات الصلاحية والـidempotency
+     (4 عبارات نظيفة)، ثم يشغّل `worker.fetch` على `/readyz` و`/api/state` و`/api/audit` فوق قاعدة SQLite الحقيقية
+     ويثبت `storage.durable: true` وسلامة سلسلة التدقيق `chain.ok: true`.
+  3. تسجيل حقل `storage` الراجع من `/readyz` الحي مباشرةً في تقرير النشر (`::notice title=Cloudflare Edge Status::`)
+     وملخص GitHub Step Summary، وتصحيح رسالة تحذير `Celia D1` عندما يكون ربط `DB` قد طُبِّق فعليًا.
+  4. **الدليل المحلي:** `test/edge-d1.test.js` + `test/deploy-cloudflare-edge.test.js` **23/23** · المجموع **498/498**
+     · تغطية `90.72 / 73.51 / 84.50` · `check` 135 ملفًا. **الحد الباقي:** النشر على `main` فقط؛ بعد دمج هذا الـPR
+     يُفحص حقل `d1.ok` و`storage.durable` من تشغيلة `Deploy (Cloudflare Edge)` على `main`.
+- **تنظيف الـPRs المفتوحة (OPS-005):** أُغلقت بتوثيق صريح دون حذف الفروع كل من **#67** (مكرر 100% من #68 بفرق صفر)،
+  و**#39** (مسودة متجاوزة بـ#40 `DEC-020` و#43 `DEC-026` ومتعارضة مع `main`)، و**#34** (ريفيرت آلي قديم لـ#33 خطر على
+  `agent_outbox`)؛ وبقي **#38** مفتوحًا لقرار المالك بشأن صفحات `/cron` و`/google-map`.
 
 ### النشر على Render — الحالة الحقيقية (2026-10-28، DEC-033)
 

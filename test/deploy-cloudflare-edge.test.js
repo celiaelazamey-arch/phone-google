@@ -139,3 +139,87 @@ test('edge deploy: a failing /readyz probe keeps liveReady false instead of thro
   assert.equal(report.status, 'deployed');
   assert.equal(report.liveReady, false);
 });
+
+test('edge deploy: full D1 migration applies all 4 statements and records live /readyz storage durability', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'celia-edge-ok-'));
+  const summaryPath = path.join(directory, 'summary.md');
+  const lines = [];
+  const queriedStatements = [];
+
+  await main({
+    argv: [],
+    env: {
+      CLOUDFLARE_ACCOUNT_ID: 'acc-1',
+      CLOUDFLARE_API_TOKEN: 'token-1',
+      GITHUB_STEP_SUMMARY: summaryPath
+    },
+    fetchImpl: async (url, init = {}) => {
+      if (url.includes('/d1/database?')) {
+        return jsonResponse(200, { success: true, result: [{ uuid: 'db-live-1', name: 'celia-edge-state' }] });
+      }
+      if (url.includes('/d1/database/db-live-1/query')) {
+        const body = JSON.parse(init.body);
+        queriedStatements.push(body.sql);
+        return jsonResponse(200, { success: true, result: [{ success: true }] });
+      }
+      if (init.method === 'PUT') return jsonResponse(200, { success: true });
+      if (url.endsWith('/subdomain')) return jsonResponse(200, { result: { subdomain: 'celia' } });
+      if (url.endsWith('/readyz')) {
+        return jsonResponse(200, {
+          ok: true,
+          ready: true,
+          storage: { mode: 'd1', durable: true, durabilityVerifiedBy: 'this endpoint: write + read-back of a fresh token' }
+        });
+      }
+      return jsonResponse(200, { result: {} });
+    },
+    log: (line) => lines.push(line)
+  });
+
+  const report = JSON.parse(lines.at(-1));
+  assert.equal(report.status, 'deployed');
+  assert.equal(report.d1.ok, true);
+  assert.equal(report.d1.id, 'db-live-1');
+  assert.equal(report.d1.migrations.statements, 4);
+  assert.equal(queriedStatements.length, 4);
+  assert.equal(queriedStatements.some((stmt) => stmt.includes('every statement is')), false);
+  assert.equal(report.liveReady, true);
+  assert.equal(report.storage?.durable, true);
+  assert.equal(report.storage?.mode, 'd1');
+
+  const summary = await readFile(summaryPath, 'utf8');
+  assert.match(summary, /durable=true/);
+  assert.match(summary, /db-live-1/);
+});
+
+test('edge deploy: when D1 exists but migration fails, warning honestly notes the binding was still applied', async () => {
+  const lines = [];
+  await main({
+    argv: [],
+    env: { CLOUDFLARE_ACCOUNT_ID: 'acc-1', CLOUDFLARE_API_TOKEN: 'token-1' },
+    fetchImpl: async (url, init = {}) => {
+      if (url.includes('/d1/database?')) {
+        return jsonResponse(200, { success: true, result: [{ uuid: 'db-existing', name: 'celia-edge-state' }] });
+      }
+      if (url.includes('/d1/database/db-existing/query')) {
+        return jsonResponse(400, { success: false, errors: [{ message: 'simulated_ddl_rejection' }] });
+      }
+      if (init.method === 'PUT') return jsonResponse(200, { success: true });
+      if (url.endsWith('/subdomain')) return jsonResponse(200, { result: { subdomain: 'celia' } });
+      if (url.endsWith('/readyz')) {
+        return jsonResponse(200, { ready: true, storage: { mode: 'cloudflare-edge', durable: false, reason: 'd1_probe_failed:no such table: edge_heartbeat' } });
+      }
+      return jsonResponse(200, { result: {} });
+    },
+    retryDelayMs: 5,
+    log: (line) => lines.push(line)
+  });
+
+  const report = JSON.parse(lines.at(-1));
+  assert.equal(report.d1.ok, false);
+  assert.equal(report.d1.bindingApplied, true);
+  assert.equal(report.storage?.durable, false);
+  const warningLine = lines.find((line) => line.startsWith('::warning title=Celia D1::')) || '';
+  assert.match(warningLine, /binding applied/);
+  assert.doesNotMatch(warningLine, /deploying without the binding/);
+});

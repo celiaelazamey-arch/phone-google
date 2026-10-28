@@ -57,26 +57,87 @@ export async function ensureD1Database({ accountId, apiToken, fetchImpl = fetch,
   return { id, name, created: true };
 }
 
+/**
+ * Splits a SQL migration script into individual executable statements while stripping `--` line comments
+ * and `/* ... *\/` block comments BEFORE splitting on semicolons, and preserving quoted string/identifier
+ * literals (`'...'`, `"..."`, `` `...` ``) intact.
+ *
+ * Regression context: `0001_state.sql` line 2 contains a semicolon inside a `--` comment
+ * (`-- ... D1 query API; every statement is`). Splitting on `;` first left `every statement is` without `--`
+ * at the start of statement 1 (`SQLITE_ERROR: near "every": syntax error`).
+ */
+export function splitSqlStatements(sql) {
+  const source = String(sql ?? '');
+  const statements = [];
+  let current = '';
+  let quote = null;
+
+  for (let i = 0; i < source.length; i += 1) {
+    const ch = source[i];
+    const next = source[i + 1];
+
+    if (quote) {
+      current += ch;
+      if (ch === quote) {
+        if (next === quote) {
+          current += next;
+          i += 1;
+        } else {
+          quote = null;
+        }
+      }
+      continue;
+    }
+
+    if (ch === "'" || ch === '"' || ch === '`') {
+      quote = ch;
+      current += ch;
+      continue;
+    }
+
+    if (ch === '-' && next === '-') {
+      i += 2;
+      while (i < source.length && source[i] !== '\n') {
+        i += 1;
+      }
+      current += '\n';
+      continue;
+    }
+
+    if (ch === '/' && next === '*') {
+      i += 2;
+      while (i < source.length && !(source[i] === '*' && source[i + 1] === '/')) {
+        i += 1;
+      }
+      i += 1;
+      current += ' ';
+      continue;
+    }
+
+    if (ch === ';') {
+      const trimmed = current.trim();
+      if (trimmed) statements.push(trimmed);
+      current = '';
+      continue;
+    }
+
+    current += ch;
+  }
+
+  const tail = current.trim();
+  if (tail) statements.push(tail);
+  return statements;
+}
+
 /** Applies the DDL in `migrations/0001_state.sql`, statement by statement, through the D1 query API. */
-export async function applyMigrations({ accountId, apiToken, databaseId, sql, fetchImpl = fetch, log = () => {} }) {
+export async function applyMigrations({ accountId, apiToken, databaseId, sql, fetchImpl = fetch, retryDelayMs = 400, log = () => {} }) {
   const baseUrl = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}`;
   const headers = { authorization: `Bearer ${apiToken}`, 'content-type': 'application/json' };
-  // Comment lines are stripped before the statement is sent: the D1 query endpoint takes SQL, not a script,
-  // and a leading `--` block is the most likely reason the first attempt came back as HTTP 400.
-  const statements = String(sql)
-    .split(';')
-    .map((part) =>
-      part
-        .split('\n')
-        .filter((line) => !line.trim().startsWith('--'))
-        .join('\n')
-        .trim()
-    )
-    .filter(Boolean);
+  const statements = splitSqlStatements(sql);
 
   let applied = 0;
   for (const [index, statement] of statements.entries()) {
-    let lastDetail = `status_unknown`;
+    let lastDetail = 'status_unknown';
     // A database created seconds ago is not always queryable immediately; one short retry covers that.
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const response = await fetchImpl(`${baseUrl}/d1/database/${encodeURIComponent(databaseId)}/query`, {
@@ -86,20 +147,24 @@ export async function applyMigrations({ accountId, apiToken, databaseId, sql, fe
         body: JSON.stringify({ sql: statement, params: [] })
       });
       const payload = await response.json().catch(() => ({}));
-      const detail = payload?.errors?.[0]?.message || `status_${response.status}`;
+      const itemError = Array.isArray(payload?.result)
+        ? payload.result.find((entry) => entry && (entry.success === false || entry.error))?.error
+        : null;
+      const resultFailed = Array.isArray(payload?.result) && payload.result.some((entry) => entry && entry.success === false);
+      const detail = payload?.errors?.[0]?.message || itemError || `status_${response.status}`;
       // Re-running the deploy must not fail on tables that already exist.
       if (/already exists/i.test(detail)) {
         applied += 1;
         lastDetail = null;
         break;
       }
-      if (response.ok && payload?.success !== false) {
+      if (response.ok && payload?.success !== false && !resultFailed) {
         applied += 1;
         lastDetail = null;
         break;
       }
       lastDetail = detail;
-      await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs * (attempt + 1)));
     }
     if (lastDetail) {
       throw new Error(`d1_migration_failed:statement_${index + 1}:${String(lastDetail).slice(0, 160)}`);
@@ -156,7 +221,7 @@ export function buildWorkerMetadata({ env = process.env, version = '0.2.1', comm
   };
 }
 
-export async function main({ argv = process.argv.slice(2), env = process.env, fetchImpl = fetch, log = console.log } = {}) {
+export async function main({ argv = process.argv.slice(2), env = process.env, fetchImpl = fetch, retryDelayMs = 400, log = console.log } = {}) {
   const accountId = String(env.CLOUDFLARE_ACCOUNT_ID || '').trim();
   const apiToken = String(env.CLOUDFLARE_API_TOKEN || '').trim();
   const scriptName = String(env.CELIA_WORKER_NAME || 'celia-phone-google').trim();
@@ -177,16 +242,20 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
     try {
       database = await ensureD1Database({ accountId, apiToken, fetchImpl, log });
       d1BindingId = database.id;
-      const migrations = await applyMigrations({ accountId, apiToken, databaseId: database.id, sql: migrationSql, fetchImpl, log });
+      const migrations = await applyMigrations({ accountId, apiToken, databaseId: database.id, sql: migrationSql, fetchImpl, retryDelayMs, log });
       d1 = { ok: true, id: database.id, name: database.name, created: database.created, migrations };
     } catch (error) {
       d1 = {
         ok: false,
         reason: String(error?.message || error).slice(0, 240),
         databaseId: database?.id || null,
-        databaseCreated: database?.created ?? null
+        databaseCreated: database?.created ?? null,
+        bindingApplied: Boolean(d1BindingId)
       };
-      log(`::warning title=Celia D1::${d1.reason} — deploying without the binding; the worker will report storage.durable=false`);
+      const bindingNote = d1BindingId
+        ? 'binding applied so /readyz reports the exact probe error'
+        : 'deploying without the binding; the worker will report storage.durable=false';
+      log(`::warning title=Celia D1::${d1.reason} — ${bindingNote}`);
     }
   }
 
@@ -319,12 +388,14 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
   const workerUrl = subdomain ? `https://${scriptName}.${subdomain}.workers.dev` : null;
 
   let liveReady = false;
+  let liveStorage = null;
   if (workerUrl) {
     try {
       const probeRes = await fetchImpl(`${workerUrl}/readyz`);
       if (probeRes.ok) {
         const probeData = await probeRes.json().catch(() => ({}));
         liveReady = Boolean(probeData.ready);
+        liveStorage = probeData.storage ?? null;
       }
     } catch {
       liveReady = false;
@@ -336,6 +407,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
     scriptName,
     workerUrl,
     liveReady,
+    storage: liveStorage,
     version: pkg.version,
     commit,
     secretBindingsInjected: secretBindingsCount,
@@ -353,6 +425,9 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
         workerUrl ? `- Live Edge URL: ${workerUrl}` : '- Live Edge URL: subdomain not enabled yet',
         `- Secrets Injected: **${secretBindingsCount} / ${SECRET_KEYS.length}**`,
         `- Live \`/readyz\` check: **${liveReady ? 'PASS' : 'pending propagation'}**`,
+        ...(liveStorage
+          ? [`- Live \`/readyz\` storage: \`durable=${Boolean(liveStorage.durable)}\` (\`mode=${liveStorage.mode || 'unknown'}\`${liveStorage.reason ? `, \`reason=${liveStorage.reason}\`` : ''})`]
+          : []),
         `- Durable storage (D1 \`${D1_DATABASE_NAME}\`): **${d1.ok ? `${d1.id}${d1.created ? ' (created)' : ''}` : `degraded — ${d1.reason}${d1BindingId ? ' (binding applied, check /readyz)' : ' (no binding)'}`}**`,
         ''
       ].join('\n'),
