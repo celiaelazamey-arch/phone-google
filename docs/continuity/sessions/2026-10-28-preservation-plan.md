@@ -31,7 +31,9 @@
 ## الدليل
 
 - محليًا (Node 22.22.3): `npm run test:coverage` → 324/324 قبل إضافة الاختبارين، التغطية 85.83 / 71.98 / 83.93 فوق الأرضية؛
-  `check` 114 ملفًا؛ `check:continuity` سليم. CI على الفرع: يُسجَّل في STATE بعد الدفع.
+  `check` 114 ملفًا؛ `check:continuity` سليم. بعد الإضافة: 326/326 (85.70 / 71.87 / 83.76).
+- CI على الفرع (`1fd0628`): `Celia quality & resilience` run `40652077014` ✅ — أول تشغيل لأرضية التغطية في CI مرّ على
+  Node 22 و24؛ `Service reality audit` skipped كما يجب (لا `[reality]`، وليس `main`).
 
 ## ما لم يُفعل ولماذا
 
