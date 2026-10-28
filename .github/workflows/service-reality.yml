@@ -1,0 +1,89 @@
+name: Service reality audit
+
+# Proves — with the real repository secrets, from a runner with open egress — which services actually work.
+# Runs the full offline suite with coverage, the real-MySQL suite, then one synthetic read-only request per
+# external service. Nothing is created, sent or stored; no key or generated content is ever printed.
+#
+# Trigger: manually (Actions → Service reality audit → Run workflow) or by pushing a commit whose message
+# contains "[reality]". Fails when any configured service does not perform its real operation (< 95%).
+
+on:
+  workflow_dispatch:
+    inputs:
+      min_rate:
+        description: 'Minimum working rate of configured services (0..1)'
+        type: string
+        default: '0.95'
+  push:
+    branches: ['**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: service-reality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[reality]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: synthetic-ci-only-password
+        ports:
+          - 3306/tcp
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -psynthetic-ci-only-password"
+          --health-interval=5s --health-timeout=5s --health-retries=30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Offline suite + coverage, real MySQL suite, live synthetic probes (secrets never printed)
+        env:
+          CELIA_MYSQL_TESTS: 'true'
+          MYSQL_TEST_HOST: 127.0.0.1
+          MYSQL_TEST_PORT: ${{ job.services.mysql.ports[3306] }}
+          MYSQL_TEST_CONTAINER: ${{ job.services.mysql.id }}
+          MYSQL_TEST_PASSWORD: synthetic-ci-only-password
+          AGENETROUTERAPI_KEY: ${{ secrets.AGENETROUTERAPI_KEY }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          CELIAOS_CRONJOB_ORG_API_KEY: ${{ secrets.CELIAOS_CRONJOB_ORG_API_KEY }}
+          CELIA_MCP_API_TOKEN: ${{ secrets.CELIA_MCP_API_TOKEN }}
+          CELIA_VOICE_ID: ${{ secrets.CELIA_VOICE_ID }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_R2_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+          CLOUDFLARE_R2_S3_ENDPOINT: ${{ secrets.CLOUDFLARE_R2_S3_ENDPOINT }}
+          CLOUDFLARE_R2_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          FIGMA_ACCESS_TOKEN: ${{ secrets.FIGMA_ACCESS_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          PHONE_NUMBER: ${{ secrets.PHONE_NUMBER }}
+          YOUR_CODATA_API_KEY: ${{ secrets.YOUR_CODATA_API_KEY }}
+          CELIA_LIVE_URL: ${{ vars.CELIA_LIVE_URL }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/service-reality.mjs --min-rate ${{ inputs.min_rate || '0.95' }}
+      - name: Upload sanitized reality report
+        if: always() && hashFiles('.validation-artifacts/service-reality.json') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: service-reality-${{ github.sha }}
+          path: .validation-artifacts/service-reality.json
+          include-hidden-files: true
+          retention-days: 90
