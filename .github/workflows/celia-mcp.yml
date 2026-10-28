@@ -45,7 +45,7 @@ jobs:
             exit 1
           fi
       - run: npm ci --no-audit --no-fund
-      - run: npm run check && npm run release:check && npm run check:continuity && npm test
+      - run: npm run check && npm run release:check && npm run check:continuity && npm run test:coverage
       - name: Require handoff for implementation changes
         if: github.event_name == 'pull_request'
         env:

@@ -4,10 +4,14 @@ name: Service reality audit
 # Runs the full offline suite with coverage, the real-MySQL suite, then one synthetic read-only request per
 # external service. Nothing is created, sent or stored; no key or generated content is ever printed.
 #
-# Trigger: manually (Actions → Service reality audit → Run workflow) or by pushing a commit whose message
-# contains "[reality]". Fails when any configured service does not perform its real operation (< 95%).
+# Trigger: every Monday 06:00 UTC (preservation cadence, DEC-031), manually (Actions → Service reality audit →
+# Run workflow), or by pushing a commit whose message contains "[reality]". Fails when any configured service
+# does not perform its real operation (< 95%). On main, scheduled/manual runs upsert ONE tracking issue
+# (label `service-reality`) so the owner is actually notified; the issue closes itself on the next pass.
 
 on:
+  schedule:
+    - cron: '0 6 * * 1'
   workflow_dispatch:
     inputs:
       min_rate:
@@ -19,6 +23,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: service-reality-${{ github.ref }}
@@ -26,7 +31,7 @@ concurrency:
 
 jobs:
   audit:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[reality]')
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[reality]')
     runs-on: ubuntu-latest
     timeout-minutes: 25
     services:
@@ -91,6 +96,13 @@ jobs:
           AI_GATEWAY_MODEL: ${{ vars.AI_GATEWAY_MODEL }}
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/service-reality.mjs --min-rate ${{ inputs.min_rate || '0.95' }}
+      - name: Notify the owner through one tracking issue (main, scheduled/manual runs only)
+        if: always() && github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && hashFiles('.validation-artifacts/service-reality.json') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/reality-notify.mjs
       - name: Upload sanitized reality report
         if: always() && hashFiles('.validation-artifacts/service-reality.json') != ''
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
