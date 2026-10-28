@@ -621,7 +621,7 @@ export class KnowledgeStore {
 
   stats() {
     const count = (sql) => Number(this.db.prepare(sql).get()?.total || 0);
-    const lastRun = this.db.prepare('SELECT * FROM ingest_runs ORDER BY started_at DESC LIMIT 1').get() || null;
+    const lastRun = this.db.prepare('SELECT * FROM ingest_runs ORDER BY started_at DESC, rowid DESC LIMIT 1').get() || null;
     const lastRejections = lastRun
       ? this.db.prepare('SELECT line, code, field FROM ingest_rejections WHERE run_id = ? ORDER BY line LIMIT 20').all(lastRun.id)
       : [];
