@@ -36,7 +36,13 @@
 4. تحقق حي على نشر الخادم الحالي وأدلة مرتبطة بنفس commit، مع الحفاظ على `WHATSAPP_AUTO_REPLY_ENABLED=false` حتى موافقة المالك والقبول النهائي.
 5. لا تعلن أن الإنتاج مجاني بلا حدود: أدوات الاختبار مجانية، أما الرسائل الحقيقية قد تكون مدفوعة وفق حساب Meta وسياساته.
 
-## الحالة عند التسليم
-- تم رفع تغييرات المصدر والاختبارات والوثائق إلى الفرع؛ يجب فحص SHA الحالي في GitHub ثم فتح PR وتشغيل CI قبل أي دمج.
-- لا يوجد دليل حي على أن أسرار Meta موجودة الآن أو أن رقم WhatsApp متصل. التكامل الخارجي ينتظر إعدادات المالك.
-- حماية `main` ونشر Render/Aiven لا يتم تفعيلهما بهذه المهمة؛ لا تتجاوز تسجيل الحساب أو طلب البطاقة. إذا طلب المزوّد بطاقة، توقف واستخدم رقم الاختبار المجاني ومسار العرض فقط.
+## الحالة النهائية بعد التنفيذ
+
+- **PR #51 مُدمج** عبر Squash؛ commit `b70f9149add3699090ac7874a51019e2dc2c345a`.
+- CI الكامل على PR نجح: [40673674333](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40673674333). بوابة جودة `main` نجحت: [40673821757](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40673821757).
+- نشر GitHub Pages نجح [40673821758](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40673821758)، وCloudflare Worker نجح [40673821848](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40673821848)، وPublish verified release نجح [40673821824](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40673821824). أحدث release `v0.2.1` يستهدف commit `b70f9149` مع 5 أصول.
+- Render workflow [40673950617](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40673950617) أنهى بنجاح نتيجة `not-configured`; هذا **ليس نشرًا**. الخدمة الكاملة وAiven MySQL لم تُنشآ/تُهيّآ بعد.
+- تدقيق `Service reality audit` على commit الدمج تخطّى التنفيذ لعدم وجود trigger `[reality]` أو dispatch يدوي؛ لا يوجد تأكيد حي على Meta/WhatsApp.
+- لم تظهر الأسرار الأربعة في قائمة Repository secrets التي زود بها المستخدم: `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`. يجب إنشاء Meta app واستخدام test phone number ثم إضافة القيم، وعدم مشاركة أي قيمة هنا.
+- `WHATSAPP_AUTO_REPLY_ENABLED=false` ما زال قيد الأمان الافتراضي. لا يُفعّل حتى نجاح Webhook challenge وHMAC وdedup والاختبار الحي، ولا ضمان أن الإنتاج مجاني بلا حدود.
+- إعداد حماية `main` لم يتغير؛ فحص GitHub أظهر `protected=false`. هذه خطوة تشغيلية للمالك مستقلة عن WhatsApp.
