@@ -1,0 +1,38 @@
+%% CeliaOS — Copilot read-only bridge. Generated from scripts/celia-copilot-mcp-bridge.mjs constants.
+flowchart RL
+  subgraph CLIENT["طبقة العميل — لا تُمنح الثقة"]
+    A1["GitHub Copilot · Cloud Agent"]
+    A2["GitHub Copilot · Code Review"]
+  end
+
+  subgraph BRIDGE["CeliaOS Copilot MCP Bridge — scripts/celia-copilot-mcp-bridge.mjs"]
+    direction TB
+    G1{"G1 · قائمة سماح<br/>4 أدوات قراءة فقط"}
+    G2["G2 · readOnlyHint<br/>destructive=false · openWorld=false"]
+    G3["G3 · قدرات: tools فقط<br/>بلا prompts/resources"]
+    G4["G4 · تنقية النتائج<br/>حجب الأسرار ← [redacted]"]
+  end
+
+  subgraph SERVER["خادم Celia MCP — src/celia-mcp.js --stdio"]
+    S1["16 أداة"]
+    S2["تخزين: الذاكرة افتراضيًا"]
+  end
+
+  B["⛔ منطقة الرفض<br/>12 أداة كتابة وأثر خارجي<br/>+ prompts/resources"]
+
+  A1 -->|"JSON-RPC · initialize / tools/list / tools/call"| G1
+  A2 -->|"JSON-RPC"| G1
+  G1 -->|"مسموح"| G2 --> G3 --> G4
+  G4 -->|"forward · stdio"| S1
+  S1 --> S2
+  G1 -.->|"policy_blocked_tool"| B
+  G1 -.->|"policy_blocked_method"| B
+
+  classDef client fill:#eef4ff,stroke:#3b82f6,color:#0f172a
+  classDef bridge fill:#ecfdf5,stroke:#059669,color:#064e3b
+  classDef server fill:#fff7ed,stroke:#ea580c,color:#7c2d12
+  classDef blocked fill:#fef2f2,stroke:#dc2626,color:#7f1d1d
+  class A1,A2 client
+  class G2,G3,G4 bridge
+  class S1,S2 server
+  class B blocked
