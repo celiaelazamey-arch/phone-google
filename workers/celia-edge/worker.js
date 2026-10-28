@@ -1,3 +1,5 @@
+import { createStateStore, probeDurability } from './state.js';
+
 const CRONJOB_ORIGIN = 'https://api.cron-job.org';
 const MAX_BODY_BYTES = 8192;
 const ALLOWED_JOB_FIELDS = new Set([
@@ -70,6 +72,27 @@ function jsonResponse(body, status = 200, extraHeaders = {}) {
       ...extraHeaders
     }
   });
+}
+
+/** Maps a state-store call to HTTP, including the honest 503 when D1 is not bound. */
+async function stateResult(run) {
+  try {
+    const body = await run();
+    const error = body && body.ok === false ? body.error : null;
+    const status = !error
+      ? 200
+      : error === 'not_found'
+        ? 404
+        : error === 'invalid_key' || error === 'value_too_large'
+          ? 400
+          : error === 'd1_not_bound'
+            ? 503
+            : 500;
+    return { status, body };
+  } catch (error) {
+    const code = error?.code || 'state_error';
+    return { status: code === 'd1_not_bound' ? 503 : 500, body: { ok: false, error: code } };
+  }
 }
 
 function verifyBearer(request, env) {
@@ -156,24 +179,23 @@ export default {
 
     if (request.method === 'GET' && (pathname === '/' || pathname === '/health' || pathname === '/readyz')) {
       const readiness = buildEdgeSecretsReport(env);
+      // `durable` is not a capability flag: every call writes a fresh token to D1 and reads it back. A bound
+      // but broken database therefore reports false with the reason, and an unbound worker keeps saying so.
+      const storage = {
+        ...(await probeDurability(env)),
+        r2CredentialsPresent: Boolean(
+          hasSecret(env, 'CLOUDFLARE_R2_ACCESS_KEY_ID') &&
+            hasSecret(env, 'CLOUDFLARE_R2_SECRET_ACCESS_KEY') &&
+            hasSecret(env, 'CLOUDFLARE_R2_S3_ENDPOINT')
+        )
+      };
       return jsonResponse(
         {
           ok: true,
           ready: true,
           service: 'celia-phone-google-edge',
           release,
-          storage: {
-            mode: 'cloudflare-edge',
-            // Presence of R2 credentials is not durability: nothing here writes or reads R2, so this
-            // endpoint never claims `durable: true`. The service-reality audit exercises R2 for real.
-            durable: false,
-            r2CredentialsPresent: Boolean(
-              hasSecret(env, 'CLOUDFLARE_R2_ACCESS_KEY_ID') &&
-                hasSecret(env, 'CLOUDFLARE_R2_SECRET_ACCESS_KEY') &&
-                hasSecret(env, 'CLOUDFLARE_R2_S3_ENDPOINT')
-            ),
-            durabilityVerifiedBy: 'service-reality audit (not this endpoint)'
-          },
+          storage,
           secretsConfiguredCount: readiness.configuredCount,
           totalSecretsTracked: readiness.totalSecretsTracked
         },
@@ -248,16 +270,55 @@ export default {
       );
     }
 
-    // All /api/secrets/*, /api/cron/*, and /api/storage/* routes require Bearer CELIA_MCP_API_TOKEN
+    // All /api/secrets/*, /api/cron/*, /api/storage/*, /api/state/* and /api/audit routes require the owner token.
     if (
       pathname.startsWith('/api/secrets') ||
       pathname.startsWith('/api/cron') ||
-      pathname.startsWith('/api/storage')
+      pathname.startsWith('/api/storage') ||
+      pathname.startsWith('/api/state') ||
+      pathname.startsWith('/api/audit')
     ) {
       const auth = verifyBearer(request, env);
       if (!auth.ok) {
         return jsonResponse({ error: auth.error }, auth.status, baseHeaders);
       }
+    }
+
+    // Durable key/value state and its audit chain (DEC-035). Every write appends a hash-chained record, so a
+    // change can be reconstructed later and tampering is detectable without storing the value twice.
+    if (pathname === '/api/state' && request.method === 'GET') {
+      const { status, body } = await stateResult(() => createStateStore(env).list({ limit: url.searchParams.get('limit') }));
+      return jsonResponse(body, status, baseHeaders);
+    }
+
+    if (pathname === '/api/audit' && request.method === 'GET') {
+      const { status, body } = await stateResult(() => createStateStore(env).audit({ limit: url.searchParams.get('limit') }));
+      return jsonResponse(body, status, baseHeaders);
+    }
+
+    if (pathname.startsWith('/api/state/')) {
+      const key = decodeURIComponent(pathname.slice('/api/state/'.length));
+      const store = createStateStore(env);
+      if (request.method === 'GET') {
+        const { status, body } = await stateResult(() => store.get(key));
+        return jsonResponse(body, status, baseHeaders);
+      }
+      if (request.method === 'PUT' || request.method === 'POST') {
+        const raw = await request.text();
+        if (raw.length > MAX_BODY_BYTES) {
+          return jsonResponse({ error: 'payload_too_large' }, 413, baseHeaders);
+        }
+        let value = raw;
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object' && 'value' in parsed) value = parsed.value;
+        } catch {
+          /* a plain string body is a valid value */
+        }
+        const { status, body } = await stateResult(() => store.put(key, value));
+        return jsonResponse(body, status, baseHeaders);
+      }
+      return jsonResponse({ error: 'method_not_allowed' }, 405, baseHeaders);
     }
 
     if (request.method === 'GET' && pathname === '/api/secrets/status') {
