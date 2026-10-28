@@ -40,7 +40,19 @@
 | `40646259843` | `ace053a` | فشل | ElevenLabs: `/user` 401 لكن 34 صوتًا مرئيًا؛ AgentRouter 0 نماذج؛ DeepSeek يسرد `deepseek-flash`/`v4-pro`؛ R2 TLS handshake مرفوض |
 | **`40646881277`** | `d473dfb` | فشل (62.5%) | AI Gateway: «requires a valid credit card»؛ DeepSeek: «Insufficient Balance»؛ ElevenLabs `missing_permissions` + `voice_not_found` |
 
-النهائي: 322/322 بلا شبكة (85.79% أسطر)، MySQL 11/11، 10 ✅ / 6 ❌ / 1 ⚪ / 2 🟡 / 1 🚫.
+| `40647848223` | `28ee4c0` | فشل (62.5%) | توثيق الجدول؛ لا تغيير في الواقع |
+| **`40649403028`** | `0ea7600` | فشل (83.3%) | بعد «ابدأ كما ذكرت»: 4 متقاعدة في Git؛ ElevenLabs: **المفتاح يولّد صوتًا** (17,597 بايت بصوت Roger) → العيب في `CELIA_VOICE_ID` فقط؛ Figma 401 |
+
+النهائي: 324/324 بلا شبكة (85.82% أسطر)، MySQL 11/11، 10 ✅ / 2 ❌ / 4 ⏸️ / 1 ⚪ / 2 🟡 / 1 🚫.
+
+## الجزء الثاني — «ابدأ كما ذكرت» (التقاعد الصريح)
+
+- محاولة `actions/variables` و`actions/secrets` من هذا التكامل → **403** (لا صلاحية)؛ لذلك صار التقاعد ملفًا مراجَعًا:
+  `src/service-retirements.js` + `docs/deployment-profile.json → serviceRetirements` (ai_gateway، cloudflare_r2، deepseek،
+  agentrouter) بسبب/دليل/تراجع لكل سطر. يغذّي المدقق (⏸️ `disabled`)، `scripts/deploy-cloudflare-edge.mjs` (`plain_text`
+  bindings)، `workers/celia-edge/worker.js` (`retired` لكل سر + `retiredServices`)، و`render.yaml` (أربعة مفاتيح `'true'`)؛
+  اختبار واحد يربط الثلاثة بالملف. مسبار ElevenLabs يولّد 6 أحرف فعلًا (صوت مهيأ عند النجاح، صوت مرئي عند الفشل).
+- لم أختر صوتًا بديلًا لسيليا ولم أغيّر أي سر (هوية الصوت قرار المالك ولا صلاحية لي أصلًا).
 
 ## ما لم يُفعل ولماذا
 
@@ -50,7 +62,8 @@
 
 ## الخطوة التالية بالضبط
 
-1. المالك: لكل خدمة فاشلة — تجديد/تمويل أو `CELIA_DISABLE_<SERVICE>=true` كمتغير مستودع؛ ElevenLabs يحتاج مفتاحًا
-   بصلاحيات `user_read`/`voices_read` ومعرّف صوت من الحساب (`CELIA_VOICE_ID`).
-2. commit بـ`[reality]` (أو dispatch من `main` بعد الدمج) وقراءة `gh api repos/<owner>/<repo>/check-runs/<job>/annotations`.
-3. عند ≥95% بدليل run: تحديث QA-005 إلى «متحقق» مع رقم الـrun.
+1. المالك: سرّ `CELIA_VOICE_ID` = معرّف صوت مرئي للمفتاح الحالي (المفتاح يولّد صوتًا فعلًا؛ مثلًا `EXAVITQu4vr4xnSDxMaL`
+   Sarah أو `FGY2WhTYpPnrIDTdsKH5` Laura أو `CwhRBWXzGAHq8TQ4Fs17` Roger) أو إعادة إنشاء صوت سيليا في هذا الحساب.
+2. المالك: توكن Figma جديد (`FIGMA_ACCESS_TOKEN`) **أو** سطر `figma` في `serviceRetirements` (سبب + تاريخ).
+3. commit بـ`[reality]` (أو dispatch من `main` بعد الدمج) وقراءة `gh api repos/<owner>/<repo>/check-runs/<job>/annotations`.
+4. عند ≥95% بدليل run: تحديث QA-005 إلى «متحقق» مع رقم الـrun.

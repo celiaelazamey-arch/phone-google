@@ -10,17 +10,21 @@
 ## الطلب الحالي (أعلى أولوية) — «لا خدمة مجرد اسم أو موكب؛ خدمات حقيقية مختبرة ≥95%» (DEC-030، QA-005)
 
 - **ما نُفِّذ:** `scripts/service-reality.mjs` (`npm run reality`) + `.github/workflows/service-reality.yml` (يعمل عند commit
-  يحمل `[reality]` أو `workflow_dispatch` من `main`) + `test/service-reality.test.js` (9) + `test/ai-providers.test.js` (3).
-  أربع تشغيلات حقيقية بالأسرار الـ18 من داخل Actions؛ **الأخيرة run `40646881277`**: 322/322 بلا شبكة (تغطية أسطر 85.79%)،
-  MySQL 8.4 حقيقي 11/11، مسابر حية: **10 متحققة · 6 فاشلة · 1 غير مهيأة · 2 لا يمكن التحقق · 1 غير منشورة → 62.5% < 95%**.
-- **الحقيقة الصريحة:** الست الفاشلة أسباب **حساب لا شيفرة**: AI Gateway 403 «يتطلب بطاقة» (يتعارض مع قيد «لا بطاقة»)،
-  DeepSeek 402 بلا رصيد، AgentRouter 0 نماذج، ElevenLabs مفتاح مقيّد (`missing_permissions`) ومعرّف صوت `voice_not_found`،
-  Figma 401، R2 TLS مرفوض (غير مفعّل). الجدول الكامل: [docs/service-reality.md](../service-reality.md).
+  يحمل `[reality]` أو `workflow_dispatch` من `main`) + `test/service-reality.test.js` (10) + `test/ai-providers.test.js` (3).
+  ست تشغيلات حقيقية بالأسرار الـ18 من داخل Actions؛ التشخيص الكامل في run `40646881277`؛ **الأخيرة run `40649403028`**:
+  324/324 بلا شبكة (85.82% أسطر)، MySQL 8.4 حقيقي 11/11، مسابر حية: **10 متحققة · 2 فاشلة · 4 متقاعدة صراحةً · 1 غير مهيأة
+  · 2 لا يمكن التحقق · 1 غير منشورة → 83.3% < 95%** (كانت 62.5%).
+- **التقاعد الصريح (بعد «ابدأ كما ذكرت»):** لا صلاحية لمتغيرات/أسرار المستودع (403) → `docs/deployment-profile.json →
+  serviceRetirements` لـAI Gateway (403 «بطاقة مطلوبة»)، R2 (TLS مرفوض/غير مفعّل)، DeepSeek (402)، AgentRouter (0 نماذج)؛
+  يغذّي المدقق وbindings الـWorker و`render.yaml` معًا؛ التراجع = حذف السطر بعد إصلاح الحساب + commit `[reality]`.
+- **ما بقي فاشلًا وسببه سرّ مالك:** ElevenLabs — **المفتاح يولّد صوتًا فعلًا** (17,597 بايت في الـrun) لكن `CELIA_VOICE_ID`
+  ليس بين الأصوات المرئية (مرئية مثلًا `EXAVITQu4vr4xnSDxMaL` Sarah، `FGY2WhTYpPnrIDTdsKH5` Laura، `CwhRBWXzGAHq8TQ4Fs17` Roger)؛
+  Figma — توكن 401. الجدول: [docs/service-reality.md](../service-reality.md).
 - **ما أصلحه الدليل:** `/readyz` للـWorker لم يعد يدّعي `durable: true`؛ افتراضي DeepSeek `deepseek-flash`؛ رسائل رفض المزوّد
-  تحمل سببها بلا مفتاح؛ `CELIA_DISABLE_<SERVICE>` كمتغير مستودع يتقاعد الخدمة ويُبلَّغ `disabled`.
-- **الخطوة التالية (المالك):** لكل خدمة فاشلة: تجديد/تمويل **أو** تقاعد صريح (`CELIA_DISABLE_*=true`)؛ ثم commit `[reality]`
-  أو dispatch من `main` بعد دمج PR #46 → النسبة تُقرأ من الـrun لا من وعد. التوصية: تقاعد AI Gateway وR2 (بطاقة)،
-  تجديد Figma وElevenLabs (مفتاح كامل + معرّف صوت من الحساب)، قرار DeepSeek/AgentRouter.
+  تحمل سببها بلا مفتاح؛ `/api/secrets/status` على الحافة يعرض `retiredServices`.
+- **الخطوة التالية (المالك، خطوتان):** (1) سرّ `CELIA_VOICE_ID` = صوت مرئي للمفتاح (أو إعادة إنشاء صوت سيليا في هذا
+  الحساب)؛ (2) توكن Figma جديد **أو** سطر `figma` في `serviceRetirements`. ثم commit `[reality]` (أو dispatch من `main` بعد
+  دمج PR #46) → 100% بدليل run، وتحديث QA-005 إلى «متحقق».
 
 ## الطلب السابق في الجلسة نفسها — «هنربط جوجل بالواتساب: لخص آخر إيميل / هات جدولي» (DEC-029، GOOG-003)
 
