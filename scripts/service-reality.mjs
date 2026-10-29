@@ -74,15 +74,20 @@ export function parseTestSummary(output) {
   const text = String(output || '');
   const num = (label) => { const match = new RegExp(`^# ${label} (\\d+)`, 'm').exec(text); return match ? Number(match[1]) : null; };
   const files = {};
+  const failing = [];
   let all = null;
   for (const line of text.split('\n')) {
+    // TAP names the failing tests (`not ok N - name`); keep them so the annotation says *which* test broke, not
+    // only how many. Test files (`not ok 1 - test/x.test.js`) and parents failing through children are skipped.
+    const notOk = /^\s*not ok \d+ - (.+?)(?: # .*)?\s*$/.exec(line);
+    if (notOk && !/\.(c|m)?js$/.test(notOk[1]) && failing.length < 12 && !failing.includes(notOk[1])) failing.push(notOk[1]);
     const row = /^#\s+(.+?)\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)\s*\|/.exec(line);
     if (!row) continue;
     const entry = { lines: Number(row[2]), branches: Number(row[3]), functions: Number(row[4]) };
     if (row[1].trim() === 'all files') all = entry;
     else if (/\.(m?js)$/.test(row[1].trim())) files[row[1].trim()] = entry;
   }
-  return { tests: num('tests'), pass: num('pass'), fail: num('fail'), skipped: num('skipped'), coverage: all, files };
+  return { tests: num('tests'), pass: num('pass'), fail: num('fail'), skipped: num('skipped'), failing, coverage: all, files };
 }
 
 /** AWS Signature V4 (used for Cloudflare R2's S3 API; region "auto"). Generic enough for the AWS test vectors. */
@@ -621,7 +626,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
   for (const service of report.live || []) {
     if (service.verdict === 'failed') process.stdout.write(`::warning title=Service Reality · ${service.id} failed::${sanitize(service.detail, env).replace(/\n/g, ' ')}\n`);
   }
-  if (report.offline) process.stdout.write(`::notice title=Service Reality · offline::${sanitize(JSON.stringify({ tests: report.offline.tests, pass: report.offline.pass, fail: report.offline.fail, exitCode: report.offline.exitCode, coverage: report.offline.coverage, weakest: report.offline.weakest?.slice(0, 5) }), env)}\n`);
+  if (report.offline) process.stdout.write(`::notice title=Service Reality · offline::${sanitize(JSON.stringify({ tests: report.offline.tests, pass: report.offline.pass, fail: report.offline.fail, failing: report.offline.failing?.length ? report.offline.failing : undefined, exitCode: report.offline.exitCode, coverage: report.offline.coverage, weakest: report.offline.weakest?.slice(0, 5) }), env)}\n`);
   if (report.mysql) process.stdout.write(`::notice title=Service Reality · mysql::${sanitize(JSON.stringify(report.mysql), env)}\n`);
   if (leaked.length) return 3;
   return report.verdict === 'pass' ? 0 : 1;

@@ -55,6 +55,9 @@ test('test-runner output parsing extracts counts and the coverage table', () => 
   assert.deepEqual(parsed.coverage, { lines: 85.87, branches: 73.3, functions: 84.16 });
   assert.deepEqual(parsed.files['src/google.js'], { lines: 59.32, branches: 51.56, functions: 60.61 });
   assert.equal(parseTestSummary('').tests, null);
+  const withFailures = parseTestSummary('# Subtest: test/x.test.js\n    # Subtest: suite\n        not ok 2 - nested failure # TODO\n    not ok 1 - suite\n    not ok 3 - top-level failure\nnot ok 1 - test/x.test.js\n# tests 3\n# pass 0\n# fail 3\n');
+  assert.deepEqual(withFailures.failing, ['nested failure', 'suite', 'top-level failure'], 'failing test names are kept (files excluded) so the annotation says which test broke');
+  assert.deepEqual(parsed.failing, []);
 });
 
 test('scoring counts only configured services in the working rate', () => {

@@ -39,6 +39,7 @@
 | **التدقيق الأسبوعي** `Service reality audit` | كل اثنين 06:00 UTC (08:00 القاهرة) + يدوي + `[reality]` | عمل الخدمات العشر، الحافة، Pages، الإصدار، GHCR، التغطية، MySQL | annotations الـrun؛ Step Summary؛ artifact 90 يومًا |
 | **issue تتبّع واحدة** (label `service-reality`) | عند فشل run مجدول/يدوي على `main`؛ تُغلق وحدها عند النجاح | إيصال الإنذار إلى المالك (إشعارات الجدولة لا تصل لأحد وإلا) | Issues |
 | **أرضية التغطية** `npm run test:coverage` (أسطر 89 / فروع 71 / دوال 82) | كل push/PR في `Celia quality & resilience` | ألّا تتآكل الاختبارات تدريجيًا | فشل CI برسالة `does not meet threshold` |
+| **فشل CI يسمّي نفسه** `npm run test:ci` / `test:coverage:ci` (`scripts/test-reporter-gha.mjs`، DEC-039) | كل push/PR + الإصدار + Pages | ألّا يكون فشل الاختبارات أعمى — سجلات الخطوات لا تُقرأ من الأتمتة، الـannotations تُقرأ | `::error title=<اسم الاختبار>` بالملف والسطر والرسالة، سطر ختامي بالأعداد والتغطية وكل الفاشلين، جدول في Step Summary |
 | البوابات القائمة | كل push/PR | `check` (صياغة 114 ملفًا)، `release:check`، `check:continuity`، `npm audit --audit-level=moderate`، `celia:mcp:verify` (عقد N/N−1)، `check:secrets` 18/18، `build:pages`، متصفح RTL/WCAG، MySQL 8.4 استمرارية/استرجاع نسخة | CI |
 | نشر من `main` فقط | كل دمج | Pages وWorker والإصدار وGHCR تُعاد من الشيفرة نفسها؛ Render بعد حسابي المالك (DEC-028) | runs الأربعة |
 | مانيفست التقاعد | كل اختبار | `serviceRetirements` = bindings الـWorker = `render.yaml` (اختبار يمنع الانحراف) | `test/service-reality.test.js` |

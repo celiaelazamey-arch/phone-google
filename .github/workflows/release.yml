@@ -57,9 +57,9 @@ jobs:
       - name: Gate 2/4 · release identity and database compatibility contract
         if: steps.identity.outputs.skip != 'true'
         run: npm run release:check
-      - name: Gate 3/4 · offline test suite
+      - name: Gate 3/4 · offline test suite (failing tests are named as annotations)
         if: steps.identity.outputs.skip != 'true'
-        run: npm test
+        run: npm run test:ci
       - name: Gate 4/4 · dependency audit (production dependencies, no force fixes)
         if: steps.identity.outputs.skip != 'true'
         run: npm audit --omit=dev --audit-level=moderate

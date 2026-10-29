@@ -45,7 +45,7 @@ jobs:
             exit 1
           fi
       - run: npm ci --no-audit --no-fund
-      - run: npm run check && npm run release:check && npm run check:continuity && npm run test:coverage
+      - run: npm run check && npm run release:check && npm run check:continuity && npm run test:coverage:ci
       # The Copilot bridge diagram is generated from the policy constants; a policy change without
       # regenerating it would let the published map claim a permission the code no longer grants.
       - name: Copilot architecture map matches the enforced policy

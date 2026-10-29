@@ -1,15 +1,38 @@
 # الحالة الحالية — ابدأ من هنا
 
-**آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** **تنفيذ الخطة التنفيذية لإكمال البنود الناقصة وسد الفجوات والثغرات ومزامنة الموصلات الـ11 (DEC-036، PLAN-001، SEC-001/002/003/005، DOC-002، QA-005/006، OPS-005)**
-على الفرع `arena/83dde20a-phone-google` (متفرع من `main@44532f4552c20b8fb51402e14cff8fc15356b97c` بعد دمج PR `#69`) ·
-سجل الجلسة الحالي: [2026-10-28-executive-gap-closure](sessions/2026-10-28-executive-gap-closure.md) ·
+**آخر مراجعة:** 29 أكتوبر 2026 · **نوع الجلسة الحالية:** **فشل CI يسمّي نفسه — مُبلِّغ annotations لاختبارات `node --test` (DEC-039، QA-008)**
+على الفرع `arena/afd3acff-phone-google` (متفرع من `main@fc4d60f` بعد دمج PR #48، ثم دُمج فيه `main@0ebf8ca` = PR #70) · PR #72 مفتوح ·
+سجل الجلسة الحالي: [2026-10-28-ci-test-annotations](sessions/2026-10-28-ci-test-annotations.md) ·
+السجل السابق: [2026-10-28-executive-gap-closure](sessions/2026-10-28-executive-gap-closure.md) ·
 الخطة التنفيذية الشاملة: [docs/executive-completion-plan.md](../executive-completion-plan.md) ·
 سجل D1 السابق: [2026-10-28-edge-d1-sql-splitter-and-pr-hygiene](sessions/2026-10-28-edge-d1-sql-splitter-and-pr-hygiene.md) ·
 الدليل: [docs/computer-permissions](../computer-permissions/README.md) · صفحة الكمبيوتر:
 [docs/computer-use.md](../computer-use.md) · حوكمة المشكلات: [docs/issue-triage.md](../issue-triage.md) ·
-واقع الخدمات: [docs/service-reality.md](../service-reality.md)
+واقع الخدمات: [docs/service-reality.md](../service-reality.md) · خطة المحافظة: [docs/preservation-plan.md](../preservation-plan.md)
 
-## الطلب الحالي (أعلى أولوية) — «خطة تنفيذية لإكمال البنود الناقصة وسد الفجوات والثغرات والتنفيذ الشامل»
+## الطلب الحالي — «نفّذ»: مُبلِّغ annotations لاختبارات CI (DEC-039، QA-008) — PR #72
+
+- **لماذا:** فشلان أعميان في يوم واحد على commits خضراء في كل مكان آخر — ساق Node 24 في run `40662071493` ثم
+  `Publish verified release` run `40665130469` على `main@fc4d60f`؛ الـannotation الوحيدة «exit code 1»، والسجلات لا تُقرأ من هنا.
+  (لاحقًا كشف PR #49 أن الثاني كان خطأ تعادل طوابع زمنية حقيقيًا في `test/knowledge-ingest.test.js:164` — وهو بالضبط ما كان
+  هذا المُبلِّغ سيسمّيه من أول run.)
+- **ما نُفِّذ:** `scripts/test-reporter-gha.mjs` (مُبلِّغ ثانٍ إلى جانب `spec`: `::error title=<اسم الاختبار>` بالملف والسطر
+  والرسالة لكل فشل، `::error` لكل عتبة تغطية، سطر ختامي بالأعداد والتغطية وكل الفاشلين — سقف GitHub 10 annotations/خطوة —
+  وجدول Step Summary؛ نص عادي خارج Actions؛ لا يُسقط التشغيل)؛ `npm run test:ci` / `test:coverage:ci` في `celia-mcp.yml`
+  و`release.yml` (البوابة 3/4) و`pages.yml`؛ اختبار يمنع العودة إلى `npm test` أعمى؛ تدقيق الواقع يضيف `failing` إلى annotation
+  الحزمة offline. `test/test-reporter-gha.test.js` (9).
+- **الدليل قبل الدمج مع main:** run `Celia quality & resilience` **`40793725152`** على `531b090` ✅ كله؛ annotations مقروءة عبر
+  API بلا سجلات: Node 24 (`123184952053`) «336 tests · 336 passed · 0 failed · coverage lines 85.65% · branches 71.75% ·
+  functions 83.83%»، Node 22 (`123184952077`) 336/336.
+- **الدمج مع `main@0ebf8ca` (PR #70):** تعارضات في workflows/package.json/الوثائق حُلّت بأخذ نسخة `main` وإعادة سلك المُبلِّغ فوقها؛
+  أرضية التغطية الحالية 89/71/82 (REL-002/QA-006 على main) لم تُمَس. **إعادة ترقيم:** DEC-032 → **DEC-039** (DEC-032 صار
+  WhatsApp على main وDEC-038 محجوز لـPR #71 المفتوح)، QA-006 → **QA-008** (QA-006/QA-007 مستعملان على main).
+- **الدليل بعد الدمج (رأس PR #72 = `2ac0911`):** run `Celia quality & resilience` **`40796383857`** ✅ (7 وظائف) + run الدفع
+  `40796379598` ✅؛ annotations: Node 24 (`123193748389`) «520 tests · 520 passed · 0 failed · coverage lines 90.76% · branches
+  72.71% · functions 84.95% (floor 89/71/82)»، Node 22 (`123193748330`) 520/520، 90.80/72.65/85.15. PR #72 `MERGEABLE/CLEAN`.
+- **PR #72** فتحه المالك من الواجهة بقالب فارغ؛ مُلئ بالوقائع. الدمج بتفويض صريح فقط.
+
+## الطلب السابق — «خطة تنفيذية لإكمال البنود الناقصة وسد الفجوات والثغرات والتنفيذ الشامل» (DEC-036، DEC-037، مدموج في PR #70 → `main@0ebf8ca`)
 
 ### 1. إثبات خط الأساس الحي على `main@44532f4` بعد دمج PR `#69`
 
@@ -192,8 +215,6 @@
   secrets → «تم»؛ ثم Aiven + Render Blueprint + `CELIA_LIVE_URL` وأسرار Render → `verify:live` PASS؛ ثم أسرار Meta الأربعة
   وتحدي Webhook؛ ثم عميل Google OAuth.
 
-## الطلب السابق — «خطط للمحافظة لما وصلنا له حتى الآن» (DEC-031، OPS-005)
-
 ## الطلب السابق — إصلاح حتمي لفشل نشر الإصدار (PR #49، مدموج في `main@8a9fc56`)
 
 - **السبب الجذري الحقيقي لفشل `Publish verified release` على `main@fc4d60f` (run `40665130469`):** اختبار
@@ -211,8 +232,7 @@
 - فجوات المالك المستقلة ما زالت: ضبط `CELIA_VOICE_ID` في **Repository secrets → Actions** إلى `AnsOWV53Mdx5fcIanRBB` ثم تشغيل تدقيق الخدمات الحية؛ تفعيل حماية `main` بأسماء الفحوص المطلوبة في خطة المحافظة. التدقيق الحي الأخير الموثق على الفرع هو 11/12 (91.7%)، وليس 95% أو 100%.
 - معيار الاستكمال: نجاح كل وظائف PR #49، ثم الدمج وفق بوابة الفحوص، وإعادة فحص الإصدار على commit الدمج، وبعد تحديث السر تشغيل تدقيق حي على `main` وإثبات نسبة الخدمات من artifact/annotations. لا تُغيّر عتبات التغطية لإخفاء الفشل.
 
-
-
+## الطلب السابق — «خطط للمحافظة لما وصلنا له حتى الآن» (DEC-031، OPS-005) — مدموج في PR #47 و#48
 - **ما وصلنا إليه (مدموج في `main@715060a`):** 324/324 اختبارًا (تغطية 85.8/72/84)، MySQL حقيقي 11/11، Pages ✅ `40650636259`،
   Worker ✅ `40650636104` (`liveReady`، 18/18 + مفاتيح التقاعد)، Release ✅ `40650636330`، 10 خدمات متحققة / 4 متقاعدة في Git /
   2 بانتظار سرّ مالك (83.3%).
@@ -237,6 +257,8 @@
   المدقق صار يبلّغ «أقرب صوت مرئي» (حالة/خطأ كتابة/لم يُحدَّث) دون كشف القيمة.
 - **الخطوة التالية (المالك):** Settings → Secrets and variables → Actions → تبويب Secrets → Repository secrets →
   `CELIA_VOICE_ID` → Update → `AnsOWV53Mdx5fcIanRBB` → Update secret؛ ثم «تم» → run `[reality]` → عند ≥95% تحديث QA-005.
+- **مدموج:** PR #48 → `main@fc4d60f` (2026-10-28 09:33 UTC) بأمر المالك؛ بعده Edge/Quality/Pages/Render ✅ و`Publish verified
+  release` ❌ `40665130469` (بلا اسم اختبار → DEC-039 أعلاه؛ السبب الحقيقي كشفه PR #49؛ v0.2.1 لم يتأثر، 5 أصول).
 
 ## الطلب السابق — «لا خدمة مجرد اسم أو موكب؛ خدمات حقيقية مختبرة ≥95%» (DEC-030، QA-005) — مدموج في PR #46
 
