@@ -6,9 +6,10 @@
 > والإصدار `40719074453` والجودة `40719074375`. المتبقي حصرًا لإجراء المالك: رابط استدعاء Google، وأسرار Meta الاختيارية.
 > انظر [سجل جلسة النشر الحي](sessions/2026-10-28-live-edge-publication.md). ما يلي توثيق الجلسة السابقة كما كُتب، محفوظ بلا حذف.
 
-**آخر مراجعة:** 29 أكتوبر 2026 · **نوع الجلسة الحالية:** **OPS-007 — المهام المجدولة داخل عامل الحافة عبر صندوق صادر (DEC-042)** —
-على الفرع `arena/90163669-phone-google` (متفرع من `main@4f6af77` = دمج PR #73؛ يحمل أيضًا توثيق ما بعد دمج #73 المنقول من الفرع السابق) ·
-سجل الجلسة الحالي: [2026-10-29-edge-cron-outbox](sessions/2026-10-29-edge-cron-outbox.md) ·
+**آخر مراجعة:** 29 أكتوبر 2026 · **نوع الجلسة الحالية:** **SEC-006 + LEARN-001 — تثبيت الوضع الأمني كاختبارات وإكمال سجل الفيديو (DEC-043)** —
+على الفرع `arena/90163669-phone-google` (متفرع من `main@4f6af77` = دمج PR #73؛ يحمل OPS-007/DEC-042 غير المدمج بعد) ·
+سجل الجلسة الحالي: [2026-10-29-security-posture-and-video-record](sessions/2026-10-29-security-posture-and-video-record.md) ·
+سجل OPS-007 (DEC-042): [2026-10-29-edge-cron-outbox](sessions/2026-10-29-edge-cron-outbox.md) ·
 سجل QA-009 (DEC-041): [2026-10-29-qa-009-ci-failure-notify](sessions/2026-10-29-qa-009-ci-failure-notify.md) ·
 سجل الـPRs المتعارضة (DEC-040): [2026-10-29-open-prs-reconciliation](sessions/2026-10-29-open-prs-reconciliation.md) ·
 سجل النشر الحي (DEC-038): [2026-10-28-live-edge-publication](sessions/2026-10-28-live-edge-publication.md) ·
@@ -20,7 +21,24 @@
 [docs/computer-use.md](../computer-use.md) · حوكمة المشكلات: [docs/issue-triage.md](../issue-triage.md) ·
 واقع الخدمات: [docs/service-reality.md](../service-reality.md) · خطة المحافظة: [docs/preservation-plan.md](../preservation-plan.md)
 
-## الطلب الحالي — «إعادة فكرة لوحة cron كمهمة جديدة داخل `workers/celia-edge` عبر outbox» (DEC-042، OPS-007)
+## الطلب الحالي — «الاثنان معًا»: اختبار الوضع الأمني + تصحيح سجل الفيديو (DEC-043، SEC-006، LEARN-001)
+
+- **ما طُلب:** بعد تحليل خارجي عرضه المالك (أربعة مسارات دفاع، جسر «استدلال عميق» وهمي، محرك «تطور ذاتي»، قاموس 17 مصطلحًا
+  منسوبًا للفيديو) ومطابقته بالمستودع، اختار المالك تنفيذ البندين الحقيقيين: (أ) تثبيت الوضع الأمني المحقَّق كاختبارات؛ (ب) إكمال
+  سجل `yt-Cb3mBAH0IaY` وعدم نسب أي مصطلح لم يرد في نصه. الجسر ومحرك التطور الذاتي **لم يُبنَيا** (DEC-030/DEC-041).
+- **ما نُفِّذ (أ):** `test/security-posture.test.js` SP-01..SP-12 (أذونات workflows، `contents: write` في النشر وحده، لا
+  `pull_request_target`، SHA-pinning لكل `uses:`، `npm audit`، Dependabot، `.env` خارج Git، `check:secrets` على كل فرع، صفر تنفيذ
+  ديناميكي في `src/`+`workers/`، حارس SSRF 21 مضيفًا، `edge_audit` إلحاق فقط، وثيقة الوضع لا تعلن ضابط مالك إلا UNKNOWN/VERIFIED
+  بتاريخ) + `docs/security-posture.md` (المسارات → الدليل → الاختبار؛ owner-only بخطوات؛ ما ليس مُنفَّذًا؛ كيف يُكسر الوضع).
+- **ما نُفِّذ (ب):** حدّ المرور الأول كان حدّ قطعة القارئ لا حدّ الفيديو؛ المرور الثاني أعاد النص **كاملًا** (481 سطرًا، القطعة الأولى
+  مطابقة بايتًا ببايت `c7747dbc…`)، 29 مقطعًا، +11 وحدة `T1` (المجموع 20)، `EXTRACTION=FULL · COMPREHENSION=VERIFIED` (بوابة حتمية)،
+  والمواضيع المعلنة بلا مقطع (NLP/CV/الروبوتات/قسم التطبيقات) UNKNOWN. المصطلحات الـ17 في القاموس الخارجي كلها واردة فعلًا الآن.
+- **الدليل محليًا:** 561/561 (12 SP جديدة)، تغطية 91.19/73.57/85.42، `check` 145 ملفًا، `check:secrets` ✅، `kb -- verify` 20 صفًا
+  0 مرفوض، `learn-source --check` drift `[]`. CI الدفع: يُسجَّل في سجل الجلسة §5 بعد الدفع.
+- **بانتظار المالك:** «افتح PR» ثم «ادمج» (الفرع يحمل OPS-007 + SEC-006 + LEARN-001)؛ قرار #38؛ تأكيد ضوابط الإعدادات
+  (Branch protection / Dependabot alerts / Secret scanning / CodeQL) بكلمة «تم» لتُحدَّث إلى VERIFIED بتاريخ.
+
+## الطلب السابق — «إعادة فكرة لوحة cron كمهمة جديدة داخل `workers/celia-edge` عبر outbox» (DEC-042، OPS-007)
 
 - **ما طُلب:** الخيار (3) من DEC-040: فكرة PR #38 (لوحة المهام المجدولة على cron-job.org) تُعاد داخل العامل الواحد بالمفتاح
   الموجود `CELIAOS_CRONJOB_ORG_API_KEY` ورمز المالك؛ قراءة أولًا، وكل كتابة خارجية عبر outbox وموافقة (DEC-015) — بلا عامل ثانٍ ولا
@@ -397,6 +415,9 @@
   `kb -- verify` 0 مرفوض و`unresolved: []`، `npm test` 295/295.
 - **متجه حالة المصدر:** `SOURCE=VERIFIED · EXTRACTION=PARTIAL (بلا طوابع زمنية) · COMPREHENSION=PARTIAL ·
   KNOWLEDGE=CANDIDATE(9) · PROCEDURE=NONE · CAPABILITY=NONE · REGRESSION=PASS`. مواضيع NLP/CV/الروبوتات/AGI/ASI **UNKNOWN**.
+  **تحديث 2026-10-29 (DEC-043):** المرور الثاني أكمل النص (481 سطرًا، 29 مقطعًا، 20 وحدة) → `EXTRACTION=FULL ·
+  COMPREHENSION=VERIFIED · KNOWLEDGE=CANDIDATE(20)`؛ AGI/ASI صارا مقطعين موثقين (S24/S25)؛ NLP/CV/الروبوتات/قسم التطبيقات
+  تبقى UNKNOWN لأن لا مقطع لها في نص التسميات الكامل.
 - **الخطوة التالية:** (1) المالك يراجع PR هذا الفرع ويدمجه (= بوابة الموافقة؛ الدمج ينشر Pages/Worker/Release تلقائيًا)؛
   (2) إن أراد الاستخراج الكامل: لصق نص «إظهار النص» بصيغة `mm:ss نص` أو `.srt`؛ (3) HOST-003: إنشاء Render Free + Aiven
   Free من لوحتي المالك ثم `verify:live`.

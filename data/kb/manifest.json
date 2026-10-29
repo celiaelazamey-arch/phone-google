@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-10-28T01:14:50.915Z",
+  "generated_at": "2026-10-29T02:41:07.122Z",
   "files": [
     {
       "name": "sources_registry.csv",
@@ -12,7 +12,7 @@
       "trust": "T3",
       "stale_after_days": 365,
       "last_sync": "2026-10-27",
-      "sha256": "66449a25a6eff4b33cd1e82d48d0adc82c06e9509beda4249b09dd9f99164214"
+      "sha256": "44483e5d4e192d6694e801e60cdfcf622ace07ce8117c74034a1acbc96470a9b"
     },
     {
       "name": "tools_registry.csv",
@@ -72,7 +72,7 @@
       "trust": "T1",
       "stale_after_days": 180,
       "last_sync": "2026-10-27",
-      "sha256": "b2dadad9d9834b7500ae44bf47a65fabcabe9020b81994a6b1abcef6f5c06e2e"
+      "sha256": "11036f38d2c6af40fef1a9657dc91f7cea64d8c57aec7c823dfbd8e1c537e806"
     }
   ]
 }
