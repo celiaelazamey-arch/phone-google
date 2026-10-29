@@ -564,6 +564,35 @@ export function createAgentRuntime({
             claimed: true
           };
         }
+        // WP-3.1 (DEC-059): a provider failure that the deterministic planner absorbed is never silent. The step is
+        // visible to the owner, the evidence carries the provider request hash, and the verdict stays `block`
+        // because no model plan was accepted — the fallback's decision is what actually ran.
+        if (decision?.plannerFallback) {
+          const fallback = decision.plannerFallback;
+          const fallbackStep = await addStep(runId, {
+            kind: 'decide',
+            title: 'احتياط حتمي مرئي',
+            summary: `فشل المزوّد ${fallback.provider || 'provider'} (${fallback.code})؛ تولّى المخطط الحتمي القرار: ${decision.action}.`,
+            toolName: decision.action === 'call' ? decision.tool : null
+          });
+          await recordProviderEvent({
+            runId,
+            stepId: fallbackStep.id,
+            kind: EVIDENCE_KIND.planCreated,
+            input: fallback.request || { goal: null },
+            output: {
+              valid: false,
+              code: fallback.code,
+              details: fallback.details || [],
+              fallback: 'deterministic',
+              decision: decision.action,
+              tool: decision.action === 'call' ? decision.tool : null,
+              provider: fallback.provider || null,
+              model: fallback.model || null
+            },
+            verdict: VERDICT.block
+          });
+        }
         if (decision?.providerTrace) {
           const planStep = await addStep(runId, {
             kind: 'decide',

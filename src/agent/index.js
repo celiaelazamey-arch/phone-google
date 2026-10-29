@@ -3,7 +3,14 @@ import { createAgentStore } from './store.js';
 import { createMysqlDriver, createSqliteDriver } from './drivers.js';
 import { createToolRegistry, defaultToolDefinitions } from './tools.js';
 import { createDemoPlanner } from './planner.js';
-import { createProviderPlanner, PROVIDER_PLAN_SCHEMA, validateProviderPlan } from './planner-provider.js';
+import {
+  createProviderPlanner,
+  createGeminiPlannerProvider,
+  createFallbackPlanner,
+  PROVIDER_PLAN_SCHEMA,
+  validateProviderPlan
+} from './planner-provider.js';
+import { RISK } from './tools.js';
 import {
   HARNESS_LIFECYCLE_STAGES,
   HARNESS_COMPONENT_IDS,
@@ -349,6 +356,40 @@ function buildGoogleReaders({ pool, config, env }) {
  * A host keeps agent initialization out of the request path of unrelated routes.
  * `ready` resolves to the runtime, or to `null` when the mode is `off`.
  */
+/** Planner modes the host accepts. Anything else fails closed instead of guessing (DEC-059). */
+export const AGENT_PLANNER_MODES = Object.freeze(['demo', 'provider']);
+
+/**
+ * `CELIA_AGENT_PLANNER`: `demo` (default, deterministic) or `provider` (a model plans, the deterministic planner
+ * absorbs a provider failure with a visible marker). `gemini` is accepted as an explicit alias of the provider
+ * because a provider still has to be named before anything else can be one.
+ */
+export function readAgentPlanner(env = process.env) {
+  const raw = String(env?.CELIA_AGENT_PLANNER || 'demo').trim().toLowerCase();
+  if (!raw) return 'demo';
+  if (raw === 'demo') return 'demo';
+  if (raw === 'provider' || raw === 'gemini') return 'provider';
+  throw Object.assign(new Error('CELIA_AGENT_PLANNER must be demo or provider'), { code: 'invalid_agent_planner' });
+}
+
+/** Default closed read set for a provider planner: at most four executable reads, `kb.search` only when KB is on. */
+export const PROVIDER_PLANNER_TOOLS = Object.freeze(['celia.thread_context', 'product.catalog_audit', 'creative.workflow_plan']);
+
+export function selectProviderTools({ tools, kb = false, requested = null } = {}) {
+  const preferred = Array.isArray(requested) && requested.length ? requested : [...PROVIDER_PLANNER_TOOLS, ...(kb ? ['kb.search'] : [])];
+  const selected = [];
+  for (const name of preferred) {
+    if (selected.includes(name)) continue;
+    const definition = tools?.get?.(name);
+    if (!definition) continue;
+    if (definition.risk !== RISK.read || !tools.executable(name)) continue;
+    if (name === 'kb.search' && definition.plannerSafe !== true) continue;
+    selected.push(name);
+    if (selected.length === 4) break;
+  }
+  return selected;
+}
+
 export function createAgentHost({
   config = {},
   pool = null,
@@ -378,14 +419,30 @@ export function createAgentHost({
   }
   let lastBootRecovery = null;
   const nodeEnv = config.nodeEnv || env.NODE_ENV || 'development';
+  // WP-3.1 (DEC-059): the planner is chosen explicitly and fails closed. `demo` stays the default and the only
+  // mode that may run external effects through the deterministic planner.
+  let plannerMode = 'demo';
+  try {
+    plannerMode = readAgentPlanner(env);
+  } catch (error) {
+    failure = failure || { code: error.code || 'invalid_agent_planner', message: error.message };
+  }
+  const providerApiKey = String(env.GEMINI_API_KEY || config.gemini?.apiKey || '').trim();
+  const providerModel = String(env.GEMINI_MODEL || config.gemini?.model || 'gemini-2.5-flash').trim() || 'gemini-2.5-flash';
+  const providerTools = String(env.CELIA_AGENT_PLANNER_TOOLS || '')
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean);
 
   const ready = (async () => {
     if (failure) throw Object.assign(new Error(failure.message), { code: failure.code });
     if (mode === 'off') return null;
-    if (String(env.CELIA_AGENT_PLANNER || 'demo').trim().toLowerCase() !== 'demo') {
-      throw Object.assign(new Error('Only the deterministic demo planner is implemented (AGENT-001)'), {
-        code: 'agent_planner_unavailable'
-      });
+    if (plannerMode === 'provider') {
+      if (!providerApiKey) {
+        throw Object.assign(new Error('Provider planner mode needs GEMINI_API_KEY'), {
+          code: 'planner_provider_not_configured'
+        });
+      }
     }
     let driver;
     if (mode === 'mysql') {
@@ -416,18 +473,45 @@ export function createAgentHost({
     const gmail = injectedGmail || googleReaders.gmail || (!injectedConnectors && requestedConnectors.includes('gmail')
       ? buildGmailReader({ pool, config, env })
       : null);
+    const toolRegistry = createToolRegistry(defaultToolDefinitions({ statusProvider, kb, gmail, googleReaders }));
+    const demoPlanner = createDemoPlanner({
+      knowledge: Boolean(kb),
+      gmail: Boolean(gmail),
+      googleReaders: {
+        drive: Boolean(googleReaders.drive),
+        calendar: Boolean(googleReaders.calendar),
+        contacts: Boolean(googleReaders.contacts)
+      }
+    });
+    // WP-3.1 (DEC-059). Default stays the deterministic planner. In provider mode the model plans inside the same
+    // closed read set, and any provider failure becomes a visible deterministic fallback instead of a silent retry.
+    let planner = demoPlanner;
+    if (plannerMode === 'provider') {
+      const allowedTools = selectProviderTools({ tools: toolRegistry, kb: Boolean(kb), requested: providerTools });
+      if (allowedTools.length < 2) {
+        throw Object.assign(new Error('Provider planner needs between two and four executable read tools'), {
+          code: 'planner_tools_unavailable'
+        });
+      }
+      planner = createFallbackPlanner({
+        primary: createProviderPlanner({
+          provider: createGeminiPlannerProvider({
+            apiKey: providerApiKey,
+            model: providerModel,
+            ...(env.CELIA_AGENT_PLANNER_TIMEOUT_MS ? { timeoutMs: Number(env.CELIA_AGENT_PLANNER_TIMEOUT_MS) } : {})
+          }),
+          tools: toolRegistry,
+          allowedTools,
+          name: 'gemini',
+          ...(env.CELIA_AGENT_PLANNER_TIMEOUT_MS ? { timeoutMs: Number(env.CELIA_AGENT_PLANNER_TIMEOUT_MS) } : {})
+        }),
+        fallback: demoPlanner
+      });
+    }
     const runtime = createAgentRuntime({
       store,
-      tools: createToolRegistry(defaultToolDefinitions({ statusProvider, kb, gmail, googleReaders })),
-      planner: createDemoPlanner({
-        knowledge: Boolean(kb),
-        gmail: Boolean(gmail),
-        googleReaders: {
-          drive: Boolean(googleReaders.drive),
-          calendar: Boolean(googleReaders.calendar),
-          contacts: Boolean(googleReaders.contacts)
-        }
-      }),
+      tools: toolRegistry,
+      planner,
       connectors,
       ownerId: config.userId || env.APP_USER_ID || 'owner',
       limits: readAgentLimits(env),

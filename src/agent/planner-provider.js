@@ -299,3 +299,223 @@ export function createProviderPlanner({
     }
   };
 }
+
+/* -------------------------------------------------------------------------- */
+/* WP-3.1 (DEC-059): one concrete provider adapter + a visible deterministic   */
+/* fallback. The adapter is a transport: it forwards the closed request, maps  */
+/* the answer, and can be injected/replaced in any test without a network.     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * System instruction for the provider planner. It states the contract the executor already enforces:
+ * one JSON object, only the listed read tools, no invented tool, no external effect, no prose.
+ */
+export const GEMINI_PLANNER_POLICY = [
+  'أنت مخطط تنفيذ داخل نظام محدود الصلاحيات.',
+  'أعد كائن JSON واحدًا فقط يطابق المخطط المعطى بلا أي نص قبله أو بعده وبلا Markdown.',
+  'الحقول المطلوبة كلها: action وtool وargs وsummary وrationale وsuccessCriteria.',
+  'action إما call أو finish أو clarify. عند call يجب أن يكون tool أحد الأدوات المدرجة حرفيًا في القائمة المغلقة، وargs كائنًا يطابق مدخلاتها.',
+  'عند finish أو clarify يجب أن يكون tool وargs بالقيمة null وأن يحمل summary النتيجة أو سؤال التوضيح.',
+  'لا تخترع أداة ولا وسيطًا غير مدرج، ولا تطلب تنفيذ أي أثر خارجي أو كتابة أو شبكة؛ الأدوات المتاحة قراءة فقط.',
+  'rationale جملة واحدة تشرح لماذا هذا القرار اعتمادًا على الحالة ونتائج الأدوات السابقة، وsuccessCriteria من عنصر إلى ثمانية عناصر قابلة للتحقق.',
+  'إن كانت المعلومات ناقصة فاختر clarify بدل تخمين قيمة.'
+].join('\n');
+
+/** Gemini accepts a closed subset of JSON Schema; these keys are not part of it. */
+const GEMINI_UNSUPPORTED_SCHEMA_KEYS = Object.freeze([
+  'additionalProperties',
+  'minLength',
+  'maxLength',
+  'minItems',
+  'maxItems',
+  'pattern',
+  '$schema',
+  'title'
+]);
+
+/**
+ * Converts our local plan schema into Gemini's response-schema dialect.
+ *
+ * The local schema stays the authority: `type: ['string','null']` becomes `{ type: 'string', nullable: true }`,
+ * which is the only nullable spelling Gemini accepts, and anything outside its subset is dropped from the wire
+ * (never from our validator — the same plan is still checked locally against PROVIDER_PLAN_SCHEMA).
+ */
+export function toGeminiSchema(schema) {
+  if (!schema || typeof schema !== 'object') return schema;
+  const convert = (node) => {
+    if (Array.isArray(node)) return node.map(convert);
+    if (!node || typeof node !== 'object') return node;
+    const out = {};
+    for (const [key, value] of Object.entries(node)) {
+      if (GEMINI_UNSUPPORTED_SCHEMA_KEYS.includes(key)) continue;
+      if (key === 'properties' && value && typeof value === 'object') {
+        out.properties = Object.fromEntries(Object.entries(value).map(([name, child]) => [name, convert(child)]));
+        continue;
+      }
+      out[key] = convert(value);
+    }
+    if (Array.isArray(out.type)) {
+      const types = out.type.filter((type) => type !== 'null');
+      out.type = types.length === 1 ? types[0] : types;
+      if (node.type.includes('null')) out.nullable = true;
+    }
+    if (Array.isArray(out.enum)) {
+      const values = out.enum.filter((value) => value !== null);
+      if (values.length !== out.enum.length) out.nullable = true;
+      out.enum = values;
+    }
+    return out;
+  };
+  return deepFreeze(convert(schema));
+}
+
+function plannerUsage(usageMetadata) {
+  const inputTokens = finiteNonNegative(usageMetadata?.promptTokenCount);
+  const outputTokens = finiteNonNegative(usageMetadata?.candidatesTokenCount);
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens: usageMetadata?.totalTokenCount === undefined ? inputTokens + outputTokens : finiteNonNegative(usageMetadata.totalTokenCount),
+    // Cost is not claimed: this repository holds no price table, and DEC-054/DEC-059 forbid inventing one.
+    costMicros: 0,
+    measured: Boolean(usageMetadata),
+    priceKnown: false
+  };
+}
+
+/**
+ * Gemini planner transport (WP-3.1, DEC-059).
+ *
+ * - No retry, no silent second endpoint, no SDK. One POST, one JSON body, one closed schema.
+ * - Errors carry a code and the HTTP status only: never the key, never the response body, never the prompt.
+ * - `fetchImpl` is injectable so a test can exercise the exact wire contract offline.
+ */
+export function createGeminiPlannerProvider({
+  apiKey,
+  model = 'gemini-2.5-flash',
+  fetchImpl = globalThis.fetch,
+  baseUrl = 'https://generativelanguage.googleapis.com/v1beta',
+  timeoutMs = 20_000
+} = {}) {
+  if (typeof apiKey !== 'string' || !apiKey.trim()) throw codedError('planner_provider_not_configured');
+  if (typeof fetchImpl !== 'function') throw codedError('planner_provider_transport_missing');
+  if (typeof model !== 'string' || !model.trim()) throw codedError('planner_provider_model_invalid');
+  const endpoint = `${String(baseUrl).replace(/\/+$/, '')}/models/${encodeURIComponent(model)}:generateContent`;
+
+  return {
+    name: 'gemini',
+    model,
+    kind: 'cloud',
+    async createPlan(request) {
+      // The request the runtime built is the whole state: goal, thread, tool results, memory, closed tool set.
+      const body = {
+        systemInstruction: { parts: [{ text: GEMINI_PLANNER_POLICY }] },
+        contents: [
+          {
+            role: 'user',
+            parts: [{
+              text: JSON.stringify({
+                goal: request.goal,
+                threadMessages: request.threadMessages,
+                state: request.state,
+                memory: request.memory,
+                allowedTools: request.allowedTools,
+                tools: request.tools
+              })
+            }]
+          }
+        ],
+        generationConfig: {
+          temperature: 0,
+          responseMimeType: 'application/json',
+          responseSchema: toGeminiSchema(request.planSchema)
+        }
+      };
+      const signal = request.signal
+        ? AbortSignal.any([request.signal, AbortSignal.timeout(timeoutMs)])
+        : AbortSignal.timeout(timeoutMs);
+      let response;
+      try {
+        response = await fetchImpl(endpoint, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
+          body: JSON.stringify(body),
+          signal
+        });
+      } catch (error) {
+        // A cancellation is not a provider failure; the wrapper below re-throws it unchecked.
+        if (request.signal?.aborted) throw codedError('planner_cancelled');
+        throw codedError(error?.name === 'TimeoutError' ? 'planner_provider_timeout' : 'planner_provider_unreachable');
+      }
+      if (!response.ok) {
+        throw codedError('planner_provider_failed', null, [`http_status:${response.status}`]);
+      }
+      const data = await response.json().catch(() => null);
+      const text = (data?.candidates?.[0]?.content?.parts || [])
+        .map((part) => String(part?.text || ''))
+        .join('')
+        .trim();
+      if (!text) throw codedError('planner_provider_empty', null, [`finish_reason:${data?.candidates?.[0]?.finishReason || 'unknown'}`]);
+      return { plan: text, model: String(data?.modelVersion || model), usage: plannerUsage(data?.usageMetadata) };
+    }
+  };
+}
+
+/** Codes that mean "the model did not deliver a usable plan" — the only ones the fallback may answer. */
+export const PLANNER_PROVIDER_FAILURES = Object.freeze([
+  'invalid_provider_plan',
+  'invalid_provider_tool_arguments',
+  'planner_provider_not_configured',
+  'planner_provider_transport_missing',
+  'planner_provider_model_invalid',
+  'planner_provider_unreachable',
+  'planner_provider_failed',
+  'planner_provider_empty',
+  'planner_provider_timeout',
+  'planner_provider_unavailable',
+  'automatic_replan_disabled'
+]);
+
+/**
+ * Deterministic fallback wrapper (WP-3.1, DEC-059).
+ *
+ * Enabling a provider must never make the loop *less* reliable than the demo planner, and a silent switch would be
+ * worse than either. So a provider failure produces the demo decision **with a marker** (`plannerFallback`) that the
+ * runtime turns into a visible step and a `plan_created` evidence entry with verdict `block`.
+ *
+ * Refusals that must not be softened:
+ *   - `planner_cancelled` is re-thrown: a cancelled run never plans again, with any planner.
+ *   - a failure the fallback itself hits is re-thrown as the original error with its provider trace.
+ * The wrapper inherits the provider's closed tool allowlist, so turning the flag on can never widen the tool surface.
+ */
+export function createFallbackPlanner({ primary, fallback, name = null } = {}) {
+  if (!primary?.plan) throw new Error('Fallback planner requires a primary planner');
+  if (!fallback?.plan) throw new Error('Fallback planner requires a deterministic fallback planner');
+  return {
+    name: name || `${primary.name}+deterministic-fallback`,
+    providerDriven: primary.providerDriven === true,
+    allowedTools: primary.allowedTools ? [...primary.allowedTools] : null,
+    primary: primary.name,
+    fallback: fallback.name,
+    async plan(context) {
+      try {
+        return await primary.plan(context);
+      } catch (error) {
+        const code = error?.code || 'planner_provider_unavailable';
+        if (code === 'planner_cancelled' || context?.signal?.aborted) throw error;
+        if (!PLANNER_PROVIDER_FAILURES.includes(code)) throw error;
+        const decision = await fallback.plan(context);
+        return {
+          ...decision,
+          plannerFallback: {
+            code,
+            details: Array.isArray(error.details) ? [...error.details] : [],
+            provider: error?.providerTrace?.provider || primary.name,
+            model: error?.providerTrace?.model || null,
+            request: error?.providerTrace?.request || null
+          }
+        };
+      }
+    }
+  };
+}

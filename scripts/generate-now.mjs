@@ -91,6 +91,11 @@ export function parseBacklog(markdown) {
   return { total, counts, active, blocked };
 }
 
+function planLineFor(markdown, wpId) {
+  const line = markdown.split('\n').find((row) => row.startsWith(`### ${wpId}`));
+  return line || '';
+}
+
 export function parseExecutionPlan(markdown) {
   const completedHeadings = new Set();
   for (const line of markdown.split('\n')) {
@@ -107,10 +112,14 @@ export function parseExecutionPlan(markdown) {
     if (!idMatch) continue;
     const wpId = idMatch[1];
     const done = cells[0].includes('✅') || completedHeadings.has(wpId);
+    // `⏳` = implemented locally with a declared remainder (no live run / no activation yet). It is *not* done:
+    // calling it done would turn an untested claim into a printed fact (DEC-045).
+    const partial = !done && (cells[0].includes('⏳') || [...completedHeadings].some((heading) => heading === wpId && /منفَّذ محليًا/.test(planLineFor(markdown, wpId))));
     packages.push({
       id: wpId,
       step: cells[1],
       done,
+      partial,
       dependsOn: cells[4],
       ownerDecision: cells[5],
       backlogId: cells[6]
@@ -207,6 +216,7 @@ export async function collectNowFacts(root = DEFAULT_ROOT) {
 export function renderNowMarkdown(facts) {
   const { release, state, archives, decisions, backlog, packages, skills } = facts;
   const donePackages = packages.filter((wp) => wp.done).length;
+  const partialPackages = packages.filter((wp) => wp.partial).length;
   const sessionRef =
     state.latestSessionLabel && state.latestSessionHref
       ? `[${state.latestSessionLabel}](${state.latestSessionHref})`
@@ -228,7 +238,7 @@ export function renderNowMarkdown(facts) {
   const packageRows = packages
     .map(
       (wp) =>
-        `| \`${wp.id}\` | ${wp.step} | ${wp.done ? 'منفَّذ ✅' : 'مخطط'} | ${wp.backlogId} | ${wp.dependsOn} | ${wp.ownerDecision} |`
+        `| \`${wp.id}\` | ${wp.step} | ${wp.done ? 'منفَّذ ✅' : wp.partial ? 'منفَّذ محليًا ⏳' : 'مخطط'} | ${wp.backlogId} | ${wp.dependsOn} | ${wp.ownerDecision} |`
     )
     .join('\n');
 
@@ -274,7 +284,7 @@ ${decisionRows}
 
 ## 4. تقدّم الخطة التنفيذية 2026 ([agent-2026-execution-plan.md](../agent-2026-execution-plan.md))
 
-- **الحِزم المنفَّذة:** ${donePackages} من ${packages.length}
+- **الحِزم المنفَّذة:** ${donePackages} من ${packages.length}${partialPackages ? ` · **منفَّذة محليًا (بلا تفعيل/تشغيل حي):** ${partialPackages}` : ''}
 
 | الحزمة | الخطوة | الحالة | صف BACKLOG | يعتمد على | قرار مالك؟ |
 |---|---|---|---|---|---|
