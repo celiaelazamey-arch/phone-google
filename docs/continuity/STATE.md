@@ -17,7 +17,9 @@
   والرسالة لكل فشل، `::error` لكل عتبة تغطية، سطر ختامي بالأعداد والتغطية وكل الفاشلين، جدول Step Summary؛ نص عادي خارج
   Actions)؛ `npm run test:ci` / `test:coverage:ci` في `celia-mcp.yml` و`release.yml` و`pages.yml`؛ اختبار يمنع العودة إلى
   `npm test` أعمى؛ تدقيق الواقع يضيف `failing` إلى annotation الحزمة offline. اختبارات 336/336 على Node 22 و24 محليًا.
-- **الدليل المنتظر:** أول run `Celia quality & resilience` على هذا الفرع → notice `node --test` على الساقين (يُسجَّل هنا).
+- **الدليل:** run `Celia quality & resilience` **`40793725152`** على `531b090` ✅ كله؛ annotations مقروءة عبر API بلا سجلات:
+  Node 24 (`123184952053`) `node --test: 336 tests · 336 passed · 0 failed · coverage lines 85.65% · branches 71.75% ·
+  functions 83.83% (floor 80/65/78)`؛ Node 22 (`123184952077`) 336/336، 85.80/71.75/84.11. QA-006 → متحقق.
 - **لم يُفتح PR** (الطلب «نفّذ» على الفرع)؛ الدمج/الـPR عند طلب صريح.
 
 ## الطلب السابق — «خطط للمحافظة لما وصلنا له حتى الآن» (DEC-031، OPS-005) — مدموج في PR #47 و#48

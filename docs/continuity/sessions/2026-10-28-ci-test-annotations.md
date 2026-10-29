@@ -43,7 +43,9 @@
   336/336 (85.72/71.81/83.83).
 - تشغيل أحمر مُصطنع (ملف يفشل + ملف لا يُحمَّل + عتبات تغطية): كل فشل يحمل اسمه وملفه وسطره؛ العتبات تُسمّى؛ السطر الختامي
   يجمع الكل؛ `exit 1` من `node --test` نفسه.
-- دليل CI: run `Celia quality & resilience` على هذا الفرع بعد الدفع (يُسجَّل في STATE بعد قراءته).
+- دليل CI: run `Celia quality & resilience` `40793725152` على `531b090` ✅ (7 وظائف)؛ قراءة annotations عبر
+  `check-runs/<job>/annotations` بلا سجلات: Node 24 (`123184952053`) «336 tests · 336 passed · 0 failed · coverage lines
+  85.65% · branches 71.75% · functions 83.83% (floor 80/65/78)»، Node 22 (`123184952077`) 336/336، 85.80/71.75/84.11.
 
 ## ما لم يُفعل ولماذا
 
@@ -56,7 +58,7 @@
 
 ## الخطوة التالية بالضبط
 
-1. بعد الدفع: قراءة annotations run الجودة على الفرع (`gh run view <id> --json jobs` ثم `check-runs/<job>/annotations`)؛ يجب أن
-   يظهر `node --test` notice على ساقي Node 22/24. أي فشل مستقبلي يُقرأ من هناك مباشرة.
+1. (تم) قراءة annotations run الجودة على الفرع — `node --test` notice ظهر على ساقي Node 22/24. أي فشل مستقبلي يُقرأ من
+   هناك مباشرة (`gh run view <id> --json jobs` ثم `check-runs/<job>/annotations`).
 2. عند «تم» الصحيحة لـ`CELIA_VOICE_ID`: دفعة `[reality]` → 12/12 = 100% → QA-005 «متحقق» + `docs/service-reality.md` + README.
 3. بنود المالك من خطة المحافظة §د كما هي (حماية الفرع بأسماء الفحوص، Watch، PRs #34/#38/#39، Dependabot).
