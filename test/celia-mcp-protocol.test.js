@@ -1,6 +1,7 @@
 // MCP protocol surface: a client must be able to negotiate, list, read and fail predictably. These are the
 // methods a real MCP client (Claude Desktop, Codex, any SDK) calls before it ever runs a tool.
 import assert from 'node:assert/strict';
+import { DEFAULT_POLICY } from '../src/gemini.js';
 import test from 'node:test';
 import crypto from 'node:crypto';
 import { createCeliaMcpApp, loadCeliaMcpConfig } from '../src/celia-mcp.js';
@@ -82,6 +83,9 @@ test('protocol: the customer-reply prompt is served and unknown prompts are refu
     const text = prompt.body.result.messages[0].content.text;
     assert.match(text, /كم السعر؟/);
     assert.match(text, /متجر صغير/);
+    // WP-2.1: served through the context policy, byte-identical to the pre-policy format.
+    assert.equal(text, `${DEFAULT_POLICY}\nسياق النشاط المعتمد: متجر صغير\nرسالة العميل: كم السعر؟`);
+    assert.deepEqual(prompt.body.result._meta.context.dropped, []);
 
     const withDefaultContext = await rpc('prompts/get', { name: 'whatsapp_customer_reply', arguments: {} });
     assert.match(withDefaultContext.body.result.messages[0].content.text, /رسالة العميل/);

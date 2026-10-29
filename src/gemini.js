@@ -1,5 +1,6 @@
 import { UpstreamError } from './resilience.js';
 import { classifyReplyTruncation, REPLY_CHAR_CAP } from './reply-metrics.js';
+import { buildContext } from './context-policy.js';
 export const DEFAULT_POLICY = [
   'أنت مساعد خدمة عملاء يكتب ردًا قصيرًا ومهذبًا بلغة العميل، وبحد أقصى جملتين.',
   'أجب فقط عن الأسئلة العامة اعتمادًا على سياق النشاط المقدم ورسالة العميل.',
@@ -14,17 +15,19 @@ const DEFAULT_GEMINI_TIMEOUT_MS = 20_000;
 export const GEMINI_MAX_OUTPUT_TOKENS = 180;
 
 /** Same call as `generateWhatsAppReply`, but returns the truncation facts next to the text (WP-1.4, DEC-050). */
-export async function generateWhatsAppReplyDetailed({ config, customerMessage, timeoutMs = DEFAULT_GEMINI_TIMEOUT_MS, signal }) {
+export async function generateWhatsAppReplyDetailed({ config, customerMessage, knowledge = [], history = [], budgets, timeoutMs = DEFAULT_GEMINI_TIMEOUT_MS, signal }) {
   const { apiKey, model, businessContext } = config.gemini;
   if (!apiKey) throw new Error('Gemini API is not configured');
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+  // WP-2.1 (DEC-051): what reaches the model is decided by the context policy, and what was cut is reported.
+  const context = buildContext({ instructions: DEFAULT_POLICY, business: businessContext, message: String(customerMessage), knowledge, history }, budgets);
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
     signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs),
     body: JSON.stringify({
-      systemInstruction: { parts: [{ text: `${DEFAULT_POLICY}${businessContext ? ` سياق النشاط المعتمد: ${businessContext.slice(0, 4000)}` : ''}` }] },
-      contents: [{ role: 'user', parts: [{ text: String(customerMessage).slice(0, 4000) }] }],
+      systemInstruction: { parts: [{ text: context.system }] },
+      contents: [{ role: 'user', parts: [{ text: context.user }] }],
       generationConfig: { temperature: 0.2, maxOutputTokens: GEMINI_MAX_OUTPUT_TOKENS }
     })
   });
@@ -40,7 +43,8 @@ export async function generateWhatsAppReplyDetailed({ config, customerMessage, t
     truncationReason: truncation.reason,
     candidateChars: truncation.candidateChars,
     sentChars: truncation.sentChars,
-    maxOutputTokens: GEMINI_MAX_OUTPUT_TOKENS
+    maxOutputTokens: GEMINI_MAX_OUTPUT_TOKENS,
+    context: { chars: context.charsByCategory, dropped: context.dropped }
   };
 }
 
