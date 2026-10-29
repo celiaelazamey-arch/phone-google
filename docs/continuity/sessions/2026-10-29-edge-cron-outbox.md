@@ -35,7 +35,9 @@
 
 - محليًا: `GITHUB_ACTIONS=true npm run test:coverage:ci` → **549/549**، تغطية 91.17 / 73.39 / 85.42 (الأرضية 89/71/82)؛ `node scripts/check.mjs`
   144 ملفًا؛ `npm run check:secrets` ✅؛ `check:continuity` — انظر الخلاصة في STATE.
-- CI الدفع على الفرع: يُسجَّل هنا بعد الدفع (معرّفات التشغيلات).
+- CI الدفع على الفرع (`673d6a9`): «Celia quality & resilience» run **`40805521838`** ✅ — MySQL 8.4 `123223424066`، RTL/متصفح
+  `123223424239`، حاوية Node 24 `123223424262`، Python Spider `123223424304`، Node 24 `123223424349`، Node 22 `123223424443` (كلها success؛
+  مسابير المزوّدين الاختيارية متخطّاة كالمعتاد). «Service reality audit» `40805521833` متخطّاة على فرع غير `main` بالتصميم.
 - **غير متحقق حيًّا** بعد: الهجرة `0003` تُطبَّق في أول `cloudflare-deploy.yml` من `main` بعد الدمج؛ الدليل الحي المطلوب: `GET /api/cron/status`
   → `durable: true, writes: outbox-approval-only, outbox.pending_approval: 0`، ثم نيّة تعطيل/تفعيل مهمة keep-alive من `/cron.html` وموافقتها
   ومراجعة `edge_audit` (`/api/audit`).
