@@ -24,6 +24,7 @@
 | ملكية على كل صف | `owner_id` في الخيوط والتشغيلات وكل قراءة | مالك آخر لا يقرأ ولا يلغي |
 | شفافية تشغيل | خطوات مخزنة + بث SSE + عدادات استخدام | `GET /api/agent/runs/:id/events` يبدأ بلقطة ثم أحداثًا |
 | أزمنة مُثبَتة (WP-1.1، DEC-047) | `src/agent/timing.js`: مدة استدعاء الأداة = `updated_at − created_at` للصفوف التي سوّاها الوقت الحقيقي فقط؛ `null` للجارية/`unknown`/المسوّاة يدويًا؛ p50/p95 بأقرب رتبة | MET-01..05: ساعة وهمية تتقدم 7 ms فكل مدة مضاعف لـ7؛ خطوات `decide`/`deliver` بلا مدة |
+| أثر التنفيذ (WP-1.2) | حدث `step` مُثرى: `step` بأزمنته، `settledStep` (خطوة `act` السابقة بمدتها المُثبَتة حين يُحسم استدعاؤها)، `usage`/`limits`، `status`، `now`؛ و`now` في `GET /runs/:id` واللقطة (`queued`/`planning`/`executing_tool`/`waiting_approval`/`needs_reconciliation`/`finished` مع `since`/`elapsedMs`/`totalMs`)؛ الخطوات تحمل `toolRunStatus` | TRC-01..04 (`test/agent-trace.test.js`) + `e2e/agent.spec.js`: الشجرة من `plan.stages`، سطر «الآن» `aria-live`، شريطا الميزانية من `run.usage/limits`، زمن كل استدعاء كما أثبته المخزن؛ لا بيانات في الواجهة ليست في `GET /runs/:id` |
 | عقد هدف لكل تشغيل | `src/agent/goal-contract.js` + `agent_goal_contracts` | العقد بيانات قابلة للفحص (أهداف/معايير/قيود/ميزانية/موعد) ويعرضه تفصيل التشغيل |
 | بوابة موافقات قابلة للاستئناف | `agent_approvals` + `POST /runs/:id/approval` (DEC-014) | موافقة تُسجَّل وتُستأنف، ورفض يلغي بلا أثر، واستئناف استدعاء `unknown` مرفوض 409 |
 | سجل أدلة مسلسل | `src/agent/evidence.js` + `agent_evidence` | سلسلة بصمات SHA-256؛ العبث أو الحذف يُكشف بالرقم والسبب في الاختبارات |
@@ -61,7 +62,7 @@ npm run migrate -- --status
 | `GET /api/agent/threads` · `GET /api/agent/threads/:id` | الخيوط، الرسائل، التشغيلات |
 | `POST /api/agent/threads/:id/runs` | `{message, clientMessageId}` أو ترويسة `Idempotency-Key` → `202` جديد / `200` مكرر |
 | `GET /api/agent/runs/:id` | التشغيل + الخطة (`plan`) + الخطوات + الاستدعاءات + عقد الهدف + الموافقات + الـoutbox + الأدلة + حكم المُتحقِّق (بلا أسرار) |
-| `GET /api/agent/runs/:id/events` | SSE: `snapshot` ثم `step`/`approval.requested`/`approval.decided`/`plan.edited`/`verification`/`run.finished` |
+| `GET /api/agent/runs/:id/events` | SSE: `snapshot` (= التفاصيل كاملة بما فيها `now`) ثم `step` (مُثرى: `step`، `settledStep`، `usage`، `limits`، `status`، `now`)/`approval.requested`/`approval.decided`/`plan.edited`/`verification`/`run.finished` |
 | `POST /api/agent/runs/:id/cancel` | طلب إلغاء يُطبَّق بين الخطوات |
 | `GET /api/agent/runs/:id/plan` | عرض الخطة المهيكل (`PLAN_READY`, `WAITING_FOR_APPROVAL`, `EDITED`, `APPROVED`, `REJECTED`, `EXECUTING`) والانتقالات |
 | `POST /api/agent/runs/:id/plan` | تعديل الخطة المتوقفة (`{payload, summary?, note?}` مع `Idempotency-Key`): يعيد فحص السياسات ويبقي التشغيل في `waiting_approval` |

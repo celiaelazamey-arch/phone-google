@@ -95,12 +95,23 @@
         <h2 id="run-title">التشغيل</h2>
         <span id="run-state" class="pill idle">لا تشغيل</span>
       </div>
-      <div class="usage">
-        <span>خطوات: <b id="usage-steps">0</b></span>
-        <span>تكلفة: <b id="usage-cost">0</b> ⨯ 10⁻⁶ $</span>
-        <span>رموز: <b id="usage-tokens">0</b></span>
+      <p id="now-line" class="now" role="status" aria-live="polite" data-state="">لا تشغيل</p>
+      <div class="budget" aria-label="الميزانية">
+        <div class="bar">
+          <div class="bar-head"><span>خطوات</span><b><span id="usage-steps">0</span> / <span id="limit-steps">—</span></b></div>
+          <div id="bar-steps" class="bar-track" role="progressbar" aria-label="استهلاك سقف الخطوات" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="bar-fill"></span></div>
+        </div>
+        <div class="bar">
+          <div class="bar-head"><span>تكلفة (⨯ 10⁻⁶ $)</span><b><span id="usage-cost">0</span> / <span id="limit-cost">—</span></b></div>
+          <div id="bar-cost" class="bar-track" role="progressbar" aria-label="استهلاك سقف التكلفة" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="bar-fill"></span></div>
+        </div>
+        <span class="tokens">رموز: <b id="usage-tokens">0</b></span>
       </div>
-      <ol id="steps" class="steps" aria-live="polite"></ol>
+      <ol id="plan-tree" class="tree" aria-label="شجرة الخطة">
+        <li class="empty">لا تظهر شجرة الخطة إلا بعد بدء تشغيل.</li>
+      </ol>
+      <p class="hint tree-hint" id="steps-summary">خطوات التنفيذ تظهر أدناه مع زمن كل استدعاء أداة كما أثبته المخزن؛ «—» تعني أن لا قياس (قرار، تسليم، أو استدعاء لم يُحسم). التكلفة تُسجَّل على مستوى التشغيل لا لكل خطوة.</p>
+      <ol id="steps" class="steps" aria-live="polite" aria-label="خطوات التنفيذ (قائمة قابلة للتمرير)" tabindex="0"></ol>
       <pre id="delivery" class="delivery" hidden></pre>
 
       <div class="subhead">
@@ -110,7 +121,7 @@
           <span id="verification-badge" class="pill idle">بلا تحقق</span>
         </div>
       </div>
-      <ul id="approvals" class="approvals">
+      <ul id="approvals" class="approvals" aria-label="طلبات الموافقة (قائمة قابلة للتمرير)" tabindex="0">
         <li class="empty">لا طلبات موافقة بعد.</li>
       </ul>
       <label class="field" id="approval-payload-field" hidden>
@@ -132,7 +143,7 @@
         <span id="outbox-badge" class="pill idle">—</span>
       </div>
       <p class="hint">لا يخرج أي طلب خارجي من هذا الجدول: نية واحدة بمفتاح idempotency، ثم إرسال واحد بعد الموافقة. النية الملغاة أو الفاشلة تعني أنه لم يُرسل شيء؛ وغير المحسومة تعني «قد يكون وصل» ولا تُعاد.</p>
-      <ul id="outbox" class="outbox" aria-live="polite">
+      <ul id="outbox" class="outbox" aria-live="polite" aria-label="صندوق الأثر الخارجي (قائمة قابلة للتمرير)" tabindex="0">
         <li class="empty">لا نوايا خارجية بعد.</li>
       </ul>
 
@@ -141,7 +152,7 @@
         <span id="reconcile-badge" class="pill idle">—</span>
       </div>
       <p class="hint">لا يخرج أي طلب من هذا القسم. المصالحة تسجّل قرارك فقط: «الأثر موجود» أو «لم يصل»، ثم يستأنف التشغيل إن لم يبقَ شيء غير محسوم. لا شيء يُعاد إرساله تلقائيًا، والنية الفاشلة تُعاد بنفس مفتاحها بعد قرارك وليس قبله.</p>
-      <ul id="reconcile" class="outbox" aria-live="polite">
+      <ul id="reconcile" class="outbox" aria-live="polite" aria-label="عناصر المصالحة (قائمة قابلة للتمرير)" tabindex="0">
         <li class="empty">لا شيء يحتاج مصالحة.</li>
       </ul>
       <label class="field" id="reconcile-note-field" hidden>
@@ -166,7 +177,7 @@
         <h3>سجل الأدلة المسلسل</h3>
         <span id="chain-badge" class="pill idle">—</span>
       </div>
-      <ul id="evidence" class="evidence">
+      <ul id="evidence" class="evidence" aria-label="سجل الأدلة (قائمة قابلة للتمرير)" tabindex="0">
         <li class="empty">لا أدلة مسجلة بعد.</li>
       </ul>
     </section>
