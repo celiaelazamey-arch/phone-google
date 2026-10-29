@@ -106,6 +106,7 @@ AI Gateway وR2 (كلاهما يتطلب وسيلة دفع) وتجديد Figma �
 | 2026-10-29 | [`40823425686`](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40823425686) | `8f850ce` | قياس واحد في `verify:live` (فحص `ready_durable`) | 130 ms |
 | 2026-10-29 | [`40830998982`](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40830998982) | `0357442` | قياس واحد في خطوة الرفع (`liveReady`) | 189 ms |
 | 2026-10-29 | [`40835848879`](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40835848879) | `50cda13` | قياس واحد في خطوة الرفع (`liveReady`؛ أول رفع يحمل WP-1.4: 6 وحدات، 16 عبارة) | 162 ms |
+| 2026-10-29 | [`40839027744`](https://github.com/celiaelazamey-arch/phone-google/actions/runs/40839027744) | `738d832` | قياس واحد في خطوة الرفع (`liveReady`؛ رفع WP-2.1 — لا تغيير في `workers/`) | 108 ms |
 | — | — | — | سلسلة 5 قياسات متتالية (`d1_latency_series`: أدنى/وسيط/أقصى/`spreadRatio`) | **لم تُقَس هنا بعد (قيست في التشغيلة ولم تُقرأ)** — الفحص **مرّ** في تشغيلة `40835848879` على `50cda13` (العيّنات الخمس دائمة وبرقم)، لكن القيم في الأثر `edge-live-acceptance-50cda13…`/ملخص الخطوة وليست في التعليقات التوضيحية؛ تُنسخ هنا عند قراءتها (المالك من المتصفح، أو `::notice` في تغيير لاحق) |
 
 - الادعاء الذي يُختبر: «تباين 130→1400 ms». ما هو موثّق فعلًا حتى اليوم رقمان مفردان (130 و189 ms)؛ الـ1400 ms **لا تشغيلة لها**
