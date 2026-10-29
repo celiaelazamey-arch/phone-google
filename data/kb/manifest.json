@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-10-29T02:41:07.122Z",
+  "generated_at": "2026-10-29T13:04:25.590Z",
   "files": [
     {
       "name": "sources_registry.csv",
@@ -12,7 +12,7 @@
       "trust": "T3",
       "stale_after_days": 365,
       "last_sync": "2026-10-27",
-      "sha256": "44483e5d4e192d6694e801e60cdfcf622ace07ce8117c74034a1acbc96470a9b"
+      "sha256": "fc6544e3188796806e5955975a4b45436d237fb4f2313ad375fb97240d23cb27"
     },
     {
       "name": "tools_registry.csv",
@@ -60,7 +60,7 @@
       "trust": "T2",
       "stale_after_days": 90,
       "last_sync": "2026-10-27",
-      "sha256": "18f4598036814375bc3d70bdd5d50c085868175bb9860ae7d925f3076faedc79"
+      "sha256": "ac1e86bdf02b918fb8aa6c2c31f64cabdabeefa8c9d26ba002cd6960ebc3cc49"
     },
     {
       "name": "learned_registry.csv",
@@ -72,7 +72,19 @@
       "trust": "T1",
       "stale_after_days": 180,
       "last_sync": "2026-10-27",
-      "sha256": "11036f38d2c6af40fef1a9657dc91f7cea64d8c57aec7c823dfbd8e1c537e806"
+      "sha256": "4d38ffa555060c43240589e2a6e9789411d559428b37ded6553e8e26cf8c2e15"
+    },
+    {
+      "name": "drive_registry.csv",
+      "kind": "knowledge",
+      "sourceId": "src-google-drive-curated",
+      "sourceKind": "drive",
+      "uri": "https://drive.google.com/drive/folders/1ZhVmTDGam2i_EixiwI0bGPxbJ4gShOPo",
+      "license": "internal-owner",
+      "trust": "T1",
+      "stale_after_days": 90,
+      "last_sync": "2026-10-29",
+      "sha256": "3136dd1de810b164b347c2915b8e0ce41e313a26b2278245b1645700d8c698b2"
     }
   ]
 }

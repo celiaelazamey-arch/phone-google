@@ -19,6 +19,7 @@
     "celia:mcp:stdio": "node src/celia-mcp.js --stdio",
     "celia:mcp:verify": "node src/celia-mcp.js --self-test",
     "test": "node --test",
+    "test:sandbox": "CELIA_SANDBOX_INTEGRATION=1 node --test test/agent-sandbox.test.js",
     "test:coverage": "node --test --experimental-test-coverage --test-coverage-include=src/** --test-coverage-include=scripts/** --test-coverage-include=workers/** --test-coverage-lines=89 --test-coverage-branches=71 --test-coverage-functions=82",
     "test:ci": "node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./scripts/test-reporter-gha.mjs --test-reporter-destination=stdout",
     "test:coverage:ci": "npm run test:coverage -- --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./scripts/test-reporter-gha.mjs --test-reporter-destination=stdout",

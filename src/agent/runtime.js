@@ -82,6 +82,9 @@ export function createAgentRuntime({
   store,
   tools,
   planner,
+  // An executor-side allowlist is independent of the prompt/provider contract.
+  // Null preserves the existing demo runtime; an array closes tool execution to it.
+  plannerToolAllowlist = null,
   ownerId = 'owner',
   limits = {},
   connectors = createEmptyConnectorRegistry(),
@@ -92,6 +95,13 @@ export function createAgentRuntime({
   if (!store) throw new Error('Agent runtime requires an explicit durable store');
   if (!tools) throw new Error('Agent runtime requires a tool registry');
   if (!planner?.plan) throw new Error('Agent runtime requires a planner');
+  const effectivePlannerAllowlist = plannerToolAllowlist
+    ?? (planner.providerDriven ? planner.allowedTools : null);
+  if (effectivePlannerAllowlist !== null && (!Array.isArray(effectivePlannerAllowlist)
+    || effectivePlannerAllowlist.some((name) => typeof name !== 'string' || !name))) {
+    throw new Error('plannerToolAllowlist must be null or an array of tool names');
+  }
+  const plannerToolSet = effectivePlannerAllowlist === null ? null : new Set(effectivePlannerAllowlist);
   const config = Object.freeze({ ...DEFAULT_LIMITS, ...limits });
   const verifier = createVerifier({ tools, clock });
   const outbox = createOutbox({ store, connectors, clock, workerId: `${workerId}-outbox` });
@@ -109,6 +119,27 @@ export function createAgentRuntime({
       }
     }
     return payload;
+  }
+
+  async function recordProviderEvent({ runId, stepId, kind, input, output, sourceIds = [], verdict = null }) {
+    const evidence = await store.appendEvidence({
+      runId,
+      stepId,
+      kind,
+      input,
+      output,
+      sourceIds,
+      verdict
+    });
+    emit(runId, {
+      type: kind,
+      stepId,
+      evidenceId: evidence.id,
+      inputHash: evidence.inputHash,
+      outputHash: evidence.outputHash,
+      verdict
+    });
+    return evidence;
   }
 
   async function contextFor(run, signal) {
@@ -504,11 +535,53 @@ export function createAgentRuntime({
 
         const context = await contextFor(run, controller.signal);
         let decision;
+        let planEvidence = null;
         try {
           decision = await planner.plan(context);
         } catch (error) {
-          await addStep(runId, { kind: 'decide', title: 'فشل التخطيط', summary: String(error?.code || 'planner_failed') });
-          return { run: await finish(runId, RUN_STATUS.failed, { error: 'planner_failed' }), claimed: true };
+          const failureStep = await addStep(runId, {
+            kind: 'decide',
+            title: 'فشل التخطيط',
+            summary: String(error?.code || 'planner_failed')
+          });
+          if (error?.providerTrace) {
+            await recordProviderEvent({
+              runId,
+              stepId: failureStep.id,
+              kind: EVIDENCE_KIND.planCreated,
+              input: error.providerTrace.request,
+              output: {
+                valid: false,
+                code: error.code || 'planner_failed',
+                details: error.details || [],
+                plan: error.providerTrace.plan ?? null
+              },
+              verdict: VERDICT.block
+            });
+          }
+          return {
+            run: await finish(runId, RUN_STATUS.failed, { error: error?.providerTrace ? error.code : 'planner_failed' }),
+            claimed: true
+          };
+        }
+        if (decision?.providerTrace) {
+          const planStep = await addStep(runId, {
+            kind: 'decide',
+            title: `خطة النموذج: ${decision.providerTrace.plan?.action || decision.action}`,
+            summary: String(decision.reason || '').slice(0, 900),
+            toolName: decision.action === 'call' ? decision.tool : null
+          });
+          planEvidence = await recordProviderEvent({
+            runId,
+            stepId: planStep.id,
+            kind: EVIDENCE_KIND.planCreated,
+            input: decision.providerTrace.request,
+            output: { valid: true, plan: decision.providerTrace.plan, usage: decision.providerTrace.usage },
+            verdict: VERDICT.pass
+          });
+          if (decision.costMicros > 0 || decision.tokens > 0) {
+            await store.recordCost(runId, { costMicros: decision.costMicros || 0, tokens: decision.tokens || 0 });
+          }
         }
 
         if (decision?.action === 'finish') {
@@ -533,15 +606,17 @@ export function createAgentRuntime({
             title: `تحقق مستقل: ${verification.verdict}`,
             summary: verification.checks.map((check) => `${check.id}=${check.status}`).join(' · ').slice(0, 900)
           });
-          const verificationEvidence = await store.appendEvidence({
+          const verificationInput = {
             runId,
             stepId: verifyStep.id,
-            kind: EVIDENCE_KIND.verification,
             input: { objective: verification.objective, verifier: verification.version },
             output: verification,
             sourceIds: priorEvidence.map((entry) => entry.id),
             verdict: verification.verdict
-          });
+          };
+          const verificationEvidence = decision.providerTrace
+            ? await recordProviderEvent({ ...verificationInput, kind: EVIDENCE_KIND.verificationResult })
+            : await store.appendEvidence({ ...verificationInput, kind: EVIDENCE_KIND.verification });
           emit(runId, { type: 'verification', verification });
           await addStep(runId, {
             kind: 'deliver',
@@ -574,8 +649,62 @@ export function createAgentRuntime({
 
         const tool = tools.get(decision.tool);
         if (!tool) {
-          await addStep(runId, { kind: 'decide', title: 'أداة غير مسجلة', summary: `رفض استدعاء أداة غير موجودة: ${decision.tool}` });
+          const rejectedStep = await addStep(runId, { kind: 'decide', title: 'أداة غير مسجلة', summary: `رفض استدعاء أداة غير موجودة: ${decision.tool}` });
+          if (decision.providerTrace) {
+            await recordProviderEvent({
+              runId,
+              stepId: rejectedStep.id,
+              kind: EVIDENCE_KIND.toolSelected,
+              input: decision.providerTrace.plan,
+              output: { allowed: false, tool: decision.tool, reason: 'unknown_tool' },
+              sourceIds: planEvidence ? [planEvidence.id] : [],
+              verdict: VERDICT.block
+            });
+          }
           return { run: await finish(runId, RUN_STATUS.failed, { error: 'unknown_tool' }), claimed: true };
+        }
+        if (plannerToolSet && !plannerToolSet.has(tool.name)) {
+          const rejectedStep = await addStep(runId, {
+            kind: 'decide',
+            title: 'أداة خارج نطاق المخطط',
+            summary: `رفض ${tool.name} في المنفذ: الأداة غير موجودة في plannerToolAllowlist؛ لم تبدأ أي موافقة أو كتابة.`,
+            toolName: tool.name
+          });
+          if (decision.providerTrace) {
+            await recordProviderEvent({
+              runId,
+              stepId: rejectedStep.id,
+              kind: EVIDENCE_KIND.toolSelected,
+              input: decision.providerTrace.plan,
+              output: { allowed: false, tool: tool.name, reason: 'planner_tool_not_allowed' },
+              sourceIds: planEvidence ? [planEvidence.id] : [],
+              verdict: VERDICT.block
+            });
+          }
+          return { run: await finish(runId, RUN_STATUS.failed, { error: 'planner_tool_not_allowed' }), claimed: true };
+        }
+        const inputValidation = decision.providerTrace || plannerToolSet
+          ? tools.validateInput(tool.name, decision.args ?? {})
+          : { ok: true };
+        if (!inputValidation.ok) {
+          const rejectedStep = await addStep(runId, {
+            kind: 'decide',
+            title: 'مدخلات أداة غير صالحة',
+            summary: `رفض المنفذ مدخلات ${tool.name}: ${inputValidation.code}`,
+            toolName: tool.name
+          });
+          if (decision.providerTrace) {
+            await recordProviderEvent({
+              runId,
+              stepId: rejectedStep.id,
+              kind: EVIDENCE_KIND.toolSelected,
+              input: decision.providerTrace.plan,
+              output: { allowed: false, tool: tool.name, reason: inputValidation.code },
+              sourceIds: planEvidence ? [planEvidence.id] : [],
+              verdict: VERDICT.block
+            });
+          }
+          return { run: await finish(runId, RUN_STATUS.failed, { error: inputValidation.code }), claimed: true };
         }
         if (!tools.executable(tool.name)) {
           const gateStep = await addStep(runId, {
@@ -671,6 +800,17 @@ export function createAgentRuntime({
           summary: decision.reason ? String(decision.reason).slice(0, 300) : null,
           toolName: decision.tool
         });
+        const selectionEvidence = decision.providerTrace
+          ? await recordProviderEvent({
+              runId,
+              stepId: step.id,
+              kind: EVIDENCE_KIND.toolSelected,
+              input: decision.providerTrace.plan,
+              output: { allowed: true, tool: tool.name, args: decision.args ?? {} },
+              sourceIds: planEvidence ? [planEvidence.id] : [],
+              verdict: VERDICT.pass
+            })
+          : null;
         const idempotencyKey = `${runId}:${step.index}:${tool.name}`;
         const { created, toolRun } = await store.startToolRun({
           runId,
@@ -704,15 +844,21 @@ export function createAgentRuntime({
             controller.signal
           );
           const settledToolRun = await store.finishToolRun(toolRun.id, TOOL_RUN_STATUS.succeeded, JSON.stringify(outcome ?? null));
-          await store.appendEvidence({
+          const toolEvidenceInput = {
             runId,
             stepId: step.id,
-            kind: EVIDENCE_KIND.toolCall,
             input: { tool: tool.name, args: decision.args || null },
             output: outcome ?? null,
-            sourceIds: [toolRun.id],
+            sourceIds: decision.providerTrace
+              ? [selectionEvidence?.id, toolRun.id].filter(Boolean)
+              : [toolRun.id],
             verdict: VERDICT.pass
-          });
+          };
+          if (decision.providerTrace) {
+            await recordProviderEvent({ ...toolEvidenceInput, kind: EVIDENCE_KIND.toolExecuted });
+          } else {
+            await store.appendEvidence({ ...toolEvidenceInput, kind: EVIDENCE_KIND.toolCall });
+          }
           const preview = JSON.stringify(outcome ?? null).slice(0, 300);
           await addStep(
             runId,
@@ -723,15 +869,21 @@ export function createAgentRuntime({
           const cancelled = error?.code === 'cancelled' || controller.signal.aborted;
           const status = tool.risk === RISK.read ? TOOL_RUN_STATUS.failed : TOOL_RUN_STATUS.unknown;
           const settledToolRun = await store.finishToolRun(toolRun.id, status, JSON.stringify({ error: error?.code || 'tool_failed' }));
-          await store.appendEvidence({
+          const toolEvidenceInput = {
             runId,
             stepId: step.id,
-            kind: EVIDENCE_KIND.toolCall,
             input: { tool: tool.name, args: decision.args || null },
             output: { error: error?.code || 'tool_failed', status },
-            sourceIds: [toolRun.id],
+            sourceIds: decision.providerTrace
+              ? [selectionEvidence?.id, toolRun.id].filter(Boolean)
+              : [toolRun.id],
             verdict: status === TOOL_RUN_STATUS.unknown ? VERDICT.unknown : VERDICT.block
-          });
+          };
+          if (decision.providerTrace) {
+            await recordProviderEvent({ ...toolEvidenceInput, kind: EVIDENCE_KIND.toolExecuted });
+          } else {
+            await store.appendEvidence({ ...toolEvidenceInput, kind: EVIDENCE_KIND.toolCall });
+          }
           await addStep(
             runId,
             {
@@ -749,7 +901,9 @@ export function createAgentRuntime({
             return { run: await finish(runId, RUN_STATUS.needsReconciliation, { error: 'outcome_unknown' }), claimed: true };
           }
         }
-        await store.recordCost(runId, { costMicros: Number(decision.costMicros) || 0, tokens: Number(decision.tokens) || 0 });
+        if (!decision.providerTrace) {
+          await store.recordCost(runId, { costMicros: Number(decision.costMicros) || 0, tokens: Number(decision.tokens) || 0 });
+        }
       }
     } catch (error) {
       logger.error?.('Agent run failed:', error?.code || 'run_failed');
@@ -769,6 +923,7 @@ export function createAgentRuntime({
         enabled: true,
         dialect: store.dialect,
         planner: planner.name,
+        plannerToolAllowlist: plannerToolSet ? [...plannerToolSet] : null,
         verifier: verifier.name,
         approvalGate: true,
         evidenceLedger: 'sha256-hash-chain-v1',
@@ -882,7 +1037,9 @@ export function createAgentRuntime({
       const toolRuns = rawToolRuns.map((toolRun) => ({ ...toolRun, outcome: parseOutcome(toolRun.outcome) }));
       // WP-1.1: every step carries the duration its tool run proves (or null) — nothing is estimated.
       const steps = timeSteps(rawSteps, toolRuns);
-      const verificationEntry = [...evidence].reverse().find((entry) => entry.kind === EVIDENCE_KIND.verification) || null;
+      const verificationEntry = [...evidence].reverse().find((entry) => (
+        entry.kind === EVIDENCE_KIND.verification || entry.kind === EVIDENCE_KIND.verificationResult
+      )) || null;
       const verification = verificationEntry
         ? { seq: verificationEntry.seq, verdict: verificationEntry.verdict, at: verificationEntry.createdAt, hash: verificationEntry.hash }
         : null;

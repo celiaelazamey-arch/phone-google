@@ -67,6 +67,17 @@
       "trust": "T1",
       "stale_after_days": 180,
       "last_sync": "2026-10-27"
+    },
+    {
+      "name": "drive_registry.csv",
+      "kind": "knowledge",
+      "sourceId": "src-google-drive-curated",
+      "sourceKind": "drive",
+      "uri": "https://drive.google.com/drive/folders/1ZhVmTDGam2i_EixiwI0bGPxbJ4gShOPo",
+      "license": "internal-owner",
+      "trust": "T1",
+      "stale_after_days": 90,
+      "last_sync": "2026-10-29"
     }
   ]
 }

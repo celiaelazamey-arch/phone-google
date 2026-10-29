@@ -9,7 +9,7 @@
  * Tracks (mirroring docs/security-posture.md):
  *   A. CI & supply chain  (SP-01..SP-06)   — workflows, permissions, pinned actions, npm audit, Dependabot
  *   B. Secrets            (SP-07..SP-08)   — .env never tracked, check:secrets wired into the quality gate
- *   C. Runtime hardening  (SP-09..SP-11)   — no dynamic code execution, SSRF guard, append-only audit chain
+ *   C. Runtime hardening  (SP-09..SP-11)   — no dynamic execution outside the isolated sandbox, SSRF guard, append-only audit chain
  *   D. Governance         (SP-12)          — the owner-only controls are documented, not simulated
  */
 import test from 'node:test';
@@ -140,7 +140,7 @@ test('SP-08 the secrets-wiring check exists and runs inside the quality workflow
 // C. Runtime hardening
 // ---------------------------------------------------------------------------------------------------------
 
-test('SP-09 runtime code never evaluates strings or spawns processes (src/ and workers/)', () => {
+test('SP-09 runtime code never evaluates strings or spawns processes outside the isolated AGENT-003 executor', () => {
   const forbidden = [
     ['eval(', /\beval\s*\(/],
     ['new Function(', /\bnew\s+Function\s*\(/],
@@ -152,12 +152,23 @@ test('SP-09 runtime code never evaluates strings or spawns processes (src/ and w
   assert.ok(files.length >= 50, `runtime files scanned (${files.length})`);
   const hits = [];
   for (const file of files) {
+    const relative = path.relative(root, file);
     const text = readFileSync(file, 'utf8');
     for (const [label, pattern] of forbidden) {
-      if (pattern.test(text)) hits.push(`${path.relative(root, file)}: ${label}`);
+      // AGENT-003 is the single, reviewed exception: it launches unshare with a
+      // fixed entrypoint and fails closed. Every other runtime file remains
+      // subject to the original zero-spawn rule, and sandbox.js is still scanned
+      // for eval/vm above.
+      const isolatedSpawn = relative === 'src/agent/sandbox.js' && (label === 'child_process' || label === 'execSync/spawn');
+      if (!isolatedSpawn && pattern.test(text)) hits.push(`${relative}: ${label}`);
     }
   }
-  assert.deepEqual(hits, [], 'dynamic code execution or process spawning found in runtime code');
+  assert.deepEqual(hits, [], 'dynamic code execution or process spawning found outside the isolated AGENT-003 executor');
+  const sandbox = read('src/agent/sandbox.js');
+  assert.match(sandbox, /sandbox_linux_namespaces_required/);
+  assert.match(sandbox, /--net/);
+  assert.match(sandbox, /--map-user=/);
+  assert.match(sandbox, /createSandboxPolicy/);
 });
 
 test('SP-10 the outbound-target guard blocks loopback, private, link-local and metadata hosts', () => {

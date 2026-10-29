@@ -76,7 +76,7 @@ export function buildMarkdown() {
 > **مُولَّد آليًا** من \`src/agent/computer-policy.js\` (\`${COMPUTER_POLICY_VERSION}\`). لا تُحرّره يدويًا:
 > \`npm run computer:permissions\` يعيد توليده، و\`npm run computer:permissions:check\` يُفشل CI عند الانحراف.
 >
-> **لا شيء هنا مُنفَّذ:** ${summary.wired} من ${summary.total} قدرة موصولة بمحرك تنفيذ. \`AGENT-003\` (العزل) موقوفة،
+> **لا شيء هنا مُنفَّذ:** ${summary.wired} من ${summary.total} قدرة موصولة بمحرك Computer Use. Backend AGENT-003 المحلي غير موصول بهذه القدرات،
 > لذا \`decideAction\` يعيد الحكم السياسي مع \`executable: false\`. المخطط يوثّق الحدود، ولا يثبت أن النقر والكتابة يعملان.
 
 **حالة النظام المعلنة:** \`NETWORK = ${SYSTEM_STATE.network}\` · \`EXTERNAL GATES = ${SYSTEM_STATE.externalGates}\` · \`IDENTITY = ${SYSTEM_STATE.identity}\`
@@ -273,7 +273,7 @@ ${cards}
 
       <div class="truth" role="note">
         <b>ليست قدرات مُشغَّلة.</b>
-        ${summary.wired} من ${summary.total} قدرة موصولة بمحرك تنفيذ (<code>AGENT-003</code> موقوفة). القرار يُحسب فعليًا، لكن
+        ${summary.wired} من ${summary.total} قدرة موصولة بمحرك Computer Use (Backend <code>AGENT-003</code> المحلي غير موصول بها). القرار يُحسب فعليًا، لكن
         <code>executable</code> يبقى <code>false</code> — والمخطط يوثّق الحدود بدل أن يوحي بقدرة قائمة.
         <div class="state">
           <code>NETWORK = ${SYSTEM_STATE.network}</code>

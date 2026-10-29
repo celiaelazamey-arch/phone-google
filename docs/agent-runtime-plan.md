@@ -37,6 +37,7 @@ Manus ليس «دردشة بأدوات»، بل **حلقة تنفيذ مستقل
 | خادم HTTP | Express 5 / ESM، مسارات صحية وإصدار وتشخيص وMCP على `/mcp` (GET/POST) وواجهة أدوات | `src/operations.js` · `src/celia-mcp.js:1023-1060` |
 | أدوات | 12 أداة MCP افتراضية + 4 اختيارية (`CELIA_EXTENDED_MCP_TOOLS`) تغطي Google (Gmail/Drive/Calendar/Contacts)، WhatsApp، AI، صوت، Figma، Codata، أسرار | `src/celia-mcp.js` · DEC-010 |
 | Google OAuth | تخزين رموز مشفّر AES-256-GCM، جدول `google_credentials`، نطاقات قراءة + إنشاء تقويم محدود | `src/security.js:18` · `sql/schema.sql` |
+| Gmail read-only للوكيل | `google.gmail_read` عبر `src/agent/gmail.js` و`fetchInboxMessages()`؛ 1–5 رسائل بmetadata ومقتطف ≤500 حرف، تسجيل صريح بـ`CELIA_AGENT_CONNECTORS=gmail`، ولا outbox أو body/attachments | `test/agent-gmail.test.js` 7/7 Mock/SQLite؛ لا اتصال حي ولا تفعيل إنتاجي |
 | WhatsApp | تحقّق HMAC، تفادي تكرار، **موافقتان** (تحدث + AI) قبل أي رد آلي | `src/whatsapp.js` · `src/policy.js` |
 | البيانات | MySQL بخمسة جداول فقط: `app_users`، `oauth_states`، `google_credentials`، `whatsapp_contacts`، `whatsapp_messages` | `sql/schema.sql` |
 | المرونة | قواطع دوائر، مهل، حدود تزامن، لا سقوط صامت لذاكرة | `src/resilience.js` · `src/ollama.js` |
@@ -96,11 +97,12 @@ Manus ليس «دردشة بأدوات»، بل **حلقة تنفيذ مستقل
 |---|---|---|---|
 | M1 — الذاكرة والحلقة | **AGENT-001** | `schema 2` + orchestrator + 3 أدوات قراءة، بث SSE، إلغاء، استئناف | مهمة واحدة تُنجز ≥3 خطوات وتُستأنف بعد إعادة تشغيل الخادم من آخر خطوة مؤكدة، دون تكرار أثر؛ طلب مكرر بنفس `client_message_id` لا يُضاعف؛ الحالة في MySQL لا في ذاكرة Node |
 | M2 — الأثر الخارجي والموافقات | **AGENT-002** | outbox + approvals + أدوات كتابة (تقويم، إرسال WhatsApp، تصدير Drive) | كل أثر خارجي يمرّ بـ outbox وموافقة؛ انقطاع بعد الإرسال لا يُنتج إرسالًا ثانيًا؛ اختبار «موافقة مرفوضة» لا يترك أثرًا — **متحقق للـoutbox وموصل التقويم (DEC-015)؛ باقٍ WhatsApp وDrive** |
-| M3 — العزل والمخرجات | **AGENT-003** | حاوة تنفيذ لكل مهمة + مخزن artifacts + تنزيل بانتهاء | كود يُنفَّذ داخل حاوية بلا وصول للمضيف/الشبكة إلا بقائمة سماح؛ ملف مخرج يُسلَّم برابط ينتهي؛ حدود CPU/ذاكرة/زمن مفروضة ومختبرة |
+| M3 — العزل والمخرجات | **AGENT-003** | Backend namespaces لكل Run + مخزن artifacts + مرجع ينتهي؛ **محلي وغير موصول بـRuntime** | `test:sandbox` يثبت 17/17: جذر مؤقت يُتلف، UID/GID غير جذري، حجب ملفات المضيف، default-deny وProbe مسجلة، CPU/ذاكرة/workspace/wall/concurrency، Artifact واحد بSHA-256 وEvidence؛ لا egress allowlist ولا تفعيل `sandbox.exec` بعد (`docs/agent-sandbox.md`) |
 | M4 — منتج متعدد المستخدمين | **AGENT-004** | عزل مستخدمين، حصص، سياسة احتفاظ، تكلفة | مستخدم لا يرى خيطًا/ملفًا/تشغيلًا لغيره؛ تجاوز الحصة يوقف التشغيل برسالة واضحة؛ حذف حساب يحذف آثاره وفق DATA-004 |
 
-M1 لا يحتاج أي حساب خارجي جديد ولا أسرارًا إضافية، ويمكن تنفيذه على بيئة التطوير الحالية. M3 لا يعمل على
-طبقة استضافة مجانية بذاكرة صغيرة ونوم دوري — يحتاج قرار ميزانية من المالك.
+M1 لا يحتاج أي حساب خارجي جديد ولا أسرارًا إضافية، ويمكن تنفيذه على بيئة التطوير الحالية. Backend M3 المحلي لا يغيّر
+متطلبات الإنتاج: تشغيله كخدمة على طبقة استضافة مجانية بذاكرة صغيرة ونوم دوري غير معتمد — يحتاج قرار ميزانية وبيئة هدف
+تدعم namespaces وحدود الموارد، وربط Runtime مستقل.
 
 ## 5. حدود يجب قولها صريحة
 

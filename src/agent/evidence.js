@@ -30,8 +30,19 @@ export const EVIDENCE_KIND = Object.freeze({
   // owner's stated finding, never to an observation this process could not make.
   reconciliation: 'reconciliation',
   verification: 'verification',
+  // Provider-planned runs separate model decisions from runtime execution.
+  planCreated: 'plan_created',
+  toolSelected: 'tool_selected',
+  toolExecuted: 'tool_executed',
+  verificationResult: 'verification_result',
   delivery: 'delivery',
-  memoryDeleted: 'memory_deleted'
+  memoryDeleted: 'memory_deleted',
+  // AGENT-003: local per-run isolation and artifact lifecycle. These events
+  // describe the executor's observations; they are not a live-tool capability.
+  sandboxCreated: 'sandbox_created',
+  sandboxFinished: 'sandbox_finished',
+  sandboxNetworkAttempt: 'sandbox_network_attempt',
+  sandboxArtifact: 'sandbox_artifact'
 });
 
 export const EVIDENCE_VERSION = 'evidence-v1';

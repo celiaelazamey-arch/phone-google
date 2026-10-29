@@ -7,7 +7,8 @@
  *   1. Default deny. A capability that is not named here is refused, and an action whose target is outside the
  *      task scope is refused even when the capability itself is allowed.
  *   2. Policy is not capability. Every entry carries `wired`, and today every value is `false`: the computer-use
- *      engine (AGENT-003) is parked, so `decideAction` returns the policy verdict *and* `executable: false`.
+ *      engine is not wired to Computer Use; the local AGENT-003 sandbox backend does not change that boundary,
+ *      so `decideAction` returns the policy verdict *and* `executable: false`.
  *      Adding click and type to a diagram proves nothing about them working, and this module refuses to pretend
  *      otherwise.
  *
@@ -55,7 +56,7 @@ export const GROUPS = Object.freeze({
  * gate        the control that has to pass
  * external    the action leaves the machine (needs an open external gate)
  * identity    the action acts in the user's name (needs a proven identity)
- * wired       false until AGENT-003 ships an isolated executor — nothing is executable today
+ * wired       false until Computer Use is explicitly wired to a reviewed executor; the local AGENT-003 backend alone does not enable it
  * tested      whether the control has an automated test in this repository
  */
 export const CAPABILITIES = Object.freeze([

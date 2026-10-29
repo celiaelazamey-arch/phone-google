@@ -1,12 +1,13 @@
 # حلقة الوكيل M1 — ما نُفِّذ فعلًا وما لم يُنفَّذ
 
-**التاريخ:** 27 أكتوبر 2026 (محدَّث: WP-2.4 / AI-001 / DEC-054) · **المهمة:** AGENT-001 (M1) + الحوكمة + AGENT-002 + ذاكرة الوكيل + تقييم المهمة الذهبية
-**الحالة:** منفّذ ومختبر محليًا على مخزن SQLite صريح — **لا يشغّل نموذجًا لغويًا، والأثر الخارجي لا يخرج إلا عبر outbox وبموصل صريح؛ الذاكرة حتمية وبلا متجهات، وتقييم AI-001 وهمي بلا شبكة**.
+**التاريخ:** 27 أكتوبر 2026 (محدَّث: 29 أكتوبر 2026 — WP-2.4 / AI-001 / DEC-054 + شريحة AI-002 المحلية + GOOG-004) · **المهمة:** AGENT-001 (M1) + الحوكمة + AGENT-002 + GOOG-004 + ذاكرة الوكيل + تقييم المهمة الذهبية + Planner المزود المحلي
+**الحالة:** منفّذ ومختبر محليًا على مخزن SQLite صريح — **المسار الافتراضي لا يشغّل نموذجًا لغويًا؛ توجد شريحة Planner/Tool Use بمزود وهمي فقط، والأثر الخارجي لا يخرج إلا عبر outbox وبموصل صريح؛ الذاكرة حتمية وبلا متجهات، وتقييم AI-001 وهمي بلا شبكة**.
 **الإصدار:** `0.2.1` بلا تغيير · **مخطط الجداول الخمسة الأساسية:** `schema 1` بلا تغيير.
 
 > لا يجوز وصف النظام بأنه «مثل Manus» بعد. هذه الوثيقة تصف **هيكل الحلقة الدائمة**، لا وكيلًا عامًا: المخطط
-> الحالي حتمي (تجريبي)، وأدوات الحلقة قراءة داخلية فقط، والأثر الخارجي يخرج من **صندوق outbox** واحد وبموصل
-> مُفعَّل صراحةً — والافتراضي بلا موصلات فيُرفض الأثر بـ`external_connector_unavailable`.
+> الافتراضي حتمي (تجريبي)، وأدوات الحلقة قراءة داخلية فقط، والأثر الخارجي يخرج من **صندوق outbox** واحد وبموصل
+> مُفعَّل صراحةً — والافتراضي بلا موصلات فيُرفض الأثر بـ`external_connector_unavailable`. عقد Planner المزود المحلي
+> موثق في [AI-002](agent-planner-provider.md)، ولا يغيّر هذا المسار الافتراضي أو يثبت نموذجًا حيًا.
 
 ## 1. ما يعمل الآن
 
@@ -23,6 +24,8 @@
 | بوابة مخاطر لكل أداة | `read` / `internal_write` / `external_effect` / `irreversible` | أداتان خارجيتان تُوقفان التشغيل بصف موافقة مسجل قابل للقرار |
 | ملكية على كل صف | `owner_id` في الخيوط والتشغيلات وكل قراءة | مالك آخر لا يقرأ ولا يلغي |
 | ذاكرة طويلة الأمد بلا متجهات (WP-2.3) | `src/agent/memory.js` + `agent_thread_summaries`/`agent_owner_facts`؛ ملخص خيط وحقائق `owner.*` تُشتق حتميًا من الخطوات عند `run.finished`، وفحص `findSecret` قبل حفظ نص التسليم | MEM-01..05: الحتمية، الملكية/404، الحذف النهائي مع `memory_deleted` وسلسلة سليمة، ومسارا HTTP؛ `context_memory` يعلن `summaries:true, facts:true` |
+| Planner + Tool Use بمزود قابل للحقن (شريحة AI-002) | `src/agent/planner-provider.js` + `plannerToolAllowlist` في Runtime؛ 2–4 قراءات فقط، JSON مغلق، `tool_result` يعود للمزود، وأحداث قرار/تنفيذ مستقلة | `test/agent-planner-provider.test.js`: حالات عربية/إنجليزية، رفض قبل الأثر، فشل آمن، منع إعادة التخطيط، واستئناف بلا تكرار؛ مزود وهمي فقط |
+| Gmail read-only (GOOG-004) | `src/agent/gmail.js` + `google.gmail_read`؛ تسجيل صريح بـ`CELIA_AGENT_CONNECTORS=gmail` أو حقن reader، وإعادة استخدام OAuth المشفر و`gmail.readonly`؛ intent حتمي ضيق في `demo` عند التفعيل | `test/agent-gmail.test.js`: 7/7 Mock/SQLite؛ آخر 1–5 رسائل بmetadata فقط، صفر outbox/approvals، ولا اتصال Google حي |
 | تقييم المهمة الذهبية العربية (WP-2.4) | `src/agent/ai-eval*.js` + 120 حالة ثابتة؛ الحلقة والموافقات وoutbox وموصل Calendar والمُتحقّق والأدلة حقيقية، والنقل وهمي بلا شبكة | AI-EVAL-01..08 و`npm run eval:ai`: 120/120، مواعيد مؤهلة 109/109، صفر تكرار/كتابة غير مصرح بها/إعادة عمياء، و`unknown` 2/2 إلى مصالحة |
 | شفافية تشغيل | خطوات مخزنة + بث SSE + عدادات استخدام | `GET /api/agent/runs/:id/events` يبدأ بلقطة ثم أحداثًا |
 | أزمنة مُثبَتة (WP-1.1، DEC-047) | `src/agent/timing.js`: مدة استدعاء الأداة = `updated_at − created_at` للصفوف التي سوّاها الوقت الحقيقي فقط؛ `null` للجارية/`unknown`/المسوّاة يدويًا؛ p50/p95 بأقرب رتبة | MET-01..05: ساعة وهمية تتقدم 7 ms فكل مدة مضاعف لـ7؛ خطوات `decide`/`deliver` بلا مدة |
@@ -86,7 +89,8 @@ npm run migrate -- --status
 | عقد الهدف | `src/agent/goal-contract.js` · `agent_goal_contracts` | كل تشغيل يحمل عقدًا يُبنى حتميًا من حدوده الفعلية؛ معايير النجاح الآلية يقيّمها المُتحقِّق |
 | بوابة الموافقات | `agent_approvals` · `runtime.approve()` | قرار idempotent بمفتاح ومرجع ممثل؛ `unknown`/`started` يمنع الاستئناف (`409 reconciliation_required`)؛ الرفض يلغي بلا أثر |
 | صندوق الأثر الخارجي | `src/agent/outbox.js` · `agent_outbox` | نية واحدة بمفتاح idempotency قبل القرار؛ ادعاء شرطي واحد؛ `dispatching` لا يُدعى ثانية ويُسوّى `unknown` عند انتهاء المهلة؛ لا إعادة إرسال تلقائية |
-| موصل التقويم | `src/agent/connectors.js` · `CELIA_AGENT_CONNECTORS` | الموصل الوحيد الذي يلمس طرفًا ثالثًا؛ `iCalUID` حتمي؛ `failed` فقط عند إثبات عدم الوصول |
+| موصلات الأثر الخارجي | `src/agent/connectors.js` · `CELIA_AGENT_CONNECTORS` | Calendar/WhatsApp/Drive فقط عبر outbox وموافقة؛ `iCalUID`/مفاتيح idempotency؛ `failed` فقط عند إثبات عدم الوصول |
+| قارئ Gmail | `src/agent/gmail.js` · `google.gmail_read` | قراءة metadata ومقتطف ≤500 حرف عبر OAuth المشفر القائم؛ لا `send()` أو outbox أو body/attachments، ولا يسجل افتراضيًا |
 | سجل الأدلة | `src/agent/evidence.js` · `agent_evidence` | إضافي فقط، `prev_hash`+`hash` من SHA-256 وجذر genesis لكل تشغيل؛ العبث يُكشف عند `verifyEvidenceChain` |
 | المصالحة البشرية | `runtime.reconcile()` · `POST /runs/:id/reconcile` | تُحلّ فقط صفوف `unknown`/`started` (أو `dispatching` بlease منتهٍ) بقرار مالك مسجل في السلسلة؛ لا نوش على نتيجة محسومة، ولا إرسال من هذا المسار |
 | المُتحقِّق المستقل | `src/agent/verifier.js` | منفصل عن المنتِج، بلا كتابة؛ أحكام `PASS`/`BLOCK`/`UNKNOWN`؛ لا خطوة `deliver` بلا `verify`؛ فحص `reconciliation_evidence` يمنع تحصيل نتيجة بلا شاهد في السلسلة |
@@ -109,6 +113,19 @@ CELIA_AGENT_CALENDAR_TIMEZONE=Africa/Cairo   # اختياري
 
 يشترط `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` وحسابًا موصولًا بصلاحية `calendar.events`؛ إن غاب أي منها
 يفشل الإعداد برمز `agent_connector_unconfigured` بدل تدهور صامت. الموصل لا يضيف نطاقًا ولا سرًا جديدًا.
+
+### تفعيل قارئ Gmail (اختياري وصريح — GOOG-004)
+
+```bash
+CELIA_AGENT_CONNECTORS=gmail       # الافتراضي none: لا تسجيل ولا قراءة
+# يمكن جمعه مع calendar/whatsapp/drive بالفواصل عند الحاجة
+```
+
+يستخدم `google.gmail_read` النطاق القائم `gmail.readonly` و`fetchInboxMessages()` مع منح OAuth المشفر نفسه.
+المدخل الوحيد `maxResults` من 1 إلى 5 (الافتراضي 5) و`unreadOnly`؛ لا query حر ولا body أو مرفقات. النتيجة
+`id/from/subject/date/snippet/unread` (المقتطف ≤500 حرف)، وتسجل كنتيجة أداة وEvidence hash chain، لا كـoutbox أو أثر خارجي. غياب إعداد
+Google أو pool الدائم يفشل الإعداد برمز `agent_connector_unconfigured`. هذه الوثيقة لا تفعّل الحساب الحي؛ الاختبار
+الحالي Mock فقط، والتفعيل الفعلي قرار لاحق.
 
 ### الاستعادة عند الإقلاع (اختيارية وصريحة — DEC-018)
 
@@ -162,13 +179,15 @@ CELIA_AGENT_RESUME_ON_BOOT=true      # الافتراضي false: لا يستأن
 
 ## 4. ما لم يُنفَّذ — بصراحة
 
-1. **لا نموذج لغوي:** `planner` الحالي حتمي (خطوات ثابتة حسب الرسالة). واجهة `plan()` جاهزة، لكن ربط مزوّد
-   (AI-002) لم يُنفَّذ ولم يُختبر؛ لذلك لا تخطيط حرّ ولا جودة استدلال. تقييم AI-001 يستخدم مستخرجًا عربيًا حتميًا
-   ونقلًا وهميًا، ولا يرفع هذا الحد ولا يثبت جودة Gemini أو تكلفته أو اتصال Calendar الحي.
-2. **الأثر الخارجي محدود بموصل واحد:** الـoutbox وموصل Google Calendar مبنيان، لكن WhatsApp وDrive لم يُبنَيا.
-   المصالحة وإعادة المحاولة اليدوية صارتا مسارًا وواجهة (DEC-016)، لكن `unknown` لا يُعاد تلقائيًا أبدًا ولا
-   يوجد حل تلقائي بالتصويت — القرار البشري شرط.
-3. **لا تنفيذ معزول:** `sandbox.exec` يُرفض دائمًا حتى AGENT-003؛ لا حاوية ولا مخرجات artifacts بعد.
+1. **لا نموذج حي ولا تفعيل إنتاجي:** `demo-deterministic` ما زال الافتراضي والوحيد الذي يقبله `createAgentHost`.
+   أُضيف عقد `planner-provider.js` واختُبر بمزود وهمي داخل الحلقة، مع أدوات قراءة مغلقة و`tool_result` وأدلة مستقلة؛
+   هذا يثبت التكامل والحوكمة محليًا فقط، لا تخطيطًا حرًّا أو جودة استدلال. تقييم AI-001 يستخدم مستخرجًا عربيًا حتميًا
+   ونقلًا وهميًا، ولا يرفع هذا الحد ولا يثبت جودة Gemini أو تكلفته أو اتصال Calendar الحي. التفاصيل في
+   [مستند شريحة AI-002](agent-planner-provider.md).
+2. **الأثر الخارجي مشروط بموصل مهيأ صراحة:** موصلات Calendar وWhatsApp وDrive موجودة في الكود وتُربط اختياريًا،
+   لكن لا يثبت هذا التغيير أي اتصال إنتاجي حي بها. المصالحة وإعادة المحاولة اليدوية صارتا مسارًا وواجهة (DEC-016)،
+   لكن `unknown` لا يُعاد تلقائيًا أبدًا ولا يوجد حل تلقائي بالتصويت — القرار البشري شرط.
+3. **التنفيذ المعزول غير موصول بالوكيل:** أُضيف Backend محلي لـAGENT-003 في `src/agent/sandbox.js` مع namespaces وحدود وموارد وArtifact store واختبارات حقيقية (`docs/agent-sandbox.md`)، لكن `sandbox.exec` ما زال `irreversible` ويُرفض من بوابة Runtime؛ لا Shell/Git/Computer Use ولا مسار إنتاجي أو egress allowlist مفعّل.
 4. **لا تعدد مستخدمين:** الملكية مفروضة على كل صف، لكن الإعداد الحالي لمالك واحد (AGENT-004 لاحقًا).
 5. **MySQL:** لا خدمة MySQL في بيئة الجلسة، لذلك اختبارات التطوير على SQLite. اختبار القبول في
    [integration/mysql.integration.mjs](../integration/mysql.integration.mjs) شُغِّل فعليًا على **MySQL 8.4** في
@@ -196,10 +215,12 @@ node --test test/agent-document-automation.test.js # 7/7 أتمتة المستن
 node --test test/agent-comprehension-gate.test.js  # 10/10 بوابة الفهم والشرح المبسّط (CL-01..CL-10)
 node --test test/agent-store.test.js               # 6/6
 node --test test/agent-runtime.test.js             # 16/16
+node --test test/agent-gmail.test.js               # 7/7 Gmail read-only · Mock/SQLite
 node --test test/agent-routes.test.js              # 3/3
 node --test test/agent-memory.test.js              # MEM-01..04: حتمية/أسرار/ملكية/حذف/انتهاء
 node --test test/agent-memory-routes.test.js       # MEM-05: عرض وحذف HTTP وسلسلة الأدلة
 node --test test/agent-ai-eval.test.js              # AI-EVAL-01..08: 8/8
+node --test test/agent-planner-provider.test.js     # AI-002: 10/10، مزود وهمي وSQLite فقط
 npm run eval:ai                                     # 120/120 · PASS · تقرير reports/ai-001.json
 npm test                                            # 615/615 محليًا بعد WP-2.4
 npm run check                                       # 160 ملف JavaScript بعد WP-2.4
