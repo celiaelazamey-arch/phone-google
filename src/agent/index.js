@@ -657,6 +657,9 @@ export function createAgentHost({
     }));
     const demoPlanner = createDemoPlanner({
       knowledge: Boolean(kb),
+      // C2-a(loop): نية الويب تُعلن للمخطط فقط عند وجود خدمة ويب فعلية؛ بلا تفعيل
+      // يرفض الطلب صراحةً بدل أن يتخطاه.
+      web: Boolean(webAccess),
       gmail: Boolean(gmail),
       googleReaders: {
         drive: Boolean(googleReaders.drive),
@@ -714,7 +717,9 @@ export function createAgentHost({
         // A2: نافذة مراجعة واحدة محكومة (maxPerStep=1 + حارس حلقة maxPerRun=1، قراءة فقط).
         primary: createProviderPlanner({ provider, tools: toolRegistry, allowedTools, revisionPolicy: createReplanPolicy() }),
         fallback: demoPlanner,
-        extraAllowedTools: [...DEMO_PLANNER_TOOL_SURFACE]
+        // `web.fetch` تُضاف إلى قائمة المنفذ فقط حين يكون الوصول إلى الويب مُفعَّلًا
+        // بهذه النشرة؛ بلا تفعيل تبقى القائمة حرفيًا كما كانت.
+        extraAllowedTools: [...DEMO_PLANNER_TOOL_SURFACE, ...(webAccess ? ['web.fetch'] : [])]
       });
     }
     const runtime = createAgentRuntime({

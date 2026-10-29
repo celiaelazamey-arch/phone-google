@@ -52,6 +52,11 @@ const DOCUMENT_HINTS = /(فاتورة|فواتير|مستند|استخرج|invoi
 const DOCUMENT_FILE_RE = /\b([A-Za-z0-9._/-]+\.(?:csv|json|txt|md))\b/i;
 const COMMIT_LEDGER_HINTS = /(سجل\s*المشتريات|دفتر\s*المشتريات|purchase\s*ledger|commit\s*invoice)/i;
 const SLOT_DURATION_MS = 30 * 60 * 1000;
+// M-C/C2-a(loop): جلب صفحة يتطلب رابطًا صريحًا في الطلب — المخطط لا يخترع عنوانًا.
+const WEB_URL_RE = /https?:\/\/[^\s<>"'`)\]}]+/gi;
+const WEB_INTENT_HINTS = /(اجلب|جلب|افتح|اقرأ|اقرئي|لخّص|تلخيص|ملخص|مصادر|مصدر|صفحة|صفحات|روابط|رابط|fetch|summari[sz]e|summary|sources?|pages?)/i;
+const WEB_MAX_SOURCES = 3;
+const WEB_SNIPPET_CHARS = 150;
 
 /**
  * Deterministic proposed slot for an external calendar effect: tomorrow at 10:00 UTC
@@ -109,6 +114,69 @@ function gmailOutcomeSummary(outcome) {
   return `رسائل Gmail المقروءة (${Number(outcome.count) || 0}):\n${lines.join('\n') || 'لا توجد رسائل في الوارد.'}`;
 }
 
+/** روابط الطلب: منقّاة، بلا تكرار، وبترتيب ورودها — وبسقف معلن. */
+function webTargets(goal) {
+  const matches = String(goal || '').match(WEB_URL_RE) || [];
+  const cleaned = matches.map((url) => url.replace(/[.,;:!?]+$/, '')).filter(Boolean);
+  return [...new Set(cleaned)].slice(0, WEB_MAX_SOURCES);
+}
+
+function withoutUrls(goal) {
+  return String(goal || '').replace(WEB_URL_RE, ' ').trim();
+}
+
+/** كل عمليات `web.fetch` الناجحة في التشغيل، بعوائدها المفكوكة. */
+function webOutcomes(toolRuns) {
+  return toolRuns
+    .filter((toolRun) => toolRun.toolName === 'web.fetch' && toolRun.status === 'succeeded')
+    .map((toolRun) => {
+      try {
+        return JSON.parse(toolRun.outcome);
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+}
+
+function webFailure(toolRuns) {
+  const failedRun = toolRuns.find((toolRun) => toolRun.toolName === 'web.fetch' && toolRun.status !== 'succeeded');
+  if (!failedRun) return null;
+  let code = failedRun.status;
+  try {
+    const parsed = JSON.parse(failedRun.outcome);
+    code = parsed?.code || parsed?.error || parsed?.status || code;
+  } catch {
+    /* outcome not JSON: the status is all we know */
+  }
+  return { code: String(code), status: failedRun.status };
+}
+
+/**
+ * ملخّص كل مصدر في سطر يحمل رابطه وبصمته. لا «رأي» هنا: السطر هو مقتطف من نص
+ * الصفحة المنقّى + رابطه، فالإسناد قابل للتحقق لا مُعلنًا.
+ */
+function webSummary(outcomes) {
+  const lines = outcomes.map((outcome, index) => {
+    const url = outcome.finalUrl || outcome.url;
+    const title = cleanSummary(outcome.title, url);
+    const snippet = cleanSummary(outcome.text, '').slice(0, WEB_SNIPPET_CHARS);
+    const digest = String(outcome.sha256 || '').slice(0, 12);
+    return `${index + 1}) ${title}: ${snippet || 'بلا نص مقروء'} — المصدر: ${url} · بصمة ${digest}`;
+  });
+  const tainted = outcomes.filter((outcome) => outcome.injection?.tainted);
+  const rules = [...new Set(tainted.flatMap((outcome) => outcome.injection?.ruleIds || []))];
+  return [
+    `لخّصت ${outcomes.length} ${outcomes.length === 1 ? 'مصدر' : 'مصادر'} عبر الوصول المحكوم؛ كل سطر يحمل رابطه وبصمته:`,
+    ...lines,
+    tainted.length
+      ? `تنبيه: ${tainted.length} صفحة احتوت نصًا موجّهًا للتعليمات ونُقّي قبل القراءة (${rules.join(', ')}) — لم يمنح ذلك أي أداة أو صلاحية إضافية.`
+      : null
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
 function cleanSummary(value, fallback = '') {
   return String(value || fallback).replace(/\s+/g, ' ').trim().slice(0, 160);
 }
@@ -134,10 +202,17 @@ function contactsOutcomeSummary(outcome) {
   return `جهات Contacts المقروءة (${Number(outcome.count) || 0}):\n${lines.join('\n') || 'لا توجد جهات مطابقة.'}`;
 }
 
-export function createDemoPlanner({ externalEffectTool = 'google.calendar_create_event', knowledge = false, gmail = false, googleReaders = {} } = {}) {
+export function createDemoPlanner({
+  externalEffectTool = 'google.calendar_create_event',
+  knowledge = false,
+  gmail = false,
+  googleReaders = {},
+  web = false
+} = {}) {
   return {
     name: 'demo-deterministic',
     knowledge,
+    web,
     async plan({ messages, toolRuns, approvals = [], outbox = [], run = null }) {
       const goal = lastUserMessage(messages);
       const driveReadIntent = googleReaders.drive && DRIVE_READ_HINTS.test(goal) && DRIVE_READ_ACTION_HINTS.test(goal) && !GOOGLE_WRITE_HINTS.test(goal);
@@ -147,6 +222,46 @@ export function createDemoPlanner({ externalEffectTool = 'google.calendar_create
       if (knowledge && !succeeded(toolRuns, 'kb.search')) {
         if (failed(toolRuns, 'kb.search')) return this.giveUp(toolRuns, 'kb.search');
         return { action: DECISION.call, tool: 'kb.search', args: { query: goal, limit: 4 } };
+      }
+
+      // M-C/C2-a(loop): كل رابط في الطلب يُجلب مرة واحدة عبر `web.fetch`، ثم يُلخَّص
+      // باسناد URL لكل سطر. بلا تفعيل صريح: رفض صريح، لا تخطٍّ صامت ولا مصادر مخترعة.
+      const targets = webTargets(goal);
+      // نية كتابة صريحة (تصدير/رفع/إنشاء/إرسال) تتقدّم على الجلب: وجود رابط في طلب
+      // تصدير ليس دعوة لجلب صفحة.
+      const writeIntent = GOOGLE_WRITE_HINTS.test(goal) || WHATSAPP_HINTS.test(goal);
+      const webIntent = !writeIntent && targets.length > 0 && (WEB_INTENT_HINTS.test(goal) || withoutUrls(goal).length <= 8);
+      if (webIntent) {
+        if (!web) {
+          return {
+            action: DECISION.finish,
+            failed: true,
+            summary:
+              `طلبت ${targets.length} ${targets.length === 1 ? 'رابطًا' : 'روابط'}، لكن الوصول إلى الويب غير مُفعَّل في هذا النشر ` +
+              '(CELIA_AGENT_EGRESS=off). لم أفتح أي صفحة ولم أختلق مصدرًا: فعّل الوسيط بقائمة مضيفين صريحة أولًا.'
+          };
+        }
+        const failure = webFailure(toolRuns);
+        if (failure) {
+          return {
+            action: DECISION.finish,
+            failed: true,
+            summary:
+              `توقفت المهمة: فشل جلب مصدر (${failure.code}) بعد ${webOutcomes(toolRuns).length} مصادر ناجحة. ` +
+              'لم يُعَد المحاولة تلقائيًا، ولم يُقدَّم ملخّص ناقص كأنه كامل.'
+          };
+        }
+        const fetched = webOutcomes(toolRuns);
+        const next = targets.find((url) => !fetched.some((outcome) => outcome.url === url || outcome.finalUrl === url));
+        if (next) {
+          return {
+            action: DECISION.call,
+            tool: 'web.fetch',
+            args: { url: next },
+            reason: 'رابط صريح في الطلب؛ جلب قراءة فقط عبر الوسيط المحكوم'
+          };
+        }
+        return { action: DECISION.finish, summary: webSummary(fetched) };
       }
 
       const fileMatch = DOCUMENT_FILE_RE.exec(goal);
