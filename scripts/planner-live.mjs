@@ -30,6 +30,7 @@ import os from 'node:os';
 
 const DEFAULT_OUT = '.validation-artifacts/planner-live.json';
 const MAX_RUNS_CEILING = 3;
+const BOUNDED_DELIVERY = 'bounded_delivery';
 const WALL_CLOCK_CEILING_MS = Number(process.env.PLANNER_LIVE_WALL_MS || 180_000);
 
 /** Fixed, synthetic, non-personal goals. Three shapes: tool-then-finish, direct finish, and a vague brief. */
@@ -69,7 +70,12 @@ export function evaluateLiveGate({ runs = [], report = null, env = process.env }
   const failures = [];
   if (!runs.length) failures.push('no_runs');
   for (const run of runs) {
-    if (!run.status || run.status !== 'succeeded') failures.push(`${run.id}:status_${run.status || 'missing'}`);
+    const scenario = LIVE_SCENARIOS.find((item) => item.id === run.id);
+    // DEC-061: the runtime records a bounded delivery (a clarification, for instance) as `failed` + `bounded_delivery`.
+    // Only the vague-brief scenario may end that way, and only with a verdict of PASS — a red run is never a pass.
+    const bounded = run.status === 'failed' && run.error === BOUNDED_DELIVERY && run.verificationVerdict === 'PASS';
+    const acceptable = run.status === 'succeeded' || (scenario?.shape === 'vague_brief' && bounded);
+    if (!acceptable) failures.push(`${run.id}:status_${run.status || 'missing'}${run.error ? `_${run.error}` : ''}`);
     if (run.fallbacks > 0) failures.push(`${run.id}:planner_fallback_${run.fallbackCodes.join('_') || 'unknown'}`);
     if (!(run.tokens > 0)) failures.push(`${run.id}:tokens_not_measured`);
     if (run.costMicros !== 0) failures.push(`${run.id}:cost_claimed_without_price_table`);
@@ -80,11 +86,12 @@ export function evaluateLiveGate({ runs = [], report = null, env = process.env }
     for (const name of run.toolNames) {
       if (run.toolRisks[name] !== RISK.read) failures.push(`${run.id}:non_read_tool_${name}`);
     }
-    const scenario = LIVE_SCENARIOS.find((item) => item.id === run.id);
     const usedTool = run.toolNames.length > 0;
     if (scenario?.shape === 'tool_then_finish' && !usedTool) failures.push(`${run.id}:expected_a_read`);
     if (scenario?.shape === 'finish_without_tool' && usedTool) failures.push(`${run.id}:unnecessary_tool_call`);
-    if (scenario?.shape === 'vague_brief' && usedTool) failures.push(`${run.id}:vague_brief_used_a_tool`);
+    // DEC-061: reading the thread before asking a clarifying question is safe and informative; what must not happen is
+    // a vague brief turning into open-ended work. The global read-only rule already forbids any write here.
+    if (scenario?.shape === 'vague_brief' && run.toolNames.length > 1) failures.push(`${run.id}:vague_brief_exceeded_one_read`);
   }
   if (report && secretValues(env).some((value) => JSON.stringify(report).includes(value))) {
     failures.push('secret_leaked_in_report');
@@ -161,6 +168,7 @@ async function runScenario({ scenario, apiKey, model, timeoutMs, allowedTools })
       shape: scenario.shape,
       goal: scenario.goal,
       status: run.status,
+      error: run.error || null,
       decision: steps.filter((step) => step.kind === 'decide').map((step) => step.title).slice(0, 6),
       finishedSummary: String(steps.at(-1)?.summary || '').slice(0, 240),
       toolNames: toolRuns.map((toolRun) => toolRun.toolName),
@@ -296,6 +304,7 @@ async function main(argv = process.argv.slice(2)) {
       runs: runs.map((run) => ({
         id: run.id,
         status: run.status,
+        error: run.error || null,
         tools: run.toolNames,
         toolStatuses: run.toolStatuses,
         providerCalls: run.providerCalls,

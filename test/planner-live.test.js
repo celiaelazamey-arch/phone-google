@@ -53,9 +53,10 @@ test('LIVE-01 — the gate passes only a clean, measured, fallback-free, read-on
     assert.match(verdict.failures.join(' '), pattern);
   }
   assert.match(evaluateLiveGate({ runs: [], env: {} }).failures.join(' '), /no_runs/);
+  assert.match(evaluateLiveGate({ runs: [cleanRun({ status: 'failed', error: 'planner_failed' })], env: {} }).failures.join(' '), /live-1:status_failed_planner_failed/);
 });
 
-test('LIVE-02 — scenario shapes are enforced: a required read, no gratuitous tool, no tool for a vague brief', () => {
+test('LIVE-02 — scenario shapes are enforced: a required read, no gratuitous tool, and a vague brief that stays bounded', () => {
   // live-1 must actually read; live-2 must not call anything; live-3 must not guess a tool from "نفّذ المهمة".
   const noRead = evaluateLiveGate({ runs: [{ ...cleanRun(), id: 'live-1', toolNames: [], toolRisks: {} }], env: {} });
   assert.match(noRead.failures.join(' '), /live-1:expected_a_read/);
@@ -63,8 +64,18 @@ test('LIVE-02 — scenario shapes are enforced: a required read, no gratuitous t
   const extraTool = evaluateLiveGate({ runs: [{ ...cleanRun(), id: 'live-2' }], env: {} });
   assert.match(extraTool.failures.join(' '), /live-2:unnecessary_tool_call/);
 
-  const vague = evaluateLiveGate({ runs: [{ ...cleanRun(), id: 'live-3' }], env: {} });
-  assert.match(vague.failures.join(' '), /live-3:vague_brief_used_a_tool/);
+  // DEC-061: a vague brief may read once before asking, and a clarification is recorded as a bounded delivery.
+  const vagueRead = evaluateLiveGate({ runs: [{ ...cleanRun(), id: 'live-3', status: 'failed', error: 'bounded_delivery' }], env: {} });
+  assert.equal(vagueRead.ok, true, vagueRead.failures.join(' '));
+  const vagueSpin = evaluateLiveGate({ runs: [{ ...cleanRun(), id: 'live-3', toolNames: ['celia.thread_context', 'product.catalog_audit'], toolRisks: { 'celia.thread_context': 'read', 'product.catalog_audit': 'read' } }], env: {} });
+  assert.match(vagueSpin.failures.join(' '), /live-3:vague_brief_exceeded_one_read/);
+  // A bounded delivery is only acceptable for the vague brief and only when the verifier said PASS.
+  const boundedWrongScenario = evaluateLiveGate({ runs: [{ ...cleanRun(), status: 'failed', error: 'bounded_delivery' }], env: {} });
+  assert.match(boundedWrongScenario.failures.join(' '), /live-1:status_failed_bounded_delivery/);
+  const boundedBlocked = evaluateLiveGate({ runs: [{ ...cleanRun(), id: 'live-3', status: 'failed', error: 'bounded_delivery', verificationVerdict: 'BLOCK' }], env: {} });
+  assert.match(boundedBlocked.failures.join(' '), /live-3:verification_BLOCK/);
+  const failedNoReason = evaluateLiveGate({ runs: [{ ...cleanRun(), id: 'live-3', status: 'failed' }], env: {} });
+  assert.match(failedNoReason.failures.join(' '), /live-3:status_failed/);
 
   assert.deepEqual(LIVE_SCENARIOS.map((scenario) => scenario.id), ['live-1', 'live-2', 'live-3']);
   assert.equal(LIVE_SCENARIOS.every((scenario) => scenario.goal.length > 0), true);
