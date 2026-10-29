@@ -222,7 +222,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .steps { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.5rem; max-height: 380px; overflow-y: auto; }
 /* منطقة تمرير يجب أن تصل إليها لوحة المفاتيح (axe: scrollable-region-focusable) — الحلقة مرئية عند التركيز. */
-.steps:focus-visible, .approvals:focus-visible, .evidence:focus-visible, .outbox:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 8px; }
+.steps:focus-visible, .approvals:focus-visible, .evidence:focus-visible, .outbox:focus-visible, .memory-list:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 8px; }
 .steps li {
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -274,6 +274,16 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .decision-approved { color: var(--ok); }
 .decision-edited { color: var(--accent); }
 .decision-rejected { color: var(--bad); }
+
+/* WP-2.3 — memory is inspectable and removable without exposing raw run payloads. */
+.memory-list { list-style: none; margin: 0.35rem 0 0.85rem; padding: 0; display: grid; gap: 0.5rem; max-height: 260px; overflow-y: auto; }
+.memory-list li { min-width: 0; border: 1px solid var(--line); border-radius: 12px; padding: 0.55rem 0.7rem; background: color-mix(in srgb, var(--field) 65%, transparent); font-size: 0.82rem; }
+.memory-list .empty { color: var(--muted); border-style: dashed; text-align: center; }
+.memory-list .head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+.memory-list .memory-text { margin: 0.2rem 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.memory-list .meta { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; color: var(--muted); font-size: 0.72rem; overflow-wrap: anywhere; }
+.memory-list .memory-delete { padding: 0.25rem 0.55rem; font-size: 0.75rem; }
+.memory-card h3 { margin: 0.75rem 0 0; font-size: 0.9rem; }
 
 @media (prefers-reduced-motion: reduce) {
   button, .bar-fill { transition: none; }

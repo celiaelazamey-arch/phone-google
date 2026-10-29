@@ -62,6 +62,23 @@
       <p class="hint" id="mode-note"></p>
     </section>
 
+    <section class="card memory-card" aria-labelledby="memory-title">
+      <div class="row">
+        <h2 id="memory-title">ما يتذكره الوكيل</h2>
+        <button id="refresh-memory" class="ghost" type="button">تحديث الذاكرة</button>
+      </div>
+      <p class="hint">ملخصات خيوط وحقائق مالك موسومة فقط؛ بلا متجهات أو نموذج. تُحفظ بعد انتهاء التشغيل، ويمكن حذف أي عنصر نهائيًا مع تسجيل الحذف في الأدلة.</p>
+      <p id="memory-status" class="hint" role="status">اتصل لعرض الذاكرة.</p>
+      <h3>ملخصات الخيوط</h3>
+      <ul id="memory-summaries" class="memory-list" aria-label="ملخصات الخيوط (قائمة قابلة للتمرير)" tabindex="0">
+        <li class="empty">لا ملخصات محفوظة.</li>
+      </ul>
+      <h3>حقائق المالك الموسومة</h3>
+      <ul id="memory-facts" class="memory-list" aria-label="حقائق المالك الموسومة (قائمة قابلة للتمرير)" tabindex="0">
+        <li class="empty">لا حقائق محفوظة.</li>
+      </ul>
+    </section>
+
     <section class="card contract-card" aria-labelledby="contract-title">
       <h2 id="contract-title">عقد الهدف</h2>
       <p class="hint">بيانات قابلة للفحص الآلي، لا نص بلاغي: الهدف، معايير النجاح، القيود، شروط التوقف، الميزانية والموعد النهائي.</p>

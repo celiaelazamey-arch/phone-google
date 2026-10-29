@@ -260,16 +260,18 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
     assert.deepEqual(applied.appliedNow, [
       '0002_agent-runtime.sql',
       '0003_agent-governance.sql',
-      '0004_agent-outbox.sql'
+      '0004_agent-outbox.sql',
+      '0005_agent-memory.sql'
     ]);
 
     const second = await runMigrations({ connection: migrationConnection, directory, apply: true });
     assert.deepEqual(second.pending, [], 'a second apply is a no-op');
     const status = await runMigrations({ connection: migrationConnection, directory, statusOnly: true });
-    assert.equal(status.applied.length, 3);
+    assert.equal(status.applied.length, 4);
     assert.equal(status.applied[0].version, 2);
     assert.equal(status.applied[1].version, 3);
     assert.equal(status.applied[2].version, 4);
+    assert.equal(status.applied[3].version, 5);
   } finally {
     await migrationConnection.end();
   }
@@ -280,7 +282,7 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
       cwd: root,
       env: { ...process.env, ...mysqlEnv }
     });
-    assert.equal(JSON.parse(stdout).applied.length, 3);
+    assert.equal(JSON.parse(stdout).applied.length, 4);
   } catch (error) {
     throw new Error(`migrate CLI failed: ${String(error?.stderr || error?.message || '').slice(0, 600)}`);
   }
@@ -365,6 +367,23 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
   const detail = await runtime.detail(submitted.run.id);
   assert.ok(detail.steps.length >= 6);
   assert.equal(detail.run.usage.steps, detail.steps.length);
+
+  // WP-2.3 on the real adapter: deterministic memory, owner isolation and a
+  // permanent delete atomically linked to the source run's evidence chain.
+  const memory = await store.listMemory(config.userId);
+  assert.equal(memory.summaries.length, 1);
+  assert.ok(memory.facts.length >= 2);
+  assert.equal(memory.summaries[0].sourceRunId, submitted.run.id);
+  assert.equal(await store.getMemoryItem('summary', memory.summaries[0].id, 'another-owner'), null);
+  await assert.rejects(
+    runtime.deleteMemory('summary', memory.summaries[0].id, 'another-owner'),
+    (error) => error.status === 404
+  );
+  const deletedMemory = await runtime.deleteMemory('summary', memory.summaries[0].id, config.userId);
+  assert.equal(deletedMemory.deleted, true);
+  assert.equal(await store.getMemoryItem('summary', memory.summaries[0].id, config.userId), null);
+  assert.equal((await store.listEvidence(submitted.run.id)).at(-1).kind, 'memory_deleted');
+  assert.equal((await store.verifyEvidenceChain(submitted.run.id)).ok, true);
 
   const duplicate = await runtime.submit({ threadId: thread.id, message: 'مكرر', clientMessageId: 'mysql-acceptance-0001' });
   assert.equal(duplicate.created, false);
@@ -505,7 +524,9 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
   // The five core tables are untouched by the additive migration.
   const [tables] = await pool.execute('SELECT TABLE_NAME AS name FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()');
   const names = tables.map((row) => row.name);
-  assert.equal(names.filter((name) => name.startsWith('agent_')).length, 9);
+  assert.equal(names.filter((name) => name.startsWith('agent_')).length, 11);
   assert.ok(names.includes('agent_outbox'));
+  assert.ok(names.includes('agent_thread_summaries'));
+  assert.ok(names.includes('agent_owner_facts'));
   assert.ok(['app_users', 'oauth_states', 'google_credentials', 'whatsapp_contacts', 'whatsapp_messages'].every((name) => names.includes(name)));
 });

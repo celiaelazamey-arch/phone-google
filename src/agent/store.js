@@ -1,5 +1,7 @@
 import crypto from 'node:crypto';
+import { findSecret } from '../knowledge/validate.js';
 import {
+  EVIDENCE_KIND,
   EVIDENCE_VERSION,
   entryHash,
   genesisHash,
@@ -248,8 +250,91 @@ function mapGoalContract(row) {
   }
 }
 
+function mapThreadSummary(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    threadId: row.thread_id,
+    ownerId: row.owner_id,
+    sourceRunId: row.source_run_id,
+    summary: row.summary,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    expiresAt: row.expires_at ?? null
+  };
+}
+
+function mapOwnerFact(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    ownerId: row.owner_id,
+    sourceRunId: row.source_run_id,
+    tag: row.tag,
+    value: row.value,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    expiresAt: row.expires_at ?? null
+  };
+}
+
+function memoryTable(kind) {
+  if (kind === 'summary') return { table: 'agent_thread_summaries', map: mapThreadSummary };
+  if (kind === 'fact') return { table: 'agent_owner_facts', map: mapOwnerFact };
+  throw codedError('invalid_memory_kind', 'invalid_memory_kind');
+}
+
 function codedError(code, message) {
   return Object.assign(new Error(message || code), { code });
+}
+
+function memoryText(value, max) {
+  const clean = typeof value === 'string' ? value : '';
+  // Scan before truncating so a credential crossing the output boundary cannot
+  // be weakened into a prefix that evades the repository's pattern scanner.
+  if (findSecret(clean)) throw codedError('memory_secret_detected', 'memory_secret_detected');
+  return clean.slice(0, max);
+}
+
+/** Shared by ordinary evidence writes and atomic memory deletion. */
+async function appendEvidenceRecord(tx, {
+  runId,
+  stepId = null,
+  kind,
+  input = null,
+  output = null,
+  sourceIds = [],
+  verdict = null,
+  version = EVIDENCE_VERSION
+}, { clock, idFactory }) {
+  const row = await tx.get('SELECT COALESCE(MAX(seq), 0) AS maxSeq FROM agent_evidence WHERE run_id = ?', [runId]);
+  const seq = Number(row?.maxSeq || 0) + 1;
+  const id = idFactory();
+  const at = nowIso(clock);
+  const inputHash = hashOf(input);
+  const outputHash = output === null || output === undefined ? null : hashOf(output);
+  const prevRow = await tx.get('SELECT hash FROM agent_evidence WHERE run_id = ? ORDER BY seq DESC LIMIT 1', [runId]);
+  const prevHash = prevRow?.hash || genesisHash(runId);
+  const ids = (Array.isArray(sourceIds) ? sourceIds : []).map((entry) => String(entry));
+  const hash = entryHash({
+    prevHash,
+    runId,
+    seq,
+    kind: text(kind, 32),
+    inputHash,
+    outputHash,
+    sourceIds: ids,
+    verdict,
+    version: text(version, 24),
+    at
+  });
+  await tx.run(
+    `INSERT INTO agent_evidence
+       (id, run_id, step_id, seq, kind, input_hash, output_hash, source_ids, verdict, version, prev_hash, hash, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, runId, stepId, seq, text(kind, 32), inputHash, outputHash, JSON.stringify(ids), verdict, text(version, 24), prevHash, hash, at]
+  );
+  return mapEvidence(await tx.get('SELECT * FROM agent_evidence WHERE id = ?', [id]));
 }
 
 export function createAgentStore({ driver, clock = Date.now, idFactory = crypto.randomUUID } = {}) {
@@ -620,49 +705,8 @@ export function createAgentStore({ driver, clock = Date.now, idFactory = crypto.
       return result.changes > 0;
     },
     // ── Append-only evidence ledger with a SHA-256 hash chain ──────────────
-    async appendEvidence({
-      runId,
-      stepId = null,
-      kind,
-      input = null,
-      output = null,
-      sourceIds = [],
-      verdict = null,
-      version = EVIDENCE_VERSION
-    }) {
-      return driver.transaction(async (tx) => {
-        const row = await tx.get('SELECT COALESCE(MAX(seq), 0) AS maxSeq FROM agent_evidence WHERE run_id = ?', [runId]);
-        const seq = Number(row?.maxSeq || 0) + 1;
-        const id = idFactory();
-        const at = nowIso(clock);
-        const inputHash = hashOf(input);
-        const outputHash = output === null || output === undefined ? null : hashOf(output);
-        const prevRow = await tx.get(
-          'SELECT hash FROM agent_evidence WHERE run_id = ? ORDER BY seq DESC LIMIT 1',
-          [runId]
-        );
-        const prevHash = prevRow?.hash || genesisHash(runId);
-        const ids = (Array.isArray(sourceIds) ? sourceIds : []).map((entry) => String(entry));
-        const hash = entryHash({
-          prevHash,
-          runId,
-          seq,
-          kind: text(kind, 32),
-          inputHash,
-          outputHash,
-          sourceIds: ids,
-          verdict,
-          version: text(version, 24),
-          at
-        });
-        await tx.run(
-          `INSERT INTO agent_evidence
-             (id, run_id, step_id, seq, kind, input_hash, output_hash, source_ids, verdict, version, prev_hash, hash, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [id, runId, stepId, seq, text(kind, 32), inputHash, outputHash, JSON.stringify(ids), verdict, text(version, 24), prevHash, hash, at]
-        );
-        return mapEvidence(await tx.get('SELECT * FROM agent_evidence WHERE id = ?', [id]));
-      });
+    async appendEvidence(data) {
+      return driver.transaction((tx) => appendEvidenceRecord(tx, data, { clock, idFactory }));
     },
     async listEvidence(runId) {
       const rows = await driver.all('SELECT * FROM agent_evidence WHERE run_id = ? ORDER BY seq ASC', [runId]);
@@ -671,6 +715,145 @@ export function createAgentStore({ driver, clock = Date.now, idFactory = crypto.
     async verifyEvidenceChain(runId) {
       const rows = await driver.all('SELECT * FROM agent_evidence WHERE run_id = ? ORDER BY seq ASC', [runId]);
       return verifyChain(rows, { runId });
+    },
+    // ── WP-2.3: owner-scoped deterministic memory ──────────────────────────
+    async getThreadSummary(threadId, ownerId) {
+      return mapThreadSummary(
+        await driver.get('SELECT * FROM agent_thread_summaries WHERE thread_id = ? AND owner_id = ?', [threadId, ownerId])
+      );
+    },
+    async getOwnerFact(ownerId, tag) {
+      return mapOwnerFact(await driver.get('SELECT * FROM agent_owner_facts WHERE owner_id = ? AND tag = ?', [ownerId, tag]));
+    },
+    async saveThreadSummary({ threadId, ownerId, sourceRunId, summary, expiresAt = null }) {
+      const [thread, sourceRun] = await Promise.all([
+        store.getThread(threadId, ownerId),
+        store.getRunForOwner(sourceRunId, ownerId)
+      ]);
+      if (!thread || !sourceRun || sourceRun.threadId !== threadId) {
+        throw codedError('memory_source_not_found', 'memory_source_not_found');
+      }
+      const existing = await store.getThreadSummary(threadId, ownerId);
+      const id = existing?.id || idFactory();
+      const at = nowIso(clock);
+      const createdAt = existing?.createdAt || at;
+      const values = [id, threadId, ownerId, sourceRunId, memoryText(summary, 4000), createdAt, at, expiresAt === null ? null : text(expiresAt, 32)];
+      if (driver.dialect === 'mysql') {
+        await driver.run(
+          `INSERT INTO agent_thread_summaries
+             (id, thread_id, owner_id, source_run_id, summary, created_at, updated_at, expires_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE owner_id = VALUES(owner_id), source_run_id = VALUES(source_run_id),
+             summary = VALUES(summary), created_at = VALUES(created_at), updated_at = VALUES(updated_at), expires_at = VALUES(expires_at)`,
+          values
+        );
+      } else {
+        await driver.run(
+          `INSERT INTO agent_thread_summaries
+             (id, thread_id, owner_id, source_run_id, summary, created_at, updated_at, expires_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(thread_id) DO UPDATE SET owner_id = excluded.owner_id, source_run_id = excluded.source_run_id,
+             summary = excluded.summary, created_at = excluded.created_at, updated_at = excluded.updated_at, expires_at = excluded.expires_at`,
+          values
+        );
+      }
+      return store.getThreadSummary(threadId, ownerId);
+    },
+    async saveOwnerFact({ ownerId, sourceRunId, tag, value, expiresAt = null }) {
+      const sourceRun = await store.getRunForOwner(sourceRunId, ownerId);
+      if (!sourceRun) throw codedError('memory_source_not_found', 'memory_source_not_found');
+      const cleanTag = memoryText(tag, 96);
+      if (!cleanTag) throw codedError('invalid_memory_tag', 'invalid_memory_tag');
+      const existing = await store.getOwnerFact(ownerId, cleanTag);
+      const id = existing?.id || idFactory();
+      const at = nowIso(clock);
+      const createdAt = existing?.createdAt || at;
+      const values = [id, ownerId, sourceRunId, cleanTag, memoryText(value, 2000), createdAt, at, expiresAt === null ? null : text(expiresAt, 32)];
+      if (driver.dialect === 'mysql') {
+        await driver.run(
+          `INSERT INTO agent_owner_facts
+             (id, owner_id, source_run_id, tag, value, created_at, updated_at, expires_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE source_run_id = VALUES(source_run_id), value = VALUES(value),
+             created_at = VALUES(created_at), updated_at = VALUES(updated_at), expires_at = VALUES(expires_at)`,
+          values
+        );
+      } else {
+        await driver.run(
+          `INSERT INTO agent_owner_facts
+             (id, owner_id, source_run_id, tag, value, created_at, updated_at, expires_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(owner_id, tag) DO UPDATE SET source_run_id = excluded.source_run_id, value = excluded.value,
+             created_at = excluded.created_at, updated_at = excluded.updated_at, expires_at = excluded.expires_at`,
+          values
+        );
+      }
+      return store.getOwnerFact(ownerId, cleanTag);
+    },
+    async listThreadSummaries(ownerId, { threadId = null, limit = 50, includeExpired = false, at = null } = {}) {
+      const reference = at || nowIso(clock);
+      const expiry = includeExpired ? '' : ' AND (expires_at IS NULL OR expires_at > ?)';
+      const params = threadId ? [ownerId, threadId] : [ownerId];
+      if (!includeExpired) params.push(reference);
+      params.push(Math.min(Math.max(Number(limit) || 50, 1), 100));
+      const rows = await driver.all(
+        `SELECT * FROM agent_thread_summaries WHERE owner_id = ?${threadId ? ' AND thread_id = ?' : ''}${expiry}
+         ORDER BY updated_at DESC, id ASC LIMIT ?`,
+        params
+      );
+      return rows.map(mapThreadSummary);
+    },
+    async listOwnerFacts(ownerId, { limit = 100, includeExpired = false, at = null } = {}) {
+      const reference = at || nowIso(clock);
+      const params = [ownerId];
+      if (!includeExpired) params.push(reference);
+      params.push(Math.min(Math.max(Number(limit) || 100, 1), 200));
+      const rows = await driver.all(
+        `SELECT * FROM agent_owner_facts WHERE owner_id = ?${includeExpired ? '' : ' AND (expires_at IS NULL OR expires_at > ?)'}
+         ORDER BY tag ASC, id ASC LIMIT ?`,
+        params
+      );
+      return rows.map(mapOwnerFact);
+    },
+    async listMemory(ownerId, options = {}) {
+      const summaryOptions = { ...options, limit: options.summaryLimit ?? options.limit ?? 50 };
+      const factOptions = { ...options, limit: options.factLimit ?? options.limit ?? 100 };
+      const [summaries, facts] = await Promise.all([
+        store.listThreadSummaries(ownerId, summaryOptions),
+        store.listOwnerFacts(ownerId, factOptions)
+      ]);
+      return { summaries, facts };
+    },
+    async getMemoryItem(kind, id, ownerId, { includeExpired = false, at = null } = {}) {
+      const { table, map } = memoryTable(kind);
+      const params = [id, ownerId];
+      const expiry = includeExpired ? '' : ' AND (expires_at IS NULL OR expires_at > ?)';
+      if (!includeExpired) params.push(at || nowIso(clock));
+      return map(await driver.get(`SELECT * FROM ${table} WHERE id = ? AND owner_id = ?${expiry}`, params));
+    },
+    /**
+     * Permanently delete one item and record only its non-sensitive identifiers in
+     * the source run's append-only evidence chain, atomically in one transaction.
+     */
+    async deleteMemory(kind, id, ownerId) {
+      const { table } = memoryTable(kind);
+      return driver.transaction(async (tx) => {
+        const row = await tx.get(`SELECT * FROM ${table} WHERE id = ? AND owner_id = ?`, [id, ownerId]);
+        if (!row) return { deleted: false, reason: 'memory_not_found' };
+        const sourceRun = await tx.get('SELECT id FROM agent_runs WHERE id = ? AND owner_id = ?', [row.source_run_id, ownerId]);
+        if (!sourceRun) return { deleted: false, reason: 'memory_source_not_found' };
+        const removed = await tx.run(`DELETE FROM ${table} WHERE id = ? AND owner_id = ?`, [id, ownerId]);
+        if (removed.changes !== 1) return { deleted: false, reason: 'memory_delete_conflict' };
+        const evidence = await appendEvidenceRecord(tx, {
+          runId: row.source_run_id,
+          kind: EVIDENCE_KIND.memoryDeleted,
+          input: { memoryKind: kind, memoryId: id, ownerId },
+          output: { deleted: true },
+          sourceIds: [id],
+          verdict: 'PASS'
+        }, { clock, idFactory });
+        return { deleted: true, kind, id, sourceRunId: row.source_run_id, evidence };
+      });
     },
     // ── Transactional outbox for external effects (AGENT-002) ──────────────
     /**

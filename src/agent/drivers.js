@@ -147,7 +147,33 @@ const SQLITE_DDL = [
   )`,
   'CREATE UNIQUE INDEX IF NOT EXISTS uq_agent_outbox_key ON agent_outbox (idempotency_key)',
   'CREATE INDEX IF NOT EXISTS idx_agent_outbox_run ON agent_outbox (run_id, enqueued_at)',
-  'CREATE INDEX IF NOT EXISTS idx_agent_outbox_status ON agent_outbox (status, lease_until)'
+  'CREATE INDEX IF NOT EXISTS idx_agent_outbox_status ON agent_outbox (status, lease_until)',
+  `CREATE TABLE IF NOT EXISTS agent_thread_summaries (
+    id TEXT PRIMARY KEY,
+    thread_id TEXT NOT NULL REFERENCES agent_threads(id) ON DELETE CASCADE,
+    owner_id TEXT NOT NULL,
+    source_run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+    summary TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    expires_at TEXT NULL
+  )`,
+  'CREATE UNIQUE INDEX IF NOT EXISTS uq_agent_thread_summaries_thread ON agent_thread_summaries (thread_id)',
+  'CREATE INDEX IF NOT EXISTS idx_agent_thread_summaries_owner ON agent_thread_summaries (owner_id, updated_at)',
+  'CREATE INDEX IF NOT EXISTS idx_agent_thread_summaries_source ON agent_thread_summaries (source_run_id)',
+  `CREATE TABLE IF NOT EXISTS agent_owner_facts (
+    id TEXT PRIMARY KEY,
+    owner_id TEXT NOT NULL,
+    source_run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+    tag TEXT NOT NULL,
+    value TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    expires_at TEXT NULL
+  )`,
+  'CREATE UNIQUE INDEX IF NOT EXISTS uq_agent_owner_facts_tag ON agent_owner_facts (owner_id, tag)',
+  'CREATE INDEX IF NOT EXISTS idx_agent_owner_facts_source ON agent_owner_facts (source_run_id)',
+  'CREATE INDEX IF NOT EXISTS idx_agent_owner_facts_expiry ON agent_owner_facts (owner_id, expires_at)'
 ];
 
 const MYSQL_AGENT_TABLES = [
@@ -159,7 +185,9 @@ const MYSQL_AGENT_TABLES = [
   'agent_approvals',
   'agent_goal_contracts',
   'agent_evidence',
-  'agent_outbox'
+  'agent_outbox',
+  'agent_thread_summaries',
+  'agent_owner_facts'
 ];
 
 function uniqueViolation(error) {

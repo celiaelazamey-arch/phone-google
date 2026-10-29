@@ -56,6 +56,11 @@
 - **سجل أدلة مسلسل:** جدول `agent_evidence` إضافي فقط بسلسلة بصمات SHA-256 (`prev_hash`) تكشف أي عبث أو حذف.
 - **مُتحقِّق مستقل:** مكوّن منفصل عن المنتِج بأحكام `PASS`/`BLOCK`/`UNKNOWN`؛ لا تسليم بلا خطوة تحقق، وإعادة
   تنفيذ القراءات الحتمية المعلّمة صراحةً، وقول `UNKNOWN` للآثار غير القابلة للقراءة بدل التخمين.
+- **ذاكرة طويلة الأمد (WP-2.3):** ملخص خيط وحقائق مالك موسومة تُشتق حتميًا من الخطوات عند انتهاء التشغيل، بلا نموذج
+  أو متجهات؛ عرضها وحذفها النهائي من `/agent` و`GET/DELETE /api/agent/memory`، مع دليل `memory_deleted` وفحص الأسرار.
+- **تقييم المهمة الذهبية (WP-2.4):** `npm run eval:ai` يشغّل 120 حالة عربية ثابتة عبر الحلقة والموافقات وoutbox الفعليين
+  بمزوّد وهمي بلا شبكة، ويكتب `reports/ai-001.json` بقرار وحمولة ومرجع وسلسلة أدلة لكل حالة. النتيجة المحلية PASS؛
+  لا تقيس جودة نموذج حي أو تكلفة إنتاج أو اتصال Google.
 - **مصالحة بشرية (DEC-016):** `POST /api/agent/runs/:id/reconcile` هو المخرج الوحيد من `needs_reconciliation`:
   قرار `applied`/`not_applied` لاستدعاء أو نية، يُقيَّد في سلسلة الأدلة، ويستأنف التشغيل فقط إذا لم يبقَ شيء غير
   محسوم. لا يستدعي أي موصل، ولا يعيد إرسال شيء، ولا يكتب فوق نتيجة محسومة؛ وإعادة محاولة نية `failed` تحتاج
@@ -64,8 +69,8 @@
 - التفعيل صريح: `CELIA_AGENT_RUNTIME=mysql` (إنتاج) أو `sqlite` محلي/تجريبي — **لا وضع ذاكرة**. المسارات
   `/api/agent/*` خلف مصادقة المالك؛ الافتراضي `off` ويعيد `503` صريحًا.
 - MySQL: الجداول تُنشأ بسجل ترحيل مستقل فقط: `npm run migrate` (dry-run) ثم `npm run migrate -- --apply`
-  (`0003_agent-governance.sql` يضيف جداول الحوكمة الثلاثة، و`0004_agent-outbox.sql` يضيف `agent_outbox`؛
-  9 جداول `agent_*`). الجداول الخمسة الأساسية و`schema 1` بلا تغيير.
+  (`0003_agent-governance.sql` يضيف جداول الحوكمة الثلاثة، و`0004_agent-outbox.sql` يضيف `agent_outbox`،
+  و`0005_agent-memory.sql` يضيف جدولَي الذاكرة؛ 11 جدول `agent_*`). الجداول الخمسة الأساسية و`schema 1` بلا تغيير.
 - **الأثر الخارجي:** يخرج فقط عبر `agent_outbox` (نية واحدة بمفتاح idempotency، إرسال واحد، ولا إعادة إرسال بعد
   `unknown`). يحتاج تفعيلًا صريحًا: `CELIA_AGENT_CONNECTORS=calendar` مع حساب Google موصول؛ الافتراضي بلا موصلات
   فيُرفض الأثر بـ`external_connector_unavailable`.
@@ -74,7 +79,7 @@
   مالك مسجل، لا استئناف آلي ولا تخمين لنتيجة غير قابلة للقراءة.
   **لا يُوصف النظام بأنه «مثل Manus» بعد.**
 
-التفاصيل والفحوص: [docs/agent-runtime.md](docs/agent-runtime.md).
+التفاصيل والفحوص: [docs/agent-runtime.md](docs/agent-runtime.md) · خطة نشر WP-2.3 وحدودها (توثيق مستقبلي بلا ترحيل أو نشر منفّذ): [docs/agent-memory-deployment.md](docs/agent-memory-deployment.md) · حدود وتشغيل تقييم WP-2.4: [docs/agent-ai-evaluation.md](docs/agent-ai-evaluation.md).
 
 ## الجديد في 0.2.1 — Free Launch Runtime
 

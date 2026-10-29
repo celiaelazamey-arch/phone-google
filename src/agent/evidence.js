@@ -30,7 +30,8 @@ export const EVIDENCE_KIND = Object.freeze({
   // owner's stated finding, never to an observation this process could not make.
   reconciliation: 'reconciliation',
   verification: 'verification',
-  delivery: 'delivery'
+  delivery: 'delivery',
+  memoryDeleted: 'memory_deleted'
 });
 
 export const EVIDENCE_VERSION = 'evidence-v1';
