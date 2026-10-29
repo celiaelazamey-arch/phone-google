@@ -7,6 +7,7 @@ import { createProviderPlanner, PROVIDER_PLAN_SCHEMA, validateProviderPlan, CALL
 import { createGeminiPlannerProvider } from './gemini-planner-provider.js';
 import { createGovernedFallbackPlanner, PLANNER_FALLBACK_CODES } from './planner-fallback.js';
 import { createReplanPolicy, REPLAN_LIMITS, REVISION_STEP_TITLE } from './replanner.js';
+import { createModelRouter, defaultRoute, MODEL_TIERS, ROUTE_REASONS, DECLARED_GEMINI_PRICING, DEFAULT_PER_CALL_CAPS, computeCostMicros } from './model-router.js';
 import {
   HARNESS_LIFECYCLE_STAGES,
   HARNESS_COMPONENT_IDS,
@@ -88,6 +89,13 @@ export {
   createReplanPolicy,
   REPLAN_LIMITS,
   REVISION_STEP_TITLE,
+  createModelRouter,
+  defaultRoute,
+  MODEL_TIERS,
+  ROUTE_REASONS,
+  DECLARED_GEMINI_PRICING,
+  DEFAULT_PER_CALL_CAPS,
+  computeCostMicros,
   HARNESS_LIFECYCLE_STAGES,
   HARNESS_COMPONENT_IDS,
   inspectAgentHarness,
@@ -396,16 +404,16 @@ export function createAgentHost({
     if (failure) throw Object.assign(new Error(failure.message), { code: failure.code });
     if (mode === 'off') return null;
     const plannerMode = String(env.CELIA_AGENT_PLANNER || 'demo').trim().toLowerCase();
-    if (plannerMode !== 'demo' && plannerMode !== 'gemini') {
+    if (plannerMode !== 'demo' && plannerMode !== 'gemini' && plannerMode !== 'gemini-router') {
       throw Object.assign(
-        new Error('CELIA_AGENT_PLANNER must be "demo" (default, deterministic) or "gemini" (A1 provider planner with governed fallback)'),
+        new Error('CELIA_AGENT_PLANNER must be "demo" (default, deterministic), "gemini" (A1 provider planner with governed fallback) or "gemini-router" (A4 two-tier model router)'),
         { code: 'agent_planner_unavailable' }
       );
     }
-    if (plannerMode === 'gemini' && !injectedPlannerProvider && !config?.gemini?.apiKey) {
+    if ((plannerMode === 'gemini' || plannerMode === 'gemini-router') && !injectedPlannerProvider && !config?.gemini?.apiKey) {
       // لا ارتداد صامت إلى demo: طلب gemini بلا مفتاح خطأ تهيئة صريح.
       throw Object.assign(
-        new Error('CELIA_AGENT_PLANNER=gemini requires GEMINI_API_KEY (config.gemini.apiKey); the default planner stays "demo"'),
+        new Error(`CELIA_AGENT_PLANNER=${plannerMode} requires GEMINI_API_KEY (config.gemini.apiKey); the default planner stays "demo"`),
         { code: 'agent_planner_misconfigured' }
       );
     }
@@ -443,7 +451,7 @@ export function createAgentHost({
       kb,
       gmail,
       googleReaders,
-      plannerSafe: plannerMode === 'gemini'
+      plannerSafe: plannerMode === 'gemini' || plannerMode === 'gemini-router'
     }));
     const demoPlanner = createDemoPlanner({
       knowledge: Boolean(kb),
@@ -455,7 +463,7 @@ export function createAgentHost({
       }
     });
     let planner = demoPlanner;
-    if (plannerMode === 'gemini') {
+    if (plannerMode === 'gemini' || plannerMode === 'gemini-router') {
       // A1: المزوّد يقترح فقط ضمن 2-4 أدوات قراءة؛ الحلقة تبقى المنفّذ والبوابات كما هي.
       const allowedTools = [
         'celia.thread_context',
@@ -463,10 +471,43 @@ export function createAgentHost({
         'celia.draft_outline',
         ...(kb ? ['kb.search'] : [])
       ];
-      const provider = injectedPlannerProvider || createGeminiPlannerProvider({
-        apiKey: config.gemini.apiKey,
-        model: config.gemini.model
-      });
+      let provider = injectedPlannerProvider;
+      if (!provider && plannerMode === 'gemini-router') {
+        // A4: طبقتان معلنتان — تسعير DECLARED_GEMINI_PRICING (إعلان تهيئة لا قياس)
+        // وأسوأ تكلفة لكل استدعاء DEFAULT_PER_CALL_CAPS؛ نموذج خارج الجدول = خطأ تهيئة صريح.
+        const plannerModel = String(config.gemini.model || 'gemini-2.5-flash');
+        const fastModel = String(env.CELIA_AGENT_FAST_MODEL || 'gemini-2.5-flash-lite').trim();
+        for (const modelId of [plannerModel, fastModel]) {
+          if (!DECLARED_GEMINI_PRICING[modelId]) {
+            throw Object.assign(
+              new Error(`gemini-router has no declared pricing for model "${modelId}"; extend DECLARED_GEMINI_PRICING deliberately`),
+              { code: 'agent_planner_misconfigured' }
+            );
+          }
+        }
+        provider = createModelRouter({
+          tiers: {
+            fast: {
+              provider: createGeminiPlannerProvider({ apiKey: config.gemini.apiKey, model: fastModel }),
+              model: fastModel,
+              pricing: DECLARED_GEMINI_PRICING[fastModel],
+              maxCostMicrosPerCall: DEFAULT_PER_CALL_CAPS.fast
+            },
+            planner: {
+              provider: createGeminiPlannerProvider({ apiKey: config.gemini.apiKey, model: plannerModel }),
+              model: plannerModel,
+              pricing: DECLARED_GEMINI_PRICING[plannerModel],
+              maxCostMicrosPerCall: DEFAULT_PER_CALL_CAPS.planner
+            }
+          }
+        });
+      }
+      if (!provider) {
+        provider = createGeminiPlannerProvider({
+          apiKey: config.gemini.apiKey,
+          model: config.gemini.model
+        });
+      }
       planner = createGovernedFallbackPlanner({
         // A2: نافذة مراجعة واحدة محكومة (maxPerStep=1 + حارس حلقة maxPerRun=1، قراءة فقط).
         primary: createProviderPlanner({ provider, tools: toolRegistry, allowedTools, revisionPolicy: createReplanPolicy() }),

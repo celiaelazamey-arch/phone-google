@@ -12,9 +12,9 @@
 ## 2. التركيز النشط وسجل الحالة ([STATE.md](STATE.md))
 
 - **آخر مراجعة مسجّلة:** 29 أكتوبر 2026
-- **الجلسة النشطة:** MANUS-A3 — `call_many` للقراءات المستقلة على `arena/718068f3-phone-google`؛ تنفيذ صف A3 من خطة «منافس مانوس»: إجراء `call_many` في `PROVIDER_PLAN_SCHEMA` (خاصية `calls` اختيارية تحفظ التوافق الخلفي حرفيًا) وفرع runtime بتحقق ذري على الدفعة كلها قبل بدء أي toolRun (`call_many_requires_read_tools`/`call_many_batch_too_large`/`unknown_tool`/`planner_tool_not_allowed`/كود المدخلات/`step_budget_exhausted` — صفر تنفيذ جزئي وصفر موافقات وصفر outbox)، إطلاق متوازٍ بسقف بنيوي ≤ 4 وتسوية بترتيب الدفعة، و`call_many_after_failure` يمنع الدفعة كوسيلة استعادة (الاستعادة حصرًا عبر مراجعة A2 — التركيب مثبت CM-07)؛ `test/agent-call-many.test.js` 12/12 ومعيار القبول مقاس: p50 لمهمة 5 قراءات انخفض 57.9% (428ms←180ms بطوابع WP-1.1)؛ التغطية 90.75/75.88/86.91؛ الفشل البيئي الوحيد (N/N-1) كما هو. سجل الجلسة: [2026-10-29-manus-a3-call-many](sessions/2026-10-29-manus-a3-call-many.md)
-- **آخر سجل جلسة مؤرَّخ:** [2026-10-29-manus-a3-call-many](sessions/2026-10-29-manus-a3-call-many.md)
-- **حجم [STATE.md](STATE.md) النشط:** 79 سطرًا (16813 بايت)
+- **الجلسة النشطة:** MANUS-A4 — موجّه النماذج `model_router` على `arena/718068f3-phone-google` (بعد دمج A1–A3 في `main` عبر PR #89)؛ تنفيذ صف A4/درجة S1: `src/agent/model-router.js` (طبقتا fast/planner بتوجيه حتمي خالص مبصوم في الأدلة عبر `usage.router`)، التكلفة رموز مقاسة × تسعير معلن مؤرخ (`DECLARED_GEMINI_PRICING`) بتقريب لأعلى إلى `recordCost`، سقف التكلفة رفضًا لا تجاوزًا: `cost_budget_refused` قبل الإرسال (صفر إنفاق) → `budget_exhausted`، و`cost_budget_unknown` وFail-Closed و`model_cost_contract_violation`، الثلاثة خارج التحويل الحتمي؛ بند `cost` في `computeAgentMetrics`؛ وضع `CELIA_AGENT_PLANNER=gemini-router`؛ `test/agent-model-router.test.js` 10/10 والحزمة 701 ناجحًا والتغطية 90.82/75.92/86.97؛ الفشل البيئي الوحيد (N/N-1) كما هو. سجل الجلسة: [2026-10-29-manus-a4-model-router](sessions/2026-10-29-manus-a4-model-router.md)
+- **آخر سجل جلسة مؤرَّخ:** [2026-10-29-manus-a4-model-router](sessions/2026-10-29-manus-a4-model-router.md)
+- **حجم [STATE.md](STATE.md) النشط:** 81 سطرًا (18038 بايت)
 - **الأرشيف التاريخي المحفوظ بلا حذف:**
 - [STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md) — الأساس `9f6f8b2` · **983 سطرًا** محفوظًا حرفيًا (بصمة `f2674637e82e…`)
 

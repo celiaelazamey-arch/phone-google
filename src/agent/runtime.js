@@ -560,8 +560,11 @@ export function createAgentRuntime({
               verdict: VERDICT.block
             });
           }
+          // A4: رفض سقف التكلفة قبل الاستدعاء ليس فشل مخطط بل استنفاد ميزانية معلن —
+          // «رفض لا تجاوز»: صفر إنفاق إضافي والتشغيل ينتهي budget_exhausted صراحة.
+          const failStatus = error?.code === 'cost_budget_refused' ? RUN_STATUS.budgetExhausted : RUN_STATUS.failed;
           return {
-            run: await finish(runId, RUN_STATUS.failed, { error: error?.providerTrace ? error.code : 'planner_failed' }),
+            run: await finish(runId, failStatus, { error: error?.providerTrace ? error.code : 'planner_failed' }),
             claimed: true
           };
         }
