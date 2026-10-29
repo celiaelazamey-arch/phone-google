@@ -19,6 +19,10 @@ on:
         description: "How many of the fixed scenarios to run (1..3)"
         type: string
         default: "3"
+      timeout_ms:
+        description: "Per-decision provider timeout in ms"
+        type: string
+        default: "20000"
   push:
     branches: ["**"]
 
@@ -49,7 +53,8 @@ jobs:
           CELIA_AGENT_RUNTIME: sqlite
           CELIA_KB: "off"
           CELIA_DISABLE_OLLAMA: "true"
-          CELIA_AGENT_PLANNER_TIMEOUT_MS: "20000"
+          CELIA_AGENT_PLANNER_TIMEOUT_MS: ${{ inputs.timeout_ms || '20000' }}
+          PLANNER_LIVE_WALL_MS: "300000"
         run: |
           if [ -z "$GEMINI_API_KEY" ]; then
             echo "::error title=Planner live::GEMINI_API_KEY is not configured for this repository"

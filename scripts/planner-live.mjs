@@ -30,7 +30,7 @@ import os from 'node:os';
 
 const DEFAULT_OUT = '.validation-artifacts/planner-live.json';
 const MAX_RUNS_CEILING = 3;
-const WALL_CLOCK_CEILING_MS = 180_000;
+const WALL_CLOCK_CEILING_MS = Number(process.env.PLANNER_LIVE_WALL_MS || 180_000);
 
 /** Fixed, synthetic, non-personal goals. Three shapes: tool-then-finish, direct finish, and a vague brief. */
 export const LIVE_SCENARIOS = Object.freeze([
@@ -93,7 +93,7 @@ export function evaluateLiveGate({ runs = [], report = null, env = process.env }
 }
 
 /** Times each provider decision without changing it; the model text is capped, never echoed whole. */
-function timedProvider(base, latencies) {
+function timedProvider(base, latencies, calls) {
   return {
     name: base.name,
     model: base.model,
@@ -102,10 +102,15 @@ function timedProvider(base, latencies) {
       const started = Date.now();
       try {
         const envelope = await base.createPlan(request);
-        latencies.push(Date.now() - started);
+        const ms = Date.now() - started;
+        latencies.push(ms);
+        calls.push({ ms, ok: true, tokens: envelope?.usage?.totalTokens ?? null });
         return envelope;
       } catch (error) {
-        latencies.push(Date.now() - started);
+        const ms = Date.now() - started;
+        latencies.push(ms);
+        // Only the declared code and the bounded details (e.g. `http_status:429`) survive; never a body or a key.
+        calls.push({ ms, ok: false, code: String(error?.code || 'unexpected'), details: (error?.details || []).slice(0, 4).map(String) });
         throw error;
       }
     }
@@ -115,6 +120,7 @@ function timedProvider(base, latencies) {
 async function runScenario({ scenario, apiKey, model, timeoutMs, allowedTools }) {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'celia-live-planner-'));
   const latencies = [];
+  const calls = [];
   let driver = null;
   try {
     driver = await createSqliteDriver({ path: path.join(directory, 'live.sqlite3') });
@@ -122,7 +128,8 @@ async function runScenario({ scenario, apiKey, model, timeoutMs, allowedTools })
     const tools = createToolRegistry(defaultToolDefinitions({ statusProvider: () => ({ version: 'live-probe', storage: 'sqlite-temp' }) }));
     const provider = timedProvider(
       createGeminiPlannerProvider({ apiKey, model, timeoutMs }),
-      latencies
+      latencies,
+      calls
     );
     // The provider planner is *wrapped* in the same deterministic fallback the host uses, so a fallback in a live
     // run is visible here instead of being hidden by a lower-level retry.
@@ -159,6 +166,7 @@ async function runScenario({ scenario, apiKey, model, timeoutMs, allowedTools })
       toolNames: toolRuns.map((toolRun) => toolRun.toolName),
       toolRisks,
       toolStatuses: toolRuns.map((toolRun) => toolRun.status),
+      calls,
       providerCalls: latencies.length,
       providerLatencyMs: {
         samples: latencies,
@@ -278,10 +286,35 @@ async function main(argv = process.argv.slice(2)) {
   await mkdir('.validation-artifacts', { recursive: true });
   await writeFile('.validation-artifacts/planner-live-summary.md', `${sanitize(renderMarkdown(report), process.env)}\n`, 'utf8');
 
+  // Annotations are the only channel a reviewer can read without downloading the artifact, so the notice carries
+  // every measured fact (latency samples, fallback codes, counters) in one sanitized line.
   process.stdout.write(
     `::notice title=Planner live · ${report.gate.ok ? 'PASS' : 'FAIL'}::${sanitize(JSON.stringify({
       model,
-      runs: runs.map((run) => ({ id: run.id, status: run.status, tools: run.toolNames, providerCalls: run.providerCalls, medianMs: run.providerLatencyMs.median, tokens: run.tokens, fallbacks: run.fallbacks, verdict: run.verificationVerdict }))
+      bounds: report.bounds,
+      allowedTools: report.allowedTools,
+      runs: runs.map((run) => ({
+        id: run.id,
+        status: run.status,
+        tools: run.toolNames,
+        toolStatuses: run.toolStatuses,
+        providerCalls: run.providerCalls,
+        calls: run.calls,
+        samplesMs: run.providerLatencyMs.samples,
+        minMs: run.providerLatencyMs.min,
+        medianMs: run.providerLatencyMs.median,
+        maxMs: run.providerLatencyMs.max,
+        tokens: run.tokens,
+        costMicros: run.costMicros,
+        steps: run.steps,
+        fallbacks: run.fallbacks,
+        fallbackCodes: run.fallbackCodes,
+        verdict: run.verificationVerdict,
+        evidenceChainOk: run.evidenceChainOk,
+        outboxCount: run.outboxCount,
+        approvalsCount: run.approvalsCount,
+        decision: run.decision
+      }))
     }), process.env)}\n`
   );
   for (const failure of report.gate.failures) {
