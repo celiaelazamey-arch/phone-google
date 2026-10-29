@@ -164,5 +164,6 @@ test('LIVE-05 — the workflow is manual/opted-in only, read-only, pinned and sa
     assert.match(match[2], /#\s*v\d+/, `${match[1]} carries a version comment`);
   }
   assert.match(workflow, /node scripts\/planner-live\.mjs/, 'runs the reviewed script');
+  assert.match(workflow, /--only "\$\{\{ inputs\.scenarios \}\}"/, 'the owner can spend the quota on one scenario');
   assert.match(workflow, /refuse|exit 2|not configured/, 'a missing secret fails the job instead of skipping silently');
 });
