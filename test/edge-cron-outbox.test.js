@@ -252,7 +252,10 @@ test('approve = hash-bound claim + single dispatch; replays and races cannot dis
   assert.deepEqual(statuses, [200, 409], JSON.stringify([first.json, second.json]));
   const winner = first.status === 200 ? first : second;
   const loser = first.status === 200 ? second : first;
-  assert.equal(loser.json.error, 'intent_not_pending');
+  // The loser's 409 names whichever race it lost: its first read still saw `pending` and its conditional claim
+  // changed 0 rows (`intent_not_pending`), or the winner's claim had already committed before that read
+  // (`dispatch_in_progress`). Both are the designed refusal; PR run 40829637283 hit the second interleaving.
+  assert.ok(['intent_not_pending', 'dispatch_in_progress'].includes(loser.json.error), JSON.stringify(loser.json));
   assert.equal(winner.json.intent.status, 'applied');
   assert.equal(winner.json.intent.externalRef, '4242');
   assert.equal(winner.json.intent.attempts, 1);
@@ -274,6 +277,19 @@ test('approve = hash-bound claim + single dispatch; replays and races cannot dis
   assert.deepEqual(mine.map((row) => row.action), ['created', 'approved', 'applied']);
   for (const row of mine) assert.equal(row.value_hash, intent.payloadHash);
   assert.doesNotMatch(JSON.stringify(audit.rows), /workers\.dev\/health|keep-alive/, 'the audit chain stores hashes, never payloads');
+});
+
+test('an intent already claimed (`dispatching`) refuses a second approval with dispatch_in_progress and never re-dispatches', async () => {
+  // Deterministic twin of the race above: the row is put into `dispatching` directly, as the winner's claim does.
+  const { env, upstream } = await makeEnv({ script: { 'PUT /jobs': { body: { jobId: 4343 } } } });
+  const intent = (await call(env, 'POST', '/api/cron/intents', { body: { action: 'create', job: validJob }, headers: { 'idempotency-key': 'claimed-flow-0001' } })).json.intent;
+  env.DB.sqlite.prepare('UPDATE edge_cron_outbox SET status = ?, dispatched_at = ?, attempts = 1 WHERE id = ?').run('dispatching', new Date().toISOString(), intent.id);
+  const second = await call(env, 'POST', `/api/cron/intents/${intent.id}/approve`, { body: { expectedHash: intent.payloadHash } });
+  assert.equal(second.status, 409);
+  assert.equal(second.json.error, 'dispatch_in_progress');
+  assert.equal(second.json.intentId, intent.id);
+  assert.equal(upstream.calls.length, 0, 'a claimed intent is never dispatched again');
+  assert.equal((await call(env, 'GET', `/api/cron/intents/${intent.id}`)).json.intent.status, 'dispatching', 'the claim is untouched');
 });
 
 test('update and delete intents dispatch PATCH and DELETE; a rejected intent can never be approved', async () => {
