@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { LIVE_SCENARIOS, evaluateLiveGate } from '../scripts/planner-live.mjs';
+import { LIVE_SCENARIOS, evaluateLiveGate, timedProvider } from '../scripts/planner-live.mjs';
 import { sanitize } from '../scripts/service-reality.mjs';
 
 const run = promisify(execFile);
@@ -91,6 +91,34 @@ test('LIVE-03 — a report carrying any tracked secret value is rejected, and sa
   assert.equal(cleaned.debug.includes(KEY), false);
   assert.equal(cleaned.debug.includes('<redacted>'), true);
   assert.equal(evaluateLiveGate({ runs: [cleanRun()], report: cleaned, env }).ok, true);
+});
+
+test('LIVE-03b — a 429 is retried once by the probe and both attempts stay visible in the call log', async () => {
+  const quota = Object.assign(new Error('planner_provider_failed'), { code: 'planner_provider_failed', details: ['http_status:429'] });
+  let attempts = 0;
+  const flaky = {
+    name: 'gemini',
+    model: 'gemini-2.5-flash',
+    kind: 'cloud',
+    async createPlan() {
+      attempts += 1;
+      if (attempts === 1) throw quota;
+      return { plan: '{}', usage: { totalTokens: 42 } };
+    }
+  };
+  const latencies = [];
+  const calls = [];
+  const provider = timedProvider(flaky, latencies, calls, null, { retryMs: 0, retries: 1 });
+  const envelope = await provider.createPlan({});
+  assert.equal(envelope.usage.totalTokens, 42);
+  assert.deepEqual(calls.map((call) => [call.ok, call.attempt]), [[false, 0], [true, 1]]);
+  assert.deepEqual(calls[0].details, ['http_status:429']);
+
+  // Any other failure is not retried: a broken plan is a planning result, not a quota answer.
+  let hardAttempts = 0;
+  const broken = { name: 'gemini', model: 'm', kind: 'cloud', async createPlan() { hardAttempts += 1; throw Object.assign(new Error('planner_provider_timeout'), { code: 'planner_provider_timeout' }); } };
+  await assert.rejects(() => timedProvider(broken, [], [], null, { retryMs: 0 }).createPlan({}), /planner_provider_timeout/);
+  assert.equal(hardAttempts, 1, 'a timeout is reported, not retried');
 });
 
 test('LIVE-04 — without a key the script refuses to run (exit 2) and never pretends to have planned', async () => {

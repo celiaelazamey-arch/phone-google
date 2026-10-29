@@ -60,6 +60,7 @@ jobs:
           # Live run 40937158612 got HTTP 429 twice in a row on the free tier; the probe spaces its calls instead of
           # retrying (DEC-059 refuses retries), and the report records the spacing it used.
           PLANNER_LIVE_PACE_MS: "12000"
+          PLANNER_LIVE_RETRY_MS: "20000"
         run: |
           if [ -z "$GEMINI_API_KEY" ]; then
             echo "::error title=Planner live::GEMINI_API_KEY is not configured for this repository"

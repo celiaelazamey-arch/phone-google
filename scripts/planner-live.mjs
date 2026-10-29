@@ -99,40 +99,52 @@ export function evaluateLiveGate({ runs = [], report = null, env = process.env }
   return { ok: failures.length === 0, failures: [...new Set(failures)] };
 }
 
-/** Times each provider decision without changing it; the model text is capped, never echoed whole. */
-function timedProvider(base, latencies, calls, pacer = null) {
-  const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
+const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
+
+/**
+ * Times each provider decision without changing it; the model text is capped, never echoed whole.
+ *
+ * A 429 is a quota answer, not a planning decision, so the *probe* waits and tries the same decision once more
+ * (`--retry-ms`, default 20s, one retry per call). The provider itself still never retries — DEC-059 refused an
+ * internal retry loop — and every attempt is recorded in `calls` so a retry can never look like a clean run.
+ */
+export function timedProvider(base, latencies, calls, pacer = null, { retryMs = 20_000, retries = 1 } = {}) {
   return {
     name: base.name,
     model: base.model,
     kind: base.kind,
     async createPlan(request) {
-      // The free tier answered HTTP 429 after two calls in live run 40937158612; the probe paces itself instead of
-      // retrying, because a retry inside the provider is a policy DEC-059 refused.
-      if (pacer && pacer.paceMs > 0 && pacer.lastAt) {
-        const wait = pacer.paceMs - (Date.now() - pacer.lastAt);
-        if (wait > 0) await sleep(wait);
-      }
-      if (pacer) pacer.lastAt = Date.now();
-      const started = Date.now();
-      try {
-        const envelope = await base.createPlan(request);
-        const ms = Date.now() - started;
-        latencies.push(ms);
-        calls.push({ ms, ok: true, tokens: envelope?.usage?.totalTokens ?? null });
-        return envelope;
-      } catch (error) {
-        const ms = Date.now() - started;
-        latencies.push(ms);
-        // Only the declared code and the bounded details (e.g. `http_status:429`) survive; never a body or a key.
-        calls.push({ ms, ok: false, code: String(error?.code || 'unexpected'), details: (error?.details || []).slice(0, 4).map(String) });
-        throw error;
+      let attempt = 0;
+      for (;;) {
+        if (pacer && pacer.paceMs > 0 && pacer.lastAt) {
+          const wait = pacer.paceMs - (Date.now() - pacer.lastAt);
+          if (wait > 0) await sleep(wait);
+        }
+        if (pacer) pacer.lastAt = Date.now();
+        const started = Date.now();
+        try {
+          const envelope = await base.createPlan(request);
+          const ms = Date.now() - started;
+          latencies.push(ms);
+          calls.push({ ms, ok: true, attempt, tokens: envelope?.usage?.totalTokens ?? null });
+          return envelope;
+        } catch (error) {
+          const ms = Date.now() - started;
+          latencies.push(ms);
+          // Only the declared code and the bounded details (e.g. `http_status:429`) survive; never a body or a key.
+          const details = (error?.details || []).slice(0, 4).map(String);
+          const quota = details.includes('http_status:429');
+          calls.push({ ms, ok: false, attempt, code: String(error?.code || 'unexpected'), details });
+          if (!quota || attempt >= retries) throw error;
+          attempt += 1;
+          await sleep(Math.max(0, retryMs));
+        }
       }
     }
   };
 }
 
-async function runScenario({ scenario, apiKey, model, timeoutMs, allowedTools, pacer = null }) {
+async function runScenario({ scenario, apiKey, model, timeoutMs, allowedTools, pacer = null, retryMs = 20_000 }) {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'celia-live-planner-'));
   const latencies = [];
   const calls = [];
@@ -145,7 +157,8 @@ async function runScenario({ scenario, apiKey, model, timeoutMs, allowedTools, p
       createGeminiPlannerProvider({ apiKey, model, timeoutMs }),
       latencies,
       calls,
-      pacer
+      pacer,
+      { retryMs }
     );
     // The provider planner is *wrapped* in the same deterministic fallback the host uses, so a fallback in a live
     // run is visible here instead of being hidden by a lower-level retry.
@@ -252,6 +265,7 @@ async function main(argv = process.argv.slice(2)) {
   const timeoutMs = Number(process.env.CELIA_AGENT_PLANNER_TIMEOUT_MS || 20_000);
   const paceMs = Math.max(0, Number(argOf(argv, 'pace-ms', process.env.PLANNER_LIVE_PACE_MS || 0)) || 0);
   const pacer = { paceMs, lastAt: 0 };
+  const retryMs = Math.max(0, Number(argOf(argv, 'retry-ms', process.env.PLANNER_LIVE_RETRY_MS || 20_000)) || 0);
   const scenarios = LIVE_SCENARIOS.slice(0, requested);
   const startedAt = Date.now();
   const runs = [];
@@ -262,7 +276,7 @@ async function main(argv = process.argv.slice(2)) {
     }
     process.stdout.write(`planner-live: running ${scenario.id} (${scenario.shape})\n`);
     try {
-      runs.push(await runScenario({ scenario, apiKey, model, timeoutMs, allowedTools, pacer }));
+      runs.push(await runScenario({ scenario, apiKey, model, timeoutMs, allowedTools, pacer, retryMs }));
     } catch (error) {
       runs.push({
         id: scenario.id,
@@ -294,7 +308,7 @@ async function main(argv = process.argv.slice(2)) {
     scope: 'isolated live run; no production activation, no MySQL, no external effect',
     model,
     allowedTools,
-    bounds: { maxSteps: 4, maxRuns: requested, timeoutMs, paceMs, wallClockMs: Date.now() - startedAt },
+    bounds: { maxSteps: 4, maxRuns: requested, timeoutMs, paceMs, retryMs, wallClockMs: Date.now() - startedAt },
     runId: process.env.GITHUB_RUN_ID || null,
     sha: process.env.GITHUB_SHA || null,
     runs
