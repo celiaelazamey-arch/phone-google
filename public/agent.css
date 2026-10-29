@@ -215,6 +215,8 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .pill.bad { color: var(--bad); border-color: rgba(255, 123, 138, 0.5); }
 
 .steps { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.5rem; max-height: 380px; overflow-y: auto; }
+/* منطقة تمرير يجب أن تصل إليها لوحة المفاتيح (axe: scrollable-region-focusable) — الحلقة مرئية عند التركيز. */
+.steps:focus-visible, .approvals:focus-visible, .evidence:focus-visible, .outbox:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 8px; }
 .steps li {
   border: 1px solid var(--line);
   border-radius: 12px;
