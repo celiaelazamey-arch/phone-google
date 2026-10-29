@@ -10,6 +10,7 @@ import {
   editDistance,
   parseArgs,
   parseTestSummary,
+  probeWhatsAppCloudApi,
   renderMarkdown,
   runProbes,
   sanitize,
@@ -66,6 +67,49 @@ test('scoring counts only configured services in the working rate', () => {
   assert.equal(scoreServices([{ verdict: 'not-configured' }]).workingRate, null);
 });
 
+test('WhatsApp read-only probe authenticates the phone-number ID and never sends a message', async () => {
+  const env = {
+    WHATSAPP_ACCESS_TOKEN: 'meta-access-token-test',
+    WHATSAPP_PHONE_NUMBER_ID: '123456789012345',
+    WHATSAPP_APP_SECRET: 'meta-app-secret-test',
+    WHATSAPP_VERIFY_TOKEN: 'meta-verify-token-test',
+    WHATSAPP_API_VERSION: 'v26.0'
+  };
+  const calls = [];
+  const result = await probeWhatsAppCloudApi({
+    env,
+    timeoutMs: 1000,
+    fetchImpl: async (url, init = {}) => {
+      calls.push({ url: String(url), method: init.method || 'GET', authorization: init.headers?.authorization });
+      return new Response(JSON.stringify({ id: env.WHATSAPP_PHONE_NUMBER_ID, display_phone_number: '+15551234567', verified_name: 'Celia Test' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      });
+    }
+  });
+  assert.equal(result.verdict, 'verified');
+  assert.match(result.detail, /read-only phone-number lookup passed/);
+  assert.match(result.detail, /no message sent/);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].method, 'GET');
+  assert.match(calls[0].url, /^https:\/\/graph\.facebook\.com\/v26\.0\/123456789012345\?/);
+  assert.equal(calls[0].authorization, 'Bearer meta-access-token-test');
+  assert.equal(JSON.stringify(result).includes('meta-access-token-test'), false);
+});
+
+test('WhatsApp read-only probe refuses malformed configuration and never calls Meta', async () => {
+  let calls = 0;
+  const missing = await probeWhatsAppCloudApi({ env: {}, fetchImpl: async () => { calls += 1; throw new Error('unexpected_network_call'); } });
+  assert.equal(missing.verdict, 'not-configured');
+  const invalidId = await probeWhatsAppCloudApi({
+    env: { WHATSAPP_ACCESS_TOKEN: 'meta-access-token-test', WHATSAPP_PHONE_NUMBER_ID: '+201012345678' },
+    fetchImpl: async () => { calls += 1; throw new Error('unexpected_network_call'); }
+  });
+  assert.equal(invalidId.verdict, 'failed');
+  assert.match(invalidId.detail, /numeric Meta phone-number ID/);
+  assert.equal(calls, 0);
+});
+
 test('sanitize removes every configured secret value and args parse strictly', () => {
   const env = { GEMINI_API_KEY: 'AIzaSySECRET', CELIA_MCP_API_TOKEN: 't'.repeat(40), PHONE_NUMBER: '+201012345678' };
   const out = sanitize('k=AIzaSySECRET t=tttttttttttttttttttttttttttttttttttttttt p=+201012345678', env);
@@ -98,7 +142,7 @@ test('probes classify a fake Cloudflare/R2/Google/edge world without touching th
       return reply(400, { error: 'invalid_grant' });
     }
     if (target.endsWith('/api/secrets/status')) return init.headers?.authorization ? reply(200, { configuredCount: 18, totalSecretsTracked: 18 }) : reply(401, { error: 'unauthorized' });
-    if (target.endsWith('/readyz')) return reply(200, { ok: true, release: { version: '0.2.1', commit: 'abcdef1234567' } });
+    if (target.endsWith('/readyz')) return reply(200, { ok: true, release: { version: '0.2.1', commit: 'abcdef1234567' }, storage: { mode: 'd1', durable: true } });
     if (target.endsWith('/version.json')) return reply(200, { version: '0.2.1', commit: 'abcdef1234567' });
     if (target.startsWith('https://ghcr.io/token')) return reply(200, { token: 'anon' });
     if (target.includes('/manifests/')) return reply(200, { schemaVersion: 2 });
@@ -120,6 +164,7 @@ test('probes classify a fake Cloudflare/R2/Google/edge world without touching th
   assert.equal(byId.google_oauth_client.verdict, 'verified');
   assert.equal(byId.owner_token_edge.verdict, 'verified');
   assert.equal(byId.worker_edge_public.verdict, 'verified');
+  assert.match(byId.worker_edge_public.detail, /storage d1 \(durable=true\)/);
   assert.equal(byId.pages_static.verdict, 'verified');
   assert.equal(byId.ghcr_image.verdict, 'verified');
   assert.equal(byId.github_release.verdict, 'verified');
@@ -236,11 +281,17 @@ test('retirement manifest: validated, reversible, and told identically by the au
   assert.deepEqual(blueprintFlags, Object.keys(retirementFlags(retirements)).sort());
 });
 
-test('service-reality workflow wires all 18 secrets, a real MySQL service, and never a Render/MySQL production credential', () => {
+test('service-reality workflow wires existing secrets plus optional WhatsApp credentials, and never a Render/MySQL production credential', () => {
   const workflow = fs.readFileSync(path.join(root, '.github/workflows/service-reality.yml'), 'utf8');
-  for (const name of ['AGENETROUTERAPI_KEY', 'AI_GATEWAY_API_KEY', 'CELIAOS_CRONJOB_ORG_API_KEY', 'CELIA_MCP_API_TOKEN', 'CELIA_VOICE_ID', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_R2_ACCESS_KEY_ID', 'CLOUDFLARE_R2_S3_ENDPOINT', 'CLOUDFLARE_R2_SECRET_ACCESS_KEY', 'DEEPSEEK_API_KEY', 'ELEVENLABS_API_KEY', 'FIGMA_ACCESS_TOKEN', 'GEMINI_API_KEY', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'PHONE_NUMBER', 'YOUR_CODATA_API_KEY']) {
+  for (const name of ['AGENETROUTERAPI_KEY', 'AI_GATEWAY_API_KEY', 'CELIAOS_CRONJOB_ORG_API_KEY', 'CELIA_MCP_API_TOKEN', 'CELIA_VOICE_ID', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_R2_ACCESS_KEY_ID', 'CLOUDFLARE_R2_S3_ENDPOINT', 'CLOUDFLARE_R2_SECRET_ACCESS_KEY', 'DEEPSEEK_API_KEY', 'ELEVENLABS_API_KEY', 'FIGMA_ACCESS_TOKEN', 'GEMINI_API_KEY', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'PHONE_NUMBER', 'YOUR_CODATA_API_KEY', 'WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_APP_SECRET', 'WHATSAPP_VERIFY_TOKEN']) {
     assert.ok(workflow.includes(`\${{ secrets.${name} }}`), `${name} must be wired`);
   }
+  assert.ok(workflow.includes('WHATSAPP_API_VERSION: ${{ vars.WHATSAPP_API_VERSION }}'));
+  const renderBlueprint = fs.readFileSync(path.join(root, 'render.yaml'), 'utf8');
+  for (const name of ['APP_OWNER_PHONE_E164', 'WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_APP_SECRET', 'WHATSAPP_VERIFY_TOKEN', 'WHATSAPP_API_VERSION']) {
+    assert.ok(renderBlueprint.includes(`- key: ${name}`), `${name} must be declared for the runtime`);
+  }
+  assert.ok(renderBlueprint.includes("- key: WHATSAPP_AUTO_REPLY_ENABLED\n        value: 'false'"), 'auto replies stay disabled until separately approved');
   assert.ok(workflow.includes('image: mysql:8.4'));
   assert.ok(workflow.includes("contains(github.event.head_commit.message, '[reality]')"));
   assert.ok(workflow.includes('contents: read'));
@@ -253,7 +304,7 @@ test('service-reality workflow wires all 18 secrets, a real MySQL service, and n
   const quality = fs.readFileSync(path.join(root, '.github/workflows/celia-mcp.yml'), 'utf8');
   assert.ok(quality.includes('npm run test:coverage'), 'CI enforces the coverage floor');
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-  assert.match(pkg.scripts['test:coverage'], /--test-coverage-lines=80 --test-coverage-branches=65 --test-coverage-functions=78/);
+  assert.match(pkg.scripts['test:coverage'], /--test-coverage-lines=89 --test-coverage-branches=71 --test-coverage-functions=82/);
   assert.ok(!/MYSQL_PASSWORD:|MYSQL_SSL_CA_BASE64|TOKEN_ENCRYPTION_KEY/.test(workflow));
   for (const flag of ['AI_GATEWAY', 'DEEPSEEK', 'AGENTROUTER', 'ELEVENLABS', 'FIGMA', 'CODATA', 'CLOUDFLARE_R2']) {
     assert.ok(workflow.includes(`CELIA_DISABLE_${flag}: \${{ vars.CELIA_DISABLE_${flag} }}`), `${flag} retirement switch missing`);

@@ -44,7 +44,7 @@ export const MANUAL_CHECKS = Object.freeze([
 ]);
 
 function parseArgs(argv) {
-  const options = { url: null, expectCommit: null, expectVersion: null, samples: 3, maxFirstMs: 10_000, out: DEFAULT_OUT, allowHttp: false, timeoutMs: 90_000 };
+  const options = { url: null, mode: 'mysql', expectCommit: null, expectVersion: null, samples: 3, maxFirstMs: 10_000, out: DEFAULT_OUT, allowHttp: false, timeoutMs: 90_000 };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     const next = () => {
@@ -53,6 +53,11 @@ function parseArgs(argv) {
       return argv[index];
     };
     if (arg === '--url') options.url = next();
+    else if (arg === '--mode') {
+      const m = next();
+      if (!['mysql', 'edge'].includes(m)) throw new Error('--mode must be mysql or edge');
+      options.mode = m;
+    }
     else if (arg === '--expect-commit') options.expectCommit = next();
     else if (arg === '--expect-version') options.expectVersion = next();
     else if (arg === '--samples') options.samples = Number(next());
@@ -81,6 +86,7 @@ export function describeTarget(url) {
 
 export async function verifyLive({
   url,
+  mode = 'mysql',
   token = null,
   expectCommit = null,
   expectVersion = null,
@@ -170,6 +176,73 @@ export async function verifyLive({
     });
   } catch (error) {
     add('version', '/version يطابق الإصدار والـcommit المقصودين', 'fail', { reason: error?.code || error?.name || 'request_failed' });
+  }
+
+  if (mode === 'edge') {
+    // 3e. Readiness with durable Cloudflare D1 + full edge runtime capabilities (card-free path, DEC-037).
+    try {
+      const ready = await get('/readyz');
+      const storage = ready.body?.storage || {};
+      const caps = ready.body?.capabilities || {};
+      const ok =
+        ready.status === 200 &&
+        ready.body?.ready === true &&
+        storage.mode === 'd1' &&
+        storage.durable === true &&
+        caps.mcp === true &&
+        caps.googleOAuth === true &&
+        caps.whatsappWebhook === true;
+      add('ready_durable', '/readyz يعيد 200 مع storage.mode=d1 وdurable=true ومسارات الحافة الكاملة', ok ? 'pass' : 'fail', {
+        httpStatus: ready.status,
+        ready: ready.body?.ready ?? null,
+        cardFreeHosting: ready.body?.cardFreeHosting ?? null,
+        storage: { mode: storage.mode ?? null, durable: storage.durable ?? null },
+        capabilities: caps
+      });
+    } catch (error) {
+      add('ready_durable', '/readyz يعيد 200 مع storage.mode=d1 وdurable=true ومسارات الحافة الكاملة', 'fail', { reason: error?.code || error?.name || 'request_failed' });
+    }
+
+    // 4e. Owner MCP surface is gated: no token → 401.
+    try {
+      const gate = await get('/mcp');
+      add('edge_auth_gate', 'خادم MCP على الحافة يرفض الطلب بلا رمز المالك (401)', gate.status === 401 ? 'pass' : 'fail', { httpStatus: gate.status });
+    } catch (error) {
+      add('edge_auth_gate', 'خادم MCP على الحافة يرفض الطلب بلا رمز المالك (401)', 'fail', { reason: error?.code || error?.name || 'request_failed' });
+    }
+
+    // 5e. With owner token (env only): JSON-RPC 2.0 `tools/list` returns the 12 official Celia tools.
+    if (!token) {
+      add('edge_mcp_tools', 'POST /mcp (tools/list) يعيد أدوات سيليا الـ12', 'skipped', { reason: 'CELIA_MCP_API_TOKEN not provided to this process' });
+    } else {
+      try {
+        const startedAt = now();
+        const rpcRes = await fetchImpl(`${base}/mcp`, {
+          method: 'POST',
+          headers: {
+            accept: 'application/json',
+            'content-type': 'application/json',
+            authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }),
+          redirect: 'manual',
+          signal: AbortSignal.timeout(timeoutMs)
+        });
+        const elapsedMs = Math.round(now() - startedAt);
+        const rpcBody = await rpcRes.json().catch(() => null);
+        const tools = Array.isArray(rpcBody?.result?.tools) ? rpcBody.result.tools : [];
+        const ok = rpcRes.status === 200 && tools.length === 12;
+        add('edge_mcp_tools', 'POST /mcp (tools/list) يعيد أدوات سيليا الـ12', ok ? 'pass' : 'fail', {
+          httpStatus: rpcRes.status,
+          toolsCount: tools.length,
+          elapsedMs
+        });
+      } catch (error) {
+        add('edge_mcp_tools', 'POST /mcp (tools/list) يعيد أدوات سيليا الـ12', 'fail', { reason: error?.code || error?.name || 'request_failed' });
+      }
+    }
+
+    return finish();
   }
 
   // 3. Readiness with durable MySQL — a memory demo can never pass this.
@@ -265,6 +338,7 @@ export async function runCli(argv = process.argv.slice(2), { env = process.env, 
   }
   const report = await verifyLive({
     url: options.url,
+    mode: options.mode,
     token: env.CELIA_MCP_API_TOKEN || null,
     expectCommit: options.expectCommit,
     expectVersion,

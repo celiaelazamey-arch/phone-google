@@ -31,7 +31,7 @@ import {
   inspectFigmaFile,
   synthesizeCeliaSpeech
 } from './secrets-hub.js';
-import { decryptJson, encryptJson, isValidE164, isWithinCustomerWindow, safeEqual } from './security.js';
+import { decryptJson, encryptJson, isValidE164, isWithinCustomerWindow, parseEncryptionKeyring, safeEqual } from './security.js';
 import { sendWhatsAppText } from './whatsapp.js';
 import { createIdempotencyStore, extractIdempotencyKey, isValidIdempotencyKey } from './idempotency.js';
 
@@ -89,6 +89,12 @@ export function loadCeliaMcpConfig(env = process.env, { requireToken = true } = 
         ? 'PHONE_NUMBER'
         : null,
     encryptionKey: hasValidEncryptionKey ? rawEncryptionKey : '',
+    encryptionKeyring: hasValidEncryptionKey
+      ? parseEncryptionKeyring(rawEncryptionKey, {
+          primaryKeyId: env.TOKEN_ENCRYPTION_KEY_ID || '',
+          keyringSpec: env.TOKEN_ENCRYPTION_KEYRING || ''
+        })
+      : null,
     envDisableMysql: env.CELIA_MCP_DISABLE_MYSQL === 'true',
     landingRoot: env.CELIA_LANDING_ROOT === 'true',
     celia: Object.freeze({
@@ -155,13 +161,14 @@ async function getGoogleClient(pool, config) {
     throw Object.assign(new Error('google_not_connected'), { status: 409 });
   }
   const client = new google.auth.OAuth2({ clientId: config.google.clientId, clientSecret: config.google.clientSecret, redirectUri: config.google.redirectUri, transporterOptions: { timeout: config.resilience?.timeoutMs || 8000, retry: false } });
-  const tokens = decryptJson(rows[0].encrypted_tokens, config.encryptionKey);
+  const keyTarget = config.encryptionKeyring || config.encryptionKey;
+  const tokens = decryptJson(rows[0].encrypted_tokens, keyTarget);
   client.setCredentials(tokens);
   client.on('tokens', (fresh) => {
     const merged = { ...tokens, ...fresh, refresh_token: fresh.refresh_token || tokens.refresh_token };
     pool.execute(
       'UPDATE google_credentials SET encrypted_tokens = ? WHERE user_id = ?',
-      [encryptJson(merged, config.encryptionKey), config.userId]
+      [encryptJson(merged, keyTarget), config.userId]
     ).catch(() => {});
   });
   return client;
@@ -1116,13 +1123,13 @@ async function runStdioServer({ pool, config }) {
   });
 }
 
-async function runSelfTest() {
+export async function runSelfTest({ env: baseEnv = process.env, log = console.log } = {}) {
   const fallbackToken = crypto.randomBytes(32).toString('hex');
   const env = {
-    ...process.env,
+    ...baseEnv,
     CELIA_MCP_API_TOKEN:
-      process.env.CELIA_MCP_API_TOKEN && !isPlaceholder(process.env.CELIA_MCP_API_TOKEN) && process.env.CELIA_MCP_API_TOKEN.length >= 32
-        ? process.env.CELIA_MCP_API_TOKEN
+      baseEnv.CELIA_MCP_API_TOKEN && !isPlaceholder(baseEnv.CELIA_MCP_API_TOKEN) && baseEnv.CELIA_MCP_API_TOKEN.length >= 32
+        ? baseEnv.CELIA_MCP_API_TOKEN
         : fallbackToken
   };
   const config = loadCeliaMcpConfig(env, { requireToken: true });
@@ -1177,7 +1184,7 @@ async function runSelfTest() {
       config.agentrouter?.apiKey
     );
     let aiVerification = { tested: false, provider: null, note: 'لا يوجد مزود سحابي مفعّل للفحص الحي أو خادم Ollama نشط في هذه البيئة' };
-    if (process.env.CELIA_VERIFY_SKIP_CLOUD !== 'true' && (anyCloudConfigured || statusData?.providers?.ollama?.reachable)) {
+    if (env.CELIA_VERIFY_SKIP_CLOUD !== 'true' && (anyCloudConfigured || statusData?.providers?.ollama?.reachable)) {
       const replyCall = await rpc(4, 'tools/call', {
         name: 'celia_ai_reply',
         arguments: {
@@ -1196,7 +1203,7 @@ async function runSelfTest() {
       };
     }
 
-    console.log(
+    log(
       JSON.stringify(
         {
           selfTest: 'passed',

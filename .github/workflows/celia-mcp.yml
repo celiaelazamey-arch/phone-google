@@ -46,6 +46,12 @@ jobs:
           fi
       - run: npm ci --no-audit --no-fund
       - run: npm run check && npm run release:check && npm run check:continuity && npm run test:coverage:ci
+      # The Copilot bridge diagram is generated from the policy constants; a policy change without
+      # regenerating it would let the published map claim a permission the code no longer grants.
+      - name: Copilot architecture map matches the enforced policy
+        run: npm run copilot:diagram:check
+      - name: Computer permission matrix matches the enforced policy
+        run: npm run computer:permissions:check
       - name: Require handoff for implementation changes
         if: github.event_name == 'pull_request'
         env:

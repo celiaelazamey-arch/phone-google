@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>وكيل CeliaOS يستخدم الكمبيوتر — عرض توضيحي (غير مُفعَّل)</title>
+    <meta
+      name="description"
+      content="عرض توضيحي لمعمارية «الوكيل يستخدم الكمبيوتر» في CeliaOS: الرحلة، المعمارية، تتبّع التنفيذ والحدود. محرك التنفيذ على الكمبيوتر غير مُفعَّل في هذا المستودع، والأرقام المعروضة توضيحية."
+    />
+    <link rel="stylesheet" href="./fonts.css" />
+    <link rel="stylesheet" href="./computer.css" />
+  </head>
+  <body class="cu-page" data-page="computer">
+    <a class="cu-skip" href="#main-content">انتقل إلى المحتوى الرئيسي</a>
+
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true" focusable="false">
+      <defs>
+        <symbol id="cu-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5" /><path d="M5 20c1-4 4-6 7-6s6 2 7 6" /></symbol>
+        <symbol id="cu-brain" viewBox="0 0 24 24"><rect x="5" y="7" width="14" height="11" rx="3" /><circle cx="9.5" cy="12" r="1" /><circle cx="14.5" cy="12" r="1" /><path d="M12 7V4M9 18v2M15 18v2" /></symbol>
+        <symbol id="cu-click" viewBox="0 0 24 24"><path d="M6 3l12 8-5 1.5L11 18 6 3z" /></symbol>
+        <symbol id="cu-term" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M7 10l3 2-3 2M12 15h5" /></symbol>
+        <symbol id="cu-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M8 12.5l2.7 2.7L16 9.5" /></symbol>
+        <symbol id="cu-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z" /><path d="M8.5 12l2.5 2.5 4.5-5" /></symbol>
+        <symbol id="cu-log" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2" /><path d="M8.5 8h7M8.5 12h7M8.5 16h4" /></symbol>
+        <symbol id="cu-branch" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2" /><circle cx="6" cy="19" r="2" /><circle cx="18" cy="9" r="2" /><path d="M6 7v10M18 11c0 4-6 3-12 6" /></symbol>
+        <symbol id="cu-plug" viewBox="0 0 24 24"><path d="M9 3v5M15 3v5M6 8h12v4a6 6 0 01-12 0V8zM12 18v3" /></symbol>
+        <symbol id="cu-pc" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M8 20h8M12 16v4" /></symbol>
+        <symbol id="cu-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M6 6l12 12" /></symbol>
+        <symbol id="cu-eye" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></symbol>
+        <symbol id="cu-user2" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3" /><path d="M3 19c1-3 3-5 6-5s5 2 6 5M17 8l1.5 1.5L21 7" /></symbol>
+        <symbol id="cu-loop" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0113-6l3 3M20 4v5h-5M20 12a8 8 0 01-13 6l-3-3M4 20v-5h5" /></symbol>
+        <symbol id="cu-warn" viewBox="0 0 24 24"><path d="M12 3l9 16H3L12 3z" /><path d="M12 9v5M12 17h.01" /></symbol>
+      </defs>
+    </svg>
+
+    <div class="cu-wrap">
+      <header class="cu-topbar">
+        <div class="cu-brand">CeliaOS</div>
+        <nav class="cu-nav" aria-label="التنقل الرئيسي">
+          <a href="./index.html">الاستوديو</a>
+          <a href="./agent">الوكيل المحكوم</a>
+          <a href="./system">مركز النظام</a>
+          <a href="./deploy">مركز النشر</a>
+          <a href="./protocol">البروتوكول</a>
+          <a href="./computer.html" aria-current="page">استخدام الكمبيوتر</a>
+          <a href="./computer-permissions.html">صلاحيات الكمبيوتر</a>
+        </nav>
+      </header>
+
+      <div class="cu-header">
+        <div class="cu-brandline">CeliaOS × Computer Use · 2026</div>
+        <h1>وكيل <em>CeliaOS</em> يستخدم الكمبيوتر</h1>
+        <p class="cu-sub">من الفكرة إلى التنفيذ… وكيل ذكي يعمل على جهازك بأمان.</p>
+        <div class="cu-badges">
+          <span class="cu-badge"><b>متصفح</b> حقيقي</span>
+          <span class="cu-badge"><b>نتائج</b> ملموسة</span>
+          <span class="cu-badge"><b>أمان</b> بصلاحيات دقيقة</span>
+          <span class="cu-badge cu-live"><i aria-hidden="true"></i>Agentic · 2026</span>
+        </div>
+      </div>
+
+      <div class="cu-truth" role="note" aria-label="حالة هذه الصفحة">
+        <svg aria-hidden="true"><use href="#cu-warn" /></svg>
+        <div>
+          <b>حالة هذه الصفحة: عرض توضيحي.</b>
+          محرك تنفيذ الكمبيوتر (تصفّح، نقر، طرفية) <b>غير مُفعَّل</b> في هذا المستودع — المهمة
+          <code>AGENT-003</code> موقوفة بانتظار قرار عزل/ميزانية، ولا توجد هنا أتمتة متصفح حقيقية. الأرقام في قسم
+          «تتبّع التنفيذ» <b>توضيحية</b> وليست قياسًا تشغيليًا. ما هو حقيقي ومتحقَّق تجده في
+          <a href="./system">مركز النظام</a> و<a href="./agent">صفحة الوكيل</a>.
+        </div>
+      </div>
+
+      <main id="main-content">
+        <section class="cu-section" aria-labelledby="cu-journey-title">
+          <h2 id="cu-journey-title"><svg aria-hidden="true"><use href="#cu-loop" /></svg>الرحلة: كيف يعمل الوكيل على الكمبيوتر</h2>
+          <div class="cu-journey">
+            <div class="cu-card">
+              <h3><svg aria-hidden="true"><use href="#cu-user" /></svg>المستخدم</h3>
+              <p>يطلب مهمة بلغة طبيعية.</p>
+              <div class="cu-quote">“ابحث عن أفضل أدوات تصميم للتيشيرتات وأنشئ قائمة بالمواقع مع التفاصيل.”</div>
+              <h3 style="margin-top: 14px"><svg aria-hidden="true"><use href="#cu-brain" /></svg>وكيل CeliaOS</h3>
+              <p>يفهم الهدف ويضع خطة.</p>
+              <ul class="cu-list">
+                <li>تحليل المهمة</li>
+                <li>تحديد الأدوات المناسبة</li>
+                <li>توزيع المهام</li>
+                <li>متابعة التنفيذ</li>
+              </ul>
+            </div>
+            <div class="cu-card">
+              <h3><svg aria-hidden="true"><use href="#cu-pc" /></svg>أدوات الكمبيوتر</h3>
+              <p>يتصفح · يبحث · يقرأ · يكتب · ينفذ</p>
+              <ul class="cu-list">
+                <li>المتصفح</li>
+                <li>النقر والكتابة</li>
+                <li>قراءة الملفات</li>
+                <li>التقاط الشاشة</li>
+                <li>تنفيذ أوامر الطرفية</li>
+              </ul>
+            </div>
+            <div class="cu-card">
+              <h3><svg aria-hidden="true"><use href="#cu-log" /></svg>تنفيذ المهام</h3>
+              <ol class="cu-list n" style="margin-top: 6px">
+                <li>فتح المتصفح والبحث</li>
+                <li>زيارة المواقع وتحليلها</li>
+                <li>استخراج البيانات</li>
+                <li>تنظيم المعلومات</li>
+                <li>حفظ النتائج في Drive</li>
+              </ol>
+            </div>
+            <div class="cu-card">
+              <h3><svg aria-hidden="true"><use href="#cu-check" /></svg>النتيجة</h3>
+              <p>مخرجات دقيقة مع أدلة.</p>
+              <ul class="cu-list">
+                <li>قائمة أفضل أدوات التصميم</li>
+                <li>روابط المواقع</li>
+                <li>مقارنة المميزات والأسعار</li>
+                <li>ملف منظم في Google Drive</li>
+              </ul>
+              <div class="cu-verify">تحقق مستقل<small>في نظام الوكيل الحقيقي: لا تسليم بلا أدلة قابلة للقراءة.</small></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="cu-section" aria-labelledby="cu-arch-title">
+          <h2 id="cu-arch-title"><svg aria-hidden="true"><use href="#cu-plug" /></svg>المعمارية</h2>
+          <div class="cu-arch">
+            <div class="cu-card">
+              <h3><svg aria-hidden="true"><use href="#cu-branch" /></svg>GitHub</h3>
+              <p>المستودع</p>
+              <div class="cu-mono">celiaelazamey-arch/phone-google</div>
+              <ul class="cu-list">
+                <li>كود المصدر</li>
+                <li>ملفات المهام</li>
+                <li>سجل التشغيل</li>
+              </ul>
+            </div>
+            <div class="cu-link" aria-hidden="true"><b>⇄</b></div>
+            <div class="cu-card">
+              <h3><svg aria-hidden="true"><use href="#cu-plug" /></svg>CeliaOS MCP</h3>
+              <p>خادم MCP: أداة المهام</p>
+              <ul class="cu-list">
+                <li>أدوات آمنة ومحدودة</li>
+                <li>قراءة فقط</li>
+                <li>قائمة بيضاء</li>
+                <li>حماية الوصول</li>
+              </ul>
+            </div>
+            <div class="cu-link" aria-hidden="true"><b>⇄</b>stdio<br />MCP</div>
+            <div class="cu-card">
+              <h3><svg aria-hidden="true"><use href="#cu-brain" /></svg>CeliaOS Agent</h3>
+              <p>وكيل الذكاء الاصطناعي</p>
+              <ul class="cu-list">
+                <li>التخطيط</li>
+                <li>التنفيذ</li>
+                <li>المراقبة</li>
+                <li>التحقق</li>
+              </ul>
+            </div>
+            <div class="cu-link" aria-hidden="true"><b>⇄</b></div>
+            <div class="cu-card">
+              <h3><svg aria-hidden="true"><use href="#cu-pc" /></svg>جهاز الكمبيوتر</h3>
+              <p>يعمل على متصفح حقيقي.</p>
+              <ul class="cu-list">
+                <li>Chrome وما يماثله</li>
+                <li>Google Drive وDocs وSheets</li>
+                <li>تفاعل مباشر مع النظام والويب</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section class="cu-section" aria-labelledby="cu-trace-title">
+          <h2 id="cu-trace-title">
+            <svg aria-hidden="true"><use href="#cu-term" /></svg>تتبّع تنفيذ — مثال توضيحي
+            <small>(بيانات ثابتة، ليست تشغيلًا حيًّا)</small>
+          </h2>
+          <div class="cu-trace" role="img" aria-label="مثال توضيحي لسجل خطوات الوكيل: ست خطوات مكتملة وخطوة محظورة بالسياسة">
+            <div class="cu-trace-head">
+              <i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i>
+              <span class="cu-live"><i aria-hidden="true"></i>عرض ثابت</span>
+            </div>
+            <div class="cu-tr"><b>plan</b><span>تحليل الطلب وبناء الخطة</span><em class="s">تم</em></div>
+            <div class="cu-tr"><b>browser</b><span>فتح المتصفح والبحث عن أدوات التصميم</span><em class="s">تم</em></div>
+            <div class="cu-tr"><b>read</b><span>زيارة المواقع المرشحة وتحليلها</span><em class="s">تم</em></div>
+            <div class="cu-tr"><b>extract</b><span>استخراج الأسماء والمميزات والأسعار</span><em class="s">تم</em></div>
+            <div class="cu-tr"><b>drive</b><span>حفظ الجدول المنظم في Google Drive</span><em class="s">تم</em></div>
+            <div class="cu-tr"><b>verify</b><span>مطابقة النتائج مع الأدلة</span><em class="s">تم التحقق</em></div>
+            <div class="cu-tr"><b>policy</b><span>طلب تعديل الكود خارج النطاق</span><em class="x">محظور</em></div>
+          </div>
+          <div class="cu-kpis" aria-label="مؤشرات توضيحية">
+            <div class="cu-kpi"><b>5/5</b><span>خطوات منفذة (توضيحي)</span></div>
+            <div class="cu-kpi"><b>100%</b><span>خطوات مسجّلة (توضيحي)</span></div>
+            <div class="cu-kpi"><b>0</b><span>مفاتيح مكشوفة (توضيحي)</span></div>
+            <div class="cu-kpi"><b>3</b><span>قيود مفروضة (توضيحي)</span></div>
+          </div>
+          <p class="cu-sub" style="font-size: 13px; margin-top: 10px">
+            هذه المؤشرات مرسومة في الصفحة لا تُقاس من خادم. القياس الحقيقي للمزودين والخدمات يُقرأ من تدقيق
+            <a href="./system" style="color: var(--cu-cy)">مركز النظام</a>، وسجل كل قرار محكوم في المستودع نفسه.
+          </p>
+        </section>
+
+        <section class="cu-section" aria-label="الأمان والحدود">
+          <div class="cu-two">
+            <div class="cu-card">
+              <h3><svg aria-hidden="true"><use href="#cu-shield" /></svg>الأمان والقيود</h3>
+              <ul class="cu-list ok">
+                <li>عزل التنفيذ في بيئة آمنة</li>
+                <li>منع الوصول للأنظمة الحساسة</li>
+                <li>تقييد الوصول إلى الإنترنت بقائمة مسموحة</li>
+                <li>لا توجد مفاتيح API أو بيانات سرية</li>
+                <li>سجل كامل لكل خطوة</li>
+              </ul>
+              <div class="cu-ban">
+                <b><svg aria-hidden="true"><use href="#cu-ban" /></svg>محظور</b>
+                <ul class="cu-list no">
+                  <li>تعديل الكود أو دفعه</li>
+                  <li>الوصول لبيانات حساسة</li>
+                  <li>تنفيذ أوامر خطرة</li>
+                </ul>
+              </div>
+            </div>
+            <div class="cu-card">
+              <h3><svg aria-hidden="true"><use href="#cu-eye" /></svg>مميزات هذا النهج</h3>
+              <ul class="cu-list ok">
+                <li>استغلال قوة المتصفح الحقيقي</li>
+                <li>تنفيذ مهام معقدة متعددة الخطوات</li>
+                <li>نتائج مع أدلة</li>
+                <li>أمان عالٍ بضبط صلاحيات دقيق</li>
+                <li>مناسب لمشاريع GitHub</li>
+              </ul>
+              <p style="margin-top: 10px">
+                ثمنه: يحتاج عزلًا حقيقيًا وحدود ميزانية — ولهذا بقيت <code>AGENT-003</code> بلا تفعيل بدل تشغيل
+                «متصفح بلا صندوق».
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="cu-section" aria-label="نصائح ومبادئ">
+          <div class="cu-three">
+            <div class="cu-card">
+              <h3><svg aria-hidden="true"><use href="#cu-user2" /></svg>نصائح الاستخدام</h3>
+              <ul class="cu-list">
+                <li>ابدأ بالمهام البسيطة</li>
+                <li>راقب السجلات والنتائج</li>
+                <li>وسّع الأدوات حسب الحاجة</li>
+              </ul>
+            </div>
+            <div class="cu-card">
+              <h3><svg aria-hidden="true"><use href="#cu-shield" /></svg>المبادئ الأساسية</h3>
+              <div class="cu-principles">
+                <span><svg aria-hidden="true"><use href="#cu-shield" /></svg>الخصوصية</span>
+                <span><svg aria-hidden="true"><use href="#cu-check" /></svg>الأمان</span>
+                <span><svg aria-hidden="true"><use href="#cu-eye" /></svg>الشفافية</span>
+                <span><svg aria-hidden="true"><use href="#cu-user2" /></svg>المسؤولية</span>
+                <span><svg aria-hidden="true"><use href="#cu-loop" /></svg>تطوير مستمر</span>
+              </div>
+            </div>
+            <div class="cu-card">
+              <h3><svg aria-hidden="true"><use href="#cu-pc" /></svg>CeliaOS Computer Agent</h3>
+              <p>مساعد يعمل على جهازك من أجلك، بأمان وذكاء — حين يُفعَّل محركه بعزل صريح.</p>
+            </div>
+          </div>
+          <div class="cu-note">الوكيل ينفذ · الصلاحيات تحدّ · السجل يثبت</div>
+        </section>
+      </main>
+
+      <footer class="cu-footer">
+        CeliaOS · 2026 — <strong>عرض توضيحي</strong>. لا تنفيذ على الكمبيوتر في هذا المستودع، والأرقام المعروضة
+        ليست قياسًا. تفاصيل التنفيذ تُؤكَّد على بيئتك الفعلية · <a href="./system">حالة النظام الحقيقية</a>
+      </footer>
+    </div>
+  </body>
+</html>

@@ -1,29 +1,236 @@
 # الحالة الحالية — ابدأ من هنا
 
-**آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** **فشل CI يسمّي نفسه (DEC-032، QA-006)** على الفرع
-`arena/afd3acff-phone-google` (متفرع من `main@fc4d60f` = دمج PR #48) · سجل الجلسة:
-[2026-10-28-ci-test-annotations](sessions/2026-10-28-ci-test-annotations.md) · السجلات السابقة:
-[2026-10-28-preservation-plan](sessions/2026-10-28-preservation-plan.md) ·
-[2026-10-28-service-reality-audit](sessions/2026-10-28-service-reality-audit.md) ·
-الخطة: [docs/preservation-plan.md](../preservation-plan.md) · واقع الخدمات: [docs/service-reality.md](../service-reality.md) ·
-المرجع التشغيلي: [deploy/free-always-on/README.md](../../deploy/free-always-on/README.md)
+**آخر مراجعة:** 29 أكتوبر 2026 · **نوع الجلسة الحالية:** **فشل CI يسمّي نفسه — مُبلِّغ annotations لاختبارات `node --test` (DEC-039، QA-008)**
+على الفرع `arena/afd3acff-phone-google` (متفرع من `main@fc4d60f` بعد دمج PR #48، ثم دُمج فيه `main@0ebf8ca` = PR #70) · PR #72 مفتوح ·
+سجل الجلسة الحالي: [2026-10-28-ci-test-annotations](sessions/2026-10-28-ci-test-annotations.md) ·
+السجل السابق: [2026-10-28-executive-gap-closure](sessions/2026-10-28-executive-gap-closure.md) ·
+الخطة التنفيذية الشاملة: [docs/executive-completion-plan.md](../executive-completion-plan.md) ·
+سجل D1 السابق: [2026-10-28-edge-d1-sql-splitter-and-pr-hygiene](sessions/2026-10-28-edge-d1-sql-splitter-and-pr-hygiene.md) ·
+الدليل: [docs/computer-permissions](../computer-permissions/README.md) · صفحة الكمبيوتر:
+[docs/computer-use.md](../computer-use.md) · حوكمة المشكلات: [docs/issue-triage.md](../issue-triage.md) ·
+واقع الخدمات: [docs/service-reality.md](../service-reality.md) · خطة المحافظة: [docs/preservation-plan.md](../preservation-plan.md)
 
-## الطلب الحالي — «نفّذ»: مُبلِّغ annotations لاختبارات CI (DEC-032، QA-006)
+## الطلب الحالي — «نفّذ»: مُبلِّغ annotations لاختبارات CI (DEC-039، QA-008) — PR #72
 
 - **لماذا:** فشلان أعميان في يوم واحد على commits خضراء في كل مكان آخر — ساق Node 24 في run `40662071493` ثم
-  `Publish verified release` run `40665130469` على `main@fc4d60f` (نفس الـSHA الذي نجح فيه Quality؛ `npm audit` نظيف محليًا؛
-  `npm test` ×3 تحت Node 24.22.1 محليًا 326/326). الـannotation الوحيدة «exit code 1»، والسجلات لا تُقرأ من هنا.
+  `Publish verified release` run `40665130469` على `main@fc4d60f`؛ الـannotation الوحيدة «exit code 1»، والسجلات لا تُقرأ من هنا.
+  (لاحقًا كشف PR #49 أن الثاني كان خطأ تعادل طوابع زمنية حقيقيًا في `test/knowledge-ingest.test.js:164` — وهو بالضبط ما كان
+  هذا المُبلِّغ سيسمّيه من أول run.)
 - **ما نُفِّذ:** `scripts/test-reporter-gha.mjs` (مُبلِّغ ثانٍ إلى جانب `spec`: `::error title=<اسم الاختبار>` بالملف والسطر
-  والرسالة لكل فشل، `::error` لكل عتبة تغطية، سطر ختامي بالأعداد والتغطية وكل الفاشلين، جدول Step Summary؛ نص عادي خارج
-  Actions)؛ `npm run test:ci` / `test:coverage:ci` في `celia-mcp.yml` و`release.yml` و`pages.yml`؛ اختبار يمنع العودة إلى
-  `npm test` أعمى؛ تدقيق الواقع يضيف `failing` إلى annotation الحزمة offline. اختبارات 336/336 على Node 22 و24 محليًا.
-- **الدليل:** run `Celia quality & resilience` **`40793725152`** على `531b090` ✅ كله؛ annotations مقروءة عبر API بلا سجلات:
-  Node 24 (`123184952053`) `node --test: 336 tests · 336 passed · 0 failed · coverage lines 85.65% · branches 71.75% ·
-  functions 83.83% (floor 80/65/78)`؛ Node 22 (`123184952077`) 336/336، 85.80/71.75/84.11. QA-006 → متحقق.
-- **لم يُفتح PR** (الطلب «نفّذ» على الفرع)؛ الدمج/الـPR عند طلب صريح.
+  والرسالة لكل فشل، `::error` لكل عتبة تغطية، سطر ختامي بالأعداد والتغطية وكل الفاشلين — سقف GitHub 10 annotations/خطوة —
+  وجدول Step Summary؛ نص عادي خارج Actions؛ لا يُسقط التشغيل)؛ `npm run test:ci` / `test:coverage:ci` في `celia-mcp.yml`
+  و`release.yml` (البوابة 3/4) و`pages.yml`؛ اختبار يمنع العودة إلى `npm test` أعمى؛ تدقيق الواقع يضيف `failing` إلى annotation
+  الحزمة offline. `test/test-reporter-gha.test.js` (9).
+- **الدليل قبل الدمج مع main:** run `Celia quality & resilience` **`40793725152`** على `531b090` ✅ كله؛ annotations مقروءة عبر
+  API بلا سجلات: Node 24 (`123184952053`) «336 tests · 336 passed · 0 failed · coverage lines 85.65% · branches 71.75% ·
+  functions 83.83%»، Node 22 (`123184952077`) 336/336.
+- **الدمج مع `main@0ebf8ca` (PR #70):** تعارضات في workflows/package.json/الوثائق حُلّت بأخذ نسخة `main` وإعادة سلك المُبلِّغ فوقها؛
+  أرضية التغطية الحالية 89/71/82 (REL-002/QA-006 على main) لم تُمَس. **إعادة ترقيم:** DEC-032 → **DEC-039** (DEC-032 صار
+  WhatsApp على main وDEC-038 محجوز لـPR #71 المفتوح)، QA-006 → **QA-008** (QA-006/QA-007 مستعملان على main).
+- **الدليل بعد الدمج:** يُسجَّل هنا من run PR #72 بعد الدفع.
+- **PR #72** فتحه المالك من الواجهة بقالب فارغ؛ مُلئ بالوقائع. الدمج بتفويض صريح فقط.
+
+## الطلب السابق — «خطة تنفيذية لإكمال البنود الناقصة وسد الفجوات والثغرات والتنفيذ الشامل» (DEC-036، DEC-037، مدموج في PR #70 → `main@0ebf8ca`)
+
+### 1. إثبات خط الأساس الحي على `main@44532f4` بعد دمج PR `#69`
+
+- **Cloudflare Edge + D1 (`40706047781`):** `status: "deployed"`، `liveReady: true`، `18/18` سرًّا، إنشاء وترحيل وربط القاعدة `celia-edge-state` (`f63ccd9f-49b1-4eca-861b-fd478c433518`، `4` عبارات SQL نظيفة)، وإثبات حي من `/readyz`: `storage: { mode: "d1", durable: true, latencyMs: 106 }`.
+- **GitHub Pages (`40706047514`) والإصدار (`40706047877`) والجودة (`40706047968`):** كلها خضراء على `main@44532f4`.
+- **واقع الخدمات الحية (`40680228320`):** `verdict: pass`، **12/12 خدمة متحققة = 100%** (`workingRate: 1`, `failed: []`) شاملة توليف ElevenLabs الصوتي الفعلي وFigma وGemini وCloudflare وGoogle OAuth client.
+
+### 2. الثغرات والفجوات البرمجية والأمنية التي أُغلقت في `arena/83dde20a-phone-google` (`DEC-036`)
+
+1. **تدوير مفاتيح تشفير رموز OAuth (`SEC-005` — `src/security.js`, `src/{config,google,celia-mcp,celia-ui}.js`):** دعم حلقة مفاتيح مسمّاة `parseEncryptionKeyring` والمغلف المختوم بـAAD (`v2.<keyId>.<iv>.<tag>.<ciphertext>`) مع بقاء `v1.*` متوافقًا بالكامل ودالة `rotateEncryptedJson` دون كسر العقود القائمة.
+2. **تحصين حارس SSRF الشامل (`SEC-003` — `src/ai-providers.js`, `workers/celia-edge/worker.js`):** حجب جميع عناوين IPv4/IPv6 الخاصة والمحلية وCGNAT وmetadata وعناوين `::ffff:` المدمجة، وتطبيقه كذلك على أهداف مهام الحافة في `validateCronJobPayload` (`422`).
+3. **تحصين خادم الحافة ومركز الأسرار (`SEC-001`, `SEC-002`, `OPS-005`):** مقارنة رمز المالك بزمن ثابت آمن للطول عبر `SHA-256`، فرض حد `8 KiB` على أجسام JSON (`413`)، `405` مع `Allow`، فصل `/health` عن `/readyz`، ترويسات أمنية صارمة، دعم أصليْ CORS (`celiaelazamey-arch.github.io` + `localhost:3000`)، وإضافة `wiredInEdgeOrReadinessNames` في `src/secrets-hub.js` وإبراز `storage.mode`/`durable` في `scripts/service-reality.mjs`.
+4. **سد فجوة التوجيه وفحوص الصفحات والوثائق (`DOC-002`, `QA-005`, `QA-006`, `PLAN-001`):** ربط مسارات `/computer` و`/computer.html` و`/computer-permissions` و`/computer-permissions.html` و`/computer.css` في `src/celia-ui.js`، ورفع فحص `pages.yml` إلى `12/12` مسارًا حيًا، وتحديث `docs/{deployment-profile.json,service-reality.md,plan-100-percent.md,preservation-plan.md}` و`README.md` وإصدار [docs/executive-completion-plan.md](../executive-completion-plan.md)، مع إضافة `test/security-surface-audit.test.js` وتوسيع اختبارات الحافة والكمبيوتر ومخزن المعرفة.
+5. **مزامنة الموصلات الـ11 المتصلة بنطاق خاص للمالك وصفر أسرار:** توثيق وتتبع الخطة التنفيذية عبر مشروع `Linear` (`55a2e8fd-c1fe-4253-9485-efc0b76cc95e` ومهام `CEL-5`..`CEL-11` على فريق `CEL`)، ومجلد `Google Drive` الخاص (`1ZhVmTDGam2i_EixiwI0bGPxbJ4gShOPo` شاملاً مستند `Google Docs` `1HEv5hkdaYfGu8akZkR3fFcyis3sJrstF2jwiikQE0PA` وجدول `Google Sheets` `18cXH45gVKC8QALyvHRAFddW_0EoZXY7gaSXts4yeNhw` وعرض `Google Slides` `1MLHKJx0Ukr3DB5jn6dmNUpkQ4_Hv__atDEjnbwRzios` من 5 شرائح)، ونسخة `Dropbox` (`/CeliaOS-Executive-Plan-2026/executive-completion-plan.md`)، مع التحقق القرائي من `Google Calendar` (`timezone: UTC`) و`Gmail` (`celiaelazamey@gmail.com` دون إرسال أي بريد) و`Supabase` (`yqzhgogmtscoqejuxplv` `INACTIVE`) و`Vercel` (`0` مشاريع) و`Notion` (المتاح للتكامل حالياً هو دليل `People` المُدار من Notion فقط — مشاركة صفحة عادية تتيح إنشاء صفحات فرعية).
+
+### 3. تطبيق مسار النشر الإنتاجي الكامل مجانًا 100% بدون فيزا (`DEC-037`)
+
+استجابةً لطلب المالك («طبق ما يحتاجه نظامي ليتم نشره مجانا بدون فيزا تحقق في البداية»):
+- **التحقق الأولي:** تأكيد حجب `Render` ببوابة بطاقة `1$` (`DEC-034`) وتوقف `Supabase` المجاني بالخمول (`INACTIVE`) مقابل عمل **Cloudflare Workers + Cloudflare D1 (`celia-edge-state`) + GitHub Pages** حيًّا بلا أي بطاقة دفع ومع `18/18` سرًّا مربوطة آليًا.
+- **التنفيذ الكامل على الحافة + D1 ([docs/no-visa-deployment.md](../no-visa-deployment.md)):**
+  - ترحيل `workers/celia-edge/migrations/0002_runtime.sql` (إجمالي `12` جملة SQL idempotent تشمل `app_users`، `oauth_states`، `google_credentials`، `whatsapp_contacts`، `whatsapp_messages`، `edge_idempotency`).
+  - وحدة التشفير `workers/celia-edge/crypto.js` (`AES-256-GCM` بصيغة `v2.<keyId>` عبر `TOKEN_ENCRYPTION_KEY` أو اشتقاق `HKDF-SHA-256` مع توافق `v1.*`، وتذاكر ربط المتصفح، وHMAC الخام لـMeta).
+  - محرك التشغيل الكامل `workers/celia-edge/runtime.js` المربوط في `worker.js` و`scripts/deploy-cloudflare-edge.mjs`: جميع أدوات MCP الـ12 (`POST /mcp`)، وربط Google OAuth2 + Gmail/Drive/Calendar/Contacts، وWebhook واتساب + أوامر المالك العربية («اربط جوجل»، «لخص آخر إيميل»، «هات جدولي») + رد Gemini الذكي، وبوابة القبول الحية `npm run verify:edge` في `cloudflare-deploy.yml` وربط `CELIA_REAL_SERVICE_URL` في `pages.yml`.
+
+### 4. ما يتبقى حصريًا لقرار أو لوحة المالك (لا يُغلق بكود)
+
+- دمج PR `#70` في `main` لينطلق النشر التلقائي لـCloudflare Edge + D1 (الـ12 أداة كاملة) وGitHub Pages بلا أي بطاقة دفع.
+- إضافة رابط الاستدعاء `https://celia-phone-google.celiaelazamey.workers.dev/auth/google/callback` في Google Cloud Console لإتمام ربط `GOOG-001` الحي، وإضافة أسرار Meta الأربعة عند الرغبة بتشغيل `WA-005`.
+- تفعيل حماية الفرع `main` في إعدادات GitHub (`Settings → Branches` — حالياً `protected: false`)، وقرار PR `#38` المفتوح، وبيانات `SPDR-002` وسياسات `DATA-004`/`GOV-001`/`REL-001` (ويظل `HOST-003` لخادم حاوية MySQL المستقل اختياريًا فقط بعد توفر البديل الكامل على Workers + D1).
+
+## الطلب السابق — «إتمام دوام D1 الفعلي على الحافة وتنظيف الـPRs المفتوحة»
+
+### حجب Render بالبطاقة → الدوام على الحافة (2026-10-28، DEC-034/DEC-035)
+
+- **Render لا يُنشئ خدمة بلا تفويض بطاقة** (1$ مؤقت، بلا زر تخطٍّ) — قيد موثّق، لا عطل في الكود. القرار: لا بطاقة،
+  ولا وسيلة دفع، ولا تجاوز تحقق. `HOST-003` يبقى مفتوحًا ولا يُغلق بكود.
+- **البديل المنفَّذ:** D1 على Cloudflare (مجاني، والحساب والمفتاح موجودان): `workers/celia-edge/state.js` +
+  مسارات `/api/state` و`/api/audit` + `migrations/0001_state.sql` + إنشاء/ترحيل/ربط آلي في
+  `scripts/deploy-cloudflare-edge.mjs`.
+- **قاعدة الصدق:** `storage.durable` تُقاس بكتابة رمز جديد وقراءته في كل نداء؛ لا تُعلن من وجود اعتماد. بلا ربط
+  ⇒ `false` + `d1_not_bound`، وقاعدة معطوبة ⇒ `false` + سببها.
+- **بعد دمج #66 نُشر الـWorker فعلًا** (`main@d46a816`): 18/18 سرًّا، والرابط الحقيقي أعلن الكود الجديد بصدق
+  `storage.durable:false` + `reason:d1_not_bound`، وبيانات النشر حملت `d1_migration_400`.
+- **بعد دمج #68 (`main@202aa19`، التشغيلة `40700333139` / الوظيفة `122858095918`):** أثمرت ميزة التشخيص وكشفت السبب
+  الحرفي في annotations:
+  `d1_migration_failed:statement_1:near "every": syntax error at offset 0: SQLITE_ERROR`
+  على القاعدة `f63ccd9f-49b1-4eca-861b-fd478c433518`. السبب الجذري: `applyMigrations` كانت تقسم النص عبر `.split(';')`
+  **قبل** حذف أسطر التعليقات `--`، والسطر الثاني من `0001_state.sql` يحوي فاصلة منقوطة داخل التعليق
+  (`-- ... D1 query API; every statement is`) فبقي المقطع `every statement is` بلا `--` في مطلع العبارة الأولى.
+- **الإصلاح النهائي في هذا الفرع (`arena/3f0d6498-phone-google`):**
+  1. دالة `splitSqlStatements(sql)` المصدّرة تحذف تعليقات `--` وتعليقات الكتل `/* ... */` **قبل** التقسيم على `;`
+     مع صون النصوص والمعرّفات المقتبسة (`'...'` و`"..."` و`` `...` ``).
+  2. اختبار تكامل حقيقي في `test/edge-d1.test.js` يمرّر ملف `workers/celia-edge/migrations/0001_state.sql` الفعلي عبر
+     `applyMigrations` على محرك `node:sqlite` (`DatabaseSync(':memory:')`) مرتين لإثبات الصلاحية والـidempotency
+     (4 عبارات نظيفة)، ثم يشغّل `worker.fetch` على `/readyz` و`/api/state` و`/api/audit` فوق قاعدة SQLite الحقيقية
+     ويثبت `storage.durable: true` وسلامة سلسلة التدقيق `chain.ok: true`.
+  3. تسجيل حقل `storage` الراجع من `/readyz` الحي مباشرةً في تقرير النشر (`::notice title=Cloudflare Edge Status::`)
+     وملخص GitHub Step Summary، وتصحيح رسالة تحذير `Celia D1` عندما يكون ربط `DB` قد طُبِّق فعليًا.
+  4. **الدليل المحلي:** `test/edge-d1.test.js` + `test/deploy-cloudflare-edge.test.js` **23/23** · المجموع **498/498**
+     · تغطية `90.72 / 73.51 / 84.50` · `check` 135 ملفًا. **الحد الباقي:** النشر على `main` فقط؛ بعد دمج هذا الـPR
+     يُفحص حقل `d1.ok` و`storage.durable` من تشغيلة `Deploy (Cloudflare Edge)` على `main`.
+- **تنظيف الـPRs المفتوحة (OPS-005):** أُغلقت بتوثيق صريح دون حذف الفروع كل من **#67** (مكرر 100% من #68 بفرق صفر)،
+  و**#39** (مسودة متجاوزة بـ#40 `DEC-020` و#43 `DEC-026` ومتعارضة مع `main`)، و**#34** (ريفيرت آلي قديم لـ#33 خطر على
+  `agent_outbox`)؛ وبقي **#38** مفتوحًا لقرار المالك بشأن صفحات `/cron` و`/google-map`.
+
+### النشر على Render — الحالة الحقيقية (2026-10-28، DEC-033)
+
+- **لم يُنشر شيء بعد، والسبب ليس عطلًا:** المالك أضاف `CELIA_LIVE_URL` (سرًّا) و`RENDER_API_KEY`، لكن الـworkflow
+  كان يقرأ `vars.CELIA_LIVE_URL` وحده ويطلب `RENDER_SERVICE_ID` (غير موجود). لذلك كل تشغيل ينتهي `success` في
+  ~20 ثانية برسالة `not-configured` — سلوك مقصود، لكنه كان يخفي أن المالك أدّى دوره.
+- **أُصلح:** الرابط `CELIA_LIVE_URL` يُقبل من تبويب المتغيّرات أو الأسرار (المتغيّر أولًا)؛ ومفتاح API وحده يكفي
+  (اكتشاف `id`+`url` من `GET /v1/services`، ورفض التخمين عند تعدّد الخدمات مع طباعة الأسماء المرئية).
+- **الدليل:** 14/14 في `test/deploy-render.test.js`، و`--plan` بمفتاح فقط يعطي `status: planned` و`missing: []`.
+- **`celia-phone-google.onrender.com` يعيد صفحة Render «Not Found»** → الخدمة لم تُنشأ بعد (أو باسم آخر).
+- **دُمج #62** (`main@23154a8`): Pages نشرت صفحة الصلاحيات (متحقَّق بجلبها)، والـWorker يعلن `commit 23154a8`.
+- **تشخيص حقيقي (28 أكتوبر، تشغيل `40694847170`):** `GET /v1/services` = **200 و`count=0`** → لا خدمة واحدة في
+  حساب Render؛ و`celia-phone-google.onrender.com/readyz` = **404**؛ و`CELIA_LIVE_URL` **غير قابل للتحليل كـURL**.
+  أي أن «تم» لم تُنشئ خدمة، والقيمة المخزّنة ليست رابطًا. التفصيل: [جلسة التحقق](sessions/2026-10-28-live-verification.md).
+- **أُصلح:** رابط فاسد لم يعد يمنع الاكتشاف — يُسقَط بتحذير عند وجود المفتاح، ويأتي الرابط من الـAPI (15/15).
+- **ما يتبقى:** إنشاء Blueprint في Render + ضبط `CELIA_LIVE_URL` **بالمخطّط**. بعدها أول CI على `main` ينشر
+  تلقائيًا. `workflow_dispatch` و`actions/secrets` = 403 للجلسة، والدمج/الإنشاء قرار المالك.
+
+
+- **السياسة شيفرة:** `src/agent/computer-policy.js` — 16 قدرة × 4 حالات (مسموح 7 · موافقة 3 · مقيّد 2 · محظور 4)
+  مع نطاق وبوابة لكل قدرة. `decideAction` يطبّق الطبقات بالترتيب: منع صريح ← `NETWORK=DENY` ← `IDENTITY=NOT_PROVEN`
+  ← النطاق ← الموافقة/الإذن. المنع الافتراضي حرفي: قدرة غير مسمّاة مرفوضة.
+- **الحكم ≠ القدرة:** كل قدرة `wired=false` (لأن `AGENT-003` موقوفة)، فالنقر يعطي `verdict: allow` مع
+  `executable: false`؛ واختبار يثبت `wired === 0`. أي وصل مستقبلي يفرض تحديث السياسة والاختبار والصورة معًا.
+- **الإنفوجرافيك مُولَّد:** `public/computer-permissions.html` + `docs/computer-permissions/README.md` من نفس الثوابت،
+  و`npm run computer:permissions:check` يُفشل CI عند الانحراف (خطوة في `celia-mcp.yml`).
+- **الميزة التنافسية:** Evidence-Carrying Autonomy — 5 ركائز و4 مراحل ببوابات، تنتهي بمقارنة عادلة، ومعلَّمة صراحة
+  «مستهدفة لا مُثبتة» (`notClaimed` مطبوع ومُختبر).
+- **البوابات:** 22 اختبارًا للسياسة · الصفحة بلا طلبات خارجية · تقليل الحركة · روابط داخلية سليمة.
+- **لم يُثبت:** لا تنفيذ كمبيوتر ولا اختبار صلاحيات حي على جهاز حقيقي، ولا مقارنة مهام مع Claude/Manus.
+
+## الطلب السابق — «أضف حوكمة أتمتة المشكلات لنظامي وأكّد النشر من بيانات المستودع»
+
+- **منفَّذ كشيفرة مفروضة لا كمخطط:** عتبات 0.90/0.60 في `src/agent/issue-triage/policy.js`، قائمة سماح مغلقة
+  للوسوم والمُسندين، سقف 10 تطبيقات تلقائية يوميًا، نافذة تراجع 7 أيام، وحجب بالاسم لتعديل الكود/الفرع/PR/
+  الـworkflow/الأسرار/النشر/الإصدار (`EFFECT_SCOPE.blocked` + `assertInScope` + حارس ثابت على الكاتب الوحيد).
+- **نص الـIssue بيانات لا تعليمات:** `injection.js` يكشف ويُنقّي ويسجّل أوامر التعطيل والتمثيل والأسرار والنشر
+  وقذائف الطرفية والتخفّي، ولا يرفع الثقة أبدًا — الحقن يمكنه فقط أن *يخفض* القرار إلى مراجعة بشرية.
+- **سجل تدقيق بسلسلة SHA-256:** كل قرار في سجل واحد (#59) بحقول التصميم الدنيا؛ `npm run triage:verify` يعيد بناء
+  السلسلة بلا صلاحية كتابة.
+- **الدليل الحي من المستودع:** run `40682911724` (#56 تلقائي 0.94 · #57 رفض 0.35 · #58 حقن → بشري) وrun
+  `40683251035` (#61 تلقائي 0.94) — والسجل #59: 3 سجلات، سلسلة سليمة.
+- **عيب كشفه التشغيل الحي:** سجلّا تدقيق بسبب تأخر البحث بعد الإنشاء؛ أُصلح (ترتيب الإنشاء + الأقدم + تحذير +
+  اختبار انحدار) وأُغلق #60 كمتجاوَز.
+- **البوابات:** 443/443 اختبارًا · تغطية 90.36/73.12/84.15 · `check` 131 ملفًا · 35 اختبارًا للتصنيف وحده.
+- **النشر:** Pages وWorker والإصدار `v0.2.1` متحققة من بيانات المستودع؛ Render ما زال `not-configured` ويحتاج
+  إجراء المالك (`CELIA_LIVE_URL` + `RENDER_API_KEY`/`RENDER_SERVICE_ID`) — وصلاحية الجلسة لا تسمح بـdispatch (403).
+- **تفعيل الحوكمة تلقائيًا:** يحتاج الدمج في `main`، لأن أحداث `issues` لا تشغّل workflow غير موجود على الفرع الافتراضي.
+- **لم يُثبت:** لا اتصال ببيئة Copilot المستضافة؛ والمصنّف قواعد حتمية لا نموذج.
+
+## الطلب السابق — «تحقق `CELIA_VOICE_ID` + تنفيذ النشر المجاني بمعدل 100% نجاح»
+
+- **الصوت: ✅ متحقَّق بدليل حي.** تدقيق `40680228320` (commit `b708056`، `verdict: pass`): حي **12/12**،
+  `workingRate: 1`، `failed: []`، offline 401/401، تغطية 90.49/73.32/83.88، MySQL 11/11. الـrun السابق
+  `40678857684` كان 11/12 بسبب `elevenlabs — voice_not_found` وحده. الشاهد أن `verified` لذلك المزوّد لا يُمنح إلا بعد
+  `POST /text-to-speech/<CELIA_VOICE_ID>` يعيد `audio/*` (6 حروف، لا تُخزَّن) — أي أن السرّ صار صوتًا فعليًا.
+- **النشر: ❌ لم يُنفَّذ، ولا يُنفَّذ من الجلسة.** `deploy-render.yml` run `40679651805` = success لكن
+  `status: not-configured` و`missing: [CELIA_LIVE_URL, RENDER_API_KEY + RENDER_SERVICE_ID (أو RENDER_DEPLOY_HOOK_URL)]`
+  — وأُعيد التحقق محليًا بـ`node scripts/deploy-render.mjs --plan` بنفس النتيجة. العوائق صلاحية مالك:
+  `gh workflow run` و`gh secret list` و`gh api …/actions/variables` كلها **403**، والـworkflow يعمل فقط على
+  `workflow_run` من `main` أو dispatch، والجلسة لا تدفع إلى `main`.
+- **إصلاح جوهري في هذه الجلسة:** `render.yaml` لم يكن يعلن `APP_BASE_URL` ولا `GOOGLE_*`، فكان `redirectUri` سيُبنى على
+  `http://localhost:PORT` ويرسل «اربط جوجل» رابط موافقة لا يعمل. أُضيف `APP_BASE_URL` (`sync: false`)،
+  `GOOGLE_CLIENT_ID/SECRET/REDIRECT_URI`، و`CELIA_TIMEZONE=Africa/Cairo`؛ وحُمي بـ`test/deployment-blueprint.test.js`
+  (**7/7**) الذي يربط `render.yaml` بـ`src/config.js` و`docs/deployment-profile.json`.
+- **البوابات المحلية:** `test:coverage` **408/408** (90.51/73.24/83.88) · `check` 128 ملفًا · `copilot:diagram:check` نظيف ·
+  `check:continuity` 39 وثيقة/138 رابطًا.
+- **لم يُثبت:** لا خدمة Render ولا Aiven ولا URL حي؛ ولا اتصال بيئة Copilot المستضافة بالجسر. 12 متحققة = 12 مزوّدًا
+  ردّوا من CI، وليست دليلًا على تشغيل التطبيق كاملًا على مضيف عام.
+
+## الطلب السابق — طبقة حماية Copilot ومخططها (AGENT-005، PR #54 مدموج في `main@8dc3c0e`)
+
+- **جسر مفروض لا إعداد JSON:** Copilot يستدعي أدوات MCP المفعّلة دون موافقة لكل استدعاء، فالقيد في شيفرة أمام الخادم.
+  `scripts/celia-copilot-mcp-bridge.mjs` يفرض: قائمة سماح بأربع أدوات قراءة، `readOnlyHint` مثبتًا من الجسر، قدرات
+  `tools` فقط (رفض prompts/resources)، وتنقية نتائج تحجب أي قيمة سرّية. الاختبار الحاسم E2E على **الخادم الحقيقي** (16 أداة).
+- **المخطط:** `docs/copilot-mcp/architecture.svg` (+`.html` وMermaid) مُولَّد من ثوابت السياسة نفسها، و`--check` يفشل عند
+  أي قدم أو تجاوز نصي — وصار خطوة في CI.
+- **لم يُثبت:** اتصال بيئة Copilot المستضاف بالجسر (لا صلاحية لوحة المالك).
+
+## الطلب السابق — WhatsApp مجاني-أولًا (DEC-032، PR #51، مدموج في `main@b70f914`)
+
+- PR #51 أضاف حقول تشغيل WhatsApp إلى `render.yaml`، وجعل إصدار Graph الافتراضي `v26.0`، وأضاف مسبار `whatsapp_cloud_api`
+  للقراءة فقط (GET فقط، لا إرسال) مع اختبارات وتوثيق؛ سجل الجلسة:
+  [2026-10-28-whatsapp-free-first-setup](sessions/2026-10-28-whatsapp-free-first-setup.md).
+- **بعد دمج #51 صار الإصدار أخضر على `main`:** جودة `40673821757`، Pages `40673821758`، Worker `40673821848`، وإصدار
+  `v0.2.1` بأصوله `40673821824` — أي أن فشل `Publish verified release` الذي عالجه هذا الفرع **لم يتكرر بعد إصلاح PR #49**.
+- **Render ما زال غير منشور:** run `40673950617` انتهى `not-configured` وينقص `CELIA_LIVE_URL` و`RENDER_API_KEY` +
+  `RENDER_SERVICE_ID` (أو `RENDER_DEPLOY_HOOK_URL`) وإنشاء خادم Render وقاعدة Aiven.
+- الأسرار الأربعة `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` / `WHATSAPP_APP_SECRET` / `WHATSAPP_VERIFY_TOKEN`
+  لم تظهر في قائمة الأسرار؛ `PHONE_NUMBER` هو رقم المالك لا Phone Number ID ولا توكن. الرد الآلي باقٍ `false`، ولم يُشغَّل
+  تدقيق حي لـMeta بعد الدمج (لا يوجد دليل على اتصال WhatsApp حقيقي).
+- `main` غير محمي في آخر قراءة (`protected=false`) — إجراء مالك مستقل.
+
+
+
+- **ما نُفِّذ في هذه الجلسة (على الفرع، قبل الدمج):** فصل بوابات الإصدار الأربع في خطوات مسمّاة داخل
+  `.github/workflows/release.yml` (الفشل الوحيد على `main@fc4d60f` كان «exit code 1» بلا اسم بوابة، والـjob توقف بعد 20
+  ثانية أي قبل `npm test` البالغ 24 ثانية) + **نشر idempotent** يقارن `SHA256SUMS` فلا يفشل إعادة التشغيل على أصول متطابقة
+  + مدخل `live_only` في `service-reality.yml` (تحقق من السرّ في ~دقيقة بدل ~20).
+- **التغطية:** 383/383 اختبارًا (كانت 326)، أسطر **90.29%** وفروع 73.20 ودوال 83.79 (كانت 85.72/71.79/83.83)، والأرضية في
+  CI صارت **89/71/82** بدل 80/65/78 (`package.json` + `COVERAGE_FLOOR` + اختبارها).
+- **اختبارات جديدة:** `deploy-cloudflare-edge`، `deploy-release`، `learn-source`، `reality-notify-main`، `lifecycle`،
+  `celia-mcp-tools`، `celia-mcp-protocol`، `celia-mcp-selftest`، `agent-tool-validation`، `outbound-guards`.
+- **الخدمات الحية لم تتغيّر:** 11 متحققة / 1 فاشلة / 4 متقاعدة من 12 مهيأة = **91.7%**؛ الفشل الوحيد `CELIA_VOICE_ID`
+  (القيمة الواصلة للـworkflow ليست بين 22 صوتًا مرئيًا؛ القائمة تضم `cela=AnsOWV53Mdx5fcIanRBB`).
+- **النشر الكامل:** لم يُنفَّذ ولا يُدّعى — `deploy-render.yml` يخرج `not-configured` ويسمّي الناقص:
+  `CELIA_LIVE_URL` (variable) + `RENDER_API_KEY`/`RENDER_SERVICE_ID` أو `RENDER_DEPLOY_HOOK_URL`، والحسابان (Render Free،
+  Aiven MySQL Free) غير موجودين.
+- **مدموج:** PR #50 ← `main@5709bad` (28 أكتوبر 2026). كل الـworkflows على commit الدمج ناجحة: الجودة `40674752264`
+  (Node 22/24 + Python + حاوية + RTL + MySQL)، `Publish verified release` `40674752228` بخطواته المسمّاة
+  `Gate 1/4 … Gate 4/4` ثم نشر موقّع OIDC، Pages `40674752288`، Worker `40674752211`، Render `40674873835`
+  (`not-configured` صريح) → **REL-002 وQA-006 «متحقق»**. WhatsApp صار له حقول تشغيل ومسبار قراءة فقط (DEC-032).
+- **ما زال ناقصًا (كله لوحات مالك):** `CELIA_VOICE_ID` (91.7% < 95%)، Render+Aiven (`not-configured`)، أسرار Meta الأربعة،
+  عميل Google OAuth، وحماية `main` (`protected=false`).
+- **الخطوة التالية (المالك، خمس لوحات في [plan-100-percent](../plan-100-percent.md) §2):** `CELIA_VOICE_ID` في Repository
+  secrets → «تم»؛ ثم Aiven + Render Blueprint + `CELIA_LIVE_URL` وأسرار Render → `verify:live` PASS؛ ثم أسرار Meta الأربعة
+  وتحدي Webhook؛ ثم عميل Google OAuth.
+
+## الطلب السابق — إصلاح حتمي لفشل نشر الإصدار (PR #49، مدموج في `main@8a9fc56`)
+
+- **السبب الجذري الحقيقي لفشل `Publish verified release` على `main@fc4d60f` (run `40665130469`):** اختبار
+  `test/knowledge-ingest.test.js:164` — `KnowledgeStore.stats()` كان يختار آخر سجل بـ`ORDER BY started_at DESC` وحده، فإذا
+  تساوى توقيتان بدقة المللي ثانية لم يكن السجل المختار هو الأحدث. الإصلاح: `rowid DESC` لكسر التعادل + تثبيت ساعة الاختبار
+  (سجل الجلسة: [2026-10-28-knowledge-ingest-tie-fix](sessions/2026-10-28-knowledge-ingest-tie-fix.md)). **تصحيح ذاتي:** تحليلي
+  المبدئي في جلسة PLAN-001 استنتج من زمن التوقف (20 ثانية) أن الفشل قبل `npm test`؛ الفحص المتوازي أثبت أنه داخل الاختبار —
+  ولهذا صار فصل البوابات في خطوات مسمّاة مطلبًا لا تحسينًا.
+- `main` ما زال عند `fc4d60fddb66ad4349ddf664e23e094444a939b8` وقت بدء هذه الجلسة؛ لا دمج ولا تغيير على `main`.
+- run `40665130469` لـ`Publish verified release` فشل في `test/knowledge-ingest.test.js:164`؛ فحوص الجودة على commit نفسه نجحت في run `40665130587`، ونشر Pages/Cloudflare وRender نجح في التشغيلات المسجلة.
+- السبب الجذري: `KnowledgeStore.stats()` كان يختار آخر سجل بـ`ORDER BY started_at DESC` فقط. إذا تساوى توقيت تشغيلين بدقة المللي ثانية، فقد لا يكون السجل المختار هو الأحدث.
+- الإصلاح المعزول في PR #49: إضافة `rowid DESC` لكسر التعادل، وتثبيت ساعة الاختبار بحيث تتساوى الطوابع الزمنية عمدًا. رابط PR: https://github.com/celiaelazamey-arch/phone-google/pull/49.
+- تشغيل PR `40671238246`: سجل Node 24 `fail 0` في الاختبارات، لكن بوابة `check:continuity` رفضت التغيير أولًا لغياب `STATE.md` وسجل الجلسة؛ أضيف هذا السجل والملف المصاحب ضمن الـPR. لا يُعلن نجاح CI الكامل قبل اكتمال التشغيل النهائي بعد التوثيق.
+- لا تغييرات على الأسرار أو إعدادات النشر أو بيانات الإنتاج في هذا الإصلاح. لم يُدمج PR، ولم يُعاد تشغيل نشر الإصدار.
+- فجوات المالك المستقلة ما زالت: ضبط `CELIA_VOICE_ID` في **Repository secrets → Actions** إلى `AnsOWV53Mdx5fcIanRBB` ثم تشغيل تدقيق الخدمات الحية؛ تفعيل حماية `main` بأسماء الفحوص المطلوبة في خطة المحافظة. التدقيق الحي الأخير الموثق على الفرع هو 11/12 (91.7%)، وليس 95% أو 100%.
+- معيار الاستكمال: نجاح كل وظائف PR #49، ثم الدمج وفق بوابة الفحوص، وإعادة فحص الإصدار على commit الدمج، وبعد تحديث السر تشغيل تدقيق حي على `main` وإثبات نسبة الخدمات من artifact/annotations. لا تُغيّر عتبات التغطية لإخفاء الفشل.
 
 ## الطلب السابق — «خطط للمحافظة لما وصلنا له حتى الآن» (DEC-031، OPS-005) — مدموج في PR #47 و#48
-
 - **ما وصلنا إليه (مدموج في `main@715060a`):** 324/324 اختبارًا (تغطية 85.8/72/84)، MySQL حقيقي 11/11، Pages ✅ `40650636259`،
   Worker ✅ `40650636104` (`liveReady`، 18/18 + مفاتيح التقاعد)، Release ✅ `40650636330`، 10 خدمات متحققة / 4 متقاعدة في Git /
   2 بانتظار سرّ مالك (83.3%).
@@ -49,7 +256,7 @@
 - **الخطوة التالية (المالك):** Settings → Secrets and variables → Actions → تبويب Secrets → Repository secrets →
   `CELIA_VOICE_ID` → Update → `AnsOWV53Mdx5fcIanRBB` → Update secret؛ ثم «تم» → run `[reality]` → عند ≥95% تحديث QA-005.
 - **مدموج:** PR #48 → `main@fc4d60f` (2026-10-28 09:33 UTC) بأمر المالك؛ بعده Edge/Quality/Pages/Render ✅ و`Publish verified
-  release` ❌ `40665130469` (تقلّب أعمى → DEC-032 أعلاه؛ v0.2.1 لم يتأثر، 5 أصول).
+  release` ❌ `40665130469` (بلا اسم اختبار → DEC-039 أعلاه؛ السبب الحقيقي كشفه PR #49؛ v0.2.1 لم يتأثر، 5 أصول).
 
 ## الطلب السابق — «لا خدمة مجرد اسم أو موكب؛ خدمات حقيقية مختبرة ≥95%» (DEC-030، QA-005) — مدموج في PR #46
 
@@ -471,7 +678,7 @@ pass/warn/fail، بلا شبكة وبلا طباعة أي سر) · `npm run goog
 
 ## حدود لا يجوز نسيانها
 
-- فرع الجلسة الحالية `arena/0220ec0b-phone-google` هو الوحيد للعمل والدفع (يحوي فرع PR #36 مدمجًا)؛ أسماء الفروع المذكورة في الأقسام التاريخية تخص جلسات منتهية بعد الدمج ولا يُعمل عليها.
+- فرع الجلسة الحالية `arena/2edb2881-phone-google` هو الوحيد للعمل والدفع؛ أسماء الفروع في الأقسام التاريخية تخص جلسات منتهية بعد الدمج ولا يُعمل عليها. لا دفع إلى `main` ولا `workflow_dispatch` من الجلسة (403).
 - أسرار المستودع التسعة لا تُقرأ ولا تُطبع ولا تُضاف لملفات الحزمة؛ و`credentials.json` و`token.json` ممنوعان من Git مهما طُلب من التوثيق.
 - الحزمة ليست موصلة ChatGPT (خارج النطاق صراحةً) ولا تدّعي بحثًا دلاليًا ولا حذفًا تلقائيًا، ولا يُعلن نشرها كمكوّن من النظام قبل قبول المالك (SPDR-002).
 - لا مستودع GitHub جديد ولا دفع خارج فرع الجلسة الحالي؛ لا releases ولا دمج/إغلاق PR من هذه الجلسة دون طلب صريح (ينطبق على #34 و#36).
@@ -481,17 +688,17 @@ pass/warn/fail، بلا شبكة وبلا طباعة أي سر) · `npm run goog
 
 ## الخطوة التالية بالضبط
 
-1. **المالك (الركن 0):** دمج PR #36 ثم هذا الفرع (أو هذا الفرع وحده)، وإغلاق PR #34 بلا دمج. بعد الدمج تأكد أن
-   وظيفة `deploy` في `pages.yml` **لم تُتخطَّ** وأن `https://celiaelazamey-arch.github.io/phone-google/` يفتح.
-2. **المالك (الركن 1 — HOST-003):** Aiven Free ← Render Blueprint ← أسرار ← `empty-only` ثم `false` ←
-   `npm run migrate -- --apply` ← `CELIA_AGENT_RUNTIME=mysql` + `CELIA_AGENT_RESUME_ON_BOOT=true` ← cron-job.org
-   كل 10 دقائق على `/readyz` ← `CELIA_MCP_API_TOKEN=… npm run verify:live -- --url … --expect-commit …` ⇒ PASS
-   يُلصق في سجل جلسة جديد ويُحدَّث HOST-003 إلى «متحقق».
-3. **بعدها من هنا (الركن 7):** `backup:verify` (DATA-001)، موصل WhatsApp في الـoutbox (AGENT-002)، ثم AI-001/AI-002
-   بعد قرار المزوّد. التفاصيل والبوابات في [docs/go-live-plan.md](../go-live-plan.md).
-4. **بقية الخطة** كما هي في BACKLOG دون ادعاء إغلاقها.
-5. **واقع الخدمات (QA-005):** قبل أي ادعاء «يعمل»، شغّل `[reality]` واقرأ annotations الـrun؛ الست الفاشلة في
-   [docs/service-reality.md](../service-reality.md) لا تُصلحها شيفرة — تجديد أو تقاعد صريح بـ`CELIA_DISABLE_*`.
+1. **المالك — إنشاء ما لا يمكن إنشاؤه من الجلسة (بلا بطاقة):** Render → New → Blueprint من `render.yaml`
+   (تير Free) ← Aiven MySQL Free ← إدخال الستة `MYSQL_*` في Render Environment ← نسخ رابط الخدمة إلى `APP_BASE_URL`
+   وإعادة النشر ← `npm run migrate -- --apply` مرة واحدة.
+2. **المالك — تشغيل النشر المتحقَّق:** GitHub → Settings → Secrets and variables → Actions:
+   Variable `CELIA_LIVE_URL=https://<service>.onrender.com` · Secrets `RENDER_API_KEY` و`RENDER_SERVICE_ID`
+   (أو `RENDER_DEPLOY_HOOK_URL`). أول push على `main` بعدها يشغّل `deploy-render.yml` تلقائيًا (نشر ← انتظار `/readyz`
+   بـ`storage.mode=mysql` ← `verify:live --expect-commit` ← keep-alive كل 10 دقائق). **حينها فقط** يُكتب «منشور».
+3. **بعد النشر:** لصق تقرير `verify:live` في سجل جلسة جديد وتحديث HOST-003 إلى «متحقق»، ثم `backup:verify` (DATA-001)،
+   ثم موصل WhatsApp في الـoutbox (AGENT-002)، ثم AI-001/AI-002 بعد قرار المزوّد
+   ([docs/go-live-plan.md](../go-live-plan.md)).
+4. **أي ادعاء «يعمل»:** شغّل `[reality]` واقرأ annotations الـrun؛ لا يُستبدل بدليل محلي أو محاكاة.
 
 ## التحقق من الحفظ في الجلسة التالية
 

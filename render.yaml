@@ -43,6 +43,20 @@ services:
         value: 'true'
       - key: MYSQL_SSL_CA_BASE64
         sync: false
+      # The public URL of this service. Without it the OAuth callback and the links the assistant sends fall back
+      # to localhost, so "اربط جوجل" would silently produce an unusable consent link. Paste the onrender.com URL
+      # after the first deploy, then redeploy (Render cannot know its own URL at creation time).
+      - key: APP_BASE_URL
+        sync: false
+      - key: CELIA_TIMEZONE
+        value: Africa/Cairo
+      # Google channel (GOOG-001/GOOG-002): the client is created in Google Cloud with exactly this redirect URI.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
       - key: CELIA_AI_PROVIDER
         value: auto
       - key: GEMINI_API_KEY
@@ -61,6 +75,20 @@ services:
         sync: false
       - key: YOUR_CODATA_API_KEY
         sync: false
+      # WhatsApp Cloud API runtime credentials must be entered in Render's environment dashboard.
+      # Repository Actions secrets are only available to workflows; they do not propagate to the runtime.
+      - key: APP_OWNER_PHONE_E164
+        sync: false
+      - key: WHATSAPP_ACCESS_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_APP_SECRET
+        sync: false
+      - key: WHATSAPP_VERIFY_TOKEN
+        sync: false
+      - key: WHATSAPP_API_VERSION
+        value: 'v26.0'
       - key: CELIA_DISABLE_OLLAMA
         value: 'true'
       # Retired services (DEC-030, docs/deployment-profile.json → serviceRetirements): credentials proven dead by the

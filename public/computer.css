@@ -1,0 +1,638 @@
+/* ============================================================
+   صفحة «وكيل CeliaOS يستخدم الكمبيوتر» — عرض توضيحي.
+   خطوط محلية (./fonts.css) بلا أي طلب خارجي، وحركة تتوقف
+   تلقائيًا عند تفضيل تقليل الحركة.
+   ============================================================ */
+
+.cu-page {
+  --cu-bg: #0b1030;
+  --cu-bg2: #121a4a;
+  --cu-card: #161f55;
+  --cu-line: #2e3a8c;
+  --cu-txt: #eaf0ff;
+  --cu-mut: #a9b6e8;
+  --cu-vio: #8b5cf6;
+  --cu-cy: #22d3ee;
+  --cu-ok: #34d399;
+  --cu-bad: #f87171;
+  --cu-term: #070b24;
+  --cu-warn: #fbbf24;
+
+  margin: 0;
+  background:
+    radial-gradient(1200px 600px at 80% -10%, #3b2a8f55, transparent),
+    radial-gradient(900px 500px at 10% 10%, #0e749033, transparent),
+    var(--cu-bg);
+  color: var(--cu-txt);
+  font-family: "IBM Plex Sans Arabic", system-ui, "Segoe UI", Tahoma, sans-serif;
+  line-height: 1.7;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* شبكة خلفية ثابتة، باهتة، وغير قابلة للتفاعل. */
+.cu-page::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(#ffffff0a 1px, transparent 1px),
+    linear-gradient(90deg, #ffffff0a 1px, transparent 1px);
+  background-size: 44px 44px;
+  -webkit-mask-image: radial-gradient(circle at 50% 15%, #000, transparent 75%);
+  mask-image: radial-gradient(circle at 50% 15%, #000, transparent 75%);
+}
+
+.cu-wrap {
+  position: relative;
+  z-index: 1;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px 18px 40px;
+}
+
+.cu-skip {
+  position: absolute;
+  inset-inline-start: -9999px;
+  top: 8px;
+  background: var(--cu-cy);
+  color: #06102c;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-weight: 700;
+  z-index: 5;
+}
+.cu-skip:focus {
+  inset-inline-start: 12px;
+}
+
+.cu-topbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--cu-line);
+  border-radius: 14px;
+  padding: 10px 14px;
+  background: #ffffff08;
+}
+.cu-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 800;
+  font-size: 13.5px;
+  letter-spacing: 0.02em;
+  background: linear-gradient(135deg, var(--cu-vio), var(--cu-cy));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.cu-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.cu-nav a {
+  color: var(--cu-mut);
+  text-decoration: none;
+  font-size: 13px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+.cu-nav a:hover,
+.cu-nav a:focus-visible {
+  color: var(--cu-txt);
+  border-color: var(--cu-line);
+  background: #ffffff0a;
+}
+.cu-nav a[aria-current="page"] {
+  color: var(--cu-cy);
+  border-color: var(--cu-cy);
+}
+
+.cu-header {
+  text-align: center;
+  margin: 28px 0 22px;
+}
+.cu-brandline {
+  font-weight: 800;
+  font-size: 14px;
+  background: linear-gradient(135deg, var(--cu-vio), var(--cu-cy));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin-bottom: 8px;
+}
+.cu-header h1 {
+  margin: 0 0 6px;
+  font-size: clamp(26px, 4.4vw, 42px);
+  font-weight: 800;
+  line-height: 1.35;
+}
+.cu-header h1 em {
+  font-style: normal;
+  background: linear-gradient(90deg, var(--cu-cy), var(--cu-vio), var(--cu-cy));
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: cu-sh 6s linear infinite;
+}
+@keyframes cu-sh {
+  to {
+    background-position: 200% center;
+  }
+}
+.cu-sub {
+  color: var(--cu-mut);
+  font-size: 16px;
+  margin: 0;
+}
+.cu-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 14px;
+}
+.cu-badge {
+  border: 1px solid var(--cu-line);
+  background: #ffffff0a;
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 13px;
+  color: var(--cu-mut);
+}
+.cu-badge b {
+  color: var(--cu-cy);
+}
+.cu-live {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.cu-live i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--cu-ok);
+  animation: cu-ping 1.8s infinite;
+}
+@keyframes cu-ping {
+  0% {
+    box-shadow: 0 0 0 0 #34d39999;
+  }
+  100% {
+    box-shadow: 0 0 0 10px #34d39900;
+  }
+}
+
+/* لوحة الصدق: الحالة الحقيقية قبل أي رسم. */
+.cu-truth {
+  margin: 18px 0 4px;
+  border: 1px solid #fbbf2477;
+  background: #fbbf2414;
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 13.5px;
+  color: var(--cu-txt);
+}
+.cu-truth svg {
+  width: 22px;
+  height: 22px;
+  stroke: var(--cu-warn);
+  flex: none;
+  margin-top: 2px;
+}
+.cu-truth b {
+  color: var(--cu-warn);
+}
+.cu-truth a {
+  color: var(--cu-cy);
+}
+
+.cu-section {
+  margin-top: 26px;
+}
+.cu-section h2 {
+  font-size: 20px;
+  margin: 0 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cu-section h2 svg {
+  width: 26px;
+  height: 26px;
+  stroke: var(--cu-cy);
+  flex: none;
+}
+.cu-section h2 small {
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--cu-mut);
+}
+.cu-section h2::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--cu-line), transparent);
+}
+
+.cu-card {
+  background: linear-gradient(160deg, var(--cu-card), var(--cu-bg2));
+  border: 1px solid var(--cu-line);
+  border-radius: 16px;
+  padding: 16px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 10px 30px #0005, inset 0 1px 0 #ffffff14;
+  transition: transform 0.25s, border-color 0.25s;
+}
+.cu-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--cu-cy);
+}
+.cu-card h3 {
+  margin: 0 0 4px;
+  font-size: 16.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cu-card h3 svg {
+  width: 28px;
+  height: 28px;
+  stroke: var(--cu-cy);
+  flex: none;
+}
+.cu-card > p {
+  margin: 0 0 6px;
+  color: var(--cu-mut);
+  font-size: 13.5px;
+}
+
+.cu-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  font-size: 13.5px;
+  color: var(--cu-mut);
+}
+.cu-list li {
+  margin-bottom: 4px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.cu-list li::before {
+  content: "•";
+  color: var(--cu-cy);
+}
+.cu-list.ok li::before {
+  content: "✓";
+  color: var(--cu-ok);
+  font-weight: 800;
+}
+.cu-list.no li::before {
+  content: "✕";
+  color: var(--cu-bad);
+  font-weight: 800;
+}
+.cu-list.n {
+  counter-reset: cu-s;
+}
+.cu-list.n li::before {
+  counter-increment: cu-s;
+  content: counter(cu-s);
+  background: var(--cu-vio);
+  color: #fff;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  text-align: center;
+  font-size: 12px;
+  line-height: 20px;
+  font-weight: 700;
+}
+
+.cu-journey {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.25fr 1fr;
+  gap: 16px;
+}
+.cu-journey > .cu-card {
+  position: relative;
+}
+.cu-journey > .cu-card:not(:last-child)::after {
+  content: "←";
+  position: absolute;
+  left: -16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  text-align: center;
+  color: var(--cu-cy);
+  font-weight: 800;
+}
+.cu-quote {
+  background: var(--cu-term);
+  border: 1px dashed var(--cu-line);
+  border-radius: 12px;
+  padding: 10px;
+  font-size: 13px;
+  color: var(--cu-txt);
+  margin-top: 8px;
+}
+.cu-verify {
+  margin-top: 12px;
+  border: 1px solid #34d39988;
+  background: #34d3991f;
+  border-radius: 12px;
+  padding: 10px;
+  font-weight: 700;
+  color: var(--cu-ok);
+  font-size: 14px;
+}
+.cu-verify small {
+  display: block;
+  font-weight: 400;
+  color: var(--cu-mut);
+}
+
+.cu-arch {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+.cu-arch .cu-card {
+  flex: 1;
+}
+.cu-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--cu-cy);
+  font-weight: 800;
+  font-size: 12px;
+  min-width: 44px;
+  text-align: center;
+}
+.cu-link b {
+  font-size: 22px;
+  line-height: 1;
+  animation: cu-pl 2s ease-in-out infinite;
+}
+@keyframes cu-pl {
+  50% {
+    opacity: 0.35;
+  }
+}
+.cu-mono {
+  font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  direction: ltr;
+  text-align: left;
+  color: var(--cu-mut);
+  word-break: break-all;
+}
+
+.cu-trace {
+  background: var(--cu-term);
+  border: 1px solid var(--cu-line);
+  border-radius: 16px;
+  padding: 14px;
+  font-size: 13.5px;
+}
+.cu-trace-head {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.cu-trace-head > i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ffffff33;
+}
+.cu-trace-head .cu-live {
+  margin-inline-start: auto;
+  font-size: 12px;
+  color: var(--cu-mut);
+}
+.cu-tr {
+  display: grid;
+  grid-template-columns: 78px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px dashed #2e3a8c66;
+  animation: cu-in 0.6s both;
+}
+.cu-tr:nth-child(3) {
+  animation-delay: 0.1s;
+}
+.cu-tr:nth-child(4) {
+  animation-delay: 0.2s;
+}
+.cu-tr:nth-child(5) {
+  animation-delay: 0.3s;
+}
+.cu-tr:nth-child(6) {
+  animation-delay: 0.4s;
+}
+.cu-tr:nth-child(7) {
+  animation-delay: 0.5s;
+}
+.cu-tr:nth-child(8) {
+  animation-delay: 0.6s;
+}
+@keyframes cu-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.cu-tr:last-child {
+  border: 0;
+}
+.cu-tr b {
+  color: var(--cu-cy);
+  font-weight: 700;
+  font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+}
+.cu-tr em {
+  font-style: normal;
+  font-size: 12px;
+  border-radius: 99px;
+  padding: 0 10px;
+}
+.cu-tr .s {
+  background: #34d39933;
+  color: var(--cu-ok);
+}
+.cu-tr .x {
+  background: #f8717133;
+  color: var(--cu-bad);
+}
+.cu-tr .d {
+  background: #fbbf2433;
+  color: var(--cu-warn);
+}
+
+.cu-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+.cu-kpi {
+  border: 1px solid var(--cu-line);
+  border-radius: 14px;
+  padding: 12px;
+  text-align: center;
+  background: #ffffff0a;
+}
+.cu-kpi b {
+  display: block;
+  font-size: 24px;
+  background: linear-gradient(90deg, var(--cu-cy), var(--cu-vio));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.cu-kpi span {
+  font-size: 12.5px;
+  color: var(--cu-mut);
+}
+
+.cu-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.cu-three {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr 1fr;
+  gap: 14px;
+}
+.cu-ban {
+  margin-top: 12px;
+  border-top: 1px dashed var(--cu-line);
+  padding-top: 10px;
+}
+.cu-ban b {
+  color: var(--cu-bad);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.cu-ban svg {
+  width: 20px;
+  height: 20px;
+  stroke: var(--cu-bad);
+}
+.cu-principles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+.cu-principles span {
+  flex: 1 1 90px;
+  text-align: center;
+  border: 1px solid var(--cu-line);
+  border-radius: 12px;
+  padding: 8px 6px;
+  font-size: 13px;
+  background: #ffffff0a;
+}
+.cu-principles svg {
+  width: 24px;
+  height: 24px;
+  stroke: var(--cu-vio);
+  display: block;
+  margin: 0 auto 2px;
+}
+.cu-note {
+  margin-top: 14px;
+  text-align: center;
+  font-weight: 800;
+  border: 1px dashed var(--cu-cy);
+  border-radius: 14px;
+  padding: 10px;
+  color: var(--cu-cy);
+  font-size: 15px;
+}
+.cu-footer {
+  margin-top: 26px;
+  text-align: center;
+  color: var(--cu-mut);
+  font-size: 12.5px;
+}
+.cu-footer a {
+  color: var(--cu-cy);
+}
+
+@media (max-width: 980px) {
+  .cu-kpis {
+    grid-template-columns: 1fr 1fr;
+  }
+  .cu-journey,
+  .cu-two,
+  .cu-three {
+    grid-template-columns: 1fr;
+  }
+  .cu-journey > .cu-card:not(:last-child)::after {
+    content: "↓";
+    left: 50%;
+    top: auto;
+    bottom: -16px;
+    transform: translateX(-50%);
+  }
+  .cu-arch {
+    flex-direction: column;
+  }
+  .cu-link {
+    min-width: 0;
+    padding: 2px 0;
+  }
+  .cu-tr {
+    grid-template-columns: 64px 1fr auto;
+    font-size: 12.5px;
+  }
+}
+
+/* الاحترام الصريح لتفضيل تقليل الحركة: لا حركة ولا انتقال. */
+@media (prefers-reduced-motion: reduce) {
+  .cu-page *,
+  .cu-page *::before,
+  .cu-page *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .cu-card,
+  .cu-trace,
+  .cu-kpi {
+    border: 1px solid CanvasText;
+  }
+}
+
+.cu-page :focus-visible {
+  outline: 2px solid var(--cu-cy);
+  outline-offset: 2px;
+}

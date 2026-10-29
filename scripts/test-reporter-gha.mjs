@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * GitHub Actions annotation reporter for `node --test` (DEC-032, QA-006).
+ * GitHub Actions annotation reporter for `node --test` (DEC-039, QA-008).
  *
  * Why: the step logs of this repository's workflows cannot be retrieved by the automation that maintains it
  * (only check-run annotations can), so a red "Node 24 · tests" job that merely says "exit code 1" is blind.

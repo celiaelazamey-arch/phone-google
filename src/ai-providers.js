@@ -10,28 +10,75 @@ function cleanSecret(raw) {
   return trimmed;
 }
 
-function isDisallowedHost(hostname) {
-  const host = String(hostname || '').toLowerCase();
+function isDisallowedIpv4(octets) {
+  if (!Array.isArray(octets) || octets.length !== 4) return true;
+  if (octets.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return true;
+  const [a, b] = octets;
+  if (a === 0 || a === 10 || a === 127) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true;
+  if (a >= 224) return true;
+  return false;
+}
+
+function extractMappedIpv4Octets(ipv6Host) {
+  const lower = ipv6Host.toLowerCase();
+  const prefixMatch = lower.match(/^(?:::ffff:|0:0:0:0:0:ffff:)(.+)$/);
+  if (!prefixMatch) return null;
+  const tail = prefixMatch[1];
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(tail)) {
+    return tail.split('.').map((n) => Number.parseInt(n, 10));
+  }
+  const hexMatch = tail.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (!hexMatch) return null;
+  const hi = Number.parseInt(hexMatch[1], 16);
+  const lo = Number.parseInt(hexMatch[2], 16);
+  return [(hi >> 8) & 0xff, hi & 0xff, (lo >> 8) & 0xff, lo & 0xff];
+}
+
+export function isDisallowedHost(hostname) {
+  const raw = String(hostname || '').trim().toLowerCase();
+  if (!raw) return true;
+  const host = raw.startsWith('[') && raw.endsWith(']') ? raw.slice(1, -1) : raw;
   if (!host) return true;
+
   if (
     host === 'localhost' ||
-    host === '0.0.0.0' ||
-    host === '::1' ||
-    host === '[::1]' ||
     host.endsWith('.localhost') ||
     host.endsWith('.local') ||
-    host.endsWith('.internal')
+    host.endsWith('.internal') ||
+    host === 'metadata.google.internal'
   ) {
     return true;
   }
-  if (/^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host) || /^169\.254\./.test(host)) {
+
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) {
+    return isDisallowedIpv4(host.split('.').map((n) => Number.parseInt(n, 10)));
+  }
+
+  if (/^\d+$/.test(host) || /^0x[0-9a-f]+$/i.test(host)) {
     return true;
   }
-  const match172 = /^172\.(\d{1,3})\./.exec(host);
-  if (match172) {
-    const second = Number(match172[1]);
-    if (second >= 16 && second <= 31) return true;
+
+  if (host.includes(':')) {
+    if (host === '::' || host === '::1' || host === '0:0:0:0:0:0:0:0' || host === '0:0:0:0:0:0:0:1') {
+      return true;
+    }
+    const mapped = extractMappedIpv4Octets(host);
+    if (mapped) return isDisallowedIpv4(mapped);
+    const firstHextet = host.split(':').find((part) => part.length > 0);
+    if (firstHextet) {
+      const value = Number.parseInt(firstHextet, 16);
+      if (Number.isFinite(value)) {
+        if ((value & 0xfe00) === 0xfc00) return true;
+        if ((value & 0xffc0) === 0xfe80) return true;
+        if ((value & 0xff00) === 0xff00) return true;
+      }
+    }
   }
+
   return false;
 }
 

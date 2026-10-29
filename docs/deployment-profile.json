@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-27",
+  "reviewedAt": "2026-10-28",
   "repository": "celiaelazamey-arch/phone-google",
-  "inspectedBaseline": "d5cdac830aa213cfe0f096d6519c786516593c57",
+  "inspectedBaseline": "44532f4552c20b8fb51402e14cff8fc15356b97c",
   "ownerStatement": "النظام موجود حاليًا في GitHub؛ مطلوب اختيار استضافة ورابط مجانيين والنشر دون بطاقة دفع، وتوظيف أسرار المستودع التسعة في النظام بالكامل",
   "constraints": {
     "paidResourcesAuthorized": false,
@@ -26,15 +26,24 @@
     "web": "Render Free, one combined Node web service",
     "database": "Aiven Free MySQL, a dedicated empty database",
     "url": "provider-assigned HTTPS onrender.com subdomain, not yet created",
-    "accountAuthorizationAvailable": false
+    "accountAuthorizationAvailable": false,
+    "cardFreePrimaryRuntime": {
+      "decision": "DEC-037",
+      "guide": "docs/no-visa-deployment.md",
+      "web": "Cloudflare Workers Free (https://celia-phone-google.celiaelazamey.workers.dev) — full MCP 12 tools + Google OAuth2/Workspace + WhatsApp Cloud API + Gemini AI",
+      "database": "Cloudflare D1 Free SQLite (celia-edge-state / f63ccd9f-49b1-4eca-861b-fd478c433518, 12 idempotent statements)",
+      "ui": "GitHub Pages Free (https://celiaelazamey-arch.github.io/phone-google/)",
+      "visaRequired": false,
+      "monthlyCostUsd": 0
+    }
   },
   "publication": {
     "permanentPublicUrl": null,
     "permanentPublicUrlNote": "The full Express + MySQL service has no public URL yet: no Render service and no Aiven database exist (owner accounts required).",
     "staticSiteUrl": "https://celiaelazamey-arch.github.io/phone-google/",
-    "staticSiteVerifiedBy": "GitHub Pages deployment 7374226427 (success) + workflow run 40611588083 live probe 10/10 routes, commit 1a11810685075868a6c1c6148fc4346de2b7d1a9, 2026-10-28T00:53Z",
+    "staticSiteVerifiedBy": "GitHub Pages workflow run 40706047514 (success) on main@44532f4552c20b8fb51402e14cff8fc15356b97c, 2026-10-28 (12/12 routes verified in pages.yml)",
     "edgeUrl": "https://celia-phone-google.celiaelazamey.workers.dev",
-    "edgeVerifiedBy": "workflow run 40611588035: status deployed, liveReady true, 18/18 secret bindings, commit 1a11810685075868a6c1c6148fc4346de2b7d1a9",
+    "edgeVerifiedBy": "workflow run 40706047781 on main@44532f4552c20b8fb51402e14cff8fc15356b97c: status deployed, liveReady true, 18/18 secret bindings, D1 celia-edge-state (f63ccd9f-49b1-4eca-861b-fd478c433518, 4 SQL migration statements) verified with storage.mode=d1, durable=true",
     "containerImage": "ghcr.io/celiaelazamey-arch/phone-google:v0.2.1",
     "containerImageVisibility": "public",
     "release": "https://github.com/celiaelazamey-arch/phone-google/releases/tag/v0.2.1",

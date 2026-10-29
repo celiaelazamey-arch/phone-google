@@ -35,6 +35,7 @@ const SECRET_ENV_NAMES = [
   'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_R2_ACCESS_KEY_ID', 'CLOUDFLARE_R2_S3_ENDPOINT',
   'CLOUDFLARE_R2_SECRET_ACCESS_KEY', 'DEEPSEEK_API_KEY', 'ELEVENLABS_API_KEY', 'FIGMA_ACCESS_TOKEN', 'GEMINI_API_KEY',
   'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'PHONE_NUMBER', 'YOUR_CODATA_API_KEY',
+  'WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_APP_SECRET', 'WHATSAPP_VERIFY_TOKEN',
   'RENDER_API_KEY', 'RENDER_DEPLOY_HOOK_URL', 'GITHUB_TOKEN', 'MYSQL_TEST_PASSWORD'
 ];
 const EMPTY_SHA256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
@@ -131,7 +132,7 @@ export function classifyGoogleTokenResponse(status, body = {}) {
 }
 
 /** Regression floor for the offline suite (DEC-031). Current: ~85.8 / 72 / 84 — headroom is deliberate. */
-export const COVERAGE_FLOOR = Object.freeze({ lines: 80, branches: 65, functions: 78 });
+export const COVERAGE_FLOOR = Object.freeze({ lines: 89, branches: 71, functions: 82 });
 
 export function coverageShortfalls(coverage, floor = COVERAGE_FLOOR) {
   if (!coverage) return [];
@@ -177,8 +178,44 @@ async function probeJson(fetchImpl, url, init, timeoutMs) {
   return { status: response.status, json, text, latencyMs: Date.now() - started };
 }
 
+/**
+ * Read-only WhatsApp credential probe. It never sends a message and cannot prove
+ * the Meta webhook subscription; that requires a separate signed end-to-end test.
+ */
+export async function probeWhatsAppCloudApi({ env = process.env, fetchImpl = fetch, timeoutMs = 5000 } = {}) {
+  const token = String(env.WHATSAPP_ACCESS_TOKEN || '').trim();
+  const phoneNumberId = String(env.WHATSAPP_PHONE_NUMBER_ID || '').trim();
+  if (!token || !phoneNumberId) {
+    return { verdict: 'not-configured', detail: 'WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID are required; no message sent' };
+  }
+  const apiVersion = String(env.WHATSAPP_API_VERSION || 'v26.0').trim();
+  if (!/^v\d{1,3}\.0$/.test(apiVersion)) {
+    return { verdict: 'failed', detail: 'WHATSAPP_API_VERSION must use a version such as v26.0; no message sent' };
+  }
+  if (!/^\d{5,30}$/.test(phoneNumberId)) {
+    return { verdict: 'failed', detail: 'WHATSAPP_PHONE_NUMBER_ID must be the numeric Meta phone-number ID, not a phone number; no message sent' };
+  }
+  try {
+    const query = new URLSearchParams({ fields: 'id,display_phone_number,verified_name' });
+    const response = await probeJson(
+      fetchImpl,
+      `https://graph.facebook.com/${apiVersion}/${encodeURIComponent(phoneNumberId)}?${query}`,
+      { headers: { accept: 'application/json', authorization: `Bearer ${token}` } },
+      timeoutMs
+    );
+    const matched = response.status === 200 && String(response.json?.id || '') === phoneNumberId;
+    if (matched) {
+      return { verdict: 'verified', detail: 'Meta read-only phone-number lookup passed; no message sent; webhook remains a separate acceptance test', latencyMs: response.latencyMs };
+    }
+    const code = String(response.json?.error?.code || response.json?.error?.type || response.status).slice(0, 40);
+    return { verdict: 'failed', detail: `Meta read-only phone-number lookup rejected (HTTP ${response.status}, ${code}); no message sent`, latencyMs: response.latencyMs };
+  } catch (error) {
+    return { verdict: 'failed', detail: `Meta read-only phone-number lookup unreachable (${error?.cause?.code || error?.name || 'network_error'}); no message sent` };
+  }
+}
+
 export function buildProbes({ config, env, fetchImpl = fetch, timeoutMs, publication, version, modules }) {
-  const { generateCeliaReply, probeCeliaVoice, fetchFigmaProfile, getCodataStatus, getCronjobStatus, planDeployment } = modules;
+  const { generateCeliaReply, probeCeliaVoice, fetchFigmaProfile, getCodataStatus, getCronjobStatus, planDeployment, renderServiceName = 'celia-phone-google' } = modules;
   const synthetic = 'مرحبا، كيف أتواصل مع موظف؟';
   const upstreamMeaning = { 401: 'credential rejected (401)', 402: 'authenticated but payment required / no balance (402)', 403: 'forbidden (403) — key invalid for this endpoint or plan', 404: 'endpoint or model not found (404)', 429: 'rate limited or quota exhausted (429) — key accepted' };
   const listModels = async (cfg) => {
@@ -380,12 +417,8 @@ export function buildProbes({ config, env, fetchImpl = fetch, timeoutMs, publica
       run: async () => ({ verdict: 'unverifiable', detail: 'no Google account is linked (no refresh token exists anywhere); the owner links once via «اربط جوجل» on the live backend — code paths are covered by offline tests only' })
     },
     {
-      id: 'whatsapp_cloud_api', label: 'WhatsApp Cloud API (send/receive)', secret: 'WHATSAPP_ACCESS_TOKEN + WHATSAPP_PHONE_NUMBER_ID (absent)', category: 'messaging',
-      run: async () => {
-        const configured = Boolean(String(env.WHATSAPP_ACCESS_TOKEN || '').trim() && String(env.WHATSAPP_PHONE_NUMBER_ID || '').trim());
-        if (!configured) return { verdict: 'not-configured', detail: 'no Meta access token / phone number id in the repository secrets — outbound WhatsApp cannot work until the owner creates the Meta app; webhook + commands are offline-tested only' };
-        return { verdict: 'unverifiable', detail: 'sending a real message is not a synthetic probe; verify via the webhook on the live backend' };
-      }
+      id: 'whatsapp_cloud_api', label: 'WhatsApp Cloud API credentials (read-only)', secret: 'WHATSAPP_ACCESS_TOKEN + WHATSAPP_PHONE_NUMBER_ID', category: 'messaging',
+      run: () => probeWhatsAppCloudApi({ env, fetchImpl, timeoutMs })
     },
     {
       id: 'owner_token_edge', label: 'Owner token on the live edge Worker', secret: 'CELIA_MCP_API_TOKEN', category: 'auth',
@@ -414,7 +447,13 @@ export function buildProbes({ config, env, fetchImpl = fetch, timeoutMs, publica
         if (!workerUrl) return { verdict: 'unverifiable', detail: 'no edge URL' };
         const ready = await probeJson(fetchImpl, `${workerUrl}/readyz`, {}, timeoutMs);
         const ok = ready.status === 200 && ready.json?.ok === true;
-        return { verdict: ok ? 'verified' : 'failed', detail: ok ? `readyz 200, release ${ready.json.release?.version} @ ${String(ready.json.release?.commit || '').slice(0, 7)}` : `readyz ${ready.status}`, latencyMs: ready.latencyMs };
+        const storageNote = ready.json?.storage?.mode
+          ? `; storage ${ready.json.storage.mode} (durable=${Boolean(ready.json.storage.durable)})`
+          : '';
+        const capsNote = ready.json?.capabilities?.mcp
+          ? `; runtime=mcp(${ready.json.capabilities.mcpToolsCount || 12})+oauth+whatsapp`
+          : '';
+        return { verdict: ok ? 'verified' : 'failed', detail: ok ? `readyz 200, release ${ready.json.release?.version} @ ${String(ready.json.release?.commit || '').slice(0, 7)}${storageNote}${capsNote}` : `readyz ${ready.status}`, latencyMs: ready.latencyMs };
       }
     },
     {
@@ -452,6 +491,7 @@ export function buildProbes({ config, env, fetchImpl = fetch, timeoutMs, publica
       run: async () => {
         const plan = planDeployment(env);
         if (!plan.ok) return { verdict: 'not-deployed', detail: `no live instance; missing ${plan.missing.join(', ')} — deploy-render.yml activates once added` };
+        if (!plan.liveUrl) return { verdict: 'not-deployed', detail: `service not resolved yet; deploy-render.yml discovers ${renderServiceName} by name from RENDER_API_KEY on its next run` };
         const ready = await probeJson(fetchImpl, `${plan.liveUrl}/readyz`, {}, timeoutMs);
         const ok = ready.status === 200 && ready.json?.storage?.mode === 'mysql';
         return { verdict: ok ? 'verified' : 'failed', detail: ok ? 'readyz 200 with durable MySQL' : `readyz ${ready.status} mode ${ready.json?.storage?.mode || 'n/a'}`, latencyMs: ready.latencyMs };
@@ -553,12 +593,12 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
   if (!options.skipOffline) report.mysql = runMysqlSuite({ env });
 
   if (!options.skipLive) {
-    const [{ loadCeliaMcpConfig }, { generateCeliaReply }, hub, { planDeployment }] = await Promise.all([
+    const [{ loadCeliaMcpConfig }, { generateCeliaReply }, hub, { planDeployment, RENDER_SERVICE_NAME }] = await Promise.all([
       import('../src/celia-mcp.js'), import('../src/ollama.js'), import('../src/secrets-hub.js'), import('./deploy-render.mjs')
     ]);
     const token = String(env.CELIA_MCP_API_TOKEN || '').trim().length >= 32 ? env.CELIA_MCP_API_TOKEN : crypto.randomBytes(32).toString('hex');
     const config = loadCeliaMcpConfig({ ...env, CELIA_MCP_API_TOKEN: token, CELIA_MCP_DISABLE_MYSQL: 'true', CELIA_DISABLE_OLLAMA: 'true', CELIA_SERVICE_TIMEOUT_MS: env.CELIA_SERVICE_TIMEOUT_MS || String(Math.min(Math.max(options.timeoutMs, 50), 60_000)) });
-    const probes = buildProbes({ config, env, fetchImpl, timeoutMs: options.timeoutMs, publication, version: pkg.version, modules: { generateCeliaReply, planDeployment, ...hub } });
+    const probes = buildProbes({ config, env, fetchImpl, timeoutMs: options.timeoutMs, publication, version: pkg.version, modules: { generateCeliaReply, planDeployment, renderServiceName: RENDER_SERVICE_NAME, ...hub } });
     report.live = await runProbes(probes, { env, timeoutMs: options.timeoutMs, features: config.features, retirements });
     report.score = scoreServices(report.live);
   }

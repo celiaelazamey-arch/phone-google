@@ -2,6 +2,7 @@ import { loadExtendedIntegrationsConfig } from './ai-providers.js';
 import { loadMysqlConfig } from './mysql-config.js';
 import { normalizeOllamaBaseUrl } from './ollama.js';
 import { loadFeatures, loadResilienceConfig } from './resilience.js';
+import { parseEncryptionKeyring } from './security.js';
 export function loadConfig(env = process.env) {
   const required = (name) => {
     const value = env[name]?.trim();
@@ -21,6 +22,10 @@ export function loadConfig(env = process.env) {
   const encryptionKey = required('TOKEN_ENCRYPTION_KEY');
   const decodedKey = Buffer.from(encryptionKey, 'base64');
   if (decodedKey.length !== 32) throw new Error('TOKEN_ENCRYPTION_KEY must be base64 for exactly 32 bytes');
+  const encryptionKeyring = parseEncryptionKeyring(encryptionKey, {
+    primaryKeyId: env.TOKEN_ENCRYPTION_KEY_ID || '',
+    keyringSpec: env.TOKEN_ENCRYPTION_KEYRING || ''
+  });
 
   const port = Number(env.PORT || 3000);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT must be a valid TCP port');
@@ -45,6 +50,7 @@ export function loadConfig(env = process.env) {
     ownerPhone: (env.APP_OWNER_PHONE_E164 || env.PHONE_NUMBER || '').trim() || null,
     timezone: (env.CELIA_TIMEZONE || '').trim() || 'Africa/Cairo',
     encryptionKey,
+    encryptionKeyring,
     mysql: loadMysqlConfig(env),
     google: {
       clientId: (env.GOOGLE_CLIENT_ID || '').trim(),
@@ -67,7 +73,7 @@ export function loadConfig(env = process.env) {
       appSecret: env.WHATSAPP_APP_SECRET || '',
       accessToken: env.WHATSAPP_ACCESS_TOKEN || '',
       phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID || '',
-      apiVersion: env.WHATSAPP_API_VERSION || 'v23.0',
+      apiVersion: env.WHATSAPP_API_VERSION || 'v26.0',
       autoReplyEnabled: env.WHATSAPP_AUTO_REPLY_ENABLED === 'true'
     }
   });

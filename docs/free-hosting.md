@@ -1,12 +1,14 @@
 # نشر سيليا مجانًا — خادم كامل، لا واجهة ثابتة فقط
 
+> **تحديث معتمد للنشر بدون فيزا (`DEC-037` — 28 أكتوبر 2026):** نظرًا لأن Render يفرض تفويض بطاقة بقيمة `1$` على هذا الحساب (`DEC-034`)، تم تنفيذ وتشغيل **الخادم الكامل لسيليا 100% مجانًا وبدون أي بطاقة فيزا** مباشرةً على **Cloudflare Workers + قاعدة بيانات Cloudflare D1 الدائمة + GitHub Pages** (شاملًا أدوات MCP الـ 12، وربط Google OAuth2 لـ Gmail/Drive/Calendar/Contacts، وWebhook واتساب الرسمي وأوامر المالك، والرد الذكي بـ Gemini). راجع الدليل الكامل والجاهز للتشغيل الفوري في **[docs/no-visa-deployment.md](no-visa-deployment.md)**. تبقى خطوات Render + Aiven أدناه مرجعًا اختياريًا للحسابات التي لا تخضع لبوابة البطاقة.
+
 **حزمة التنفيذ:** 0.2.1، 27 أكتوبر 2026. **حالة النشر العام:** غير منفذ حتى إنشاء حسابات الاستضافة وربط قاعدة البيانات. عمل الكود أو نجاح CI لا يثبت نشر خدمة في حسابك.
 
 ## الاختيار والحدود
 
 - **Render Free:** خدمة Node/Docker واحدة، وHTTPS ورابط فرعي يعيّنه المزوّد من نوع `<service>.onrender.com`. المصدر الرسمي يعرض المسار الأساسي بلا بطاقة، لكنه محدود وينام بعد الخمول؛ ليس قدرة غير محدودة أو SLA. [1](https://render.com/articles/platforms-with-a-real-free-tier-for-developers-in-2026)
 - **Aiven Free MySQL:** قاعدة MySQL مُدارة خارج القرص المؤقت، بخطة مجانية لا تنتهي بعد 30 يومًا وموارد محدودة ونسخ لدى المزوّد. ليست HA، وقد تُوقف بعد خمول طويل. [2](https://aiven.io/docs/products/mysql/concepts/mysql-free-tier)
-- **قد يُطلب تحقق أمني من بعض حسابات Render.** إذا طُلبت بطاقة فتوقف، ولا تضف وسيلة دفع أو تختَر خطة مدفوعة. لا نضمن إلغاء متطلبات مكافحة الاحتيال ولا نتجاوزها. [3](https://community.render.com/t/free-tier-payment-error/36531)
+- **التحقق الأمني صار فعليًا على هذا الحساب (28 أكتوبر 2026):** عند إنشاء Web Service يظهر نموذج بطاقة بتفويض مؤقت بقيمة 1$ بلا زر تخطٍّ. القرار: **توقف** — لا بطاقة ولا خطة مدفوعة ولا تجاوز التحقق. الفروع البديلة والمقايضات في `docs/continuity/DECISIONS.md` (DEC-034).
 - الرابط المجاني **نطاق فرعي**، لا ملكية نطاق مدفوع. لا شراء DNS أو اشتراكات أو بطاقات ضمن التنفيذ.
 - لم نختر Hugging Face Docker لكون إنشاء compute Spaces أصبح يتطلب خطة مدفوعة وفق الوثائق الحالية؛ لا نعتمد شروحات مجانية قديمة. [4](https://huggingface.co/docs/hub/en/spaces-overview)
 
@@ -83,11 +85,13 @@ openssl base64 -A -in ca.pem
 
 - Render يوفر `RENDER_EXTERNAL_URL`؛ يشتق الوضع الكامل callback افتراضيًا كـ`https://<actual-host>/auth/google/callback`. على استضافة أخرى اضبط `APP_BASE_URL` إلى أصل HTTPS الفعلي.
 - Google: أنشئ OAuth client بحسابك، وفعّل APIs المطلوبة، واضبط callback مطابقًا؛ أدخل `GOOGLE_CLIENT_ID` و`GOOGLE_CLIENT_SECRET` و`APP_OWNER_EMAIL` لدى Render. اتبع README للاتصال المصادق عليه؛ لا توسيع scopes أو حسابات بلا موافقتك.
-- Meta/WhatsApp: يلزم تطبيقك ورقمك ومفتاح التوقيع ورمز الوصول والتحقق. عنوان Webhook الفعلي هو `https://<actual-host>/webhooks/whatsapp`. إرسال حقيقي يحتاج موافقات ونافذة الخدمة؛ لا broadcast أو replay.
+- Meta/WhatsApp: ابدأ برقم الاختبار المجاني من [Meta Developer Hub](https://whatsappbusiness.com/developers/developer-hub/) قبل نقل الرقم إلى الإنتاج. عنوان Webhook الفعلي هو `https://<actual-host>/webhooks/whatsapp`. إعداد الخادم الكامل يحتاج `WHATSAPP_ACCESS_TOKEN` و`WHATSAPP_PHONE_NUMBER_ID` و`WHATSAPP_APP_SECRET` و`WHATSAPP_VERIFY_TOKEN`، مع `APP_OWNER_PHONE_E164` لحدود أوامر المالك. قيمة `WHATSAPP_API_VERSION` الافتراضية هي `v26.0` (إصدار Graph API الحالي في تاريخ هذه المراجعة)، ويمكن تغييرها عبر إعداد البيئة بعد التحقق من دعم Meta.
 - إدارة REST تستخدم `APP_API_TOKEN` إن حددته، وإلا رمز MCP نفسه في **الوضع الكامل الاختياري فقط**. لا يُستخدم الرمز في query string أو رابط.
 - Gemini وبقية مزودي الذكاء والأدوات المحمية (`GEMINI_API_KEY`، `AI_GATEWAY_API_KEY`، `DEEPSEEK_API_KEY`، `AGENETROUTERAPI_KEY`، `ELEVENLABS_API_KEY`، `CELIA_VOICE_ID`، `FIGMA_ACCESS_TOKEN`، `YOUR_CODATA_API_KEY`) اختياريون ومربوطون في `render.yaml` عبر `sync: false`؛ ضع المفاتيح في مخزن أسرار Render فقط عند الرغبة بتشغيلها على الخادم العام (أسرار GitHub Actions تعمل داخل مهام GitHub فقط ولا تنتقل تلقائيًا إلى Render). البديل المحلي محافظ وليس نموذجًا توليديًا عامًا، وOllama المحلي غير متاح تلقائيًا على Render.
 - مجانية الاستضافة لا تجعل APIs خارجية غير محدودة؛ حصص وتسعير Meta/Gemini وغيرهما تتبع حسابك. لا تفعّل فوترة أو مزوّدًا مدفوعًا ضمن هذا الطلب.
-- لا تفعل الردود التلقائية قبل الموافقتين. نطاق GitHub أو صفحة demo لا يثبت نجاح اتصال أي مزوّد.
+- مفاتيح GitHub Actions **لا تُنقل تلقائيًا** إلى خادم Render. تظهر حقول Meta أعلاه في Blueprint عبر `sync: false`؛ أدخلها في Render Dashboard فقط. للتدقيق الحي أضف الأسرار الأربعة إلى **Settings → Secrets and variables → Actions → Repository secrets**، وأضف `WHATSAPP_API_VERSION=v26.0` كـRepository variable. لا تنشئ المفتاح أو تنسخه إلى Git/واجهة الموقع أو نص المحادثة.
+- الاختبار الأول بلا تكلفة: رقم Meta التجريبي، طلب Graph API للقراءة فقط من خدمة التدقيق، والتحقق من GET challenge وتوقيع POST وdedup داخل الاختبارات. المسبار لا يرسل رسالة. اختبار الإرسال الحقيقي يدوي وبموافقة إلى رقم الاختبار فقط، ثم يُسجّل دليل webhook. لا تعتبر إعداد الأسرار دليل اتصال فعلي.
+- `WHATSAPP_AUTO_REPLY_ENABLED=false` يبقى افتراضيًا في Render. لا تفعّله قبل ثبوت opt-in وai-opt-in ونافذة 24 ساعة والاختبار الحي. Meta توفر أرقام اختبار مجانية، لكن هذا لا يضمن مجانية كل رسائل الإنتاج؛ قد تُطبق رسوم الرسائل وفق حسابك والسياسات الحالية. تحقق من [صفحة المطورين الرسمية](https://whatsappbusiness.com/developers/developer-hub/) و[سياسة الأسعار](https://developers.facebook.com/docs/whatsapp/pricing/).
 
 ## الخطوة 4 — قبول النشر الحقيقي
 
