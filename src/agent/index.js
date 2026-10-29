@@ -2,6 +2,7 @@ import { createAgentRuntime, PLAN_LIFECYCLE_STATE } from './runtime.js';
 import { createAgentStore } from './store.js';
 import { createMysqlDriver, createSqliteDriver } from './drivers.js';
 import { createToolRegistry, defaultToolDefinitions } from './tools.js';
+import { createSandboxExecutor } from './sandbox.js';
 import { createDemoPlanner, DEMO_PLANNER_TOOL_SURFACE } from './planner.js';
 import { createProviderPlanner, PROVIDER_PLAN_SCHEMA, validateProviderPlan, CALL_MANY_LIMITS } from './planner-provider.js';
 import { createGeminiPlannerProvider } from './gemini-planner-provider.js';
@@ -438,12 +439,37 @@ export function createAgentHost({
     const gmail = injectedGmail || googleReaders.gmail || (!injectedConnectors && requestedConnectors.includes('gmail')
       ? buildGmailReader({ pool, config, env })
       : null);
+    // M-B/B1: تفعيل sandbox.exec قرار استضافة صريح (CELIA_AGENT_SANDBOX=exec).
+    // الافتراض off يبقي تعريف الرفض القائم حرفيًا؛ قيمة أخرى = خطأ تهيئة لا تجاهل.
+    const sandboxMode = String(env.CELIA_AGENT_SANDBOX || 'off').trim().toLowerCase();
+    if (sandboxMode !== 'off' && sandboxMode !== 'exec') {
+      throw Object.assign(
+        new Error('CELIA_AGENT_SANDBOX must be "off" (default) or "exec" (B1: isolated sandbox.exec in the tool registry)'),
+        { code: 'agent_sandbox_misconfigured' }
+      );
+    }
+    const sandboxExecutor = sandboxMode === 'exec'
+      ? createSandboxExecutor({
+          evidenceStore: store,
+          artifactRoot: env.CELIA_SANDBOX_ARTIFACT_ROOT || undefined,
+          policy: {
+            resources: {
+              // B1: workspace حتى 256MiB وزمن CPU قابلان للضبط لكل نشر —
+              // قيم خارج حدود السياسة تفشل التهيئة بصوت عالٍ (createSandboxPolicy).
+              workspaceBytes: positiveInt(env.CELIA_SANDBOX_WORKSPACE_BYTES, 8_388_608),
+              cpuSeconds: positiveInt(env.CELIA_SANDBOX_CPU_SECONDS, 2),
+              wallTimeoutMs: positiveInt(env.CELIA_SANDBOX_WALL_MS, 2_000)
+            }
+          }
+        })
+      : null;
     const toolRegistry = createToolRegistry(defaultToolDefinitions({
       statusProvider,
       kb,
       gmail,
       googleReaders,
-      plannerSafe: plannerMode === 'gemini'
+      plannerSafe: plannerMode === 'gemini',
+      sandbox: sandboxExecutor
     }));
     const demoPlanner = createDemoPlanner({
       knowledge: Boolean(kb),
