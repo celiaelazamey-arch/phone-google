@@ -505,16 +505,29 @@ export function createFallbackPlanner({ primary, fallback, name = null } = {}) {
         if (code === 'planner_cancelled' || context?.signal?.aborted) throw error;
         if (!PLANNER_PROVIDER_FAILURES.includes(code)) throw error;
         const decision = await fallback.plan(context);
-        return {
-          ...decision,
-          plannerFallback: {
-            code,
-            details: Array.isArray(error.details) ? [...error.details] : [],
-            provider: error?.providerTrace?.provider || primary.name,
-            model: error?.providerTrace?.model || null,
-            request: error?.providerTrace?.request || null
-          }
+        const plannerFallback = {
+          code,
+          details: Array.isArray(error.details) ? [...error.details] : [],
+          provider: error?.providerTrace?.provider || primary.name,
+          model: error?.providerTrace?.model || null,
+          request: error?.providerTrace?.request || null
         };
+        const allowed = Array.isArray(primary.allowedTools) ? primary.allowedTools : null;
+        if (allowed && decision?.action === 'call' && !allowed.includes(decision.tool)) {
+          // DEC-062: the fallback may never widen the tool surface. The deterministic planner reasons about the whole
+          // registry, so after a provider failure it can name a tool the closed provider list does not contain; handing
+          // that to the runtime produced a dead run (`planner_tool_not_allowed`) in live run 40937158612. A bounded,
+          // verified delivery names the blocked tool and stops instead.
+          return {
+            action: 'finish',
+            failed: true,
+            summary: `تعذّر التخطيط بالمزوّد (${code})، واقترح الاحتياط أداةً خارج نطاق المخطط (${decision.tool}) فلم تُنفَّذ. لم يُحدث التشغيل أثرًا خارجيًا؛ أعد المحاولة لاحقًا.`,
+            reason: code,
+            successCriteria: ['A bounded delivery with no external effect and a named reason.'],
+            plannerFallback: { ...plannerFallback, blockedTool: decision.tool }
+          };
+        }
+        return { ...decision, plannerFallback };
       }
     }
   };

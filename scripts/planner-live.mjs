@@ -100,12 +100,20 @@ export function evaluateLiveGate({ runs = [], report = null, env = process.env }
 }
 
 /** Times each provider decision without changing it; the model text is capped, never echoed whole. */
-function timedProvider(base, latencies, calls) {
+function timedProvider(base, latencies, calls, pacer = null) {
+  const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
   return {
     name: base.name,
     model: base.model,
     kind: base.kind,
     async createPlan(request) {
+      // The free tier answered HTTP 429 after two calls in live run 40937158612; the probe paces itself instead of
+      // retrying, because a retry inside the provider is a policy DEC-059 refused.
+      if (pacer && pacer.paceMs > 0 && pacer.lastAt) {
+        const wait = pacer.paceMs - (Date.now() - pacer.lastAt);
+        if (wait > 0) await sleep(wait);
+      }
+      if (pacer) pacer.lastAt = Date.now();
       const started = Date.now();
       try {
         const envelope = await base.createPlan(request);
@@ -124,7 +132,7 @@ function timedProvider(base, latencies, calls) {
   };
 }
 
-async function runScenario({ scenario, apiKey, model, timeoutMs, allowedTools }) {
+async function runScenario({ scenario, apiKey, model, timeoutMs, allowedTools, pacer = null }) {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'celia-live-planner-'));
   const latencies = [];
   const calls = [];
@@ -136,7 +144,8 @@ async function runScenario({ scenario, apiKey, model, timeoutMs, allowedTools })
     const provider = timedProvider(
       createGeminiPlannerProvider({ apiKey, model, timeoutMs }),
       latencies,
-      calls
+      calls,
+      pacer
     );
     // The provider planner is *wrapped* in the same deterministic fallback the host uses, so a fallback in a live
     // run is visible here instead of being hidden by a lower-level retry.
@@ -207,7 +216,7 @@ function renderMarkdown(report) {
     '# تشغيل حي معزول لمخطط Gemini (WP-3.1 / DEC-060)',
     '',
     `**الحكم:** ${report.gate.ok ? 'PASS' : 'FAIL'} · **النموذج:** \`${report.model}\` · **التشغيل:** ${report.runId || 'local'}`,
-    `**الأدوات المسموحة:** ${report.allowedTools.join(', ')} · **حدود:** maxSteps=${report.bounds.maxSteps}, maxRuns=${report.bounds.maxRuns}, timeoutMs=${report.bounds.timeoutMs}`,
+    `**الأدوات المسموحة:** ${report.allowedTools.join(', ')} · **حدود:** maxSteps=${report.bounds.maxSteps}, maxRuns=${report.bounds.maxRuns}, timeoutMs=${report.bounds.timeoutMs}, paceMs=${report.bounds.paceMs ?? 0}`,
     '',
     '| الحالة | الأدوات المنفَّذة | نداءات المزوّد | وسيط الزمن | الرموز | احتياط | المتحقق |',
     '|---|---|---|---|---|---|---|',
@@ -241,6 +250,8 @@ async function main(argv = process.argv.slice(2)) {
   const probeTools = createToolRegistry(defaultToolDefinitions({ statusProvider: () => ({}) }));
   const allowedTools = selectProviderTools({ tools: probeTools, kb: false });
   const timeoutMs = Number(process.env.CELIA_AGENT_PLANNER_TIMEOUT_MS || 20_000);
+  const paceMs = Math.max(0, Number(argOf(argv, 'pace-ms', process.env.PLANNER_LIVE_PACE_MS || 0)) || 0);
+  const pacer = { paceMs, lastAt: 0 };
   const scenarios = LIVE_SCENARIOS.slice(0, requested);
   const startedAt = Date.now();
   const runs = [];
@@ -251,7 +262,7 @@ async function main(argv = process.argv.slice(2)) {
     }
     process.stdout.write(`planner-live: running ${scenario.id} (${scenario.shape})\n`);
     try {
-      runs.push(await runScenario({ scenario, apiKey, model, timeoutMs, allowedTools }));
+      runs.push(await runScenario({ scenario, apiKey, model, timeoutMs, allowedTools, pacer }));
     } catch (error) {
       runs.push({
         id: scenario.id,
@@ -283,7 +294,7 @@ async function main(argv = process.argv.slice(2)) {
     scope: 'isolated live run; no production activation, no MySQL, no external effect',
     model,
     allowedTools,
-    bounds: { maxSteps: 4, maxRuns: requested, timeoutMs, wallClockMs: Date.now() - startedAt },
+    bounds: { maxSteps: 4, maxRuns: requested, timeoutMs, paceMs, wallClockMs: Date.now() - startedAt },
     runId: process.env.GITHUB_RUN_ID || null,
     sha: process.env.GITHUB_SHA || null,
     runs

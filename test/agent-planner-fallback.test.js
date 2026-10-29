@@ -256,6 +256,57 @@ test('FB-03 — in the runtime a fallback is a visible step plus blocked evidenc
   assert.equal(recorder.calls.length, 0, 'the fallback decision ran, not a phantom tool call');
 });
 
+test('FB-05 — a fallback that names a tool outside the closed list becomes a bounded delivery, not a dead run', async (t) => {
+  // Live run 40937158612: after a 429 the deterministic fallback chose `calendar.create`, which the provider's closed
+  // list does not contain; the runtime answered `planner_tool_not_allowed` and the run died with no delivery at all.
+  const guard = createFallbackPlanner({
+    primary: { name: 'gemini', providerDriven: true, allowedTools: READ_TOOLS, plan: async () => { throw Object.assign(new Error('planner_provider_failed'), { code: 'planner_provider_failed', details: ['http_status:429'] }); } },
+    fallback: { name: 'demo-deterministic', plan: async () => ({ action: 'call', tool: 'calendar.create', args: {} }) }
+  });
+  const guarded = await guard.plan({ toolRuns: [] });
+  assert.equal(guarded.action, 'finish');
+  assert.equal(guarded.failed, true);
+  assert.equal(guarded.plannerFallback.code, 'planner_provider_failed');
+  assert.equal(guarded.plannerFallback.blockedTool, 'calendar.create');
+  assert.match(guarded.summary, /calendar\.create/);
+  assert.match(guarded.summary, /لم تُنفَّذ/);
+
+  const allowed = createFallbackPlanner({
+    primary: { name: 'gemini', providerDriven: true, allowedTools: READ_TOOLS, plan: async () => { throw Object.assign(new Error('planner_provider_timeout'), { code: 'planner_provider_timeout' }); } },
+    fallback: { name: 'demo-deterministic', plan: async () => ({ action: 'call', tool: 'read.beta', args: {} }) }
+  });
+  const passed = await allowed.plan({ toolRuns: [] });
+  assert.equal(passed.action, 'call');
+  assert.equal(passed.tool, 'read.beta');
+  assert.equal(passed.plannerFallback.blockedTool, undefined);
+
+  // End to end: the runtime ends the run as a bounded delivery with no tool call and no outbox row.
+  const fixture = await createTempStore();
+  t.after(() => fixture.cleanup());
+  const recorder = createRecordingTools();
+  const runtime = createAgentRuntime({
+    store: fixture.store,
+    tools: recorder.tools,
+    planner: createFallbackPlanner({
+      primary: { name: 'gemini', providerDriven: true, allowedTools: READ_TOOLS, plan: async () => { throw Object.assign(new Error('planner_provider_failed'), { code: 'planner_provider_failed', details: ['http_status:429'] }); } },
+      fallback: { name: 'demo-deterministic', plan: async () => ({ action: 'call', tool: 'calendar.create', args: {} }) }
+    }),
+    limits: { maxSteps: 4, maxCostMicros: 50_000 },
+    workerId: 'wp31-guard',
+    logger: { error() {} }
+  });
+  const thread = await fixture.store.createThread({ ownerId: 'owner', title: 'guard' });
+  const submitted = await runtime.submit({ threadId: thread.id, message: 'أنشئ موعدًا' });
+  const run = await runtime.runToCompletion(submitted.run.id);
+  assert.equal(run.status, 'failed');
+  assert.equal(run.lastError, 'bounded_delivery');
+  assert.equal(recorder.calls.length, 0, 'the blocked tool never executed');
+  assert.equal((await fixture.store.listOutbox(run.id)).length, 0, 'no external effect');
+  const steps = await fixture.store.listSteps(run.id);
+  assert.ok(steps.some((step) => step.title === 'تسليم بحدود'), 'the bounded delivery is visible in the trace');
+  assert.equal((await fixture.store.verifyEvidenceChain(run.id)).ok, true);
+});
+
 test('FB-04 — provider mode inherits the closed read allowlist, so the flag cannot widen the tool surface', async (t) => {
   const fixture = await createTempStore();
   t.after(() => fixture.cleanup());
