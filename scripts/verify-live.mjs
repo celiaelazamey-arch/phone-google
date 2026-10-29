@@ -242,6 +242,38 @@ export async function verifyLive({
       }
     }
 
+    // 6e. Governed scheduler (DEC-042): cron writes go through the D1 outbox and need the owner's approval. The
+    //     owner-gated status endpoint proves the deployed code *and* the `0003_cron_outbox` migration (outbox counts
+    //     come from the table itself). The token is used for the request and nowhere else.
+    const cronTitle = 'GET /api/cron/status يعيد writes=outbox-approval-only مع durable=true وجدول outbox موجود (DEC-042)';
+    if (!token) {
+      add('edge_cron_governed', cronTitle, 'skipped', { reason: 'CELIA_MCP_API_TOKEN not provided to this process' });
+      return finish();
+    }
+    try {
+      const cron = await get('/api/cron/status', { authorization: `Bearer ${token}` });
+      const body = cron.body || {};
+      const outboxOk = body.outbox && typeof body.outbox === 'object' && !body.outbox.error;
+      const ok =
+        cron.status === 200 &&
+        body.mode === 'governed-scheduler' &&
+        body.writes === 'outbox-approval-only' &&
+        body.durable === true &&
+        body.decision === 'DEC-042' &&
+        Boolean(outboxOk);
+      add('edge_cron_governed', cronTitle, ok ? 'pass' : 'fail', {
+        httpStatus: cron.status,
+        mode: body.mode ?? null,
+        writes: body.writes ?? null,
+        durable: body.durable ?? null,
+        configured: body.configured ?? null,
+        decision: body.decision ?? null,
+        outbox: outboxOk ? body.outbox : { error: body.outbox?.error ?? 'missing' }
+      });
+    } catch (error) {
+      add('edge_cron_governed', cronTitle, 'fail', { reason: error?.code || error?.name || 'request_failed' });
+    }
+
     return finish();
   }
 
