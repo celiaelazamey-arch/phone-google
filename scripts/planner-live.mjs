@@ -168,7 +168,8 @@ async function runScenario({ scenario, apiKey, model, timeoutMs, allowedTools })
       shape: scenario.shape,
       goal: scenario.goal,
       status: run.status,
-      error: run.error || null,
+      // The store exposes the run's terminal reason as `lastError` (column `last_error`); `error` is tolerated for fakes.
+      error: run.lastError ?? run.error ?? null,
       decision: steps.filter((step) => step.kind === 'decide').map((step) => step.title).slice(0, 6),
       finishedSummary: String(steps.at(-1)?.summary || '').slice(0, 240),
       toolNames: toolRuns.map((toolRun) => toolRun.toolName),
