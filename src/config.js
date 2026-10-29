@@ -3,6 +3,7 @@ import { loadMysqlConfig } from './mysql-config.js';
 import { normalizeOllamaBaseUrl } from './ollama.js';
 import { loadFeatures, loadResilienceConfig } from './resilience.js';
 import { parseEncryptionKeyring } from './security.js';
+import { readWaContextMode } from './whatsapp-context.js';
 export const DEFAULT_EDGE_ORIGIN = 'https://celia-phone-google.celiaelazamey.workers.dev';
 
 /**
@@ -92,7 +93,9 @@ export function loadConfig(env = process.env) {
       accessToken: env.WHATSAPP_ACCESS_TOKEN || '',
       phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID || '',
       apiVersion: env.WHATSAPP_API_VERSION || 'v26.0',
-      autoReplyEnabled: env.WHATSAPP_AUTO_REPLY_ENABLED === 'true'
+      autoReplyEnabled: env.WHATSAPP_AUTO_REPLY_ENABLED === 'true',
+      // WP-2.2 (DEC-058): the conversation window and the knowledge pack are off unless this is explicitly on.
+      contextEnabled: readWaContextMode(env) === 'on'
     }
   });
 }

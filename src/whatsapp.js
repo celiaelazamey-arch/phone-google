@@ -6,6 +6,7 @@ import { isValidE164, isWithinCustomerWindow, safeEqual, verifyWhatsAppSignature
 import { createIdempotencyStore, isValidIdempotencyKey } from './idempotency.js';
 import { createGoogleConsentLink, fetchInboxMessages, listAgendaEvents } from './google.js';
 import { agendaRange, formatAgendaReply, formatInboxReply, ownerGoogleErrorReply, parseOwnerGoogleCommand } from './owner-google-commands.js';
+import { loadWhatsAppContext } from './whatsapp-context.js';
 
 /**
  * Owner-only chat command: "اربط جوجل" / "connect google".
@@ -80,7 +81,7 @@ export async function runOwnerGoogleCommand({ pool, config, command, now = new D
   }
 }
 
-export function createWhatsAppWebhookRouter({ pool, config, services = createServiceRegistry(config), googleOps }) {
+export function createWhatsAppWebhookRouter({ pool, config, services = createServiceRegistry(config), googleOps, kb = null }) {
   const router = express.Router();
 
   router.get('/', (req, res) => {
@@ -145,10 +146,26 @@ export function createWhatsAppWebhookRouter({ pool, config, services = createSer
           const contact = rows[0];
           if (contact?.opted_in && contact?.ai_opted_in && isWithinCustomerWindow(contact.last_inbound_at)) {
             try {
+              // WP-2.2 (DEC-058): off by default. When on, the window and the knowledge pack are *read* from
+              // durable local state; the context policy still decides what fits. A failed read degrades to an
+              // empty context with a named safe code — it never blocks an entitled customer reply.
+              const waContext = await loadWhatsAppContext({
+                pool,
+                kb,
+                config,
+                phone: message.from,
+                message: message.body,
+                excludeProviderMessageId: message.id
+              });
+              if (waContext.failures.length) {
+                console.error('WhatsApp reply context degraded:', waContext.failures.join(','));
+              }
               const aiResult = await generateCeliaReply({
                 config: { ...config, features: { ollama: false, ...config.features } },
                 services,
                 customerMessage: message.body,
+                knowledge: waContext.knowledge,
+                history: waContext.history,
                 provider: config.celia?.aiProvider || 'auto'
               });
               const allowLocalAuto = config.celia?.aiProvider === 'local';

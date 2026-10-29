@@ -38,7 +38,7 @@ export function createApp({ pool, config, services = createServiceRegistry(confi
   app.use('/api/agent', createAgentRouter({ agent: agents, authorize }));
 
   // WhatsApp signature validation needs the exact raw request bytes.
-  app.use('/webhooks/whatsapp', createWhatsAppWebhookRouter({ pool, config, services }));
+  app.use('/webhooks/whatsapp', createWhatsAppWebhookRouter({ pool, config, services, kb: knowledge }));
   app.use(express.json({ limit: '256kb' }));
   app.use(createSecretsHubRouter({ config, services, authorize }));
   app.use(createGoogleRouter({ pool, config, services }));

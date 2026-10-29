@@ -117,7 +117,18 @@ export function resolveEffectiveAiProvider(config = {}) {
   return 'local';
 }
 
-export async function generateCeliaReply({ config, customerMessage, provider, businessContext, services = createServiceRegistry(config) }) {
+export async function generateCeliaReply({
+  config,
+  customerMessage,
+  provider,
+  businessContext,
+  // WP-2.2 (DEC-058): the same context policy inputs the WhatsApp window and the knowledge pack produce.
+  // Empty by default, so every existing caller keeps exactly the prompt it had before.
+  knowledge = [],
+  history = [],
+  budgets,
+  services = createServiceRegistry(config)
+}) {
   const requested = String(provider || config.celia?.aiProvider || 'auto').toLowerCase();
   if (!SUPPORTED_AI_PROVIDERS.includes(requested)) {
     throw new Error('provider must be auto, gemini, ai_gateway, deepseek, agentrouter, ollama, or local');
@@ -130,7 +141,7 @@ export async function generateCeliaReply({ config, customerMessage, provider, bu
     const model = config.gemini.model || 'gemini-2.5-flash';
     const detailed = await services.run('gemini', (signal) => generateWhatsAppReplyDetailed({
       config: { gemini: { apiKey: config.gemini.apiKey, model, businessContext: context } },
-      customerMessage, signal
+      customerMessage, knowledge, history, budgets, signal
     }));
     // WP-1.4: truncation facts travel with the reply so the caller can count them.
     const { text: reply, ...truncation } = detailed;
@@ -146,6 +157,9 @@ export async function generateCeliaReply({ config, customerMessage, provider, bu
       model,
       businessContext: context,
       customerMessage,
+      knowledge,
+      history,
+      budgets,
       signal
     }));
     return { reply, provider: serviceName, model, degraded: failures.length > 0, policyEnforced: true };
@@ -157,6 +171,7 @@ export async function generateCeliaReply({ config, customerMessage, provider, bu
     const model = config.ollama?.model || 'qwen2.5:7b';
     const reply = await services.run('ollama', (signal) => generateOllamaReply({
       baseUrl: config.ollama?.baseUrl, model, businessContext: context, customerMessage,
+      knowledge, history, budgets,
       allowRemote: Boolean(config.ollama?.allowRemote), signal
     }));
     return { reply, provider: 'ollama', model, degraded: failures.length > 0, policyEnforced: true };
