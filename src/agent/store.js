@@ -7,6 +7,7 @@ import {
   verifyChain
 } from './evidence.js';
 import { OUTBOX_STATUS } from './outbox.js';
+import { toolRunDurationMs } from './timing.js';
 
 /**
  * Durable agent store (AGENT-001).
@@ -150,7 +151,9 @@ function mapToolRun(row) {
     status: row.status,
     outcome: row.outcome ?? null,
     createdAt: row.created_at,
-    updatedAt: row.updated_at
+    updatedAt: row.updated_at,
+    // WP-1.1: proven from the two timestamps above; null for started/unknown/reconciled rows (see timing.js).
+    durationMs: toolRunDurationMs(row)
   };
 }
 
