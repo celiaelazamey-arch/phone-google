@@ -6,9 +6,10 @@
 > والإصدار `40719074453` والجودة `40719074375`. المتبقي حصرًا لإجراء المالك: رابط استدعاء Google، وأسرار Meta الاختيارية.
 > انظر [سجل جلسة النشر الحي](sessions/2026-10-28-live-edge-publication.md). ما يلي توثيق الجلسة السابقة كما كُتب، محفوظ بلا حذف.
 
-**آخر مراجعة:** 29 أكتوبر 2026 · **نوع الجلسة الحالية:** **الـPRs المفتوحة المتعارضة — السبب والحل بلا تعارض (DEC-040، OPS-006)**
-على الفرع `arena/02b291bc-phone-google` (متفرع من `main@c7723be` = دمج PR #72) ·
-سجل الجلسة الحالي: [2026-10-29-open-prs-reconciliation](sessions/2026-10-29-open-prs-reconciliation.md) ·
+**آخر مراجعة:** 29 أكتوبر 2026 · **نوع الجلسة الحالية:** **QA-009 — فشل `main` يفتح issue تسمّي الاختبار + مصفوفة مخاطر الوكيل (DEC-041)**
+على الفرع `arena/02b291bc-phone-google` (متفرع من `main@c7723be` = دمج PR #72؛ يحمل أيضًا DEC-040/OPS-006) ·
+سجل الجلسة الحالي: [2026-10-29-qa-009-ci-failure-notify](sessions/2026-10-29-qa-009-ci-failure-notify.md) ·
+سجل الـPRs المتعارضة (DEC-040): [2026-10-29-open-prs-reconciliation](sessions/2026-10-29-open-prs-reconciliation.md) ·
 سجل النشر الحي (DEC-038، أُعيد إنشاؤه هنا): [2026-10-28-live-edge-publication](sessions/2026-10-28-live-edge-publication.md) ·
 السجلات السابقة: [2026-10-28-ci-test-annotations](sessions/2026-10-28-ci-test-annotations.md) ·
 [2026-10-28-executive-gap-closure](sessions/2026-10-28-executive-gap-closure.md) ·
@@ -18,7 +19,24 @@
 [docs/computer-use.md](../computer-use.md) · حوكمة المشكلات: [docs/issue-triage.md](../issue-triage.md) ·
 واقع الخدمات: [docs/service-reality.md](../service-reality.md) · خطة المحافظة: [docs/preservation-plan.md](../preservation-plan.md)
 
-## الطلب الحالي — «السبب والحل بما يتوافق مع نظامي دون تعارض: PR #71 و#38 مفتوحان» (DEC-040، OPS-006)
+## الطلب الحالي — «نعم» على QA-009 ومصفوفة المخاطر (DEC-041)
+
+- **ما طُلب:** بعد مقترح خارجي بـ«وكيل إصلاح ذاتي مستقل» ومصفوفة مخاطر بأربعة أركان، أرفق المالك سكربت `qa_alert.js` ووثيقة
+  مصفوفة وقال «نعم». نُفِّذ الاثنان **بالشكل المتوافق مع النظام**: السكربت المرفق لم يُعتمد (يقرأ ملف سجل لا يكتبه شيء، لا يسمّي
+  الاختبار — «موكب» بمقياس DEC-030)؛ والوثيقة كُتبت مصحَّحة بإحالات.
+- **ما نُفِّذ:** `scripts/ci-failure-notify.mjs` + `.github/workflows/quality-failure-notify.yml` (`workflow_run` بعد «Celia quality &
+  resilience» على `main`، push فقط): أحمر → **issue واحدة** `ci-failure` تسمّي كل اختبار فاشل (ملف:سطر، وظيفة، رأس خطأ مُعقَّم،
+  تغطية، ملخص، أمر إعادة الإنتاج)، تعليق واحد لكل تشغيلة، معرّف التشغيلة لا يُسجَّل مرتين؛ أخضر → تعليق وإغلاق؛ PR/فرع آخر/ملغاة/
+  متجاوَزة → تخطٍّ. صلاحيات `contents/actions/checks: read` + `issues: write` فقط؛ `GITHUB_TOKEN` فقط؛ لا retry/رقعة/rollback/دمج.
+  `docs/ci-failure-notify.md` و`docs/agent-risk-matrix.md`؛ `npm run ci:notify`.
+- **الدليل المحلي:** `test/ci-failure-notify.test.js` 17/17؛ قراءات حية بلا كتابة: `40797023396` → green، `40673613296` → red
+  بوظيفة صامتة (قبل DEC-039)، `40687283608` → متجاوَزة، `40798428314` → ليست `main`. التفاصيل في سجل الجلسة §3.
+- **القيد المعلن:** `workflow_run` يعمل من الفرع الافتراضي فقط → QA-009 «بانتظار الدمج»؛ أول تشغيلة Quality مكتملة على `main` بعد
+  الدمج هي الدليل الحي (حتى الخضراء تطبع `nothing to do`).
+- **بانتظار المالك:** «افتح PR» لهذا الفرع (يحمل DEC-040 + DEC-041)، ثم إغلاق #71 بعد الدمج، وقرار #38؛ طبقة «يقترح» (رقعة + PR
+  عبر بوابة الموافقة) بعد قرار AI-002/GOV-001.
+
+## الطلب السابق — «السبب والحل بما يتوافق مع نظامي دون تعارض: PR #71 و#38 مفتوحان» (DEC-040، OPS-006)
 
 - **السبب:** #71 (`DEC-038`) متفرع من `0ebf8ca` وتعارض مع دمج PR #72 في النقاط الساخنة الثلاث فقط (رأس STATE، أول CHANGELOG، ذيل
   DECISIONS) — محتواه صحيح وما زال صحيحًا على `c7723be` (Edge run `40797023547`: `liveReady`, `durable`, 18/18). #38 متفرع من

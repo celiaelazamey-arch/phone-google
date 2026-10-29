@@ -1,0 +1,70 @@
+name: Quality failure notify (main)
+
+# QA-009 / DEC-041. Closes the loop "detect → name → tell the owner" and stops there: no retry, no generated
+# patch, no rollback, no merge. Free to run — the only credential is the workflow's own GITHUB_TOKEN.
+#
+# Runs after every completed "Celia quality & resilience" run whose head branch is `main` (`workflow_run` only
+# fires from the default branch's copy of this file, so the first live evidence appears after the merge).
+#   red   → upsert ONE issue (label `ci-failure`) naming the failing tests from the reporter annotations
+#           (DEC-039: file/line/title), one comment per run, a run id is never recorded twice;
+#   green → comment on the open issue, if any, and close it.
+# Issues created with GITHUB_TOKEN do not trigger other workflows, so the governed triage loop never sees them.
+# `workflow_dispatch` lets the owner replay any Quality run id (dry run by default).
+
+on:
+  workflow_run:
+    workflows: ['Celia quality & resilience']
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Id of the "Celia quality & resilience" run to evaluate'
+        required: true
+        type: string
+      dry_run:
+        description: 'Print the issue body without creating, commenting or closing anything'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  actions: read
+  checks: read
+  issues: write
+
+concurrency:
+  group: quality-failure-notify
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    name: One tracking issue · named failures · no retries
+    # Only pushes to main carry a verdict about main; PR runs and other branches are skipped here and again in the script.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Upsert or close the ci-failure issue from the run's own annotations
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
+          WORKFLOW_RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          INPUT_RUN_ID: ${{ inputs.run_id }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            flags=""
+            if [ "$INPUT_DRY_RUN" = "true" ]; then flags="--dry-run"; fi
+            node scripts/ci-failure-notify.mjs --run "$INPUT_RUN_ID" $flags
+          else
+            echo "::notice title=QA-009 · ci-failure notify::evaluating run $WORKFLOW_RUN_ID (conclusion: $WORKFLOW_RUN_CONCLUSION)"
+            node scripts/ci-failure-notify.mjs --run "$WORKFLOW_RUN_ID"
+          fi
