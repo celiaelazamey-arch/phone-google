@@ -516,6 +516,11 @@ test('verify:live --mode edge passes against the Cloudflare Edge + D1 runtime an
   assert.equal(byId.edge_auth_gate.status, 'pass');
   assert.equal(byId.edge_mcp_tools.status, 'pass');
   assert.equal(byId.edge_mcp_tools.detail.toolsCount, 12);
+  assert.equal(byId.edge_cron_governed.status, 'pass', JSON.stringify(byId.edge_cron_governed));
+  assert.equal(byId.edge_cron_governed.detail.writes, 'outbox-approval-only');
+  assert.equal(byId.edge_cron_governed.detail.durable, true);
+  assert.equal(byId.edge_cron_governed.detail.decision, 'DEC-042');
+  assert.equal(byId.edge_cron_governed.detail.outbox.error, undefined, 'the 0003 outbox table answers the count query');
   assert.equal(JSON.stringify(report).includes(OWNER_TOKEN), false);
 });
 

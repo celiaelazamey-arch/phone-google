@@ -38,17 +38,26 @@
 
 ## 2) ضوابط يملكها المالك وحده (owner-only)
 
-الوكيل **لا يستطيع** قراءة هذه الإعدادات ولا تغييرها: `GET /repos/{owner}/{repo}/branches/main/protection` يعيد **403
-«Resource not accessible by integration»**، وواجهات الإعدادات الأخرى كذلك. لذلك حالتها هنا **غير متحقَّقة (UNKNOWN)** حتى
-يؤكدها المالك، ولا يُسجَّل أي منها «مفعّلًا».
+الوكيل **لا يستطيع تغيير** هذه الإعدادات، ويقرأ منها القليل فقط: `GET /repos/{owner}/{repo}/branches/main/protection` يعيد **403
+«Resource not accessible by integration»**، وكذلك `secret-scanning/alerts`، `code-scanning/default-setup`، `actions/permissions/workflow`
+و`vulnerability-alerts`. ما **يمكن** قراءته بلا صلاحية إدارة: علم `protected` في `GET /branches/main`، قوائم `GET /rulesets` و
+`GET /rules/branches/main`، رسالة `GET /dependabot/alerts` (تقول صراحةً إن كانت التنبيهات معطّلة)، وقائمة `GET /actions/workflows`
+(يظهر فيها workflow ديناميكي `dynamic/github-code-scanning/codeql` عند تفعيل CodeQL الافتراضي). لذلك الحالة هنا واحدة من ثلاث فقط:
+**UNKNOWN** (لا قراءة)، **VERIFIED (تاريخ)** (قراءة إيجابية أو تأكيد مالك مؤرَّخ)، **NOT ENABLED (تاريخ)** (قراءة سلبية صريحة) — ولا
+يُسجَّل أي ضابط «مفعّلًا» بلا دليل.
+
+**آخر فحص آلي: 2026-10-29** (بعد قول المالك «تم»): `branches/main → protected: false`، `rulesets → []`، `rules/branches/main → []`،
+`dependabot/alerts → 403 "Dependabot alerts are disabled for this repository."`، لا `dynamic/github-code-scanning/codeql` في قائمة
+الـworkflows (الموجود الديناميكي الوحيد: `dynamic/dependabot/dependabot-updates`)، والبقية 403. أي أن **ضابطين على الأقل لم يُفعَّلا بعد**؛
+الصفوف أدناه تعكس ذلك لا كلمة التأكيد. إعادة الفحص: الأوامر في §4.
 
 | الضابط | الحالة | لماذا يهم | خطوات التفعيل (Settings في GitHub) |
 |---|---|---|---|
-| **Branch protection / Ruleset على `main`** | UNKNOWN (403 للوكيل) | يمنع الدفع المباشر أو القسري إلى `main` ويجعل بوابة الجودة شرطًا للدمج | Settings → **Rules → Rulesets → New branch ruleset** → Target `main` → فعّل: **Require status checks to pass** (أضف checks من workflow «Celia quality & resilience»: `Node 24 · tests & failure recovery`، `Node 22 · tests & failure recovery`، `Node 24 container smoke test`، `MySQL 8.4 · persistence / N−1 / backup restore`، `RTL dashboard · desktop / mobile / accessibility`، `Python 3.11 · Celia Google Spider tests`)، **Require linear history**، **Block force pushes**، **Restrict deletions**. **لا** تفعّل *Require pull request reviews*: المستودع بمالك واحد، والشرط سيُقفل كل دمج (المراجع المطلوب لا يمكن أن يكون كاتب الـPR). |
-| **Dependabot alerts + security updates** | UNKNOWN | ينبّه بالثغرات في الاعتماديات ويفتح PRs ترقيع تلقائيًا (تمر عبر بوابة الجودة نفسها) | Settings → **Advanced Security** (أو *Code security and analysis*) → **Dependabot alerts: Enable** → **Dependabot security updates: Enable**. ملف `dependabot.yml` الموجود يغطي تحديثات الإصدارات فقط؛ التنبيهات الأمنية تحتاج هذا المفتاح. |
-| **Secret scanning + Push protection** | UNKNOWN | يرفض الدفعات التي تحوي أسرارًا معروفة الشكل قبل أن تصل إلى التاريخ | Settings → **Advanced Security** → **Secret scanning: Enable** → **Push protection: Enable** (مجاني للمستودعات العامة). |
-| **CodeQL (code scanning)** | UNKNOWN / غير مُفعَّل على الأرجح | تحليل ثابت للـJavaScript على كل PR | Settings → **Advanced Security** → **Code scanning → Set up → Default**. يضيف workflow يديره GitHub؛ إن ظهر في `.github/workflows/` لاحقًا فسيخضع لـSP-01..SP-04 تلقائيًا. |
-| **Actions → Workflow permissions** | UNKNOWN | الافتراضي على مستوى المستودع يجب أن يكون *Read repository contents* حتى لو نسي ملف ما `permissions:` | Settings → **Actions → General → Workflow permissions → Read repository contents and packages permissions**؛ وأبقِ *Allow GitHub Actions to create and approve pull requests* **معطّلًا**. |
+| **Branch protection / Ruleset على `main`** | NOT ENABLED (2026-10-29) — `protected: false`، لا rulesets؛ تفاصيل الحماية الكلاسيكية 403 لكن العلم السلبي قاطع | يمنع الدفع المباشر أو القسري إلى `main` ويجعل بوابة الجودة شرطًا للدمج | Settings → **Rules → Rulesets → New branch ruleset** → Target `main` → فعّل: **Require status checks to pass** (أضف checks من workflow «Celia quality & resilience»: `Node 24 · tests & failure recovery`، `Node 22 · tests & failure recovery`، `Node 24 container smoke test`، `MySQL 8.4 · persistence / N−1 / backup restore`، `RTL dashboard · desktop / mobile / accessibility`، `Python 3.11 · Celia Google Spider tests`)، **Require linear history**، **Block force pushes**، **Restrict deletions**. **لا** تفعّل *Require pull request reviews*: المستودع بمالك واحد، والشرط سيُقفل كل دمج (المراجع المطلوب لا يمكن أن يكون كاتب الـPR). |
+| **Dependabot alerts + security updates** | NOT ENABLED (2026-10-29) — الواجهة تقول نصًا: «Dependabot alerts are disabled for this repository» | ينبّه بالثغرات في الاعتماديات ويفتح PRs ترقيع تلقائيًا (تمر عبر بوابة الجودة نفسها) | Settings → **Advanced Security** (أو *Code security and analysis*) → **Dependabot alerts: Enable** → **Dependabot security updates: Enable**. ملف `dependabot.yml` الموجود يغطي تحديثات الإصدارات فقط؛ التنبيهات الأمنية تحتاج هذا المفتاح. |
+| **Secret scanning + Push protection** | UNKNOWN (403 — لا قراءة؛ يُحدَّث بتأكيد مالك مؤرَّخ أو لقطة شاشة من Settings → Advanced Security) | يرفض الدفعات التي تحوي أسرارًا معروفة الشكل قبل أن تصل إلى التاريخ | Settings → **Advanced Security** → **Secret scanning: Enable** → **Push protection: Enable** (مجاني للمستودعات العامة). |
+| **CodeQL (code scanning)** | NOT ENABLED (2026-10-29) — لا workflow ديناميكي `dynamic/github-code-scanning/codeql` في قائمة الـworkflows؛ `default-setup` 403 | تحليل ثابت للـJavaScript على كل PR | Settings → **Advanced Security** → **Code scanning → Set up → Default**. يضيف workflow يديره GitHub؛ إن ظهر في `.github/workflows/` لاحقًا فسيخضع لـSP-01..SP-04 تلقائيًا. |
+| **Actions → Workflow permissions** | UNKNOWN (403 — لا قراءة؛ كل workflow في المستودع يعلن `permissions:` صراحةً فالأثر العملي محدود — SP-01) | الافتراضي على مستوى المستودع يجب أن يكون *Read repository contents* حتى لو نسي ملف ما `permissions:` | Settings → **Actions → General → Workflow permissions → Read repository contents and packages permissions**؛ وأبقِ *Allow GitHub Actions to create and approve pull requests* **معطّلًا**. |
 
 بعد التفعيل: أبلغ الوكيل بـ«تم» فتُحدَّث الحالة هنا إلى `VERIFIED (YYYY-MM-DD)` بتاريخ تأكيدك (لا يستطيع الوكيل التحقق بنفسه؛ SP-12 يرفض VERIFIED بلا تاريخ).
 
@@ -64,7 +73,7 @@
 | استدعاء `child_process` من `src/` | SP-09 | `dynamic code execution or process spawning found in runtime code` |
 | تخفيف حارس SSRF (السماح بـ`169.254.169.254`) | SP-10 | `"169.254.169.254" must be refused` |
 | `UPDATE edge_audit …` في أي ملف | SP-11 | `<file>: edge_audit is append-only` |
-| تغيير حالة Branch protection في §2 إلى VERIFIED بلا تاريخ تأكيد من المالك | SP-12 | `Branch protection: status is UNKNOWN or VERIFIED with a confirmation date` |
+| تغيير حالة Branch protection في §2 إلى VERIFIED أو ENABLED بلا تاريخ | SP-12 | `Branch protection: status is UNKNOWN, VERIFIED (date) or NOT ENABLED (date)` |
 
 الكسر المقصود (مثلًا workflow جديد يحتاج `issues: write`) مسموح: عدّل الاختبار **في الـPR نفسه** مع سطر في DECISIONS يشرح لماذا.
 
@@ -75,6 +84,13 @@ node --test test/security-posture.test.js     # SP-01..SP-12 (بلا شبكة)
 npm run check:secrets                          # توصيل الأسرار (18)
 npm audit --omit=dev --audit-level=moderate    # ما تشغّله بوابة الجودة
 grep -h "uses:" .github/workflows/*.yml | sort | uniq -c   # قائمة الإجراءات المثبّتة
+
+# فحص ضوابط المالك بما تسمح به الصلاحيات (قراءة فقط؛ 403 = لا قراءة، لا استنتاج)
+R=repos/celiaelazamey-arch/phone-google
+gh api $R/branches/main --jq .protected            # false = لا حماية كلاسيكية
+gh api $R/rulesets; gh api $R/rules/branches/main  # [] = لا rulesets
+gh api "$R/dependabot/alerts?per_page=1"           # «Dependabot alerts are disabled…» = غير مفعّل
+gh api "$R/actions/workflows" --jq '.workflows[].path' | grep code-scanning   # غياب السطر = لا CodeQL افتراضي
 ```
 
 ## 5) الروابط

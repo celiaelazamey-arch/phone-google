@@ -218,13 +218,19 @@ test('SP-12 the owner-only controls are documented with their verified status, n
   assert.match(doc, /SP-01/);
   assert.match(doc, /SP-12/);
   assert.match(doc, /403/, 'the doc records that the agent cannot read branch protection (API 403), so it is marked owner-only');
-  // Owner-only rows: "| **<control>** | <status> | ..." — the status is UNKNOWN until the owner confirms, then VERIFIED (date).
+  // Owner-only rows: "| **<control>** | <status> | ..." — the status is UNKNOWN until there is evidence; evidence turns it into
+  // VERIFIED (date) or NOT ENABLED (date) — a dated negative read from the API is a fact too (DEC-045), a bare "enabled" never is.
   const rows = doc.split('\n').filter((line) => /^\| \*\*/.test(line));
   for (const control of ['Branch protection', 'Dependabot alerts', 'Secret scanning']) {
     const row = rows.find((line) => line.toLowerCase().includes(control.toLowerCase()));
     assert.ok(row, `${control} has a status row in the owner-only table`);
     const status = row.split('|')[2].trim();
-    assert.match(status, /^(?:UNKNOWN\b|VERIFIED \(\d{4}-\d{2}-\d{2}\))/, `${control}: status is UNKNOWN or VERIFIED with a confirmation date, got "${status}"`);
+    assert.match(
+      status,
+      /^(?:UNKNOWN\b|VERIFIED \(\d{4}-\d{2}-\d{2}\)|NOT ENABLED \(\d{4}-\d{2}-\d{2}\))/,
+      `${control}: status is UNKNOWN, VERIFIED (date) or NOT ENABLED (date), got "${status}"`
+    );
+    assert.doesNotMatch(status, /^(?:ENABLED|VERIFIED)\b(?! \()/i, `${control}: an enabled/verified claim needs a date`);
   }
   assert.ok(statSync(path.join(root, 'docs', 'security-posture.md')).size > 2000, 'the posture doc is substantive');
 });

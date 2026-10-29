@@ -2,10 +2,13 @@
 // injected fetch/environment so no network call and no credential ever leaves the process.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { main } from '../scripts/deploy-cloudflare-edge.mjs';
+import { fileURLToPath } from 'node:url';
+import { collectWorkerModules, main, WORKER_ENTRY_MODULE } from '../scripts/deploy-cloudflare-edge.mjs';
+
+const workerDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'workers', 'celia-edge');
 
 const jsonResponse = (status, body) => ({
   ok: status >= 200 && status < 300,
@@ -47,7 +50,7 @@ test('edge deploy: a rejected upload reports the provider code, never the token'
   const summaryPath = path.join(directory, 'summary.md');
   const lines = [];
   const calls = [];
-  await main({
+  const returned = await main({
     argv: [],
     env: {
       CLOUDFLARE_ACCOUNT_ID: 'acc-1',
@@ -69,6 +72,8 @@ test('edge deploy: a rejected upload reports the provider code, never the token'
   assert.equal(report.errorCode, 10000);
   assert.equal(report.errorMessage, 'Authentication error');
   assert.ok(calls.length >= 2, 'the account-discovery retry must be attempted');
+  assert.ok(lines.some((line) => line.startsWith('::error title=Cloudflare Edge Status::')), 'a rejected upload is an error annotation, not a notice');
+  assert.equal(returned?.status, 'api-rejected', 'main() returns the report so the CLI can exit non-zero');
   const printed = lines.join('\n');
   assert.ok(!printed.includes('super-secret-token'), 'the API token must never be printed');
   const summary = await readFile(summaryPath, 'utf8');
@@ -145,6 +150,7 @@ test('edge deploy: full D1 migration applies all 14 statements (0001_state + 000
   const summaryPath = path.join(directory, 'summary.md');
   const lines = [];
   const queriedStatements = [];
+  const uploadedParts = [];
 
   await main({
     argv: [],
@@ -162,7 +168,10 @@ test('edge deploy: full D1 migration applies all 14 statements (0001_state + 000
         queriedStatements.push(body.sql);
         return jsonResponse(200, { success: true, result: [{ success: true }] });
       }
-      if (init.method === 'PUT') return jsonResponse(200, { success: true });
+      if (init.method === 'PUT') {
+        uploadedParts.push([...init.body.keys()]);
+        return jsonResponse(200, { success: true });
+      }
       if (url.endsWith('/subdomain')) return jsonResponse(200, { result: { subdomain: 'celia' } });
       if (url.endsWith('/readyz')) {
         return jsonResponse(200, {
@@ -188,9 +197,62 @@ test('edge deploy: full D1 migration applies all 14 statements (0001_state + 000
   assert.equal(report.storage?.durable, true);
   assert.equal(report.storage?.mode, 'd1');
 
+  // The upload carries every module of the Worker's import graph — a missing one is rejected by Cloudflare
+  // (10021 "No such module") while the previous version keeps running, which is how 2026-10-29's deploy failed.
+  const expectedModules = (await collectWorkerModules()).map((module) => module.name);
+  assert.equal(uploadedParts.length, 1, 'exactly one upload');
+  assert.deepEqual(uploadedParts[0], ['metadata', ...expectedModules]);
+  assert.deepEqual(report.modules, expectedModules);
+  assert.ok(expectedModules.includes('cron.js'), 'the cron outbox module ships with the Worker');
+
   const summary = await readFile(summaryPath, 'utf8');
   assert.match(summary, /durable=true/);
   assert.match(summary, /db-live-1/);
+  assert.match(summary, /Modules uploaded: .*`cron\.js`/);
+});
+
+test('edge deploy: the upload module list is derived from the import graph and covers every module the Worker imports', async () => {
+  const modules = await collectWorkerModules();
+  const names = modules.map((module) => module.name);
+  assert.equal(names.at(-1), WORKER_ENTRY_MODULE, 'the entry module is appended last (dependencies first)');
+  assert.equal(new Set(names).size, names.length, 'no module is uploaded twice');
+  // Independent cross-check: every relative `./x.js` import found in any module of the directory must be in the list.
+  const files = (await readdir(workerDir)).filter((name) => name.endsWith('.js'));
+  const imported = new Set();
+  for (const file of files) {
+    const source = await readFile(path.join(workerDir, file), 'utf8');
+    for (const match of source.matchAll(/from\s*['"]\.\/([^'"]+)['"]/g)) imported.add(match[1]);
+  }
+  assert.ok(imported.size >= 3, `relative imports found (${imported.size})`);
+  for (const name of imported) {
+    assert.ok(names.includes(name), `${name} is imported by a Worker module and must ship in the upload`);
+    assert.ok(files.includes(name), `${name} exists in workers/celia-edge`);
+  }
+  for (const required of ['worker.js', 'state.js', 'runtime.js', 'crypto.js', 'cron.js']) {
+    assert.ok(names.includes(required), `${required} ships`);
+  }
+});
+
+test('edge deploy: a module imported but missing from the bundle fails the deploy locally, before any upload', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'celia-edge-modules-'));
+  await writeFile(path.join(directory, 'worker.js'), "import { a } from './a.js';\nexport { b } from './lib/b.js';\nexport default { fetch: () => import('./lazy.js') };\n");
+  await writeFile(path.join(directory, 'a.js'), "import './side-effect.js';\nexport const a = 1;\n");
+  await writeFile(path.join(directory, 'side-effect.js'), 'globalThis.touched = true;\n');
+  await writeFile(path.join(directory, 'lazy.js'), 'export const lazy = true;\n');
+  await import('node:fs/promises').then(({ mkdir }) => mkdir(path.join(directory, 'lib')));
+  await writeFile(path.join(directory, 'lib', 'b.js'), "import { a } from '../a.js';\nexport const b = a + 1;\n");
+  const modules = await collectWorkerModules({ dir: directory });
+  assert.deepEqual(
+    modules.map((module) => module.name),
+    ['side-effect.js', 'a.js', 'lib/b.js', 'lazy.js', 'worker.js'],
+    'static, re-export, bare side-effect and dynamic imports are all followed, dependencies first'
+  );
+
+  await writeFile(path.join(directory, 'worker.js'), "import { gone } from './gone.js';\n");
+  await assert.rejects(collectWorkerModules({ dir: directory }), /worker_module_missing: gone\.js \(imported by worker\.js\)/);
+
+  await writeFile(path.join(directory, 'worker.js'), "import { outside } from '../outside.js';\n");
+  await assert.rejects(collectWorkerModules({ dir: directory }), /worker_module_outside_bundle/);
 });
 
 test('edge deploy: when D1 exists but migration fails, warning honestly notes the binding was still applied', async () => {
