@@ -42,7 +42,9 @@
 | `--run 40687283608 --branch arena/2edb2881-phone-google --dry-run` | `skipped — superseded by newer completed run 40691045150 (success)` |
 | `--run 40673613296 --branch feat/whatsapp-free-first-setup-20261028 --dry-run` (push أحمر قبل DEC-039) | `verdict red, 0 named test(s), 1 failed job(s)` → «Failed without a named test (open the job log)» برابط الوظيفة — الصدق بدل التجميل |
 | `--fixture red-run.json --dry-run` | عنوان «2 failing tests»؛ صفّان مسمّيان؛ `ghp_…` وJWT مُعقَّمان؛ `\|` محمية؛ وظيفة MySQL صامتة مدرجة |
-| المجموعة الكاملة / `check` / `check:continuity` / CI على الفرع | تُسجَّل أدناه بعد الدفع |
+| المجموعة الكاملة محليًا (`GITHUB_ACTIONS=true npm run test:coverage:ci`) | **537/537**، تغطية 90.88/72.83/85.22؛ `check` 141 ملفًا؛ `check:continuity` 52 وثيقة + بوابة نطاق التغيير ✅ |
+| CI على الفرع بعد الدفع (`ae0dd98`) | run **`40802365022`** ✅ كل الوظائف السبع؛ Node 24 (`123213195228`) annotation: `537 tests · 537 passed · 0 failed · coverage lines 90.81% · branches 72.78% · functions 85.02% (floor 89/71/82)`؛ RTL (`123213194932`) ✅ |
+| هل أُطلق «Quality failure notify (main)» على الفرع؟ | **لا، كما هو متوقع**: الـworkflow غير مسجَّل أصلًا في قائمة workflows المستودع لأنه `workflow_run` فقط ولا يُقرأ إلا من الفرع الافتراضي — الدليل الحي بعد الدمج |
 
 ## 4. ما لم يُفعل — عن قصد
 
