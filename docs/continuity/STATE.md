@@ -37,7 +37,7 @@
   تنتقل معه؛ وحدة مفقودة تُفشل النشر محليًا)؛ الرفض `::error` + خروج `1` بدل `::notice` أخضر؛ `verify:live --mode edge` يكتسب
   `edge_cron_governed` (`/api/cron/status` برمز المالك → `outbox-approval-only`, `durable=true`, `DEC-042`, عدّادات outbox = الجدول
   `0003` موجود). الدليل محليًا: **564/564**، تغطية 91.21/73.72/85.46، `check` 145، `check:secrets` ✅، `--dry-run` يطبع
-  `modules: [state, crypto, runtime, cron, worker]`.
+  `modules: [state, crypto, runtime, cron, worker]`؛ CI الدفع على الفرع (`e3d14e1`): run **`40809989577`** ✅ 6/6.
 - **بانتظار المالك:** كلمة فتح PR للإصلاح ثم «ادمج»؛ بعدها تشغيلة `cloudflare-deploy.yml` خضراء (`status: deployed`، `modules` تتضمن
   `cron.js`، `edge_cron_governed: pass`) = تحويل OPS-007 إلى «متحقق». كذلك: قرار #38؛ «تم» لضوابط الإعدادات.
 

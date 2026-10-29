@@ -51,7 +51,10 @@
 
 - `GITHUB_ACTIONS=true npm run test:coverage:ci` → **564/564**، تغطية **91.21 / 73.72 / 85.46** (الأرضية 89/71/82).
 - `node scripts/check.mjs` → 145 ملفًا؛ `npm run check:secrets` ✅؛ `node scripts/deploy-cloudflare-edge.mjs --dry-run` → `modules: [state.js, crypto.js, runtime.js, cron.js, worker.js]`، خروج 0.
-- `npm run check:continuity` ✅ (انظر §7 بعد دفع الوثائق).
+- `npm run check:continuity` ✅ (55 وثيقة، 162 رابطًا، 69 مهمة، بلا دورات).
+- CI الدفع على الفرع (`e3d14e1` = الإصلاح `8e3641b` + الوثائق): «Celia quality & resilience» run **`40809989577`** ✅ 6/6 (`Node 24`
+  `123237766492`، `Node 22` `123237766569`، `Node 24 container` `123237766539`، `MySQL 8.4` `123237766399`، `RTL` `123237766204`،
+  `Python 3.11` `123237766457`؛ المسابير الاختيارية `123237767530` متخطاة بالتصميم)؛ التدقيق `40809989578` متخطّى (غير `main`).
 
 ## 6. ما ينتظر المالك
 
