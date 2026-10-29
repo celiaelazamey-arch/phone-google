@@ -5,11 +5,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { applyRetirementsToEnv, flagNameFor, loadServiceRetirements, RETIRABLE_FEATURES } from '../src/service-retirements.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const workerPath = path.join(root, 'workers/celia-edge/worker.js');
-const statePath = path.join(root, 'workers/celia-edge/state.js');
-const cryptoPath = path.join(root, 'workers/celia-edge/crypto.js');
-const runtimePath = path.join(root, 'workers/celia-edge/runtime.js');
-const migrationsDir = path.join(root, 'workers/celia-edge/migrations');
+const workerDir = path.join(root, 'workers/celia-edge');
+export const WORKER_ENTRY_MODULE = 'worker.js';
+const migrationsDir = path.join(workerDir, 'migrations');
 const pkgPath = path.join(root, 'package.json');
 
 const SECRET_KEYS = [
@@ -260,6 +258,42 @@ export function buildWorkerMetadata({ env = process.env, version = '0.2.1', comm
   };
 }
 
+/**
+ * Resolves the ES-module graph of the Worker starting at `worker.js` and returns every module that must travel in the
+ * same upload, in dependency-first order. Cloudflare rejects an upload whose `main_module` imports a module that is
+ * not part of the multipart body (error 10021 `No such module`), and the running version is left untouched — which is
+ * exactly what happened on 2026-10-29 when `cron.js` was added to the Worker but not to a hard-coded upload list.
+ * Deriving the list from the imports makes that class of failure impossible and testable offline.
+ */
+export async function collectWorkerModules({ dir = workerDir, entry = WORKER_ENTRY_MODULE } = {}) {
+  const IMPORT_RE = /(?:^|\n)\s*(?:import|export)\s[^;'"]*?from\s*['"](\.\.?\/[^'"]+)['"]|(?:^|\n)\s*import\s*['"](\.\.?\/[^'"]+)['"]|import\(\s*['"](\.\.?\/[^'"]+)['"]\s*\)/g;
+  const ordered = [];
+  const seen = new Set();
+  const visit = async (name, importedBy) => {
+    const normalized = path.posix.normalize(name);
+    if (normalized.startsWith('..') || path.posix.isAbsolute(normalized)) {
+      throw new Error(`worker_module_outside_bundle: ${name} (imported by ${importedBy})`);
+    }
+    if (seen.has(normalized)) return;
+    seen.add(normalized);
+    let source;
+    try {
+      source = await readFile(path.join(dir, normalized), 'utf8');
+    } catch {
+      throw new Error(`worker_module_missing: ${normalized} (imported by ${importedBy})`);
+    }
+    const dependencies = [];
+    for (const match of source.matchAll(IMPORT_RE)) {
+      const specifier = match[1] || match[2] || match[3];
+      if (specifier) dependencies.push(path.posix.normalize(path.posix.join(path.posix.dirname(normalized), specifier)));
+    }
+    for (const dependency of dependencies) await visit(dependency, normalized);
+    ordered.push({ name: normalized, source });
+  };
+  await visit(entry, '<entry>');
+  return ordered;
+}
+
 export async function loadAllMigrationsSql(dir = migrationsDir) {
   const entries = (await readdir(dir)).filter((name) => name.endsWith('.sql')).sort();
   const chunks = await Promise.all(entries.map((name) => readFile(path.join(dir, name), 'utf8')));
@@ -273,13 +307,8 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
   const dryRun = argv.includes('--dry-run') || !accountId || !apiToken;
 
   const pkg = JSON.parse(await readFile(pkgPath, 'utf8'));
-  const [workerSource, stateSource, cryptoSource, runtimeSource, migrationSql] = await Promise.all([
-    readFile(workerPath, 'utf8'),
-    readFile(statePath, 'utf8'),
-    readFile(cryptoPath, 'utf8'),
-    readFile(runtimePath, 'utf8'),
-    loadAllMigrationsSql()
-  ]);
+  // Every module reachable from `worker.js` (state.js, runtime.js, crypto.js, cron.js, …) ships in the same upload.
+  const [workerModules, migrationSql] = await Promise.all([collectWorkerModules(), loadAllMigrationsSql()]);
   const commit = String(env.GITHUB_SHA || 'main').trim();
 
   let d1 = { ok: false, reason: 'dry_run' };
@@ -322,12 +351,13 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
       scriptName,
       version: pkg.version,
       commit,
+      modules: workerModules.map((module) => module.name),
       secretBindingsPrepared: secretBindingsCount,
       totalSecretsTracked: SECRET_KEYS.length,
       reason: !accountId || !apiToken ? 'missing_cloudflare_credentials' : 'explicit_dry_run'
     };
     log(JSON.stringify(report, null, 2));
-    return;
+    return report;
   }
 
   let resolvedAccountId = accountId;
@@ -342,27 +372,9 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
       new Blob([JSON.stringify(metadata)], { type: 'application/json' }),
       'metadata.json'
     );
-    form.append(
-      'worker.js',
-      new Blob([workerSource], { type: 'application/javascript+module' }),
-      'worker.js'
-    );
-    // `worker.js` imports `./state.js` and `./runtime.js` (which imports `./crypto.js`); all modules must travel in the same upload.
-    form.append(
-      'state.js',
-      new Blob([stateSource], { type: 'application/javascript+module' }),
-      'state.js'
-    );
-    form.append(
-      'crypto.js',
-      new Blob([cryptoSource], { type: 'application/javascript+module' }),
-      'crypto.js'
-    );
-    form.append(
-      'runtime.js',
-      new Blob([runtimeSource], { type: 'application/javascript+module' }),
-      'runtime.js'
-    );
+    for (const { name, source } of workerModules) {
+      form.append(name, new Blob([source], { type: 'application/javascript+module' }), name);
+    }
     return form;
   };
 
@@ -420,9 +432,11 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
         'utf8'
       );
     }
-    log(`::notice title=Cloudflare Edge Status::${JSON.stringify(summary)}`);
+    // A rejected upload leaves the previously deployed version running; the step must go red by itself instead of
+    // leaving the live-verification step to discover the stale commit.
+    log(`::error title=Cloudflare Edge Status::${JSON.stringify(summary)}`);
     log(JSON.stringify(summary, null, 2));
-    return;
+    return summary;
   }
 
   // Enable workers.dev route if available
@@ -469,6 +483,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
     storage: liveStorage,
     version: pkg.version,
     commit,
+    modules: workerModules.map((module) => module.name),
     secretBindingsInjected: secretBindingsCount,
     totalSecretsTracked: SECRET_KEYS.length,
     d1
@@ -481,6 +496,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
         '### Cloudflare Worker Edge Deployment',
         `- Status: **deployed**`,
         `- Worker Name: \`${scriptName}\``,
+        `- Modules uploaded: ${workerModules.map((module) => `\`${module.name}\``).join(', ')}`,
         workerUrl ? `- Live Edge URL: ${workerUrl}` : '- Live Edge URL: subdomain not enabled yet',
         `- Secrets Injected: **${secretBindingsCount} / ${SECRET_KEYS.length}**`,
         `- Live \`/readyz\` check: **${liveReady ? 'PASS' : 'pending propagation'}**`,
@@ -496,9 +512,11 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
 
   log(`::notice title=Cloudflare Edge Status::${JSON.stringify(report)}`);
   log(JSON.stringify(report, null, 2));
+  return report;
 }
 
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMain) {
-  await main();
+  const result = await main();
+  if (result?.status === 'api-rejected') process.exitCode = 1;
 }

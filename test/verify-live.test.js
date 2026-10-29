@@ -134,6 +134,50 @@ test('verify:live — an ideal durable service passes, and the report says what 
   assert.equal(wake.detail.firstMs, 50);
 });
 
+test('verify:live --mode edge — the governed-scheduler check cannot be satisfied by a missing outbox table, and is skipped without the owner token', async (t) => {
+  let cronAuth = null;
+  const server = http.createServer((req, res) => {
+    const send = (status, body) => {
+      res.writeHead(status, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(body));
+    };
+    if (req.url === '/healthz') return send(200, { status: 'ok' });
+    if (req.url === '/version') return send(200, { version: '0.2.1', commit: 'b'.repeat(40), database: { schema: 1 } });
+    if (req.url === '/readyz') {
+      return send(200, { ready: true, storage: { mode: 'd1', durable: true }, capabilities: { mcp: true, googleOAuth: true, whatsappWebhook: true } });
+    }
+    if (req.url === '/mcp') return send(401, { error: 'unauthorized' });
+    if (req.url === '/api/cron/status') {
+      cronAuth = req.headers.authorization || null;
+      if (cronAuth !== `Bearer ${TOKEN}`) return send(401, { error: 'unauthorized' });
+      // Deployed code is right, but the 0003 migration never ran: the worker says so instead of pretending.
+      return send(200, {
+        ok: true,
+        mode: 'governed-scheduler',
+        writes: 'outbox-approval-only',
+        durable: true,
+        decision: 'DEC-042',
+        outbox: { error: 'outbox_unavailable', detail: 'no such table: edge_cron_outbox' }
+      });
+    }
+    return send(404, { error: 'not_found' });
+  });
+  const baseUrl = await listen(server);
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+
+  const withToken = await verifyLive({ url: baseUrl, mode: 'edge', token: TOKEN, allowHttp: true, samples: 1 });
+  const governed = withToken.checks.find((check) => check.id === 'edge_cron_governed');
+  assert.equal(governed.status, 'fail');
+  assert.equal(governed.detail.writes, 'outbox-approval-only');
+  assert.equal(governed.detail.outbox.error, 'outbox_unavailable');
+  assert.equal(withToken.verdict, 'fail');
+  assert.equal(cronAuth, `Bearer ${TOKEN}`);
+  assert.equal(JSON.stringify(withToken).includes(TOKEN), false, 'the owner token never appears in the report');
+
+  const anonymous = await verifyLive({ url: baseUrl, mode: 'edge', allowHttp: true, samples: 1 });
+  assert.equal(anonymous.checks.find((check) => check.id === 'edge_cron_governed').status, 'skipped');
+});
+
 test('verify:live — https is required unless explicitly relaxed, and credentials in the URL are refused', async () => {
   const insecure = await verifyLive({ url: 'http://example.invalid' });
   assert.equal(insecure.verdict, 'fail');
