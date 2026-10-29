@@ -6,11 +6,12 @@
 > والإصدار `40719074453` والجودة `40719074375`. المتبقي حصرًا لإجراء المالك: رابط استدعاء Google، وأسرار Meta الاختيارية.
 > انظر [سجل جلسة النشر الحي](sessions/2026-10-28-live-edge-publication.md). ما يلي توثيق الجلسة السابقة كما كُتب، محفوظ بلا حذف.
 
-**آخر مراجعة:** 29 أكتوبر 2026 · **نوع الجلسة الحالية:** **QA-009 — فشل `main` يفتح issue تسمّي الاختبار + مصفوفة مخاطر الوكيل (DEC-041) — مدموج في PR #73 → `main@4f6af77`**
-على الفرع `arena/02b291bc-phone-google` (متفرع من `main@c7723be` = دمج PR #72؛ يحمل أيضًا DEC-040/OPS-006) ·
-سجل الجلسة الحالي: [2026-10-29-qa-009-ci-failure-notify](sessions/2026-10-29-qa-009-ci-failure-notify.md) ·
+**آخر مراجعة:** 29 أكتوبر 2026 · **نوع الجلسة الحالية:** **OPS-007 — المهام المجدولة داخل عامل الحافة عبر صندوق صادر (DEC-042)** —
+على الفرع `arena/90163669-phone-google` (متفرع من `main@4f6af77` = دمج PR #73؛ يحمل أيضًا توثيق ما بعد دمج #73 المنقول من الفرع السابق) ·
+سجل الجلسة الحالي: [2026-10-29-edge-cron-outbox](sessions/2026-10-29-edge-cron-outbox.md) ·
+سجل QA-009 (DEC-041): [2026-10-29-qa-009-ci-failure-notify](sessions/2026-10-29-qa-009-ci-failure-notify.md) ·
 سجل الـPRs المتعارضة (DEC-040): [2026-10-29-open-prs-reconciliation](sessions/2026-10-29-open-prs-reconciliation.md) ·
-سجل النشر الحي (DEC-038، أُعيد إنشاؤه هنا): [2026-10-28-live-edge-publication](sessions/2026-10-28-live-edge-publication.md) ·
+سجل النشر الحي (DEC-038): [2026-10-28-live-edge-publication](sessions/2026-10-28-live-edge-publication.md) ·
 السجلات السابقة: [2026-10-28-ci-test-annotations](sessions/2026-10-28-ci-test-annotations.md) ·
 [2026-10-28-executive-gap-closure](sessions/2026-10-28-executive-gap-closure.md) ·
 الخطة التنفيذية الشاملة: [docs/executive-completion-plan.md](../executive-completion-plan.md) ·
@@ -19,7 +20,26 @@
 [docs/computer-use.md](../computer-use.md) · حوكمة المشكلات: [docs/issue-triage.md](../issue-triage.md) ·
 واقع الخدمات: [docs/service-reality.md](../service-reality.md) · خطة المحافظة: [docs/preservation-plan.md](../preservation-plan.md)
 
-## الطلب الحالي — «نعم» على QA-009 ومصفوفة المخاطر (DEC-041)
+## الطلب الحالي — «إعادة فكرة لوحة cron كمهمة جديدة داخل `workers/celia-edge` عبر outbox» (DEC-042، OPS-007)
+
+- **ما طُلب:** الخيار (3) من DEC-040: فكرة PR #38 (لوحة المهام المجدولة على cron-job.org) تُعاد داخل العامل الواحد بالمفتاح
+  الموجود `CELIAOS_CRONJOB_ORG_API_KEY` ورمز المالك؛ قراءة أولًا، وكل كتابة خارجية عبر outbox وموافقة (DEC-015) — بلا عامل ثانٍ ولا
+  أسرار جديدة ولا متجر محاكاة ولا واجهة زائفة.
+- **ما وُجد:** `worker.js` كان أصلًا يوكّل `api.cron-job.org` قراءةً **وكتابةً مباشرة** (`POST→PUT`, `PATCH`, `DELETE`) بعد حارس SSRF —
+  أي أن فجوة DEC-015 كانت في الحافة نفسها.
+- **ما نُفِّذ:** `workers/celia-edge/cron.js` + هجرة `0003_cron_outbox.sql` (`edge_cron_outbox`) + مسارات `/api/cron/intents*`؛
+  القراءة مُنقّاة (لا `auth`/قيم ترويسات/سلاسل استعلام/أجسام استجابات)؛ الكتابة نيّة بـ`Idempotency-Key` → موافقة بـ`expectedHash`
+  → ادعاء مشروط → إرسال مرة واحدة → `applied|failed|unknown`؛ `unknown` يخرج بتسوية المالك فقط؛ كل انتقال على `edge_audit`؛
+  المسارات القديمة تردّ 202 بنيّة؛ `/api/cron/status` يعلن `configured/durable/writes/outbox` بصدق (503 بلا D1 أو بلا مفتاح).
+  لوحة `public/cron.html` (`/cron`) تتحدث مع أصل الحافة مباشرة (CSP Express تسمح به عبر `resolveEdgeOrigin`).
+- **الدليل محليًا:** 549/549 (`test/edge-cron-outbox.test.js` 8/8 بهجرات حقيقية على SQLite، `test/cron-page.test.js` 4/4)، تغطية
+  91.17/73.39/85.42 (الأرضية 89/71/82)، `check` 144 ملفًا، `check:secrets` ✅. CI الدفع: يُسجَّل في سجل الجلسة §4 بعد الدفع.
+- **القيد المعلن:** لا دليل حيّ قبل دمج `main` وتشغيلة `cloudflare-deploy.yml` (تطبّق `0003` تلقائيًا) ثم `GET /api/cron/status` →
+  `durable: true, writes: outbox-approval-only`. لا PR مفتوح لهذا الفرع إلا بكلمة المالك («افتح PR»)؛ #38 ما زال مفتوحًا حتى «أغلق #38».
+- **بانتظار المالك:** «افتح PR» ثم «ادمج»؛ قرار #38؛ بعد الدمج: تجربة حية — اتصال من `/cron.html` على Pages برمز المالك، قراءة
+  المهام، نيّة تعطيل/تفعيل مهمة keep-alive ثم موافقتها ومراجعة `edge_audit`.
+
+## الطلب السابق — «نعم» على QA-009 ومصفوفة المخاطر (DEC-041) — مدموج (PR #73 → `main@4f6af77`)
 
 - **ما طُلب:** بعد مقترح خارجي بـ«وكيل إصلاح ذاتي مستقل» ومصفوفة مخاطر بأربعة أركان، أرفق المالك سكربت `qa_alert.js` ووثيقة
   مصفوفة وقال «نعم». نُفِّذ الاثنان **بالشكل المتوافق مع النظام**: السكربت المرفق لم يُعتمد (يقرأ ملف سجل لا يكتبه شيء، لا يسمّي

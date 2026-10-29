@@ -38,6 +38,7 @@
    - فرض بروتوكول `https:` ومنع جميع عناوين الشبكات الخاصة والداخلية وخدمات البيانات الوصفية السحابية (`169.254.169.254`, `metadata.google.internal`, `100.64.0.0/10`, `fc00::/7`, `[::ffff:...]`) في `POST /api/cron/jobs` برفض صريح `422`.
    - تحديد سقف حجم الطلب عند `8192` بايت فعلي (UTF-8) برفض `413 Payload Too Large` قبل تحليل JSON.
    - إضافة مهلة `AbortSignal.timeout(15_000)` لطلبات `cron-job.org` مع تحويل انتهاء المهلة إلى `504` وأعطال المنبع إلى `502` دون كشف أي رأس تفويض.
+   - **تحديث 2026-10-29 (DEC-042، OPS-007):** الحارس نفسه صار أمام **صندوق صادر** على D1 (`edge_cron_outbox`): `POST/PATCH/DELETE /api/cron/jobs` لم تعد تكتب مباشرة بل تسجّل نيّة (202) تنتظر موافقة المالك بـ`expectedHash` وتُرسل مرة واحدة؛ المهلة/5xx في الإرسال تعني `unknown` يسوّيه المالك لا إعادة محاولة.
    - فصل `/health` (فحص حياة خفيف بلا كتابة على القاعدة) عن `/readyz` (فحص جاهزية كامل يثبت الكتابة والقراءة على D1).
    - دعم قائمة أصول متعددة مفصولة بفواصل في `ALLOWED_ORIGIN` (`https://celiaelazamey-arch.github.io,https://celia-phone-google.celiaelazamey.workers.dev`) مع `Vary: Origin` وترويسات `X-Content-Type-Options: nosniff` و`X-Frame-Options: DENY` و`Referrer-Policy: no-referrer` و`Cache-Control: no-store`.
 

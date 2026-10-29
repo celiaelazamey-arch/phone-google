@@ -6,6 +6,7 @@ import express from 'express';
 import { google } from 'googleapis';
 import helmet from 'helmet';
 import { createPool, ensureOwner } from './db.js';
+import { resolveEdgeOrigin } from './config.js';
 import { loadMysqlConfig } from './mysql-config.js';
 import { loadHostingConfig, deploymentStatus } from './hosting.js';
 import { bootstrapEmptySchema } from './bootstrap-schema.js';
@@ -75,6 +76,7 @@ export function loadCeliaMcpConfig(env = process.env, { requireToken = true } = 
     nodeEnv: env.NODE_ENV || 'development',
     hosting: loadHostingConfig(env, mcpToken),
     deploymentRoot: env.CELIA_DEPLOYMENT_ROOT === 'true',
+    edgeOrigin: resolveEdgeOrigin(env),
     features: loadFeatures(env),
     resilience: loadResilienceConfig(env),
     ...extended,
@@ -1026,7 +1028,8 @@ export function createCeliaMcpApp({ pool, config, services = createServiceRegist
           'connect-src': [
             "'self'",
             'https://generativelanguage.googleapis.com',
-            'https://api.groq.com'
+            'https://api.groq.com',
+            ...(config.edgeOrigin ? [config.edgeOrigin] : [])
           ],
           'frame-ancestors': ['*'],
           'upgrade-insecure-requests': null

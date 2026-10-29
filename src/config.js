@@ -3,6 +3,23 @@ import { loadMysqlConfig } from './mysql-config.js';
 import { normalizeOllamaBaseUrl } from './ollama.js';
 import { loadFeatures, loadResilienceConfig } from './resilience.js';
 import { parseEncryptionKeyring } from './security.js';
+export const DEFAULT_EDGE_ORIGIN = 'https://celia-phone-google.celiaelazamey.workers.dev';
+
+/**
+ * Origin of the card-free edge runtime (DEC-037). The cron dashboard (/cron) talks to it from the browser, so
+ * the CSP connect-src must admit exactly this origin; `CELIA_EDGE_ORIGIN` overrides it only with an https URL.
+ */
+export function resolveEdgeOrigin(env = process.env) {
+  const value = String(env?.CELIA_EDGE_ORIGIN || '').trim();
+  if (!value) return DEFAULT_EDGE_ORIGIN;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' ? url.origin : DEFAULT_EDGE_ORIGIN;
+  } catch {
+    return DEFAULT_EDGE_ORIGIN;
+  }
+}
+
 export function loadConfig(env = process.env) {
   const required = (name) => {
     const value = env[name]?.trim();
@@ -49,6 +66,7 @@ export function loadConfig(env = process.env) {
     ownerEmail: env.APP_OWNER_EMAIL || '',
     ownerPhone: (env.APP_OWNER_PHONE_E164 || env.PHONE_NUMBER || '').trim() || null,
     timezone: (env.CELIA_TIMEZONE || '').trim() || 'Africa/Cairo',
+    edgeOrigin: resolveEdgeOrigin(env),
     encryptionKey,
     encryptionKeyring,
     mysql: loadMysqlConfig(env),

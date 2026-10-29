@@ -887,6 +887,48 @@
   صامتة — «exit code 1» فقط، كما كان الحال قبل DEC-039) ولتشغيلة تجاوزتها أحدث (`40687283608` → تخطٍّ). القيد المعلن:
   `workflow_run` لا يعمل إلا من الفرع الافتراضي، فحالة QA-009 «بانتظار الدمج» حتى أول تشغيلة Quality مكتملة على `main`.
 
+## DEC-042 — المهام المجدولة (cron-job.org) داخل عامل الحافة الواحد: قراءة مُنقّاة مباشرة، وكل كتابة نيّة في صندوق صادر على D1 بموافقة مربوطة بالبصمة وإرسال مرة واحدة — يستبدل الوكيل المباشر للكتابة في `worker.js`
+
+- **التاريخ:** 29 أكتوبر 2026 · **الحالة:** منفذ ومختبر محليًا على الفرع `arena/90163669-phone-google`؛ **غير متحقق حيًّا** حتى
+  يُدمج في `main` ويعمل `cloudflare-deploy.yml` (الهجرة `0003` تُطبَّق تلقائيًا بالنشر) · **المهمة:** OPS-007 · **يستبدل:** سلوك
+  الكتابة المباشرة في `POST/PATCH/DELETE /api/cron/jobs` (الذي ثبّتته DEC-019/DEC-035 ضمنيًا بوصفه «وكيلًا محروسًا») ·
+  **يُنفّذ الخيار (3) من DEC-040** بدل إحياء PR #38.
+- **السياق:** PR #38 حمل فكرة صحيحة (لوحة للمهام المجدولة) بتنفيذ مرفوض: عامل ثانٍ وأسرار منفصلة (يخالف DEC-036/037)، مخزن
+  محاكاة (يخالف DEC-030)، وكتابة مباشرة على مزوّد خارجي بلا outbox (يخالف DEC-015). الفحص أظهر أن `workers/celia-edge/worker.js`
+  كان أصلًا يوكّل `api.cron-job.org` بمفتاح `CELIAOS_CRONJOB_ORG_API_KEY` المربوط على العامل (قراءة **وكتابة** مباشرة بعد
+  `validateCronJobPayload`) — أي أن فجوة DEC-015 كانت قائمة في الحافة نفسها لا في #38 فقط.
+- **البدائل المرفوضة:** (أ) دمج #38 أو إحياؤه — التعارضات والأسباب في DEC-040؛ (ب) إبقاء الوكيل المباشر وإضافة لوحة فوقه — يُرسّخ
+  أثرًا خارجيًا بلا موافقة ولا idempotency ولا سجل؛ (ج) تمرير الكتابة عبر outbox وكيل Node (`src/agent/outbox.js`) — خدمة Node
+  بلا عنوان عام (HOST-003) فتصير اللوحة واجهة زائفة؛ (د) إعادة المحاولة التلقائية عند المهلة — تكرار محتمل للأثر الخارجي
+  (DEC-016)؛ (هـ) قبول نيّات بلا D1 أو بلا مفتاح «لتسهيل التجربة» — موكب بمقياس DEC-030.
+- **القرار:** (1) **القراءة** (`GET /api/cron/jobs`, `/jobs/:id`, `/jobs/:id/history`, `/api/cron/status`) تبقى للمالك فقط وتمرّ
+  **مُنقّاة** في `workers/celia-edge/cron.js`: لا كتلة `auth` (إلا `enable`)، أسماء الترويسات لا قيمها، حجم الجسم لا نصه، الروابط بلا
+  سلسلة استعلام، ولا أجسام استجابات مخزنة في السجل. (2) **كل كتابة نيّة**: جدول `edge_cron_outbox` (هجرة `0003_cron_outbox.sql`)
+  بحقول `idempotency_key UNIQUE`, `action ∈ create|update|delete`, `payload`, `payload_hash` (SHA-256 لتمثيل قانوني مرتّب
+  المفاتيح)، وحالات `pending_approval → dispatching → applied|failed|unknown`، و`rejected`، و`not_applied`. إنشاء النيّة يتطلب
+  ترويسة `Idempotency-Key` (نفس المفتاح + نفس البصمة = إعادة 200؛ نفس المفتاح + حمولة مختلفة = 409)، ويمرّ بحارس SSRF وقائمة
+  الحقول المسموحة وسقف 8 KiB قبل التخزين (422/413 بلا أي نداء منبع). (3) **الموافقة** `POST /api/cron/intents/:id/approve`
+  تحمل `expectedHash` (≥ 12 خانة من البصمة المعروضة) وتعيد حساب البصمة من الصف (رفض `post_approval_payload_tampered`)، ثم تدّعي
+  الصف بتحديث مشروط `WHERE status='pending_approval'` (`meta.changes`) فلا يُرسل إلا مرة واحدة ولو تسابقت طلبات؛ النتيجة
+  `applied` (مع `external_ref` = `jobId`)، `failed` لرفض 4xx، و**`unknown`** لمهلة/شبكة/5xx لأن الأثر قد يكون وقع. (4) `unknown`
+  لا يُعاد تلقائيًا أبدًا؛ المخرج الوحيد `POST …/reconcile {outcome: applied|not_applied}` بيد المالك (DEC-016). (5) كل انتقال
+  يُلحق بسلسلة `edge_audit` (`appendAudit`، مفتاح `cron.outbox.<id>`، القيمة بصمة الحمولة لا الحمولة). (6) المسارات القديمة
+  `POST/PATCH/DELETE /api/cron/jobs` تُنشئ نيّة وتردّ **202** — لا كتابة مباشرة بعد اليوم. (7) الصدق في الحالة: `/api/cron/status`
+  يعلن `configured`, `durable`, `reads`, `writes: outbox-approval-only`, وعدّادات الصندوق؛ بلا D1 → 503 `d1_not_bound` لأي
+  نيّة؛ بلا مفتاح → 503 `cronjob_not_configured` للقراءة والنيّات معًا (لا تُقبل نيّة لا يمكن إرسالها). (8) لوحة واحدة
+  `public/cron.html` + `cron.js` (RTL، رمز المالك في `sessionStorage` للتبويب فقط، تتحدث مع أصل الحافة مباشرة؛ CSP خادم
+  Express تسمح بهذا الأصل تحديدًا عبر `resolveEdgeOrigin`/`CELIA_EDGE_ORIGIN`)، تعرض الحمولة وبصمتها قبل زرّ الموافقة.
+- **السبب:** الفكرة تستحق التنفيذ، لكن بالعقد ذاته الذي يحكم كل أثر خارجي في النظام: نيّة ← موافقة ← إرسال مرة واحدة ← نتيجة
+  صادقة ← سجل غير قابل للتعديل. المفتاح موجود أصلًا على العامل والتخزين الدائم موجود (D1)، فلا حاجة لعامل ثانٍ ولا أسرار جديدة.
+- **الأثر:** `workers/celia-edge/cron.js` (جديد؛ نُقل إليه `validateCronJobPayload`/`isDisallowedTargetHost` ويعاد تصديرهما من
+  `worker.js`)، `workers/celia-edge/migrations/0003_cron_outbox.sql`، `worker.js` (مسارات `/api/cron/intents*` وتحويل الكتابة إلى
+  نيّات)، `public/cron.{html,css,js}`، `src/celia-ui.js` (`/cron`)، `src/config.js` + `src/celia-mcp.js` (`edgeOrigin` في
+  `connect-src`)، `scripts/build-pages.mjs`، `.github/workflows/pages.yml` (التحقق من `/cron.html`)، اختبارات
+  `test/edge-cron-outbox.test.js` (8: حالة صادقة، تنقية، 202 بلا منبع، SSRF/413 أمام الصندوق، سباق الموافقة = إرسال واحد،
+  `PATCH/DELETE`، `failed/unknown/reconcile`، كشف العبث) و`test/cron-page.test.js` (4) وتحديث
+  `test/deploy-cloudflare-edge.test.js` (14 عبارة هجرة). القيد المعلن: لا دليل حيّ قبل تشغيلة `cloudflare-deploy.yml` على `main`
+  وقراءة `/api/cron/status` تعيد `durable: true`.
+
 ## إضافة قرار لاحق
 
 استخدم معرفًا جديدًا، والتاريخ والحالة والسياق والبدائل والقرار والسبب والأثر ومرجع المهمة، واذكر صراحة القرار المستبدل إن وجد. لا تنسخ أسرارًا أو مخطط إنتاج يحوي بيانات شخصية إلى سجل القرار.

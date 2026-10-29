@@ -21,23 +21,27 @@ import {
   searchEdgeSkills,
   verifyEdgeConsentTicket
 } from './runtime.js';
+import {
+  approveIntent,
+  createIntent,
+  getIntent,
+  isDisallowedTargetHost,
+  listIntents,
+  outboxCounts,
+  readUpstream,
+  reconcileIntent,
+  rejectIntent,
+  validateCronJobPayload
+} from './cron.js';
 
-const CRONJOB_ORIGIN = 'https://api.cron-job.org';
+export { isDisallowedTargetHost, validateCronJobPayload };
+
 const MAX_BODY_BYTES = 8192;
 const MAX_MCP_BODY_BYTES = 32_768;
-const UPSTREAM_TIMEOUT_MS = 15_000;
 const DEFAULT_ALLOWED_ORIGINS = [
   'https://celiaelazamey-arch.github.io',
   'https://celia-phone-google-ui.pages.dev'
 ];
-const ALLOWED_JOB_FIELDS = new Set([
-  'url',
-  'title',
-  'enabled',
-  'saveResponses',
-  'requestMethod',
-  'schedule'
-]);
 
 const TRACKED_SECRETS = Object.freeze([
   ['AGENETROUTERAPI_KEY', 'ai-provider', 'agentrouter'],
@@ -229,105 +233,84 @@ export function buildEdgeSecretsReport(env = {}) {
   };
 }
 
-function isDisallowedIpv4(host) {
-  const match = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (!match) return false;
-  const octets = match.slice(1).map(Number);
-  if (octets.some((n) => Number.isNaN(n) || n < 0 || n > 255)) return true;
-  const [a, b] = octets;
-  if (a === 0 || a === 10 || a === 127) return true;
-  if (a === 169 && b === 254) return true;
-  if (a === 172 && b >= 16 && b <= 31) return true;
-  if (a === 192 && b === 168) return true;
-  if (a === 100 && b >= 64 && b <= 127) return true;
-  if (a >= 224) return true;
-  return false;
-}
-
-export function isDisallowedTargetHost(rawHostname) {
-  const raw = String(rawHostname || '').trim().toLowerCase();
-  if (!raw) return true;
-  const host = raw.startsWith('[') && raw.endsWith(']') ? raw.slice(1, -1) : raw;
-  if (!host) return true;
-  if (
-    host === 'localhost' ||
-    host.endsWith('.localhost') ||
-    host.endsWith('.local') ||
-    host.endsWith('.internal') ||
-    host === 'metadata.google.internal' ||
-    host === 'metadata'
-  ) {
-    return true;
-  }
-  if (/^\d+$/.test(host) || /^0x[0-9a-f]+$/i.test(host)) {
-    return true;
-  }
-  if (isDisallowedIpv4(host)) return true;
-
-  if (host.includes(':')) {
-    const normalized = host.split('%')[0];
-    if (normalized === '::' || normalized === '::1' || normalized === '0:0:0:0:0:0:0:1' || normalized === '0:0:0:0:0:0:0:0') {
-      return true;
-    }
-    if (/^f[cd][0-9a-f]{2}:/i.test(normalized) || /^f[cd][0-9a-f]{0,2}$/i.test(normalized.split(':')[0])) {
-      return true;
-    }
-    if (/^fe[89ab][0-9a-f]:/i.test(normalized)) {
-      return true;
-    }
-    if (/^ff[0-9a-f]{2}:/i.test(normalized)) {
-      return true;
-    }
-    const v4MappedDotted = normalized.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i);
-    if (v4MappedDotted) {
-      return isDisallowedIpv4(v4MappedDotted[1]);
-    }
-    const v4MappedHex = normalized.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i);
-    if (v4MappedHex) {
-      const hi = parseInt(v4MappedHex[1], 16);
-      const lo = parseInt(v4MappedHex[2], 16);
-      const dotted = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
-      return isDisallowedIpv4(dotted);
-    }
-  }
-  return false;
-}
-
-export function validateCronJobPayload(payload, { partial = false } = {}) {
-  if (!payload || typeof payload !== 'object' || !payload.job || typeof payload.job !== 'object' || Array.isArray(payload.job)) {
-    return { ok: false, error: 'invalid_job_payload' };
-  }
-  const job = payload.job;
-  for (const key of Object.keys(job)) {
-    if (!ALLOWED_JOB_FIELDS.has(key)) {
-      return { ok: false, error: `disallowed_job_field:${key}` };
-    }
-  }
-  if (!partial || job.url !== undefined) {
-    try {
-      const parsed = new URL(String(job.url || ''));
-      if (parsed.protocol !== 'https:') {
-        return { ok: false, error: 'invalid_job_url_protocol' };
-      }
-      if (parsed.username || parsed.password) {
-        return { ok: false, error: 'disallowed_job_url_credentials' };
-      }
-      if (parsed.hash) {
-        return { ok: false, error: 'disallowed_job_url_fragment' };
-      }
-      if (isDisallowedTargetHost(parsed.hostname)) {
-        return { ok: false, error: 'disallowed_job_url_host' };
-      }
-    } catch {
-      return { ok: false, error: 'invalid_job_url' };
-    }
-  }
-  return { ok: true, job };
-}
 
 function runtimeErrorResponse(error, baseHeaders) {
   const status = Number.isInteger(error?.status) ? error.status : 500;
   return jsonResponse({ error: String(error?.message || 'runtime_error') }, status, baseHeaders);
+}
+
+/**
+ * /api/cron/intents — the outbox the owner approves from (DEC-042). Owner auth was already verified.
+ *   GET  /api/cron/intents[?status=&limit=]      list
+ *   POST /api/cron/intents                        { action, jobId?, job?, note? } + Idempotency-Key header
+ *   GET  /api/cron/intents/:id                    detail
+ *   POST /api/cron/intents/:id/approve            { expectedHash }   -> claim + dispatch once
+ *   POST /api/cron/intents/:id/reject             { note? }
+ *   POST /api/cron/intents/:id/reconcile          { outcome: applied|not_applied, externalRef?, note? } (from unknown only)
+ */
+async function handleCronIntents({ request, env, pathname, baseHeaders, fetchImpl }) {
+  const rest = pathname.slice('/api/cron/intents'.length);
+  const match = rest.match(/^(?:\/([0-9a-f-]{36})(?:\/(approve|reject|reconcile))?)?$/i);
+  if (!match) {
+    return jsonResponse({ error: 'invalid_cron_path' }, 400, baseHeaders);
+  }
+  const [, id, verb] = match;
+  if (!isD1Bound(env)) {
+    return jsonResponse({ error: 'd1_not_bound' }, 503, baseHeaders);
+  }
+  const cronKey = String(env.CELIAOS_CRONJOB_ORG_API_KEY || '').trim();
+
+  if (!id) {
+    if (request.method === 'GET') {
+      const url = new URL(request.url);
+      const intents = await listIntents(env, { status: url.searchParams.get('status'), limit: url.searchParams.get('limit') || 50 });
+      return jsonResponse({ intents, counts: await outboxCounts(env) }, 200, baseHeaders);
+    }
+    if (request.method !== 'POST') {
+      return methodNotAllowedResponse(['GET', 'POST', 'OPTIONS'], baseHeaders);
+    }
+    const parsed = await readBoundedJson(request, MAX_BODY_BYTES);
+    if (!parsed.ok) {
+      return jsonResponse({ error: parsed.error }, parsed.status, baseHeaders);
+    }
+    if (!cronKey) {
+      return jsonResponse({ error: 'cronjob_not_configured' }, 503, baseHeaders);
+    }
+    const result = await createIntent(env, {
+      action: parsed.data.action,
+      jobId: parsed.data.jobId,
+      job: parsed.data.job,
+      note: parsed.data.note,
+      idempotencyKey: request.headers.get('idempotency-key')
+    });
+    return jsonResponse(result.body, result.status, baseHeaders);
+  }
+
+  if (!verb) {
+    if (request.method !== 'GET') {
+      return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
+    }
+    const intent = await getIntent(env, id);
+    return intent
+      ? jsonResponse({ intent }, 200, baseHeaders)
+      : jsonResponse({ error: 'intent_not_found' }, 404, baseHeaders);
+  }
+
+  if (request.method !== 'POST') {
+    return methodNotAllowedResponse(['POST', 'OPTIONS'], baseHeaders);
+  }
+  const parsed = await readBoundedJson(request, MAX_BODY_BYTES);
+  if (!parsed.ok) {
+    return jsonResponse({ error: parsed.error }, parsed.status, baseHeaders);
+  }
+  const body = parsed.data && typeof parsed.data === 'object' ? parsed.data : {};
+  const result =
+    verb === 'approve'
+      ? await approveIntent(env, id, { expectedHash: body.expectedHash, cronKey, fetchImpl })
+      : verb === 'reject'
+        ? await rejectIntent(env, id, { note: body.note })
+        : await reconcileIntent(env, id, { outcome: body.outcome, externalRef: body.externalRef, note: body.note });
+  return jsonResponse(result.body, result.status, baseHeaders);
 }
 
 export default {
@@ -866,26 +849,46 @@ export default {
       if (request.method !== 'GET') {
         return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
       }
+      const configured = hasSecret(env, 'CELIAOS_CRONJOB_ORG_API_KEY');
+      const durable = isD1Bound(env);
+      let outbox = null;
+      if (durable) {
+        try {
+          outbox = await outboxCounts(env);
+        } catch (error) {
+          outbox = { error: 'outbox_unavailable', detail: String(error?.message || error).slice(0, 120) };
+        }
+      }
       return jsonResponse(
         {
           ok: true,
-          configured: hasSecret(env, 'CELIAOS_CRONJOB_ORG_API_KEY'),
-          sourceEnv: hasSecret(env, 'CELIAOS_CRONJOB_ORG_API_KEY') ? 'CELIAOS_CRONJOB_ORG_API_KEY' : null,
-          mode: 'governed-scheduler'
+          configured,
+          sourceEnv: configured ? 'CELIAOS_CRONJOB_ORG_API_KEY' : null,
+          mode: 'governed-scheduler',
+          reads: configured ? 'sanitized-proxy' : 'unavailable:cronjob_not_configured',
+          writes: durable ? 'outbox-approval-only' : 'unavailable:d1_not_bound',
+          durable,
+          outbox,
+          decision: 'DEC-042'
         },
         200,
         baseHeaders
       );
     }
 
+    if (pathname.startsWith('/api/cron/intents')) {
+      return handleCronIntents({ request, env, pathname, baseHeaders, fetchImpl });
+    }
+
     if (pathname.startsWith('/api/cron/jobs')) {
       const subPath = pathname.slice('/api/cron'.length); // /jobs or /jobs/:id or /jobs/:id/history
-      if (!/^\/jobs(\/\d+(\/history)?)?$/.test(subPath)) {
+      const match = subPath.match(/^\/jobs(?:\/(\d+)(\/history)?)?$/);
+      if (!match) {
         return jsonResponse({ error: 'invalid_cron_path' }, 400, baseHeaders);
       }
-
+      const jobId = match[1] ? Number(match[1]) : null;
       const isCollection = subPath === '/jobs';
-      const isHistory = subPath.endsWith('/history');
+      const isHistory = Boolean(match[2]);
       const allowedMethods = isCollection
         ? ['GET', 'POST', 'OPTIONS']
         : isHistory
@@ -896,66 +899,43 @@ export default {
       }
 
       const cronKey = String(env.CELIAOS_CRONJOB_ORG_API_KEY || '').trim();
-      if (!cronKey) {
-        return jsonResponse({ error: 'cronjob_not_configured' }, 503, baseHeaders);
+      if (request.method === 'GET') {
+        if (!cronKey) {
+          return jsonResponse({ error: 'cronjob_not_configured' }, 503, baseHeaders);
+        }
+        const result = await readUpstream({ cronKey, fetchImpl, subPath });
+        return jsonResponse(result.body, result.status, baseHeaders);
       }
 
-      let upstreamMethod = request.method;
-      let upstreamBody;
-      if (request.method === 'POST' && isCollection) {
-        upstreamMethod = 'PUT';
-      }
-      if (request.method === 'POST' || request.method === 'PATCH') {
-        const rawText = await request.text();
-        if (utf8ByteLength(rawText) > MAX_BODY_BYTES) {
-          return jsonResponse({ error: 'payload_too_large' }, 413, baseHeaders);
+      // Writes are intents (DEC-042): validated here, stored in D1, applied only after an owner approval.
+      let job;
+      let note;
+      if (request.method === 'DELETE') {
+        job = undefined;
+      } else {
+        const parsed = await readBoundedJson(request, MAX_BODY_BYTES);
+        if (!parsed.ok) {
+          return jsonResponse({ error: parsed.error }, parsed.status, baseHeaders);
         }
-        let parsed;
-        try {
-          parsed = JSON.parse(rawText);
-        } catch {
-          return jsonResponse({ error: 'invalid_json' }, 400, baseHeaders);
-        }
-        const check = validateCronJobPayload(parsed, { partial: request.method === 'PATCH' });
+        const check = validateCronJobPayload(parsed.data, { partial: request.method === 'PATCH' });
         if (!check.ok) {
           return jsonResponse({ error: check.error }, 422, baseHeaders);
         }
-        upstreamBody = JSON.stringify({ job: check.job });
+        job = check.job;
+        note = typeof parsed.data.note === 'string' ? parsed.data.note : undefined;
       }
-
-      let upstreamRes;
-      try {
-        upstreamRes = await fetchImpl(`${CRONJOB_ORIGIN}${subPath}`, {
-          method: upstreamMethod,
-          headers: {
-            accept: 'application/json',
-            authorization: `Bearer ${cronKey}`,
-            ...(upstreamBody ? { 'content-type': 'application/json' } : {})
-          },
-          body: upstreamBody,
-          signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
-        });
-      } catch (err) {
-        const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError';
-        return jsonResponse(
-          { error: timedOut ? 'cronjob_upstream_timeout' : 'cronjob_upstream_unreachable' },
-          timedOut ? 504 : 502,
-          baseHeaders
-        );
+      if (!cronKey) {
+        return jsonResponse({ error: 'cronjob_not_configured' }, 503, baseHeaders);
       }
-
-      if (!upstreamRes.ok) {
-        return jsonResponse(
-          {
-            error: 'cronjob_upstream_error',
-            upstreamStatus: upstreamRes.status
-          },
-          502,
-          baseHeaders
-        );
-      }
-      const data = await upstreamRes.json().catch(() => ({}));
-      return jsonResponse(data, 200, baseHeaders);
+      const action = request.method === 'POST' ? 'create' : request.method === 'PATCH' ? 'update' : 'delete';
+      const result = await createIntent(env, {
+        action,
+        jobId,
+        job,
+        note,
+        idempotencyKey: request.headers.get('idempotency-key')
+      });
+      return jsonResponse(result.body, result.status, baseHeaders);
     }
 
     return jsonResponse({ error: 'not_found' }, 404, baseHeaders);
