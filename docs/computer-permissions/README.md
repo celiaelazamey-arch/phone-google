@@ -3,7 +3,7 @@
 > **مُولَّد آليًا** من `src/agent/computer-policy.js` (`computer-agent-policy-v1`). لا تُحرّره يدويًا:
 > `npm run computer:permissions` يعيد توليده، و`npm run computer:permissions:check` يُفشل CI عند الانحراف.
 >
-> **لا شيء هنا مُنفَّذ:** 0 من 16 قدرة موصولة بمحرك تنفيذ. `AGENT-003` (العزل) موقوفة،
+> **لا شيء هنا مُنفَّذ:** 0 من 16 قدرة موصولة بمحرك Computer Use. Backend AGENT-003 المحلي غير موصول بهذه القدرات،
 > لذا `decideAction` يعيد الحكم السياسي مع `executable: false`. المخطط يوثّق الحدود، ولا يثبت أن النقر والكتابة يعملان.
 
 **حالة النظام المعلنة:** `NETWORK = DENY` · `EXTERNAL GATES = CLOSED` · `IDENTITY = NOT_PROVEN`

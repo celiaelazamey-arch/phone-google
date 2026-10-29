@@ -16,6 +16,8 @@ const EXTERNAL_HINTS = /(تقويم|موعد|اجتماع|calendar|event|meeting
 const WHATSAPP_HINTS = /(واتساب|رسالة\s*واتساب|whatsapp)/i;
 const E164_IN_TEXT_RE = /(\+[1-9]\d{6,14})\b/;
 const DRIVE_EXPORT_HINTS = /(صدّر|تصدير|احفظ\s*في\s*درايف|google\s*drive|drive\s*export)/i;
+const GMAIL_HINTS = /(gmail|جيميل|إيميل|ايميل|بريد|الوارد)/i;
+const GMAIL_UNREAD_HINTS = /(غير\s+مقروء|رسائل\s+جديدة|إيميلات\s+جديدة|unread|new\s+emails?)/i;
 const DOCUMENT_HINTS = /(فاتورة|فواتير|مستند|استخرج|invoice|receipt)/i;
 const DOCUMENT_FILE_RE = /\b([A-Za-z0-9._/-]+\.(?:csv|json|txt|md))\b/i;
 const COMMIT_LEDGER_HINTS = /(سجل\s*المشتريات|دفتر\s*المشتريات|purchase\s*ledger|commit\s*invoice)/i;
@@ -59,7 +61,16 @@ function outcomeOf(toolRuns, name) {
   }
 }
 
-export function createDemoPlanner({ externalEffectTool = 'google.calendar_create_event', knowledge = false } = {}) {
+function gmailOutcomeSummary(outcome) {
+  if (!outcome) return null;
+  const lines = (Array.isArray(outcome.messages) ? outcome.messages : []).slice(0, 5).map((message, index) => {
+    const clean = (value, fallback = '') => String(value || fallback).replace(/\s+/g, ' ').trim().slice(0, 160);
+    return `${index + 1}) ${clean(message.subject, 'بدون موضوع')} — ${clean(message.from, 'مرسل غير متاح')}`;
+  });
+  return `رسائل Gmail المقروءة (${Number(outcome.count) || 0}):\n${lines.join('\n') || 'لا توجد رسائل في الوارد.'}`;
+}
+
+export function createDemoPlanner({ externalEffectTool = 'google.calendar_create_event', knowledge = false, gmail = false } = {}) {
   return {
     name: 'demo-deterministic',
     knowledge,
@@ -186,6 +197,16 @@ export function createDemoPlanner({ externalEffectTool = 'google.calendar_create
         return { action: DECISION.call, tool: 'celia.draft_outline', args: { goal } };
       }
 
+      if (gmail && GMAIL_HINTS.test(goal) && !succeeded(toolRuns, 'google.gmail_read')) {
+        if (failed(toolRuns, 'google.gmail_read')) return this.giveUp(toolRuns, 'google.gmail_read');
+        return {
+          action: DECISION.call,
+          tool: 'google.gmail_read',
+          args: { maxResults: 5, unreadOnly: GMAIL_UNREAD_HINTS.test(goal) },
+          reason: 'قراءة Gmail metadata فقط؛ لا إرسال أو تعديل أو حذف ولا outbox'
+        };
+      }
+
       const phoneMatch = E164_IN_TEXT_RE.exec(goal);
       const whatsappAttempted = toolRuns.some((toolRun) => toolRun.toolName === 'whatsapp.send_text');
       if (WHATSAPP_HINTS.test(goal) && phoneMatch && !whatsappAttempted) {
@@ -270,6 +291,7 @@ export function createDemoPlanner({ externalEffectTool = 'google.calendar_create
       const draft = outcomeOf(toolRuns, 'celia.draft_outline');
       const status = outcomeOf(toolRuns, 'celia.system_status');
       const evidence = knowledge ? outcomeOf(toolRuns, 'kb.search') : null;
+      const gmailOutcome = gmail ? outcomeOf(toolRuns, 'google.gmail_read') : null;
       const externalOutcome = outcomeOf(toolRuns, externalEffectTool);
       const sentEffect = outbox.find((entry) => entry.status === 'sent') || null;
       const failedEffect = outbox.find((entry) => entry.status === 'unknown') || null;
@@ -284,6 +306,7 @@ export function createDemoPlanner({ externalEffectTool = 'google.calendar_create
         evidence?.items?.length ? `أدلة من شبكة المعرفة (${evidence.items.length}، منها ${evidence.entities?.length || 0} كيان):\n${citations}` : null,
         evidence && !evidence.items?.length ? 'لم يجد البحث في شبكة المعرفة دليلًا مطابقًا؛ لم تُختلق مراجع.' : null,
         status ? `حالة النظام المقروءة: الإصدار ${status.version ?? 'غير متاح'}، التخزين ${status.storage ?? 'غير متاح'}.` : null,
+        gmailOutcomeSummary(gmailOutcome),
         sentEffect
           ? `أُرسل الأثر الخارجي مرة واحدة عبر outbox بعد موافقة مسجلة؛ المرجع ${sentEffect.externalRef || '—'}.`
           : failedEffect

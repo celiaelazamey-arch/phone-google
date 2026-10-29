@@ -23,7 +23,7 @@
 | A6 | تحديثات الاعتماديات | Dependabot: npm أسبوعيًا (مجموعة `production-patches`)، github-actions أسبوعيًا، docker شهريًا | `.github/dependabot.yml` | SP-06 |
 | B1 | الأسرار خارج Git | `.gitignore`: `.env`, `.env.*`, `!.env.example`؛ الملف الوحيد المتتبَّع `.env.example` (قوالب لا مفاتيح) | `git ls-files` | SP-07 |
 | B2 | توصيل الأسرار محقَّق | `npm run check:secrets` (`scripts/check-secrets-wiring.mjs`، 18 سرًا موصولًا) يعمل داخل بوابة الجودة مع `check:continuity` و`test:coverage:ci` على كل دفعة إلى أي فرع | `celia-mcp.yml` ~48/~104 | SP-08 |
-| C1 | لا تنفيذ ديناميكي | صفر `eval(`/`new Function(`/`child_process`/`vm`/`spawn` في `src/` و`workers/` (كود وقت التشغيل)؛ السكربتات في `scripts/` تعمل في CI فقط | فحص نصي كامل | SP-09 |
+| C1 | لا تنفيذ ديناميكي خارج العزل | صفر `eval(`/`new Function(`/`vm` في `src/` و`workers/`، وصفر `child_process`/`spawn` خارج الاستثناء الوحيد `src/agent/sandbox.js`؛ هذا المنفذ يشغّل `unshare` بسياسة AGENT-003 وentrypoint ثابت ويفشل مغلقًا، وليس Shell عامًا أو تفعيلًا لـ`sandbox.exec`؛ السكربتات في `scripts/` تعمل في CI فقط | فحص نصي كامل + اختبارات العزل `test:sandbox` | SP-09 |
 | C2 | حارس SSRF للأهداف الخارجية | `isDisallowedTargetHost()` يرفض loopback والشبكات الخاصة وlink-local وmetadata وIPv6 المكافئة وأرقام IPv4 العشرية/الست عشرية | `workers/celia-edge/cron.js` | SP-10 |
 | C3 | سجل تدقيق بسلسلة بصمات | `edge_audit` يُكتب بـ`INSERT` فقط مع `prev_hash`/`hash` (SHA-256)؛ لا `UPDATE`/`DELETE` عليه في أي ملف | `workers/celia-edge/state.js`، `migrations/0001_state.sql` | SP-11 |
 | C4 | بوابات الجودة | 560+ اختبارًا حتميًا بأرضية تغطية 89/71/82 (`test:coverage`)، `check.mjs`، N/N−1 لعقود MCP، فحص الانحدار يفشل البناء (لا retry أعمى — DEC-041) | `package.json`، `celia-mcp.yml` | (اختبارات المشروع كلها) |
@@ -70,7 +70,7 @@
 | `uses: actions/checkout@v4` (وسم بدل SHA) | SP-04 | `"actions/checkout@v4" must be pinned to a 40-hex commit SHA` |
 | حذف `npm audit` من بوابة الجودة أو الإصدار | SP-05 | `quality workflow runs npm audit` |
 | التزام ملف `.env.local` بالخطأ | SP-07 | `no real .env file is committed` |
-| استدعاء `child_process` من `src/` | SP-09 | `dynamic code execution or process spawning found in runtime code` |
+| استدعاء `child_process` من `src/` خارج `src/agent/sandbox.js` أو إضافة `eval`/`vm` داخله | SP-09 | `dynamic code execution or process spawning found outside the isolated AGENT-003 executor` |
 | تخفيف حارس SSRF (السماح بـ`169.254.169.254`) | SP-10 | `"169.254.169.254" must be refused` |
 | `UPDATE edge_audit …` في أي ملف | SP-11 | `<file>: edge_audit is append-only` |
 | تغيير حالة Branch protection في §2 إلى VERIFIED أو ENABLED بلا تاريخ | SP-12 | `Branch protection: status is UNKNOWN, VERIFIED (date) or NOT ENABLED (date)` |

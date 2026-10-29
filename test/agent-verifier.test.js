@@ -235,6 +235,44 @@ test('verifier: kb.search outputs without uri/licence/trust BLOCK; complete prov
     evidence: [await store.appendEvidence({ runId: run.id, kind: 'tool_call', input: {}, output: {}, sourceIds: ['tr-2'], verdict: 'PASS' })]
   });
   assert.equal(complete.checks.find((check) => check.id === 'kb_source_licence_trust').status, 'PASS');
+
+  const governance = {
+    profile: 'planner-safe-v1',
+    kind: 'doc',
+    claimTypes: ['operational_guidance'],
+    trust: ['T1', 'T2'],
+    reviewRequired: true,
+    excluded: 0
+  };
+  const safeItem = {
+    uri: 'https://example.test/safe',
+    licence: 'MIT',
+    trust: 'T1',
+    kind: 'doc',
+    claimType: 'operational_guidance',
+    reviewDue: '2099-01-01',
+    reviewStatus: 'current',
+    plannerEligible: true
+  };
+  const governed = async (id, item, policy = governance) => createVerifier({ tools: registry }).verifyRun({
+    ...base,
+    toolRuns: [{ id, toolName: 'kb.search', status: 'succeeded', outcome: { governance: policy, items: [item] } }],
+    evidence: [await store.appendEvidence({ runId: run.id, kind: 'tool_call', input: {}, output: {}, sourceIds: [id], verdict: 'PASS' })]
+  });
+  const safe = await governed('tr-safe', safeItem);
+  assert.equal(safe.checks.find((check) => check.id === 'kb_planner_governance').status, 'PASS');
+  const historical = await governed('tr-historical', { ...safeItem, claimType: 'historical_report' });
+  assert.equal(historical.checks.find((check) => check.id === 'kb_planner_governance').status, 'BLOCK');
+  const expired = await governed('tr-expired', { ...safeItem, reviewDue: '2020-01-01' });
+  assert.equal(expired.checks.find((check) => check.id === 'kb_planner_governance').status, 'BLOCK');
+  const wrongPolicy = await governed('tr-policy', safeItem, { ...governance, trust: ['T3'] });
+  assert.equal(wrongPolicy.checks.find((check) => check.id === 'kb_planner_governance').status, 'BLOCK');
+  const missingPolicy = await createVerifier({ tools: registry }).verifyRun({
+    ...base,
+    toolRuns: [{ id: 'tr-missing-policy', toolName: 'kb.search', status: 'succeeded', outcome: { items: [safeItem] } }],
+    evidence: [await store.appendEvidence({ runId: run.id, kind: 'tool_executed', input: {}, output: {}, sourceIds: ['tr-missing-policy'], verdict: 'PASS' })]
+  });
+  assert.equal(missingPolicy.checks.find((check) => check.id === 'kb_planner_governance').status, 'BLOCK');
 });
 
 test('verifier: budget breaches and failed tool runs BLOCK the goal contract check', async (t) => {

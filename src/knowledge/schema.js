@@ -9,7 +9,7 @@
  * - absence is recorded (`absent_since`), rows are never deleted automatically.
  */
 
-export const KNOWLEDGE_SCHEMA_VERSION = 1;
+export const KNOWLEDGE_SCHEMA_VERSION = 2;
 
 export const KNOWLEDGE_DDL = Object.freeze([
   `CREATE TABLE IF NOT EXISTS meta (
@@ -60,6 +60,8 @@ export const KNOWLEDGE_DDL = Object.freeze([
     trust TEXT NOT NULL,
     uri TEXT NOT NULL,
     source_updated_at TEXT NULL,
+    claim_type TEXT NULL,
+    review_due TEXT NULL,
     indexed_at TEXT NOT NULL,
     absent_since TEXT NULL,
     UNIQUE (content_hash)

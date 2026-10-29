@@ -20,6 +20,7 @@ export const RISK = Object.freeze({
 
 import { documentAutomationToolDefinitions } from './automation/index.js';
 import { auditProductCatalog, buildCreativeWorkflowPlan } from './evaluation.js';
+import { gmailToolDefinitions } from './gmail.js';
 
 const EXECUTABLE = new Set([RISK.read, RISK.internalWrite]);
 const FORBIDDEN_SECRET_KEYS = new Set([
@@ -209,12 +210,17 @@ export function createDefaultTools(options = {}) {
  * Read-only knowledge tools. They never reach the network: the knowledge store is
  * a local index, and every answer carries source, licence and trust level.
  */
-export function knowledgeToolDefinitions({ kb } = {}) {
+export function knowledgeToolDefinitions({ kb, plannerSafe = false } = {}) {
   if (!kb) return [];
   return [
     {
       name: 'kb.search',
-      description: 'بحث في شبكة المعرفة المحلية وإرجاع أدلة مع المصدر والترخيص ومستوى الثقة',
+      // Provider construction checks this code-level marker and fails closed;
+      // it is not part of the model-facing schema or a caller-supplied arg.
+      plannerSafe: plannerSafe === true,
+      description: plannerSafe
+        ? 'بحث Planner آمن: مستندات operational_guidance فقط، T1/T2، وreview_due سارية؛ النتيجة تحمل provenance'
+        : 'بحث في شبكة المعرفة المحلية وإرجاع أدلة مع المصدر والترخيص ومستوى الثقة',
       risk: RISK.read,
       timeoutMs: 5000,
       arguments: { query: 'string', limit: 'number' },
@@ -222,9 +228,10 @@ export function knowledgeToolDefinitions({ kb } = {}) {
         const query = typeof args?.query === 'string' ? args.query.trim() : '';
         if (!query) throw new Error('query is required');
         const limit = Number.isInteger(args?.limit) ? Math.min(Math.max(args.limit, 1), 8) : 4;
-        const result = await kb.search({ query, limit, maxChars: 900 });
+        const result = await kb.search({ query, limit, maxChars: 900, profile: plannerSafe ? 'planner' : 'default' });
         return {
           terms: result.terms,
+          governance: result.governance || null,
           items: result.items.map((item) => ({
             id: item.id,
             title: item.title,
@@ -232,6 +239,10 @@ export function knowledgeToolDefinitions({ kb } = {}) {
             kind: item.kind,
             trust: item.trust,
             licence: item.licence,
+            claimType: item.claimType || null,
+            reviewDue: item.reviewDue || null,
+            reviewStatus: item.reviewStatus || 'missing',
+            plannerEligible: item.plannerEligible === true,
             snippet: String(item.snippet || '').slice(0, 300)
           })),
           entities: result.entities.slice(0, 5).map((entity) => ({
@@ -284,7 +295,9 @@ export function defaultToolDefinitions({
   documentAutomation = true,
   allowedDocumentRoots,
   modelRouter = null,
-  ledgerStore = null
+  ledgerStore = null,
+  plannerSafe = false,
+  gmail = null
 } = {}) {
   return [
     {
@@ -336,6 +349,7 @@ export function defaultToolDefinitions({
         return outline(args.goal);
       }
     },
+    ...gmailToolDefinitions({ gmail }),
     {
       name: 'google.calendar_create_event',
       description: 'إنشاء موعد في Google Calendar — أثر خارجي يمرّ بـ outbox بعد موافقة صريحة',
@@ -394,7 +408,7 @@ export function defaultToolDefinitions({
         return buildCreativeWorkflowPlan(args || {});
       }
     },
-    ...knowledgeToolDefinitions({ kb }),
+    ...knowledgeToolDefinitions({ kb, plannerSafe }),
     ...(documentAutomation
       ? documentAutomationToolDefinitions({
           allowedRoots: allowedDocumentRoots,

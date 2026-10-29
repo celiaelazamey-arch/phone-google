@@ -1,3 +1,5 @@
+import { CLAIM_TYPES, isValidReviewDate } from './governance.js';
+
 /**
  * Registry contracts. A CSV row is data, never authority: risk levels must match
  * the canonical tool policy in code (`src/knowledge/tool-policy.js`), licenses are
@@ -60,7 +62,7 @@ export function findSecret(value) {
 
 export const SCHEMAS = Object.freeze({
   knowledge: {
-    required: ['id', 'title', 'type', 'description', 'source_url', 'license', 'updated_at', 'trust_level'],
+    required: ['id', 'title', 'type', 'description', 'source_url', 'license', 'updated_at', 'trust_level', 'claim_type', 'review_due'],
     optional: ['related', 'tags', 'lang', 'aliases']
   },
   tools: {
@@ -136,6 +138,13 @@ export function validateRow(kind, values, { canonicalRisk } = {}) {
     if (!KNOWLEDGE_TYPES.includes(values.type) && !['doc'].includes(values.type)) return fail('invalid_type', 'type');
     if (!HTTPS.test(values.source_url)) return fail('invalid_source_url', 'source_url');
     if (!ISO_DATE.test(values.updated_at)) return fail('invalid_updated_at', 'updated_at');
+    if (!values.claim_type) return fail('claim_type_required', 'claim_type');
+    if (!CLAIM_TYPES.includes(values.claim_type)) return fail('invalid_claim_type', 'claim_type');
+    if (!values.review_due) return fail('review_due_required', 'review_due');
+    if (!isValidReviewDate(values.review_due)) return fail('invalid_review_due', 'review_due');
+    if (String(values.review_due).slice(0, 10) < String(values.updated_at).slice(0, 10)) {
+      return fail('review_due_before_update', 'review_due');
+    }
     return {
       ok: true,
       record: {
@@ -147,6 +156,8 @@ export function validateRow(kind, values, { canonicalRisk } = {}) {
         license: values.license,
         updatedAt: values.updated_at,
         trust: values.trust_level,
+        claimType: values.claim_type,
+        reviewDue: values.review_due,
         related: splitList(values.related),
         tags: splitList(values.tags),
         aliases: splitList(values.aliases),

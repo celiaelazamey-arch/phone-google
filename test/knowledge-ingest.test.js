@@ -89,7 +89,9 @@ test('validate: licences, urls and dates are enforced; unknown columns are repor
     source_url: 'https://example.test/x',
     license: 'internal-owner',
     updated_at: '2026-10-27',
-    trust_level: 'T2'
+    trust_level: 'T2',
+    claim_type: 'operational_guidance',
+    review_due: '2027-01-27'
   };
   assert.equal(validateRow('knowledge', base).ok, true);
   assert.equal(validateRow('knowledge', { ...base, license: 'WTFPL' }).code, 'license_not_allowed');
@@ -98,7 +100,12 @@ test('validate: licences, urls and dates are enforced; unknown columns are repor
   assert.equal(validateRow('knowledge', { ...base, updated_at: '27/10/2026' }).code, 'invalid_updated_at');
   assert.equal(validateRow('knowledge', { ...base, id: 'A B C' }).code, 'invalid_id');
   assert.equal(validateRow('knowledge', { ...base, trust_level: 'T9' }).code, 'invalid_trust_level');
-  const header = checkHeader('knowledge', ['id', 'title', 'type', 'description', 'source_url', 'license', 'updated_at', 'trust_level', 'typo_column']);
+  assert.equal(validateRow('knowledge', { ...base, claim_type: '' }).code, 'claim_type_required');
+  assert.equal(validateRow('knowledge', { ...base, claim_type: 'new_speculation' }).code, 'invalid_claim_type');
+  assert.equal(validateRow('knowledge', { ...base, review_due: '' }).code, 'review_due_required');
+  assert.equal(validateRow('knowledge', { ...base, review_due: '2026-10-26' }).code, 'review_due_before_update');
+  assert.equal(validateRow('knowledge', { ...base, review_due: '2027-02-30' }).code, 'invalid_review_due');
+  const header = checkHeader('knowledge', ['id', 'title', 'type', 'description', 'source_url', 'license', 'updated_at', 'trust_level', 'claim_type', 'review_due', 'typo_column']);
   assert.equal(header.ok, true);
   assert.deepEqual(header.warnings, [{ code: 'unknown_column', field: 'typo_column' }]);
   assert.equal(checkHeader('knowledge', ['id']).code, 'missing_columns');
@@ -191,7 +198,7 @@ test('ingest: duplicate ids and unresolved relations are reported, never silentl
 
 test('ingest: full re-import marks absence instead of deleting, and clears it when the row returns', async (t) => {
   const { store } = await tempStore(t);
-  const header = ['id', 'title', 'type', 'description', 'source_url', 'license', 'updated_at', 'trust_level'];
+  const header = ['id', 'title', 'type', 'description', 'source_url', 'license', 'updated_at', 'trust_level', 'claim_type', 'review_due'];
   const rowA = {
     id: 'kb-a',
     title: 'A',
@@ -200,7 +207,9 @@ test('ingest: full re-import marks absence instead of deleting, and clears it wh
     source_url: 'https://example.test/a',
     license: 'internal-owner',
     updated_at: '2026-10-27',
-    trust_level: 'T2'
+    trust_level: 'T2',
+    claim_type: 'operational_guidance',
+    review_due: '2027-01-27'
   };
   const rowB = { ...rowA, id: 'kb-b', title: 'B', source_url: 'https://example.test/b' };
   ingestRegistry({ store, kind: 'knowledge', source: source(), csvText: toCsv(header, [rowA, rowB]), dryRun: false, full: true });

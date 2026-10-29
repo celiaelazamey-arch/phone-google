@@ -3,6 +3,7 @@ import { createAgentStore } from './store.js';
 import { createMysqlDriver, createSqliteDriver } from './drivers.js';
 import { createToolRegistry, defaultToolDefinitions } from './tools.js';
 import { createDemoPlanner } from './planner.js';
+import { createProviderPlanner, PROVIDER_PLAN_SCHEMA, validateProviderPlan } from './planner-provider.js';
 import {
   HARNESS_LIFECYCLE_STAGES,
   HARNESS_COMPONENT_IDS,
@@ -47,6 +48,7 @@ import {
   createDriveExportConnector,
   createGoogleDriveTransport
 } from './connectors.js';
+import { createGmailReadConnector, GMAIL_CONNECTOR, GMAIL_TOOL, GMAIL_MAX_RESULTS } from './gmail.js';
 import {
   CELIA_SEVEN_STAGE_LOOP,
   TASK_CATEGORIES,
@@ -61,6 +63,9 @@ import {
 
 export {
   PLAN_LIFECYCLE_STATE,
+  createProviderPlanner,
+  PROVIDER_PLAN_SCHEMA,
+  validateProviderPlan,
   HARNESS_LIFECYCLE_STAGES,
   HARNESS_COMPONENT_IDS,
   inspectAgentHarness,
@@ -99,6 +104,10 @@ export {
   createWhatsAppCloudTransport,
   createDriveExportConnector,
   createGoogleDriveTransport,
+  createGmailReadConnector,
+  GMAIL_CONNECTOR,
+  GMAIL_TOOL,
+  GMAIL_MAX_RESULTS,
   CELIA_SEVEN_STAGE_LOOP,
   TASK_CATEGORIES,
   recommendTaskStrategy,
@@ -156,18 +165,20 @@ export function readAgentLimits(env = process.env) {
 }
 
 /**
- * External connectors are opt-in and explicit: `none` (default) keeps every external
- * effect refused with `external_connector_unavailable`, and `calendar` wires the
- * Google Calendar connector to the owner's existing Google grant. A requested
- * connector whose credentials are missing is an error, never a silent downgrade.
+ * External-effect connectors and the Gmail reader are opt-in and explicit:
+ * `none` (default) keeps every external effect refused with
+ * `external_connector_unavailable` and does not register Gmail. `calendar` and
+ * `drive` use the owner's existing Google grant; `gmail` uses that same grant for
+ * metadata-only reads and never enters the outbox. Missing configuration is an
+ * error, never a silent downgrade.
  */
 export function readAgentConnectors(env = process.env) {
   const raw = String(env.CELIA_AGENT_CONNECTORS || 'none').trim().toLowerCase();
   const names = raw === '' ? [] : raw.split(',').map((name) => name.trim()).filter(Boolean);
-  const allowed = new Set(['none', 'calendar', 'whatsapp', 'drive']);
+  const allowed = new Set(['none', 'calendar', 'whatsapp', 'drive', 'gmail']);
   for (const name of names) {
     if (!allowed.has(name)) {
-      throw new Error('CELIA_AGENT_CONNECTORS must be one of: none, calendar, whatsapp, drive');
+      throw new Error('CELIA_AGENT_CONNECTORS must be one of: none, calendar, whatsapp, drive, gmail');
     }
   }
   return [...new Set(names.filter((name) => name !== 'none'))];
@@ -182,15 +193,15 @@ function buildConnectors({ env, pool, config, logger }) {
   }
   if (!requested.length) return createEmptyConnectorRegistry();
 
-  const needsGoogle = requested.includes('calendar') || requested.includes('drive');
+  const needsGoogle = requested.some((name) => ['calendar', 'drive', 'gmail'].includes(name));
   if (needsGoogle) {
     if (!config.google?.clientId || !config.google?.clientSecret) {
-      throw Object.assign(new Error('CELIA_AGENT_CONNECTORS=calendar|drive requires Google OAuth configuration'), {
+      throw Object.assign(new Error('CELIA_AGENT_CONNECTORS=calendar|drive|gmail requires Google OAuth configuration'), {
         code: 'agent_connector_unconfigured'
       });
     }
     if (!pool || pool.isMemory) {
-      throw Object.assign(new Error('CELIA_AGENT_CONNECTORS=calendar|drive requires a durable pool for stored grants'), {
+      throw Object.assign(new Error('CELIA_AGENT_CONNECTORS=calendar|drive|gmail requires a durable pool for stored grants'), {
         code: 'agent_connector_unconfigured'
       });
     }
@@ -211,7 +222,8 @@ function buildConnectors({ env, pool, config, logger }) {
   }
 
   const userId = config.userId || env.APP_USER_ID || 'owner';
-  const definitions = requested.map((name) => {
+  // Gmail is a read tool, not an outbox/send connector; it is wired separately below.
+  const definitions = requested.filter((name) => name !== 'gmail').map((name) => {
     if (name === 'calendar') {
       const transport = createGoogleCalendarTransport({
         getCalendar: async () => {
@@ -267,6 +279,20 @@ function buildConnectors({ env, pool, config, logger }) {
   return createConnectorRegistry(definitions);
 }
 
+function buildGmailReader({ pool, config, env }) {
+  const userId = config.userId || env.APP_USER_ID || 'owner';
+  return createGmailReadConnector({
+    transport: {
+      async listMessages({ maxResults, unreadOnly, signal }) {
+        // Reuse the existing encrypted OAuth grant and Gmail fetcher. No token,
+        // credentials file, or additional scope is introduced by this connector.
+        const { fetchInboxMessages } = await import('../google.js');
+        return fetchInboxMessages({ pool, config, userId, maxResults, unreadOnly, signal });
+      }
+    }
+  });
+}
+
 /**
  * A host keeps agent initialization out of the request path of unrelated routes.
  * `ready` resolves to the runtime, or to `null` when the mode is `off`.
@@ -280,7 +306,9 @@ export function createAgentHost({
   logger = console,
   // Explicit injection seam: tests and embedders pass a registry; production builds
   // it from CELIA_AGENT_CONNECTORS. Never a silent fallback — `null` means "build it".
-  connectors: injectedConnectors = null
+  connectors: injectedConnectors = null,
+  // Read-only Gmail has its own injection seam; it is never an outbox connector.
+  gmail: injectedGmail = null
 } = {}) {
   let mode = 'off';
   let failure = null;
@@ -328,10 +356,13 @@ export function createAgentHost({
     const store = createAgentStore({ driver });
     const kb = kbHost && kbHost.mode === 'sqlite' ? kbHost : null;
     const connectors = injectedConnectors || buildConnectors({ env, pool, config, logger });
+    const gmail = injectedGmail || (!injectedConnectors && readAgentConnectors(env).includes('gmail')
+      ? buildGmailReader({ pool, config, env })
+      : null);
     const runtime = createAgentRuntime({
       store,
-      tools: createToolRegistry(defaultToolDefinitions({ statusProvider, kb })),
-      planner: createDemoPlanner({ knowledge: Boolean(kb) }),
+      tools: createToolRegistry(defaultToolDefinitions({ statusProvider, kb, gmail })),
+      planner: createDemoPlanner({ knowledge: Boolean(kb), gmail: Boolean(gmail) }),
       connectors,
       ownerId: config.userId || env.APP_USER_ID || 'owner',
       limits: readAgentLimits(env),

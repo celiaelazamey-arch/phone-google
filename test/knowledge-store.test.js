@@ -171,5 +171,5 @@ test('store: a missing parent directory is created instead of refusing the index
   t.after(() => store.close());
   assert.ok(existsSync(file), 'the file store was created');
   assert.equal(store.stats().items, 0);
-  assert.match(store.stats().schemaVersion ? String(store.stats().schemaVersion) : '1', /^1$/);
+  assert.match(String(store.stats().schemaVersion), /^2$/);
 });

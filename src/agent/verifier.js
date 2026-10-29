@@ -1,6 +1,6 @@
 import { RISK } from './tools.js';
 import { validateGoalContract } from './goal-contract.js';
-import { hashOf, verifyChain } from './evidence.js';
+import { EVIDENCE_KIND, hashOf, verifyChain } from './evidence.js';
 import {
   validateAutomationSchema,
   VALIDATION_STATUS,
@@ -8,6 +8,7 @@ import {
   COMPREHENSION_GATE_STATUS
 } from './automation/schema.js';
 import { evaluateComprehensionGate } from './automation/validator.js';
+import { PLANNER_KB_POLICY, plannerEligibility } from '../knowledge/governance.js';
 
 /**
  * Independent verifier (roadmap unit 7).
@@ -102,7 +103,7 @@ export function createVerifier({ tools, clock = Date.now } = {}) {
     }
   }
 
-  function knowledgeLicenceChecks(toolRuns, checks) {
+  function knowledgeLicenceChecks(toolRuns, checks, { planner = false } = {}) {
     for (const toolRun of toolRuns.filter((item) => item.toolName === 'kb.search' && item.status === 'succeeded')) {
       const outcome = parseOutcome(toolRun);
       const items = outcome?.items;
@@ -118,6 +119,31 @@ export function createVerifier({ tools, clock = Date.now } = {}) {
           ? { id: 'kb_source_licence_trust', status: CHECK.pass, detail: `all ${items.length} items carry uri+licence+trust` }
           : { id: 'kb_source_licence_trust', status: CHECK.block, detail: `${missing} kb item(s) missing uri/licence/trust` }
       );
+      // Provider runs are identifiable from their durable evidence kinds. A
+      // missing governance envelope is therefore BLOCK, not an opt-out from
+      // the policy; ordinary deterministic KB runs keep their legacy contract.
+      if (planner || outcome?.governance?.profile === PLANNER_KB_POLICY.profile) {
+        const policy = outcome?.governance;
+        const policyValid = Boolean(policy)
+          && policy.profile === PLANNER_KB_POLICY.profile
+          && policy.kind === PLANNER_KB_POLICY.kind
+          && policy.reviewRequired === PLANNER_KB_POLICY.reviewRequired
+          && JSON.stringify(policy.claimTypes) === JSON.stringify(PLANNER_KB_POLICY.claimTypes)
+          && JSON.stringify(policy.trust) === JSON.stringify(PLANNER_KB_POLICY.trust);
+        const invalidGoverned = items.filter((item) => {
+          const eligibility = plannerEligibility(item, clock());
+          return !eligibility.eligible || item.plannerEligible !== true || item.reviewStatus !== 'current';
+        });
+        checks.push({
+          id: 'kb_planner_governance',
+          status: policyValid && invalidGoverned.length === 0 ? CHECK.pass : CHECK.block,
+          detail: !policyValid
+            ? 'planner KB policy metadata is missing or does not match the closed policy'
+            : invalidGoverned.length
+              ? `planner received ${invalidGoverned.length} KB item(s) outside the governance policy`
+              : 'planner KB items are governed, current and operational'
+        });
+      }
     }
   }
 
@@ -467,7 +493,13 @@ export function createVerifier({ tools, clock = Date.now } = {}) {
         ? { id: 'outcome_schema', status: CHECK.pass, detail: 'all stored outcomes parse as JSON' }
         : { id: 'outcome_schema', status: CHECK.block, detail: `unparseable outcome(s): ${unparseable.map((item) => item.toolName).join(', ')}` }
     );
-    knowledgeLicenceChecks(toolRuns, checks);
+    const providerEvidence = evidence.some((entry) => [
+      EVIDENCE_KIND.planCreated,
+      EVIDENCE_KIND.toolSelected,
+      EVIDENCE_KIND.toolExecuted,
+      EVIDENCE_KIND.verificationResult
+    ].includes(entry.kind));
+    knowledgeLicenceChecks(toolRuns, checks, { planner: providerEvidence });
 
     // 7. Goal contract: structural validity plus the machine-checkable criteria.
     const contractCheck = validateGoalContract(contract);

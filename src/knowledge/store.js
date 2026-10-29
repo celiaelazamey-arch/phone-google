@@ -3,6 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { KNOWLEDGE_DDL, KNOWLEDGE_SCHEMA_VERSION, KNOWLEDGE_TABLES } from './schema.js';
 import { expandTerms, normalize, queryTerms, snippet } from './normalize.js';
+import { PLANNER_KB_POLICY, plannerEligibility, reviewStatus } from './governance.js';
 
 /**
  * Knowledge store over SQLite (`node:sqlite`, FTS5).
@@ -75,6 +76,11 @@ export class KnowledgeStore {
 
   migrate() {
     for (const statement of KNOWLEDGE_DDL) this.db.exec(statement);
+    // KB is derived and local, but existing files still need an additive upgrade:
+    // CREATE TABLE IF NOT EXISTS cannot add governance columns to a v1 items table.
+    const columns = new Set(this.db.prepare('PRAGMA table_info(items)').all().map((column) => column.name));
+    if (!columns.has('claim_type')) this.db.exec('ALTER TABLE items ADD COLUMN claim_type TEXT NULL');
+    if (!columns.has('review_due')) this.db.exec('ALTER TABLE items ADD COLUMN review_due TEXT NULL');
     this.db
       .prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
       .run('schema_version', String(KNOWLEDGE_SCHEMA_VERSION));
@@ -200,15 +206,21 @@ export class KnowledgeStore {
     const at = iso(this.clock);
     if (existing) {
       if (existing.content_hash === hash) {
+        const claimType = item.claimType ?? null;
+        const reviewDue = item.reviewDue ?? null;
+        const governanceChanged = existing.claim_type !== claimType || existing.review_due !== reviewDue;
         this.db
-          .prepare('UPDATE items SET title = ?, uri = ?, source_updated_at = ?, absent_since = NULL WHERE id = ?')
-          .run(item.title, item.uri, item.sourceUpdatedAt ?? null, item.id);
-        return { status: 'unchanged', itemId: item.id };
+          .prepare(
+            `UPDATE items SET title = ?, uri = ?, source_updated_at = ?, claim_type = ?, review_due = ?,
+              absent_since = NULL WHERE id = ?`
+          )
+          .run(item.title, item.uri, item.sourceUpdatedAt ?? null, claimType, reviewDue, item.id);
+        return { status: governanceChanged ? 'updated' : 'unchanged', itemId: item.id };
       }
       this.db
         .prepare(
           `UPDATE items SET source_id = ?, kind = ?, title = ?, body = ?, content_hash = ?, lang = ?, trust = ?,
-            uri = ?, source_updated_at = ?, indexed_at = ?, absent_since = NULL WHERE id = ?`
+            uri = ?, source_updated_at = ?, claim_type = ?, review_due = ?, indexed_at = ?, absent_since = NULL WHERE id = ?`
         )
         .run(
           item.sourceId,
@@ -220,6 +232,8 @@ export class KnowledgeStore {
           item.trust,
           item.uri,
           item.sourceUpdatedAt ?? null,
+          item.claimType ?? null,
+          item.reviewDue ?? null,
           at,
           item.id
         );
@@ -229,7 +243,8 @@ export class KnowledgeStore {
     this.db
       .prepare(
         `INSERT INTO items (id, source_id, kind, title, body, content_hash, lang, trust, uri,
-          source_updated_at, indexed_at, absent_since) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`
+          source_updated_at, claim_type, review_due, indexed_at, absent_since)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`
       )
       .run(
         item.id,
@@ -242,6 +257,8 @@ export class KnowledgeStore {
         item.trust,
         item.uri,
         item.sourceUpdatedAt ?? null,
+        item.claimType ?? null,
+        item.reviewDue ?? null,
         at
       );
     this.indexItem(item);
@@ -392,7 +409,16 @@ export class KnowledgeStore {
       },
       attrs: Object.fromEntries(attrs.map((attr) => [attr.key, attr.value])),
       evidence: evidence
-        ? { id: evidence.id, title: evidence.title, uri: evidence.uri, licence: source?.license || null, trust: evidence.trust }
+        ? {
+            id: evidence.id,
+            title: evidence.title,
+            uri: evidence.uri,
+            licence: source?.license || null,
+            trust: evidence.trust,
+            claimType: evidence.claim_type || null,
+            reviewDue: evidence.review_due || null,
+            reviewStatus: reviewStatus(evidence.review_due, this.clock())
+          }
         : null,
       outgoing: outgoing.map((edge) => ({
         rel: edge.rel,
@@ -412,11 +438,13 @@ export class KnowledgeStore {
   }
 
   /**
-   * Hybrid search: FTS5 lexical candidates + trust + freshness + one-hop graph
-   * proximity, assembled into a bounded evidence pack that always carries source,
-   * licence and trust with every result.
+   * Bounded lexical evidence search: FTS5 candidates + trust + freshness +
+   * optional one-hop graph proximity. Every result carries source, licence and
+   * trust; this is not semantic/embedding retrieval.
    */
-  search({ query, limit = 6, maxChars = 1200, minTrust = 'T1', expandGraph = true } = {}) {
+  search({ query, limit = 6, maxChars = 1200, minTrust = 'T1', expandGraph = true, profile = 'default' } = {}) {
+    if (!['default', 'planner'].includes(profile)) throw new Error('unknown_knowledge_search_profile');
+    const planner = profile === 'planner';
     const startedAt = process.hrtime.bigint();
     const terms = queryTerms(query || '');
     const result = {
@@ -431,6 +459,16 @@ export class KnowledgeStore {
       tookMs: 0,
       reason: null
     };
+    if (planner) {
+      result.governance = {
+        profile: PLANNER_KB_POLICY.profile,
+        kind: PLANNER_KB_POLICY.kind,
+        claimTypes: [...PLANNER_KB_POLICY.claimTypes],
+        trust: [...PLANNER_KB_POLICY.trust],
+        reviewRequired: PLANNER_KB_POLICY.reviewRequired,
+        excluded: 0
+      };
+    }
     if (!terms.length) {
       result.reason = 'empty_query';
       result.tookMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
@@ -444,15 +482,27 @@ export class KnowledgeStore {
       return result;
     }
 
-    const candidateIds = candidates.rows.map((row) => row.id);
-    const matchedEntities = this.matchEntities(terms, candidateIds);
+    const rows = candidates.rows.map((row) => ({ ...row, governance: plannerEligibility(row, this.clock()) }));
+    const eligibleRows = planner ? rows.filter((row) => row.governance.eligible) : rows;
+    if (planner) {
+      result.governance.excluded = rows.length - eligibleRows.length;
+      if (!eligibleRows.length) {
+        result.reason = 'no_planner_eligible_knowledge';
+        result.tookMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+        return result;
+      }
+    }
+    const candidateIds = eligibleRows.map((row) => row.id);
+    // A planner receives only entities evidenced by eligible documents; direct
+    // name matches cannot smuggle a tool/catalog entity into its evidence pack.
+    const matchedEntities = this.matchEntities(terms, candidateIds, { direct: !planner });
     const entityEvidence = new Set(matchedEntities.map((entity) => entity.evidence_item_id));
     const neighbors = this.neighborEntities(matchedEntities);
     const neighborEvidence = new Map(neighbors.map((entity) => [entity.evidence_item_id, entity]));
 
-    const maxLexical = Math.max(...candidates.rows.map((row) => row.lexical), 0.000001);
+    const maxLexical = Math.max(...eligibleRows.map((row) => row.lexical), 0.000001);
     const scored = [];
-    for (const row of candidates.rows) {
+    for (const row of eligibleRows) {
       if (TRUST_RANK[row.trust] < TRUST_RANK[minTrust]) continue;
       const lexical = row.lexical / maxLexical;
       const trust = TRUST_WEIGHT[row.trust] ?? 0.4;
@@ -482,6 +532,10 @@ export class KnowledgeStore {
         licence: entry.row.license,
         sourceId: entry.row.source_id,
         sourceKind: entry.row.source_kind,
+        claimType: entry.row.claim_type || null,
+        reviewDue: entry.row.review_due || null,
+        reviewStatus: entry.row.governance.reviewStatus,
+        plannerEligible: entry.row.governance.eligible,
         snippet: text,
         score: Number(entry.score.toFixed(4)),
         breakdown: Object.fromEntries(Object.entries(entry.breakdown).map(([key, value]) => [key, Number(value.toFixed(3))]))
@@ -497,7 +551,7 @@ export class KnowledgeStore {
       wired: Boolean(entity.wired),
       trust: entity.trust
     }));
-    if (expandGraph) {
+    if (expandGraph && !planner) {
       const allowed = new Set(matchedEntities.map((entity) => `${entity.type}:${entity.key}`));
       result.edges = this.db
         .prepare(
@@ -520,7 +574,7 @@ export class KnowledgeStore {
 
   ftsCandidates(terms) {
     const select = `SELECT f.item_id AS id, i.title, i.body, i.kind, i.uri, i.trust, i.source_id,
-        i.source_updated_at, i.indexed_at, s.license, s.kind AS source_kind,
+        i.source_updated_at, i.claim_type, i.review_due, i.indexed_at, s.license, s.kind AS source_kind,
         COALESCE(s.stale_after_days, 180) AS stale_after_days, f.rank AS rank
       FROM (SELECT item_id, bm25(items_fts, 0.0, 3.0, 1.0) AS rank FROM items_fts
             WHERE items_fts MATCH ? ORDER BY rank LIMIT ${MAX_FTS_CANDIDATES}) f
@@ -543,14 +597,16 @@ export class KnowledgeStore {
    * evidence item matched lexically, so an Arabic query that finds "إنشاء موعد"
    * also surfaces the tool entity with its risk and approval flag.
    */
-  matchEntities(terms, candidateIds = []) {
+  matchEntities(terms, candidateIds = [], { direct = true } = {}) {
     const rows = new Map();
     const statement = this.db.prepare(
       `SELECT * FROM entities WHERE status = 'active' AND (key_norm LIKE ? OR title_norm LIKE ?) LIMIT 25`
     );
-    for (const term of terms) {
-      const like = `%${term}%`;
-      for (const row of statement.all(like, like)) rows.set(`${row.type}:${row.key}`, row);
+    if (direct) {
+      for (const term of terms) {
+        const like = `%${term}%`;
+        for (const row of statement.all(like, like)) rows.set(`${row.type}:${row.key}`, row);
+      }
     }
     if (candidateIds.length) {
       const placeholders = candidateIds.map(() => '?').join(',');
@@ -600,7 +656,7 @@ export class KnowledgeStore {
   stale({ days, now = this.clock() } = {}) {
     const rows = this.db
       .prepare(
-        `SELECT i.id, i.title, i.uri, i.source_id, s.trust, s.license, s.stale_after_days,
+        `SELECT i.id, i.title, i.uri, i.source_id, i.claim_type, i.review_due, s.trust, s.license, s.stale_after_days,
                 COALESCE(i.source_updated_at, i.indexed_at) AS updated_at
          FROM items i JOIN sources s ON s.id = i.source_id
          WHERE i.absent_since IS NULL
@@ -612,7 +668,19 @@ export class KnowledgeStore {
       const threshold = days ?? row.stale_after_days ?? 180;
       const age = ageDays(row.updated_at, now);
       if (age !== null && age > threshold) {
-        out.push({ id: row.id, title: row.title, uri: row.uri, sourceId: row.source_id, trust: row.trust, licence: row.license, ageDays: Math.round(age), threshold });
+        out.push({
+          id: row.id,
+          title: row.title,
+          uri: row.uri,
+          sourceId: row.source_id,
+          trust: row.trust,
+          licence: row.license,
+          claimType: row.claim_type || null,
+          reviewDue: row.review_due || null,
+          reviewStatus: reviewStatus(row.review_due, now),
+          ageDays: Math.round(age),
+          threshold
+        });
       }
     }
     const absent = this.db.prepare('SELECT COUNT(*) AS total FROM items WHERE absent_since IS NOT NULL').get();
@@ -708,7 +776,9 @@ export class KnowledgeStore {
     const kindOf = (record) => record?.recordType || record?.type;
     const manifest = records[0];
     if (kindOf(manifest) !== 'manifest') throw new Error('backup_missing_manifest');
-    if (manifest.schemaVersion !== KNOWLEDGE_SCHEMA_VERSION) throw new Error('backup_schema_mismatch');
+    // v1 backups remain restorable into the additive v2 schema; their missing
+    // governance fields stay NULL and therefore never become planner-eligible.
+    if (![1, KNOWLEDGE_SCHEMA_VERSION].includes(manifest.schemaVersion)) throw new Error('backup_schema_mismatch');
     const existing = this.stats();
     if (existing.items || existing.entities || existing.sources) throw new Error('backup_target_not_empty');
     const counts = { sources: 0, items: 0, aliases: 0, entities: 0, attrs: 0, edges: 0 };
@@ -726,8 +796,9 @@ export class KnowledgeStore {
         } else if (kind === 'item') {
           this.db
             .prepare(
-              `INSERT INTO items (id, source_id, kind, title, body, content_hash, lang, trust, uri, source_updated_at, indexed_at, absent_since)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+              `INSERT INTO items (id, source_id, kind, title, body, content_hash, lang, trust, uri, source_updated_at,
+                claim_type, review_due, indexed_at, absent_since)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
             )
             .run(
               record.id,
@@ -740,6 +811,8 @@ export class KnowledgeStore {
               record.trust,
               record.uri,
               record.source_updated_at,
+              record.claim_type ?? null,
+              record.review_due ?? null,
               record.indexed_at,
               record.absent_since
             );

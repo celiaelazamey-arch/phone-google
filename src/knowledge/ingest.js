@@ -164,7 +164,9 @@ export function ingestRegistry({
         lang: value.lang || 'mixed',
         trust: source.trust,
         uri: value.sourceUrl || value.docsUrl || value.evidenceUrl || value.repoUrl || source.uri,
-        sourceUpdatedAt: value.updatedAt || value.lastSync || source.lastSync || null
+        sourceUpdatedAt: value.updatedAt || value.lastSync || source.lastSync || null,
+        claimType: value.claimType || null,
+        reviewDue: value.reviewDue || null
       };
       const outcome = store.putItem(item);
       counts[outcome.status] += 1;
@@ -200,7 +202,13 @@ export function ingestRegistry({
                 ? { domain: value.domain, status: value.status, priority: value.priority, owner: value.owner, repoUrl: value.repoUrl }
                 : kind === 'sources'
                   ? { kind: value.kind, uri: value.uri, lastSync: value.lastSync, staleAfterDays: String(value.staleAfterDays) }
-                  : { type: value.type, sourceUrl: value.sourceUrl, updatedAt: value.updatedAt }
+                  : {
+                      type: value.type,
+                      sourceUrl: value.sourceUrl,
+                      updatedAt: value.updatedAt,
+                      claim_type: value.claimType,
+                      review_due: value.reviewDue
+                    }
       });
 
       for (const edge of relationPlan(kind, value)) {

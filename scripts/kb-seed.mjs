@@ -483,7 +483,13 @@ const TOOL_HEADER = ['id', 'name', 'category', 'risk_level', 'requires_approval'
 const SOURCE_HEADER = ['id', 'name', 'kind', 'uri', 'license', 'last_sync', 'trust_level', 'stale_after_days', 'notes'];
 const SKILL_HEADER = ['id', 'name', 'level', 'category', 'source', 'evidence_url', 'projects', 'aliases', 'notes'];
 const PROJECT_HEADER = ['id', 'name', 'domain', 'status', 'priority', 'owner', 'repo_url', 'related', 'aliases', 'notes'];
-const KNOWLEDGE_HEADER = ['id', 'title', 'type', 'description', 'source_url', 'license', 'updated_at', 'trust_level', 'related', 'tags', 'aliases', 'lang'];
+// Review dates are owner-review deadlines, not claims that a source stays true forever.
+const GOVERNED_KNOWLEDGE = KNOWLEDGE.map((row) => ({
+  ...row,
+  claim_type: 'operational_guidance',
+  review_due: '2027-01-27'
+}));
+const KNOWLEDGE_HEADER = ['id', 'title', 'type', 'description', 'source_url', 'license', 'updated_at', 'trust_level', 'related', 'tags', 'aliases', 'lang', 'claim_type', 'review_due'];
 
 async function main() {
   const files = [
@@ -491,7 +497,7 @@ async function main() {
     ['tools_registry.csv', TOOL_HEADER, toolsRows()],
     ['skills_registry.csv', SKILL_HEADER, SKILLS],
     ['projects_registry.csv', PROJECT_HEADER, PROJECTS],
-    ['knowledge_registry.csv', KNOWLEDGE_HEADER, KNOWLEDGE]
+    ['knowledge_registry.csv', KNOWLEDGE_HEADER, GOVERNED_KNOWLEDGE]
   ];
   for (const [name, header, rows] of files) {
     await writeFile(path.join(directory, name), toCsv(header, rows), 'utf8');
