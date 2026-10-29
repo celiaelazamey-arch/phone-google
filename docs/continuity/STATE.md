@@ -6,9 +6,10 @@
 > والإصدار `40719074453` والجودة `40719074375`. المتبقي حصرًا لإجراء المالك: رابط استدعاء Google، وأسرار Meta الاختيارية.
 > انظر [سجل جلسة النشر الحي](sessions/2026-10-28-live-edge-publication.md). ما يلي توثيق الجلسة السابقة كما كُتب، محفوظ بلا حذف.
 
-**آخر مراجعة:** 29 أكتوبر 2026 · **نوع الجلسة الحالية:** **«نفّذ الستة» — إصلاح نشر الحافة حيًّا + إغلاق #38 + قراءة ضوابط المالك (DEC-044، DEC-045، OPS-007، SEC-006)** —
-على الفرع `arena/2f11f424-phone-google` (نظيف من `main@c3cc9ba`؛ يحمل إصلاح DEC-044 منقولًا من الفرع السابق المقفول `pr_merged`) ·
-سجل الجلسة الحالي: [2026-10-29-execute-six-deploy-fix-live](sessions/2026-10-29-execute-six-deploy-fix-live.md) ·
+**آخر مراجعة:** 29 أكتوبر 2026 · **نوع الجلسة الحالية:** **سكربت تفعيل ضوابط المالك (DEC-046، SEC-006)** — على الفرع `arena/74ff3f8d-phone-google`
+(نظيف من `main@f223648` = دمج PR #76؛ لا PR بعد — بكلمة المالك) ·
+سجل الجلسة الحالي: [2026-10-29-security-controls-apply-script](sessions/2026-10-29-security-controls-apply-script.md) ·
+سجل «نفّذ الستة» (DEC-044 حيًّا، DEC-045): [2026-10-29-execute-six-deploy-fix-live](sessions/2026-10-29-execute-six-deploy-fix-live.md) ·
 سجل دمج #74 وتشخيص الفشل: [2026-10-29-merge-74-and-edge-deploy-fix](sessions/2026-10-29-merge-74-and-edge-deploy-fix.md) ·
 سجل SEC-006 + LEARN-001 (DEC-043): [2026-10-29-security-posture-and-video-record](sessions/2026-10-29-security-posture-and-video-record.md) ·
 سجل OPS-007 (DEC-042): [2026-10-29-edge-cron-outbox](sessions/2026-10-29-edge-cron-outbox.md) ·
@@ -23,7 +24,26 @@
 [docs/computer-use.md](../computer-use.md) · حوكمة المشكلات: [docs/issue-triage.md](../issue-triage.md) ·
 واقع الخدمات: [docs/service-reality.md](../service-reality.md) · خطة المحافظة: [docs/preservation-plan.md](../preservation-plan.md)
 
-## الطلب الحالي — «نفّذ الستة» (DEC-044 حيًّا، DEC-045، OPS-007، SEC-006)
+## الطلب الحالي — سكربت خارجي لتفعيل ضوابط الأمان + إعلان «دستور/شخصية» (DEC-046، SEC-006)
+
+- **ما وصل:** تحليل خارجي يقترح سكربت bash (`gh api`) يفعّل Branch protection / Dependabot / CodeQL / Secret scanning ويطلب من المالك تشغيله.
+- **ما فُعل:** (1) جرّب الوكيل الاستدعاءات الخمسة بنفسه → **403 ×5** (رمز تكامل بهوية المالك بلا صلاحية إدارة) — لا تغيير حدث؛
+  (2) السكربت الخارجي فيه عيوب قاطعة (`"null"` نصًا → 422؛ check `CI / build` غير موجود → يقفل كل دمج؛ `strict=true`) فلم يُمرَّر؛
+  (3) بُني البديل الحتمي **`scripts/security-posture-apply.mjs`** (`--plan` / `--apply` / `--verify`) باختبارات SPA-01..SPA-07 —
+  ruleset بأسماء وظائف الجودة الست الحقيقية (SPA-01 يثبت مطابقتها للـworkflow)، بلا مراجعات، بلا linear history (merge commits)،
+  بلا bypass، `strict=false`؛ ثم Dependabot alerts + security updates، CodeQL الافتراضي، Secret scanning + Push protection؛
+  (4) `--verify` حيًّا يطابق DEC-045: ثلاثة `NOT ENABLED (2026-10-29)` واثنان `UNKNOWN`. 571/571 محليًا.
+- **«الدستور/الشخصية»:** لم يُضف كملف إعلاني (موكب بمقياس DEC-030)؛ المبادئ مفروضة أصلًا كقيود مختبَرة (DEC-030/041/043/045). إن أراد
+  المالك حَكْم سطح ردّ محدد (system prompt لردود WhatsApp) فبطلب صريح وقرار مرقّم (سجل الجلسة §4).
+- **بانتظار المالك:** (أ) من جهازه: `npm run security:posture -- --apply` ثم `-- --verify` (بعد `gh auth status` بحسابه) ثم «تم» → يعيد الوكيل
+  القراءة ويحدّث §2 بتاريخ؛ (ب) كلمة فتح PR لهذا الفرع («افتح PR») ثم «ادمج».
+- **«تم» الثانية (2026-10-29 03:47 UTC) غير منعكسة:** `--verify` ×2 + القراءة الخام (`rulesets` 0، `protected:false`، Dependabot معطّل، لا CodeQL)
+  — لا تغيير في أي حالة؛ لا `VERIFIED`. المطلوب: ناتج `--verify` من جهاز المالك (بعد `gh auth status` بحسابه) أو لقطة الإعدادات (سجل الجلسة §6).
+- **مسار بلا طرفية (أُضيف لأن المالك يلصق الأوامر بدل ناتجها):** `docs/github/ruleset-main-quality-gate.json` → Settings → Rules → New ruleset ▾ →
+  **Import a ruleset** → Create؛ ثم `settings/security_analysis` → Enable ×5. SPA-08 يُبقي الملف مطابقًا لجسم `--apply`؛ الفحوص مثبّتة على
+  GitHub Actions (`integration_id` 15368). 572/572.
+
+## الطلب السابق — «نفّذ الستة» (DEC-044 حيًّا، DEC-045، OPS-007، SEC-006) — **منجز ومدمج (PR #75 → `main@8ce7ded`، PR #76 → `main@f223648`)**
 
 - **1 ✓ النقل:** الفرع السابق قُفل (`pr_merged`) فنُقل الإصلاح إلى `arena/2f11f424-phone-google` بـcherry-pick (`ea078f4` كود، `ebef990`/`3bdc6f4`
   وثائق) — الشجرة مطابقة بايتًا لما كان مدفوعًا؛ 564/564 محليًا.

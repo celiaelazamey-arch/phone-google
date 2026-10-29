@@ -49,11 +49,42 @@
 **آخر فحص آلي: 2026-10-29** (بعد قول المالك «تم»): `branches/main → protected: false`، `rulesets → []`، `rules/branches/main → []`،
 `dependabot/alerts → 403 "Dependabot alerts are disabled for this repository."`، لا `dynamic/github-code-scanning/codeql` في قائمة
 الـworkflows (الموجود الديناميكي الوحيد: `dynamic/dependabot/dependabot-updates`)، والبقية 403. أي أن **ضابطين على الأقل لم يُفعَّلا بعد**؛
-الصفوف أدناه تعكس ذلك لا كلمة التأكيد. إعادة الفحص: الأوامر في §4.
+الصفوف أدناه تعكس ذلك لا كلمة التأكيد. إعادة الفحص: `npm run security:posture -- --verify` (§4).
+
+**التفعيل الآلي (DEC-046) — من جهاز المالك لا من الوكيل:** `scripts/security-posture-apply.mjs` يحمل الخطة كاملة (`--plan` يطبعها بلا
+شبكة؛ `--apply` ينفّذها عبر `gh api`؛ `--verify` يقرأها). جرّب الوكيل `--apply` بنفسه في 2026-10-29 فردّت الواجهة **403 ×5
+«Resource not accessible by integration»** — رمزه رمز تكامل بهوية المالك لكن **بلا صلاحية إدارة**. لذلك:
+
+```bash
+gh auth status                      # يجب أن يكون الحساب celiaelazamey-arch (المالك) من جهازك، لا رمز الوكيل
+npm run security:posture -- --plan  # اقرأ ما سيُرسل بالضبط
+npm run security:posture -- --apply # يطبّق الخمسة ويذكر كل واحد باسمه: applied / forbidden / failed
+npm run security:posture -- --verify
+```
+
+ما تطبّقه الخطة — وهو ما **يختلف** عن السكربت الخارجي المقترح (الذي استخدم `-f field=null` فيُرسل النص `"null"` → 422، وطلب
+check باسم `CI / build` غير موجود هنا فكان سيقفل كل دمج): **ruleset** على الفرع الافتراضي باسم `main — quality gate (Celia)` =
+منع الحذف + منع force-push + **status checks مطلوبة = وظائف الجودة الست بأسمائها الحقيقية** (الاختبار SPA-01 يثبت مطابقتها لملف
+الـworkflow)؛ `strict` معطّل (فحوص الـPR تجري أصلًا على merge ref)؛ **بلا** مراجعات مطلوبة (مالك واحد لا يستطيع اعتماد PR نفسه)؛
+**بلا** «linear history» (المستودع يدمج بـmerge commits ووثائق الاستمرارية تستشهد بـSHA التزامات الفروع)؛ **بلا** bypass (البوابة تلزم
+الوكيل أيضًا؛ في الطوارئ يعطّل المالك الـruleset من Settings → Rules → Rulesets → Enforcement: Disabled). ثم تنبيهات Dependabot +
+التحديثات الأمنية، وCodeQL بالإعداد الافتراضي، وSecret scanning + Push protection. لماذا ruleset لا حماية كلاسيكية: قواعد الـruleset
+تُقرأ بلا صلاحية إدارة (`GET /rules/branches/main`) فيستطيع الوكيل التحقق من أسماء الفحوص المطلوبة نفسها؛ تفاصيل الحماية الكلاسيكية 403.
+الفحوص المطلوبة مثبّتة على تطبيق GitHub Actions (`integration_id: 15368` — هو التطبيق الوحيد الذي يبلّغ هذه السياقات في المستودع)
+فلا يستطيع تطبيق آخر «إرضاء» الفحص.
+
+**المسار بلا طرفية (متصفح فقط — يصلح من الهاتف):** الملف **`docs/github/ruleset-main-quality-gate.json`** هو الـruleset نفسه بصيغة
+الاستيراد التي تقبلها GitHub (الاختبار SPA-08 يُبقيه مطابقًا بايتًا لما يرسله `--apply`؛ يُولَّد بـ`npm run -s security:posture -- --ruleset-json`).
+1. حمّل الملف إلى جهازك (زر **Download raw file** في صفحة الملف على GitHub).
+2. `https://github.com/celiaelazamey-arch/phone-google/settings/rules` → القائمة **New ruleset ▾** → **Import a ruleset** → اختر الملف →
+   راجع ثم **Create**. (إن فشل الاستيراد: **New branch ruleset** يدويًا كما في صف الجدول أدناه.)
+3. `https://github.com/celiaelazamey-arch/phone-google/settings/security_analysis` → **Enable** لكلٍّ من: Dependabot alerts، Dependabot security
+   updates، Code scanning → **Set up → Default**، Secret scanning، Push protection.
+4. قل «تم» → يعيد الوكيل `--verify` ويحدّث الجدول بتاريخ لما قُرئ إيجابيًا فقط.
 
 | الضابط | الحالة | لماذا يهم | خطوات التفعيل (Settings في GitHub) |
 |---|---|---|---|
-| **Branch protection / Ruleset على `main`** | NOT ENABLED (2026-10-29) — `protected: false`، لا rulesets؛ تفاصيل الحماية الكلاسيكية 403 لكن العلم السلبي قاطع | يمنع الدفع المباشر أو القسري إلى `main` ويجعل بوابة الجودة شرطًا للدمج | Settings → **Rules → Rulesets → New branch ruleset** → Target `main` → فعّل: **Require status checks to pass** (أضف checks من workflow «Celia quality & resilience»: `Node 24 · tests & failure recovery`، `Node 22 · tests & failure recovery`، `Node 24 container smoke test`، `MySQL 8.4 · persistence / N−1 / backup restore`، `RTL dashboard · desktop / mobile / accessibility`، `Python 3.11 · Celia Google Spider tests`)، **Require linear history**، **Block force pushes**، **Restrict deletions**. **لا** تفعّل *Require pull request reviews*: المستودع بمالك واحد، والشرط سيُقفل كل دمج (المراجع المطلوب لا يمكن أن يكون كاتب الـPR). |
+| **Branch protection / Ruleset على `main`** | NOT ENABLED (2026-10-29) — `protected: false`، لا rulesets؛ تفاصيل الحماية الكلاسيكية 403 لكن العلم السلبي قاطع | يمنع الدفع المباشر أو القسري إلى `main` ويجعل بوابة الجودة شرطًا للدمج | **آليًا:** `npm run security:posture -- --apply` من جهاز المالك (أعلاه). **يدويًا:** Settings → **Rules → Rulesets → New branch ruleset** → Target `main` → فعّل: **Require status checks to pass** (أضف checks من workflow «Celia quality & resilience»: `Node 24 · tests & failure recovery`، `Node 22 · tests & failure recovery`، `Node 24 container smoke test`، `MySQL 8.4 · persistence / N−1 / backup restore`، `RTL dashboard · desktop / mobile / accessibility`، `Python 3.11 · Celia Google Spider tests`)، **Block force pushes**، **Restrict deletions**. **لا** تفعّل *Require pull request reviews* (مالك واحد لا يعتمد PR نفسه) و**لا** *Require linear history* (المستودع يدمج بـmerge commits). |
 | **Dependabot alerts + security updates** | NOT ENABLED (2026-10-29) — الواجهة تقول نصًا: «Dependabot alerts are disabled for this repository» | ينبّه بالثغرات في الاعتماديات ويفتح PRs ترقيع تلقائيًا (تمر عبر بوابة الجودة نفسها) | Settings → **Advanced Security** (أو *Code security and analysis*) → **Dependabot alerts: Enable** → **Dependabot security updates: Enable**. ملف `dependabot.yml` الموجود يغطي تحديثات الإصدارات فقط؛ التنبيهات الأمنية تحتاج هذا المفتاح. |
 | **Secret scanning + Push protection** | UNKNOWN (403 — لا قراءة؛ يُحدَّث بتأكيد مالك مؤرَّخ أو لقطة شاشة من Settings → Advanced Security) | يرفض الدفعات التي تحوي أسرارًا معروفة الشكل قبل أن تصل إلى التاريخ | Settings → **Advanced Security** → **Secret scanning: Enable** → **Push protection: Enable** (مجاني للمستودعات العامة). |
 | **CodeQL (code scanning)** | NOT ENABLED (2026-10-29) — لا workflow ديناميكي `dynamic/github-code-scanning/codeql` في قائمة الـworkflows؛ `default-setup` 403 | تحليل ثابت للـJavaScript على كل PR | Settings → **Advanced Security** → **Code scanning → Set up → Default**. يضيف workflow يديره GitHub؛ إن ظهر في `.github/workflows/` لاحقًا فسيخضع لـSP-01..SP-04 تلقائيًا. |
@@ -85,7 +116,14 @@ npm run check:secrets                          # توصيل الأسرار (18)
 npm audit --omit=dev --audit-level=moderate    # ما تشغّله بوابة الجودة
 grep -h "uses:" .github/workflows/*.yml | sort | uniq -c   # قائمة الإجراءات المثبّتة
 
-# فحص ضوابط المالك بما تسمح به الصلاحيات (قراءة فقط؛ 403 = لا قراءة، لا استنتاج)
+# ضوابط المالك: الخطة / التطبيق (يحتاج رمز إدارة من جهاز المالك) / القراءة (أي رمز)
+npm run security:posture -- --plan
+npm run security:posture -- --apply
+npm run security:posture -- --verify            # exit 0 = كل الضوابط VERIFIED، 2 = شيء ما ليس كذلك
+npm run -s security:posture -- --ruleset-json > docs/github/ruleset-main-quality-gate.json   # ملف الاستيراد (مسار المتصفح)
+node --test test/security-posture-apply.test.js # SPA-01..SPA-08
+
+# نفس القراءات يدويًا (403 = لا قراءة، لا استنتاج)
 R=repos/celiaelazamey-arch/phone-google
 gh api $R/branches/main --jq .protected            # false = لا حماية كلاسيكية
 gh api $R/rulesets; gh api $R/rules/branches/main  # [] = لا rulesets
