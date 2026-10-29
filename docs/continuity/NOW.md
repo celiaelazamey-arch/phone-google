@@ -12,23 +12,23 @@
 ## 2. التركيز النشط وسجل الحالة ([STATE.md](STATE.md))
 
 - **آخر مراجعة مسجّلة:** 29 أكتوبر 2026
-- **الجلسة النشطة:** WP-3.1 / AI-002 — مزوّد Gemini واحتياط حتمي مرئي على `arena/dd2f6ff7-phone-google`: `createGeminiPlannerProvider` (POST واحد بمفتاح في ترويسة، `responseMimeType`/`responseSchema` بصيغة Gemini، بلا SDK/إعادة محاولة/تسريب) و`createFallbackPlanner` (فشل المزوّد → قرار `demo-deterministic` موسوم، وخطوة «احتياط حتمي مرئي» + `plan_created` بحكم `block`) و`CELIA_AGENT_PLANNER` بقيمتَي demo أو provider بفشل مغلق على غيرها، وعلى غياب المفتاح، وعلى نقص أدوات القراءة؛ الغلاف يرث القائمة المغلقة فلا يوسّع سطح التنفيذ · `GEM-01..03` + `FB-01..04` + `HOST-01` 8/8 · `npm test` 676: 662 ناجحًا، 0 فشل، 14 skipped · التغطية 90.95% أسطر / 75.63% فروع / 86.99% دوال · لا مكالمة Gemini حقيقية ولا تفعيل في أي بيئة · `AI-002` يبقى `جارٍ` للتشغيل الحي
+- **الجلسة النشطة:** WP-3.1 / AI-002 — مزوّد Gemini واحتياط حتمي مرئي على `arena/dd2f6ff7-phone-google`: `createGeminiPlannerProvider` (POST واحد بمفتاح في ترويسة، `responseMimeType`/`responseSchema` بصيغة Gemini، بلا SDK/إعادة محاولة/تسريب) و`createFallbackPlanner` (فشل المزوّد → قرار `demo-deterministic` موسوم، وخطوة «احتياط حتمي مرئي» + `plan_created` بحكم `block`) و`CELIA_AGENT_PLANNER` بقيمتَي demo أو provider بفشل مغلق على غيرها، وعلى غياب المفتاح، وعلى نقص أدوات القراءة؛ الغلاف يرث القائمة المغلقة فلا يوسّع سطح التنفيذ · `GEM-01..03` + `FB-01..04` + `HOST-01` 8/8 · `npm test` 676: 662 ناجحًا، 0 فشل، 14 skipped · التغطية 90.95% أسطر / 75.63% فروع / 86.99% دوال · لا مكالمة Gemini حقيقية ولا تفعيل في أي بيئة · وأُضيف مُشغِّل حي معزول (DEC-060، `scripts/planner-live.mjs` + `.github/workflows/planner-live.yml`، `LIVE-01..05` 5/5) يقرأ `secrets.GEMINI_API_KEY` داخل Actions فقط · `AI-002` يبقى `جارٍ` حتى ظهور نتيجة التشغيل الحي
 - **آخر سجل جلسة مؤرَّخ:** [2026-10-29-wp-3-1-gemini-planner](sessions/2026-10-29-wp-3-1-gemini-planner.md)
-- **حجم [STATE.md](STATE.md) النشط:** 64 سطرًا (9755 بايت)
+- **حجم [STATE.md](STATE.md) النشط:** 65 سطرًا (11747 بايت)
 - **الأرشيف التاريخي المحفوظ بلا حذف:**
 - [STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md) — الأساس `9f6f8b2` · **983 سطرًا** محفوظًا حرفيًا (بصمة `f2674637e82e…`)
 
 ## 3. سجل القرارات المعمارية ([DECISIONS.md](DECISIONS.md))
 
-- **إجمالي القرارات المسجّلة:** 59 · **آخر قرار معتمد في السجل:** `DEC-059` · **المعرّف المتاح التالي (تحقّق قبل الحجز):** `DEC-060`
+- **إجمالي القرارات المسجّلة:** 60 · **آخر قرار معتمد في السجل:** `DEC-060` · **المعرّف المتاح التالي (تحقّق قبل الحجز):** `DEC-061`
 
 | المعرّف | العنوان المختصر |
 |---|---|
+| `DEC-060` | التشغيل الحي المعزول لمخطط المزوّد: بوابات مقاسة في CI، لا تفعيل ولا ادعاء |
 | `DEC-059` | WP-3.1: مزوّد Gemini خلف العقد نفسه، واحتياط حتمي مرئي لا يوسّع سطح الأدوات |
 | `DEC-058` | WP-2.2: نافذة محادثة واتساب ومعرفة T1/T2 خلف علم مطفأ، بلا سلطة prompt ثانية |
 | `DEC-057` | GOOG-005: حزمة Google read-only بعقود مستقلة وحدود 2026 بلا scopes جديدة |
 | `DEC-056` | GOOG-004: Gmail read-only داخل Runtime بعقد مستقل عن outbox وإعادة استخدام OAuth المشفر |
-| `DEC-055` | AGENT-003: Sandbox محلي لكل Run بفشل مغلق، مع استثناء spawn الوحيد وحدود تدقيق صريحة |
 
 ## 4. تقدّم الخطة التنفيذية 2026 ([agent-2026-execution-plan.md](../agent-2026-execution-plan.md))
 
@@ -65,7 +65,7 @@
 | DATA-003 | P0 | جارٍ — agent_tool_runs بمفتاح idempotency فريد وحالة unknown لأي استدعاء غير محسوم (لا إعادة عمياء، DEC-007)،… |
 | SEC-004 | P1 | جارٍ — بوابة check:secrets تتبع الأسرار الـ18 جميعًا وتتحقق من عدم تسريب أي قيمة (DEC-025)، وnpm audit --omit… |
 | AI-001 | P1 | جارٍ — WP-2.4 / AI-001: البوابة المحلية PASS على 120/120 بعد عزل expected بنيويًا؛ اكتملت مراجعة المالك 20/20… |
-| AI-002 | P1 | جارٍ — WP-3.1 منفَّذ محليًا (DEC-059، فرع الجلسة): createGeminiPlannerProvider (POST واحد، مفتاح في ترويسة، r… |
+| AI-002 | P1 | جارٍ — WP-3.1 منفَّذ محليًا + مُشغِّل حي معزول (DEC-059/DEC-060، فرع الجلسة): createGeminiPlannerProvider (PO… |
 | QA-003 | P1 | جارٍ — 320px وWCAG2.2 آلي جزئي مع تشخيص Chromium الصريح (e2e/diagnostics.js وe2e/agent.spec.js، DEC-019) متحق… |
 | UX-003 | P1 | جارٍ — WP-1.3 منفَّذ ومدمج 2026-10-29 (DEC-049، PR #82 → main@0357442): public/theme.css + theme.js + مبدّل م… |
 | PLAN-001 | P0 | جارٍ — الخطة والبوابات الثماني محدّثة في docs/plan-100-percent.md والخطة التنفيذية لسد الفجوات في docs/execut… |

@@ -1,0 +1,68 @@
+name: Planner live run (isolated)
+
+# WP-3.1 / DEC-060. Proves the provider planner against the REAL Gemini endpoint with the repository secret,
+# inside a throwaway SQLite store, with read-only tools and hard bounds. It is deliberately not a deployment:
+# no MySQL, no migration, no outbox effect, no production flag is changed by this workflow.
+#
+# Trigger: manual (Actions → "Planner live run (isolated)" → Run workflow) or a push whose commit message contains
+# "[planner-live]". The report contains counts, latencies and token totals only — never the key, a prompt body or a
+# raw provider response; `scripts/planner-live.mjs` sanitizes and then scans its own output for every secret value.
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "Gemini model id for the planner"
+        type: string
+        default: "gemini-2.5-flash"
+      max_runs:
+        description: "How many of the fixed scenarios to run (1..3)"
+        type: string
+        default: "3"
+  push:
+    branches: ["**"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: planner-live-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  live:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[planner-live]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Live planner run (isolated SQLite, read-only tools, no external effect)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ inputs.model || 'gemini-2.5-flash' }}
+          CELIA_AGENT_PLANNER: provider
+          CELIA_AGENT_RUNTIME: sqlite
+          CELIA_KB: "off"
+          CELIA_DISABLE_OLLAMA: "true"
+          CELIA_AGENT_PLANNER_TIMEOUT_MS: "20000"
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::error title=Planner live::GEMINI_API_KEY is not configured for this repository"
+            exit 2
+          fi
+          node scripts/planner-live.mjs --model "$GEMINI_MODEL" --max-runs "${{ inputs.max_runs || '3' }}"
+      - name: Upload sanitized live report
+        if: always() && hashFiles('.validation-artifacts/planner-live.json') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: planner-live-${{ github.sha }}
+          path: |
+            .validation-artifacts/planner-live.json
+            .validation-artifacts/planner-live-summary.md
+          include-hidden-files: true
+          retention-days: 90
