@@ -3,7 +3,7 @@ import { createAgentStore } from './store.js';
 import { createMysqlDriver, createSqliteDriver } from './drivers.js';
 import { createToolRegistry, defaultToolDefinitions } from './tools.js';
 import { createDemoPlanner, DEMO_PLANNER_TOOL_SURFACE } from './planner.js';
-import { createProviderPlanner, PROVIDER_PLAN_SCHEMA, validateProviderPlan } from './planner-provider.js';
+import { createProviderPlanner, PROVIDER_PLAN_SCHEMA, validateProviderPlan, CALL_MANY_LIMITS } from './planner-provider.js';
 import { createGeminiPlannerProvider } from './gemini-planner-provider.js';
 import { createGovernedFallbackPlanner, PLANNER_FALLBACK_CODES } from './planner-fallback.js';
 import { createReplanPolicy, REPLAN_LIMITS, REVISION_STEP_TITLE } from './replanner.js';
@@ -80,6 +80,7 @@ export {
   createProviderPlanner,
   PROVIDER_PLAN_SCHEMA,
   validateProviderPlan,
+  CALL_MANY_LIMITS,
   createGeminiPlannerProvider,
   createGovernedFallbackPlanner,
   PLANNER_FALLBACK_CODES,

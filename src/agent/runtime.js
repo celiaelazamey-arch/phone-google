@@ -7,6 +7,7 @@ import {
   isTerminalStatus
 } from './store.js';
 import { RISK } from './tools.js';
+import { CALL_MANY_LIMITS } from './planner-provider.js';
 import { buildGoalContract } from './goal-contract.js';
 import { EVIDENCE_KIND, hashOf } from './evidence.js';
 import { createVerifier, VERDICT } from './verifier.js';
@@ -673,6 +674,217 @@ export function createAgentRuntime({
             run: await finish(runId, decision.failed ? RUN_STATUS.failed : RUN_STATUS.succeeded, decision.failed ? { error: 'bounded_delivery' } : {}),
             claimed: true
           };
+        }
+
+        if (decision?.action === 'call_many') {
+          // A3: دفعة قراءات مستقلة — التحقق ذري على الدفعة كلها قبل بدء أي toolRun:
+          // أي عنصر مخالف يُسقط الدفعة بأكملها بصفر تنفيذ وصفر موافقات وصفر outbox.
+          const rejectBatch = async (title, summary, errorCode, { status = RUN_STATUS.failed } = {}) => {
+            const rejectedStep = await addStep(runId, { kind: 'decide', title, summary });
+            if (decision.providerTrace) {
+              await recordProviderEvent({
+                runId,
+                stepId: rejectedStep.id,
+                kind: EVIDENCE_KIND.toolSelected,
+                input: decision.providerTrace.plan,
+                output: { allowed: false, action: 'call_many', reason: errorCode, calls: decision.calls ?? null },
+                sourceIds: planEvidence ? [planEvidence.id] : [],
+                verdict: VERDICT.block
+              });
+            }
+            return { run: await finish(runId, status, { error: errorCode }), claimed: true };
+          };
+
+          const calls = Array.isArray(decision.calls) ? decision.calls : null;
+          if (!calls || calls.length < 1 || calls.some((entry) => !entry || typeof entry.tool !== 'string')) {
+            return rejectBatch('دفعة غير صالحة', 'call_many بلا قائمة استدعاءات صالحة؛ أُوقفت المهمة دون أي تنفيذ.', 'call_many_batch_invalid');
+          }
+          if (calls.length > CALL_MANY_LIMITS.maxCalls) {
+            return rejectBatch(
+              'دفعة تتجاوز سقف التوازي',
+              `call_many بـ${calls.length} استدعاءً يتجاوز السقف ${CALL_MANY_LIMITS.maxCalls}؛ رُفضت الدفعة كاملة دون أي تنفيذ.`,
+              'call_many_batch_too_large'
+            );
+          }
+          for (const entry of calls) {
+            const candidate = tools.get(entry.tool);
+            if (!candidate) {
+              return rejectBatch('أداة غير مسجلة في الدفعة', `رفض call_many: الأداة ${entry.tool} غير موجودة؛ لم يُنفَّذ أي عنصر من الدفعة.`, 'unknown_tool');
+            }
+            if (plannerToolSet && !plannerToolSet.has(candidate.name)) {
+              return rejectBatch(
+                'أداة خارج نطاق المخطط في الدفعة',
+                `رفض call_many: ${candidate.name} خارج plannerToolAllowlist؛ لم يُنفَّذ أي عنصر من الدفعة.`,
+                'planner_tool_not_allowed'
+              );
+            }
+            if (candidate.risk !== RISK.read || !tools.executable(candidate.name)) {
+              return rejectBatch(
+                'أثر خارجي داخل call_many',
+                `رفض call_many: ${candidate.name} مصنفة ${candidate.risk}؛ الدفعة قراءة-فقط حصرًا — لم تبدأ أي موافقة أو كتابة أو outbox.`,
+                'call_many_requires_read_tools'
+              );
+            }
+            const inputValidation = tools.validateInput(candidate.name, entry.args ?? {});
+            if (!inputValidation.ok) {
+              return rejectBatch(
+                'مدخلات غير صالحة في الدفعة',
+                `رفض call_many: مدخلات ${candidate.name} غير صالحة (${inputValidation.code})؛ لم يُنفَّذ أي عنصر من الدفعة.`,
+                inputValidation.code
+              );
+            }
+          }
+          if (steps.length + 2 * calls.length > config.maxSteps) {
+            return rejectBatch(
+              'ميزانية الخطوات لا تتسع للدفعة',
+              `call_many يحتاج ${2 * calls.length} خطوة والمتبقي ${config.maxSteps - steps.length}؛ رفض قبل أي تنفيذ.`,
+              'step_budget_exhausted',
+              { status: RUN_STATUS.budgetExhausted }
+            );
+          }
+
+          // بدء toolRun لكل عنصر قبل الإطلاق: نفس مفتاح العزم المفرد (runId:step.index:tool)،
+          // فالاستئناف بعد انقطاع يعامل كل عنصر بقاعدة DEC-007 نفسها — لا إعادة تنفيذ عمياء.
+          const launched = [];
+          for (const [position, entry] of calls.entries()) {
+            const batchTool = tools.get(entry.tool);
+            const actStep = await addStep(runId, {
+              kind: 'act',
+              title: entry.tool,
+              summary: `call_many ${position + 1}/${calls.length}${decision.reason ? `: ${String(decision.reason).slice(0, 220)}` : ''}`,
+              toolName: entry.tool
+            });
+            const selectionEvidence = decision.providerTrace
+              ? await recordProviderEvent({
+                  runId,
+                  stepId: actStep.id,
+                  kind: EVIDENCE_KIND.toolSelected,
+                  input: decision.providerTrace.plan,
+                  output: {
+                    allowed: true,
+                    tool: batchTool.name,
+                    args: entry.args ?? {},
+                    batch: { position: position + 1, size: calls.length }
+                  },
+                  sourceIds: planEvidence ? [planEvidence.id] : [],
+                  verdict: VERDICT.pass
+                })
+              : null;
+            const { created, toolRun } = await store.startToolRun({
+              runId,
+              stepId: actStep.id,
+              toolName: batchTool.name,
+              risk: batchTool.risk,
+              idempotencyKey: `${runId}:${actStep.index}:${batchTool.name}`
+            });
+            if (!created) {
+              if (toolRun.status === TOOL_RUN_STATUS.succeeded) {
+                await addStep(runId, { kind: 'observe', title: 'نتيجة محفوظة', summary: 'أُعيد استخدام نتيجة سابقة مطابقة؛ لا تنفيذ ثانٍ.' });
+                continue;
+              }
+              return { run: await finish(runId, RUN_STATUS.needsReconciliation, { error: 'outcome_unknown' }), claimed: true };
+            }
+            launched.push({ tool: batchTool, entry, step: actStep, toolRun, selectionEvidence });
+          }
+
+          // الإطلاق المتوازي: حجم الدفعة نفسه ≤ maxCalls فالسقف بنيوي لا عدّاد.
+          const settledBatch = await Promise.all(
+            launched.map(async (item) => {
+              const toolController = new AbortController();
+              try {
+                if (typeof item.tool.execute !== 'function') throw httpError(501, 'tool_not_executable', 'tool_not_executable');
+                const outcome = await withTimeout(
+                  item.tool.execute(item.entry.args || {}, {
+                    signal: toolController.signal,
+                    context,
+                    run,
+                    runtime: { deadline, remainingSteps: config.maxSteps - steps.length }
+                  }),
+                  toolController,
+                  item.tool.timeoutMs || config.toolTimeoutMs,
+                  controller.signal
+                );
+                return { item, ok: true, outcome };
+              } catch (error) {
+                return { item, ok: false, error };
+              }
+            })
+          );
+
+          // تسوية مرتبة بترتيب الدفعة: سجلّ الأدلة وسلسلة الخطوات يبقيان حتميين
+          // مهما كان ترتيب اكتمال التنفيذ الفعلي.
+          let batchCancelled = false;
+          for (const result of settledBatch) {
+            const { item } = result;
+            if (result.ok) {
+              const settledToolRun = await store.finishToolRun(item.toolRun.id, TOOL_RUN_STATUS.succeeded, JSON.stringify(result.outcome ?? null));
+              const toolEvidenceInput = {
+                runId,
+                stepId: item.step.id,
+                input: { tool: item.tool.name, args: item.entry.args || null },
+                output: result.outcome ?? null,
+                sourceIds: decision.providerTrace
+                  ? [item.selectionEvidence?.id, item.toolRun.id].filter(Boolean)
+                  : [item.toolRun.id],
+                verdict: VERDICT.pass
+              };
+              if (decision.providerTrace) {
+                await recordProviderEvent({ ...toolEvidenceInput, kind: EVIDENCE_KIND.toolExecuted });
+              } else {
+                await store.appendEvidence({ ...toolEvidenceInput, kind: EVIDENCE_KIND.toolCall });
+              }
+              await addStep(
+                runId,
+                {
+                  kind: 'observe',
+                  title: `${item.tool.name} ✓`,
+                  summary: JSON.stringify(result.outcome ?? null).slice(0, 300),
+                  toolName: item.tool.name
+                },
+                { settled: { step: item.step, toolRun: settledToolRun } }
+              );
+            } else {
+              // الدفعة قراءة-فقط بالتحقق المسبق → الفشل دائمًا `failed` قابل للقياس، لا `unknown`.
+              batchCancelled = batchCancelled || result.error?.code === 'cancelled' || controller.signal.aborted;
+              const settledToolRun = await store.finishToolRun(
+                item.toolRun.id,
+                TOOL_RUN_STATUS.failed,
+                JSON.stringify({ error: result.error?.code || 'tool_failed' })
+              );
+              const toolEvidenceInput = {
+                runId,
+                stepId: item.step.id,
+                input: { tool: item.tool.name, args: item.entry.args || null },
+                output: { error: result.error?.code || 'tool_failed', status: TOOL_RUN_STATUS.failed },
+                sourceIds: decision.providerTrace
+                  ? [item.selectionEvidence?.id, item.toolRun.id].filter(Boolean)
+                  : [item.toolRun.id],
+                verdict: VERDICT.block
+              };
+              if (decision.providerTrace) {
+                await recordProviderEvent({ ...toolEvidenceInput, kind: EVIDENCE_KIND.toolExecuted });
+              } else {
+                await store.appendEvidence({ ...toolEvidenceInput, kind: EVIDENCE_KIND.toolCall });
+              }
+              await addStep(
+                runId,
+                {
+                  kind: 'observe',
+                  title: `${item.tool.name} ✗`,
+                  summary: `فشل عنصر الدفعة (${result.error?.code || 'tool_failed'})؛ الحالة المسجلة failed.`,
+                  toolName: item.tool.name
+                },
+                { settled: { step: item.step, toolRun: settledToolRun } }
+              );
+            }
+          }
+          if (batchCancelled) {
+            return { run: await finish(runId, RUN_STATUS.cancelled), claimed: true };
+          }
+          if (!decision.providerTrace) {
+            await store.recordCost(runId, { costMicros: Number(decision.costMicros) || 0, tokens: Number(decision.tokens) || 0 });
+          }
+          continue;
         }
 
         if (decision?.action !== 'call' || typeof decision.tool !== 'string') {

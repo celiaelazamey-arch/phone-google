@@ -57,8 +57,9 @@ export function buildGeminiPlannerPrompt(request) {
   const system = [
     'أنت مخطط خطوة واحدة داخل حلقة وكيل محكومة. مهمتك إعادة كائن JSON واحد فقط يطابق planSchema حرفيًا، دون أي نص آخر ودون Markdown ودون أسوار شيفرة.',
     'القواعد غير القابلة للتفاوض:',
-    '- action واحدة من: call (نفّذ أداة قراءة واحدة من allowedTools حصراً)، finish (الدليل كافٍ؛ ضع الخلاصة في summary)، clarify (الهدف غامض؛ ضع سؤال التوضيح في summary).',
+    '- action واحدة من: call (نفّذ أداة قراءة واحدة من allowedTools حصراً)، call_many (نفّذ حتى 4 قراءات مستقلة بالتوازي)، finish (الدليل كافٍ؛ ضع الخلاصة في summary)، clarify (الهدف غامض؛ ضع سؤال التوضيح في summary).',
     '- عند call: tool من allowedTools فقط و args كائن يطابق input_schema الخاص بالأداة. عند finish/clarify: tool=null و args=null و summary نص غير فارغ.',
+    '- عند call_many: tool=null و args=null و calls قائمة 1-4 عناصر {tool,args}، كل tool من allowedTools، ولا يعتمد أي عنصر على نتيجة عنصر آخر. ممنوعة بعد أي فشل أداة ملحوظ — الاستعادة تكون بنداء call واحد مستهدف فقط.',
     '- rationale يشرح سبب هذه الخطوة بإيجاز، و successCriteria قائمة 1-8 معايير قابلة للفحص.',
     '- لا تخترع أدوات أو حقولًا إضافية؛ أي حقل خارج المخطط يرفضه فاحص صارم خارجك.',
     '- لا تدّع تنفيذ شيء: أنت تقترح الخطوة التالية فقط والحلقة هي المنفّذ الوحيد.',

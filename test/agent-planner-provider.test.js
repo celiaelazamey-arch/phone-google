@@ -79,10 +79,13 @@ async function setup(t, {
 test('AI-002: provider plan schema is closed and every step needs success criteria', async (t) => {
   const recorder = createRecordingTools();
   assert.equal(PROVIDER_PLAN_SCHEMA.additionalProperties, false);
+  // A3: `calls` هي الخاصية الاختيارية الوحيدة — إلزاميتها تخص call_many ويفرضها
+  // المدقق (call_many_calls_required)، فتبقى خطط call/finish/clarify القديمة صالحة حرفيًا.
   assert.deepEqual(
     [...PROVIDER_PLAN_SCHEMA.required].sort(),
-    Object.keys(PROVIDER_PLAN_SCHEMA.properties).sort()
+    Object.keys(PROVIDER_PLAN_SCHEMA.properties).filter((key) => key !== 'calls').sort()
   );
+  assert.ok(Object.hasOwn(PROVIDER_PLAN_SCHEMA.properties, 'calls'), 'call_many batch property is part of the closed schema');
   assert.equal(validateProviderPlan(callPlan('read.alpha'), { allowedTools: READ_TOOLS }).ok, true);
   assert.equal(validateProviderPlan({ ...callPlan('read.alpha'), unexpected: true }, { allowedTools: READ_TOOLS }).ok, false);
   assert.equal(validateProviderPlan({ ...callPlan('read.alpha'), successCriteria: [] }, { allowedTools: READ_TOOLS }).ok, false);
