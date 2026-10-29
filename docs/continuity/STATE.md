@@ -38,7 +38,7 @@
   **DEC-042 حيّ الآن** على `https://celia-phone-google.celiaelazamey.workers.dev`؛ OPS-007 → «متحقق».
 - **4 ✓ #38 CLOSED** بتعليق يحيل إلى OPS-007/DEC-042 وDEC-040 (الفرع لم يُحذف). **لا PR مفتوح في المستودع.**
 - **6 ✓ الوثائق:** هذا الملف، BACKLOG (OPS-007 متحقق، OPS-006 مكتمل، SEC-006 قراءة DEC-045)، CHANGELOG، `docs/deployment-profile.json → edgeFullRuntime.latestDeploy`،
-  سجل الجلسة. وثائق ما بعد الدمج في PR وثائق فقط (رقمه أدناه عند فتحه).
+  سجل الجلسة. وثائق ما بعد الدمج في **PR #76** (وثائق فقط، تحت التفويض نفسه).
 - **المتبقي للمالك (بحكم طبيعته):** تفعيل ضوابط GitHub (خطوات `docs/security-posture.md` §2) ثم «تم» بالاسم؛ التجربة التفاعلية للوحة `/cron.html`
   برمز المالك؛ رابط استدعاء Google (GOOG-001)؛ أسرار Meta الاختيارية؛ Aiven/Render المقيّدان بالبطاقة؛ AI-002/GOV-001.
 
