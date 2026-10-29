@@ -266,7 +266,17 @@ async function main(argv = process.argv.slice(2)) {
   const paceMs = Math.max(0, Number(argOf(argv, 'pace-ms', process.env.PLANNER_LIVE_PACE_MS || 0)) || 0);
   const pacer = { paceMs, lastAt: 0 };
   const retryMs = Math.max(0, Number(argOf(argv, 'retry-ms', process.env.PLANNER_LIVE_RETRY_MS || 20_000)) || 0);
-  const scenarios = LIVE_SCENARIOS.slice(0, requested);
+  // `--only live-2` exists because the free tier answers 429 after a couple of calls: one scenario per dispatch
+  // is the cheap way to get a clean, fully model-driven run without pretending the others ran.
+  const only = String(argOf(argv, 'only', '')).split(',').map((item) => item.trim()).filter(Boolean);
+  if (only.length) {
+    const unknown = only.filter((id) => !LIVE_SCENARIOS.some((scenario) => scenario.id === id));
+    if (unknown.length) {
+      process.stderr.write(`planner-live: --only accepts ${LIVE_SCENARIOS.map((scenario) => scenario.id).join(', ')}\n`);
+      return 2;
+    }
+  }
+  const scenarios = (only.length ? LIVE_SCENARIOS.filter((scenario) => only.includes(scenario.id)) : LIVE_SCENARIOS).slice(0, requested);
   const startedAt = Date.now();
   const runs = [];
   for (const scenario of scenarios) {
@@ -308,7 +318,7 @@ async function main(argv = process.argv.slice(2)) {
     scope: 'isolated live run; no production activation, no MySQL, no external effect',
     model,
     allowedTools,
-    bounds: { maxSteps: 4, maxRuns: requested, timeoutMs, paceMs, retryMs, wallClockMs: Date.now() - startedAt },
+    bounds: { maxSteps: 4, maxRuns: requested, only: only.length ? only : null, timeoutMs, paceMs, retryMs, wallClockMs: Date.now() - startedAt },
     runId: process.env.GITHUB_RUN_ID || null,
     sha: process.env.GITHUB_SHA || null,
     runs

@@ -14,7 +14,7 @@
 - **آخر مراجعة مسجّلة:** 29 أكتوبر 2026
 - **الجلسة النشطة:** WP-3.1 / AI-002 — مزوّد Gemini واحتياط حتمي مرئي على `arena/dd2f6ff7-phone-google`: `createGeminiPlannerProvider` (POST واحد بمفتاح في ترويسة، `responseMimeType`/`responseSchema` بصيغة Gemini، بلا SDK/إعادة محاولة/تسريب) و`createFallbackPlanner` (فشل المزوّد → قرار `demo-deterministic` موسوم، وخطوة «احتياط حتمي مرئي» + `plan_created` بحكم `block`) و`CELIA_AGENT_PLANNER` بقيمتَي demo أو provider بفشل مغلق على غيرها، وعلى غياب المفتاح، وعلى نقص أدوات القراءة؛ الغلاف يرث القائمة المغلقة فلا يوسّع سطح التنفيذ · `GEM-01..03` + `FB-01..04` + `HOST-01` 8/8 · `npm test` 676: 662 ناجحًا، 0 فشل، 14 skipped · التغطية 90.95% أسطر / 75.63% فروع / 86.99% دوال · لا مكالمة Gemini حقيقية ولا تفعيل في أي بيئة · وأُضيف مُشغِّل حي معزول (DEC-060، `scripts/planner-live.mjs` + `.github/workflows/planner-live.yml`، `LIVE-01..05` 5/5) يقرأ `secrets.GEMINI_API_KEY` داخل Actions فقط · `AI-002` يبقى `جارٍ` حتى ظهور نتيجة التشغيل الحي
 - **آخر سجل جلسة مؤرَّخ:** [2026-10-29-wp-3-1-gemini-planner](sessions/2026-10-29-wp-3-1-gemini-planner.md)
-- **حجم [STATE.md](STATE.md) النشط:** 65 سطرًا (12515 بايت)
+- **حجم [STATE.md](STATE.md) النشط:** 65 سطرًا (12822 بايت)
 - **الأرشيف التاريخي المحفوظ بلا حذف:**
 - [STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md) — الأساس `9f6f8b2` · **983 سطرًا** محفوظًا حرفيًا (بصمة `f2674637e82e…`)
 
