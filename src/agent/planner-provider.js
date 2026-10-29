@@ -14,14 +14,35 @@ function deepFreeze(value) {
  * read-only tool schemas. It returns one structured plan. The runtime remains
  * the only executor: this module never invokes a tool or a connector itself.
  */
+/**
+ * A3: حدود `call_many` — سقف التوازي قرار معلن لا تهيئة صامتة.
+ * أربعة كحد أقصى: نفس سقف `allowedTools` في الشريحة الأولى (AI-002).
+ */
+export const CALL_MANY_LIMITS = Object.freeze({ maxCalls: 4 });
+
 export const PROVIDER_PLAN_SCHEMA = deepFreeze({
   type: 'object',
   additionalProperties: false,
+  // `calls` ليست في required عمدًا: الخطط القائمة (call/finish/clarify) تبقى صالحة
+  // حرفيًا كما كانت قبل A3 — إلزامية `calls` تخص call_many وحدها ويفحصها المدقق.
   required: ['action', 'tool', 'args', 'summary', 'rationale', 'successCriteria'],
   properties: {
-    action: { type: 'string', enum: ['call', 'finish', 'clarify'] },
+    action: { type: 'string', enum: ['call', 'call_many', 'finish', 'clarify'] },
     tool: { type: ['string', 'null'], maxLength: 128 },
     args: { type: ['object', 'null'] },
+    calls: {
+      type: ['array', 'null'],
+      maxItems: CALL_MANY_LIMITS.maxCalls,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['tool', 'args'],
+        properties: {
+          tool: { type: 'string', maxLength: 128 },
+          args: { type: 'object' }
+        }
+      }
+    },
     summary: { type: ['string', 'null'], maxLength: 4000 },
     rationale: { type: 'string', minLength: 1, maxLength: 2000 },
     successCriteria: {
@@ -79,15 +100,44 @@ export function validateProviderPlan(plan, { allowedTools = null } = {}) {
     errors.push('success_criteria_required');
   }
 
+  const calls = Object.hasOwn(plan, 'calls') ? plan.calls : null;
+  if (calls !== null && !Array.isArray(calls)) errors.push('invalid_calls');
+
   if (plan.action === 'call') {
     if (!nonEmptyString(plan.tool, 128)) errors.push('call_tool_required');
     if (!isObject(plan.args)) errors.push('call_args_required');
+    if (calls !== null) errors.push('call_calls_must_be_null');
     if (Array.isArray(allowedTools) && !allowedTools.includes(plan.tool)) {
       errors.push(`tool_not_allowed:${plan.tool}`);
+    }
+  } else if (plan.action === 'call_many') {
+    // A3: دفعة قراءات مستقلة — التحقق ذري على الدفعة كلها قبل أي تطبيع.
+    if (plan.tool !== null) errors.push('call_many_tool_must_be_null');
+    if (plan.args !== null) errors.push('call_many_args_must_be_null');
+    if (!Array.isArray(calls) || calls.length < 1) {
+      errors.push('call_many_calls_required');
+    } else {
+      if (calls.length > CALL_MANY_LIMITS.maxCalls) errors.push('call_many_batch_too_large');
+      calls.forEach((entry, index) => {
+        if (!isObject(entry)) {
+          errors.push(`call_many_entry_invalid:${index}`);
+          return;
+        }
+        for (const key of Object.keys(entry)) {
+          if (key !== 'tool' && key !== 'args') errors.push(`call_many_entry_invalid:${index}`);
+        }
+        if (!nonEmptyString(entry.tool, 128)) {
+          errors.push(`call_many_entry_tool_required:${index}`);
+        } else if (Array.isArray(allowedTools) && !allowedTools.includes(entry.tool)) {
+          errors.push(`tool_not_allowed:${entry.tool}`);
+        }
+        if (!isObject(entry.args)) errors.push(`call_many_entry_args_required:${index}`);
+      });
     }
   } else if (ACTIONS.has(plan.action)) {
     if (plan.tool !== null) errors.push('non_call_tool_must_be_null');
     if (plan.args !== null) errors.push('non_call_args_must_be_null');
+    if (calls !== null) errors.push('non_call_calls_must_be_null');
     if (!nonEmptyString(plan.summary, 4000)) errors.push('non_call_summary_required');
   }
   return { ok: errors.length === 0, errors };
@@ -241,10 +291,16 @@ export function createProviderPlanner({
   tools,
   allowedTools,
   timeoutMs = 20_000,
-  name = 'provider-structured-v1'
+  name = 'provider-structured-v1',
+  // A2: سياسة إعادة التخطيط المحكومة (createReplanPolicy). الافتراض null يحفظ
+  // السلوك السابق حرفيًا: أي call بعد فشل → automatic_replan_disabled.
+  revisionPolicy = null
 } = {}) {
   if (!provider || typeof provider.createPlan !== 'function') {
     throw new Error('Provider planner requires provider.createPlan(request)');
+  }
+  if (revisionPolicy !== null && typeof revisionPolicy?.evaluate !== 'function') {
+    throw new Error('revisionPolicy must be null or expose evaluate({ plan, context, tools })');
   }
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error('Provider planner timeout must be positive');
   const definitions = plannerTools(tools, allowedTools);
@@ -273,20 +329,45 @@ export function createProviderPlanner({
       const validation = validateProviderPlan(plan, { allowedTools: names });
       if (!validation.ok) throw codedError('invalid_provider_plan', trace, validation.errors);
       const failedRead = (context.toolRuns || []).find((toolRun) => toolRun.status !== 'succeeded');
+      let planRevision = null;
+      if (failedRead && plan.action === 'call_many') {
+        // A3: الاستعادة حِكر على مراجعة A2 المفردة المستهدفة (`plan.revised`).
+        // التوزيع المتوازي بعد فشل ملحوظ ليس وسيلة استعادة — رفض صريح دائمًا،
+        // بسياسة أو بدونها، ولا يُحوَّل حتميًا (خارج PLANNER_FALLBACK_CODES).
+        throw codedError('call_many_after_failure', trace, [`failed_tool:${failedRead.toolName}`]);
+      }
       if (failedRead && plan.action === 'call') {
-        // WP-3.2 owns any future revision policy. This slice may observe a
-        // failure and finish/clarify, but may not silently choose another call.
-        throw codedError('automatic_replan_disabled', trace, [`failed_tool:${failedRead.toolName}`]);
+        if (!revisionPolicy) {
+          // بلا سياسة (الافتراض): فشل ملحوظ يسمح بـfinish/clarify فقط — لا اختيار صامت لنداء آخر.
+          throw codedError('automatic_replan_disabled', trace, [`failed_tool:${failedRead.toolName}`]);
+        }
+        // A2: نافذة مراجعة واحدة محكومة؛ أي تجاوز يُرفع بكود صريح مع أثر المزوّد كاملًا.
+        try {
+          planRevision = revisionPolicy.evaluate({ plan, context, tools }).revision;
+        } catch (error) {
+          throw codedError(error.code || 'max_replan_exceeded', trace, error.details || []);
+        }
       }
       if (plan.action === 'call') {
         const inputCheck = tools.validateInput(plan.tool, plan.args);
         if (!inputCheck.ok) throw codedError(inputCheck.code || 'invalid_provider_tool_arguments', trace, [inputCheck.code]);
+      }
+      if (plan.action === 'call_many') {
+        for (const entry of plan.calls) {
+          const inputCheck = tools.validateInput(entry.tool, entry.args);
+          if (!inputCheck.ok) {
+            throw codedError(inputCheck.code || 'invalid_provider_tool_arguments', trace, [`${entry.tool}:${inputCheck.code}`]);
+          }
+        }
       }
       const usage = usageOf(envelope);
       return {
         action: plan.action === 'clarify' ? 'finish' : plan.action,
         tool: plan.action === 'call' ? plan.tool : undefined,
         args: plan.action === 'call' ? plan.args : undefined,
+        ...(plan.action === 'call_many'
+          ? { calls: plan.calls.map((entry) => ({ tool: entry.tool, args: entry.args })) }
+          : {}),
         summary: plan.summary,
         reason: plan.rationale,
         failed: plan.action === 'clarify',
@@ -294,7 +375,8 @@ export function createProviderPlanner({
         successCriteria: plan.successCriteria,
         tokens: usage.totalTokens,
         costMicros: usage.costMicros,
-        providerTrace: { ...trace, usage }
+        providerTrace: { ...trace, usage },
+        ...(planRevision ? { planRevision } : {})
       };
     }
   };

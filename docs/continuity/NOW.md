@@ -12,9 +12,9 @@
 ## 2. التركيز النشط وسجل الحالة ([STATE.md](STATE.md))
 
 - **آخر مراجعة مسجّلة:** 29 أكتوبر 2026
-- **الجلسة النشطة:** GOOG-005 Google read-only ضمن حدود 2026 على `arena/d44070e0-phone-google`؛ تنفيذ محلي/Mock لقراءات Gmail وDrive وCalendar وContacts عبر `CELIA_AGENT_CONNECTORS=google_read`، بلا OAuth حي أو scopes جديدة أو كتابة خارجية أو ربط Sandbox بـRuntime. Drive يعرض metadata لأحدث 10 ملفات، وCalendar نافذة محدودة، وContacts صفحة محدودة، مع planner حتمي يفصل القراءة عن create/export. نجح `test/agent-google-read.test.js` 8/8، والفحص المشترك 28/28، و`npm run test:coverage` 647/661 ناجحًا، 0 فشل، 14 skipped بتغطية 90.70% أسطر / 75.45% فروع / 86.90% دوال؛ لا اتصال Google حي ولا ادعاء ظهور بيانات المالك أو جاهزية إنتاجية
-- **آخر سجل جلسة مؤرَّخ:** [2026-10-29-google-readonly-2026](sessions/2026-10-29-google-readonly-2026.md)
-- **حجم [STATE.md](STATE.md) النشط:** 75 سطرًا (13244 بايت)
+- **الجلسة النشطة:** MANUS-A3 — `call_many` للقراءات المستقلة على `arena/718068f3-phone-google`؛ تنفيذ صف A3 من خطة «منافس مانوس»: إجراء `call_many` في `PROVIDER_PLAN_SCHEMA` (خاصية `calls` اختيارية تحفظ التوافق الخلفي حرفيًا) وفرع runtime بتحقق ذري على الدفعة كلها قبل بدء أي toolRun (`call_many_requires_read_tools`/`call_many_batch_too_large`/`unknown_tool`/`planner_tool_not_allowed`/كود المدخلات/`step_budget_exhausted` — صفر تنفيذ جزئي وصفر موافقات وصفر outbox)، إطلاق متوازٍ بسقف بنيوي ≤ 4 وتسوية بترتيب الدفعة، و`call_many_after_failure` يمنع الدفعة كوسيلة استعادة (الاستعادة حصرًا عبر مراجعة A2 — التركيب مثبت CM-07)؛ `test/agent-call-many.test.js` 12/12 ومعيار القبول مقاس: p50 لمهمة 5 قراءات انخفض 57.9% (428ms←180ms بطوابع WP-1.1)؛ التغطية 90.75/75.88/86.91؛ الفشل البيئي الوحيد (N/N-1) كما هو. سجل الجلسة: [2026-10-29-manus-a3-call-many](sessions/2026-10-29-manus-a3-call-many.md)
+- **آخر سجل جلسة مؤرَّخ:** [2026-10-29-manus-a3-call-many](sessions/2026-10-29-manus-a3-call-many.md)
+- **حجم [STATE.md](STATE.md) النشط:** 79 سطرًا (16813 بايت)
 - **الأرشيف التاريخي المحفوظ بلا حذف:**
 - [STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md) — الأساس `9f6f8b2` · **983 سطرًا** محفوظًا حرفيًا (بصمة `f2674637e82e…`)
 

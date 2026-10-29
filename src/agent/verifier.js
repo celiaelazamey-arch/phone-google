@@ -1,4 +1,5 @@
 import { RISK } from './tools.js';
+import { REVISION_STEP_TITLE } from './replanner.js';
 import { validateGoalContract } from './goal-contract.js';
 import { EVIDENCE_KIND, hashOf, verifyChain } from './evidence.js';
 import {
@@ -515,7 +516,24 @@ export function createVerifier({ tools, clock = Date.now } = {}) {
         const outcome = parseOutcome(item);
         return outcome && typeof outcome === 'object' && outcome.reconciled === true && outcome.outcome === 'not_applied';
       };
-      const failedTools = toolRuns.filter((item) => item.status === 'failed' && !adjudicated(item)).length;
+      // A2: فشل قراءة اسْتُدرك بمراجعة محكومة ناجحة ليس فشل عقد — بشروط ضيقة
+      // Fail-Closed: الأداة الفاشلة `read` حصرًا، وخطوة `plan.revised` مسجلة في
+      // السلسلة بعد خطوة الفشل، وأداة المراجعة نفسها نجحت فعلًا بعدها. أي فشل
+      // كتابة/أثر خارجي، أو مراجعة لم تنجح، يبقى حاجبًا كما كان.
+      const stepIndexById = new Map(steps.map((step) => [step.id, step.index]));
+      const revisionSteps = steps.filter((step) => step.title === REVISION_STEP_TITLE);
+      const supersededByRevision = (item) => {
+        if (item.risk !== RISK.read) return false;
+        const failedIndex = stepIndexById.get(item.stepId);
+        if (failedIndex === undefined) return false;
+        return revisionSteps.some((revision) => revision.index > failedIndex
+          && toolRuns.some((candidate) => candidate.status === 'succeeded'
+            && candidate.toolName === revision.toolName
+            && (stepIndexById.get(candidate.stepId) ?? -1) > revision.index));
+      };
+      const failedTools = toolRuns.filter(
+        (item) => item.status === 'failed' && !adjudicated(item) && !supersededByRevision(item)
+      ).length;
       const hasSteps = steps.length > 0;
       const contractFailures = [
         !hasSteps ? 'no_step_recorded' : null,

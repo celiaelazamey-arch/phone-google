@@ -12,6 +12,31 @@ export const DECISION = Object.freeze({
   finish: 'finish'
 });
 
+/**
+ * كل أداة يمكن أن يقترحها المخطط الحتمي عبر كل أعلامه — قائمة صريحة تُستخدم
+ * كقائمة سماح للمنفذ عندما يعمل هذا المخطط احتياطًا مرئيًا خلف مزوّد (A1).
+ * التسجيل الفعلي والبوابات (الموافقة/outbox/المخاطر) تبقى هي الحاكمة؛ هذه
+ * القائمة عضوية فقط ولا تفعّل أداة غير مسجلة.
+ */
+export const DEMO_PLANNER_TOOL_SURFACE = Object.freeze([
+  'celia.thread_context',
+  'celia.system_status',
+  'celia.draft_outline',
+  'kb.search',
+  'document.read',
+  'document.extract',
+  'data.validate',
+  'data.report',
+  'document.commit_purchase_ledger',
+  'google.gmail_read',
+  'google.drive_read',
+  'google.calendar_read',
+  'google.contacts_read',
+  'whatsapp.send_text',
+  'google.calendar_create_event',
+  'google.drive_export_report'
+]);
+
 const EXTERNAL_HINTS = /(تقويم|موعد|اجتماع|calendar|event|meeting)/i;
 const WHATSAPP_HINTS = /(واتساب|رسالة\s*واتساب|whatsapp)/i;
 const E164_IN_TEXT_RE = /(\+[1-9]\d{6,14})\b/;
