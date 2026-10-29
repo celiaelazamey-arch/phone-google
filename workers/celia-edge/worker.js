@@ -19,8 +19,11 @@ import {
   handleWhatsAppWebhookGet,
   handleWhatsAppWebhookPost,
   searchEdgeSkills,
-  verifyEdgeConsentTicket
+  verifyEdgeConsentTicket,
+  recordEdgeReplyMetric,
+  EDGE_MAX_OUTPUT_TOKENS
 } from './runtime.js';
+import { summarizeReplyMetrics, REPLY_CHAR_CAP } from './reply-metrics.js';
 import {
   approveIntent,
   createIntent,
@@ -758,20 +761,26 @@ export default {
       const parsed = await readBoundedJson(request, MAX_BODY_BYTES);
       if (!parsed.ok) return jsonResponse({ error: parsed.error }, parsed.status, baseHeaders);
       try {
-        return jsonResponse(
-          await generateEdgeAiReply({
-            env,
-            customerMessage: parsed.data?.customerMessage,
-            provider: parsed.data?.provider || 'auto',
-            businessContext: parsed.data?.businessContext || '',
-            fetchImpl
-          }),
-          200,
-          baseHeaders
-        );
+        const ai = await generateEdgeAiReply({
+          env,
+          customerMessage: parsed.data?.customerMessage,
+          provider: parsed.data?.provider || 'auto',
+          businessContext: parsed.data?.businessContext || '',
+          fetchImpl
+        });
+        // WP-1.4: owner test replies are measured too, under their own source so they never pollute the webhook ratio.
+        const metric = await recordEdgeReplyMetric(env, { providerMessageId: `api:${crypto.randomUUID()}`, source: 'api', ai, at: new Date().toISOString() });
+        return jsonResponse({ ...ai, metricRecorded: metric.ok }, 200, baseHeaders);
       } catch (err) {
         return runtimeErrorResponse(err, baseHeaders);
       }
+    }
+
+    // WP-1.4 (DEC-050): the truncated-reply ratio, owner-only, read before any change to maxOutputTokens.
+    if (pathname === '/api/whatsapp/reply-metrics') {
+      if (request.method !== 'GET') return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
+      const summary = await summarizeReplyMetrics(env, { sinceDays: url.searchParams.get('days') || 30 });
+      return jsonResponse({ ...summary, maxOutputTokens: EDGE_MAX_OUTPUT_TOKENS, charCap: REPLY_CHAR_CAP, decision: 'DEC-050' }, summary.ok ? 200 : 503, baseHeaders);
     }
 
     // Durable key/value state and its audit chain (DEC-035).

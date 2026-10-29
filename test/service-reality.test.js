@@ -18,6 +18,8 @@ import {
   signAwsV4
 } from '../scripts/service-reality.mjs';
 import { applyRetirementsToEnv, loadServiceRetirements, normalizeRetirements, retirementFlags } from '../src/service-retirements.js';
+import { EDGE_MAX_OUTPUT_TOKENS } from '../workers/celia-edge/runtime.js';
+import { GEMINI_MAX_OUTPUT_TOKENS } from '../src/gemini.js';
 import { buildWorkerMetadata } from '../scripts/deploy-cloudflare-edge.mjs';
 import { buildEdgeSecretsReport } from '../workers/celia-edge/worker.js';
 
@@ -309,4 +311,34 @@ test('service-reality workflow wires existing secrets plus optional WhatsApp cre
   for (const flag of ['AI_GATEWAY', 'DEEPSEEK', 'AGENTROUTER', 'ELEVENLABS', 'FIGMA', 'CODATA', 'CLOUDFLARE_R2']) {
     assert.ok(workflow.includes(`CELIA_DISABLE_${flag}: \${{ vars.CELIA_DISABLE_${flag} }}`), `${flag} retirement switch missing`);
   }
+});
+
+test('«أرقام مقاسة»: every number in the measured-numbers section carries a date, a run id and a commit; unmeasured rows say so instead of estimating (WP-1.4, DEC-050)', () => {
+  const doc = fs.readFileSync(path.join(root, 'docs', 'service-reality.md'), 'utf8');
+  const [, section] = doc.split('## أرقام مقاسة');
+  assert.ok(section, 'the section exists');
+  const lines = section.split('\n');
+  const rows = lines.filter((line) => line.startsWith('| ') && !line.startsWith('| التاريخ') && !line.startsWith('|---'));
+  assert.ok(rows.length >= 4, 'D1 single points, D1 series row, reply-metrics row');
+  const runLink = /actions\/runs\/(\d{9,})/;
+  const numeric = /\d+(?:\.\d+)?\s*(?:ms|%)/;
+  for (const row of rows) {
+    const cells = row.split('|').map((cell) => cell.trim());
+    const [date, run, commit, , value] = cells.slice(1);
+    if (numeric.test(value)) {
+      assert.match(date, /^\d{4}-\d{2}-\d{2}$/, `measured row has a date: ${row}`);
+      assert.match(run, runLink, `measured row has a run id: ${row}`);
+      assert.match(commit, /^`[0-9a-f]{7,40}`$/, `measured row has a commit: ${row}`);
+    } else {
+      assert.ok(/لم تُقَس/.test(value), `an unmeasured row must say so explicitly: ${row}`);
+      assert.equal(numeric.test(row), false, `an unmeasured row carries no ms/percent number: ${row}`);
+    }
+  }
+  // Prose may name a claim only while saying it has no run behind it (or pointing at one).
+  for (const line of lines.filter((l) => !l.startsWith('|') && /\d+\s*ms/.test(l))) {
+    assert.ok(runLink.test(line) || /لا تشغيلة/.test(line), `prose number without a run reference: ${line}`);
+  }
+  // The documented budgets are the ones in code — the doc cannot drift from the constants it describes.
+  assert.ok(section.includes(`\`maxOutputTokens = ${EDGE_MAX_OUTPUT_TOKENS}\``), 'edge budget documented as in code');
+  assert.ok(section.includes(`\`${GEMINI_MAX_OUTPUT_TOKENS}\` في محرك Express`), 'express budget documented as in code');
 });

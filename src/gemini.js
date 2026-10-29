@@ -1,4 +1,5 @@
 import { UpstreamError } from './resilience.js';
+import { classifyReplyTruncation, REPLY_CHAR_CAP } from './reply-metrics.js';
 export const DEFAULT_POLICY = [
   'أنت مساعد خدمة عملاء يكتب ردًا قصيرًا ومهذبًا بلغة العميل، وبحد أقصى جملتين.',
   'أجب فقط عن الأسئلة العامة اعتمادًا على سياق النشاط المقدم ورسالة العميل.',
@@ -9,8 +10,11 @@ export const DEFAULT_POLICY = [
 ].join(' ');
 
 const DEFAULT_GEMINI_TIMEOUT_MS = 20_000;
+/** Output budget for customer replies — WP-1.4 measures how often it truncates before anyone changes it. */
+export const GEMINI_MAX_OUTPUT_TOKENS = 180;
 
-export async function generateWhatsAppReply({ config, customerMessage, timeoutMs = DEFAULT_GEMINI_TIMEOUT_MS, signal }) {
+/** Same call as `generateWhatsAppReply`, but returns the truncation facts next to the text (WP-1.4, DEC-050). */
+export async function generateWhatsAppReplyDetailed({ config, customerMessage, timeoutMs = DEFAULT_GEMINI_TIMEOUT_MS, signal }) {
   const { apiKey, model, businessContext } = config.gemini;
   if (!apiKey) throw new Error('Gemini API is not configured');
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
@@ -21,12 +25,25 @@ export async function generateWhatsAppReply({ config, customerMessage, timeoutMs
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: `${DEFAULT_POLICY}${businessContext ? ` سياق النشاط المعتمد: ${businessContext.slice(0, 4000)}` : ''}` }] },
       contents: [{ role: 'user', parts: [{ text: String(customerMessage).slice(0, 4000) }] }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 180 }
+      generationConfig: { temperature: 0.2, maxOutputTokens: GEMINI_MAX_OUTPUT_TOKENS }
     })
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new UpstreamError('gemini', response.status);
   const text = (result.candidates?.[0]?.content?.parts || []).map((part) => part.text || '').join('').trim();
   if (!text) throw new Error('Gemini returned no usable reply');
-  return text.slice(0, 1000);
+  const truncation = classifyReplyTruncation({ finishReason: result.candidates?.[0]?.finishReason ?? null, candidateText: text, charCap: REPLY_CHAR_CAP });
+  return {
+    text: text.slice(0, REPLY_CHAR_CAP),
+    finishReason: truncation.finishReason,
+    truncated: truncation.truncated,
+    truncationReason: truncation.reason,
+    candidateChars: truncation.candidateChars,
+    sentChars: truncation.sentChars,
+    maxOutputTokens: GEMINI_MAX_OUTPUT_TOKENS
+  };
+}
+
+export async function generateWhatsAppReply(options) {
+  return (await generateWhatsAppReplyDetailed(options)).text;
 }

@@ -12,6 +12,7 @@
  */
 
 import { appendAudit, isD1Bound } from './state.js';
+import { classifyReplyTruncation, recordReplyMetric, REPLY_CHAR_CAP } from './reply-metrics.js';
 import {
   constantTimeEqualAsync,
   decryptEdgeJson,
@@ -26,6 +27,8 @@ import {
 export const MCP_PROTOCOL_VERSION = '2024-11-05';
 export const SUPPORTED_MCP_VERSIONS = Object.freeze(['2024-11-05', '2025-03-26']);
 export const CUSTOMER_WINDOW_MS = 24 * 60 * 60 * 1000;
+/** Gemini output budget for customer replies — measured by WP-1.4 (`whatsapp_reply_metrics`) before it is ever changed. */
+export const EDGE_MAX_OUTPUT_TOKENS = 220;
 const E164_PATTERN = /^\+[1-9]\d{7,14}$/;
 const IDEMPOTENCY_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 
@@ -275,11 +278,11 @@ export async function generateEdgeAiReply({
     if (provider === 'gemini') {
       throw Object.assign(new Error('gemini_not_configured'), { status: 503 });
     }
-    return {
+    return withTruncationFacts({
       reply: localPolicyReply(message),
       provider: 'local',
       model: 'deterministic-policy-v1'
-    };
+    });
   }
 
   const model = String(env.GEMINI_MODEL || 'gemini-2.5-flash').trim();
@@ -304,7 +307,7 @@ export async function generateEdgeAiReply({
       ],
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 220
+        maxOutputTokens: EDGE_MAX_OUTPUT_TOKENS
       }
     }),
     signal: AbortSignal.timeout(timeoutMs)
@@ -313,12 +316,12 @@ export async function generateEdgeAiReply({
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     if (provider === 'auto') {
-      return {
+      return withTruncationFacts({
         reply: localPolicyReply(message),
         provider: 'local',
         model: 'deterministic-policy-v1',
         fallbackReason: `gemini_http_${response.status}`
-      };
+      });
     }
     throw Object.assign(new Error(`gemini_upstream_${response.status}`), { status: 502 });
   }
@@ -329,19 +332,59 @@ export async function generateEdgeAiReply({
     .trim();
 
   if (!candidateText) {
-    return {
+    return withTruncationFacts({
       reply: localPolicyReply(message),
       provider: 'local',
       model: 'deterministic-policy-v1',
       fallbackReason: 'gemini_empty_reply'
-    };
+    });
   }
 
+  // WP-1.4: the two observable truncation facts travel with the reply (model stop reason + character cap).
+  const truncation = classifyReplyTruncation({ finishReason: data?.candidates?.[0]?.finishReason ?? null, candidateText, charCap: REPLY_CHAR_CAP });
   return {
-    reply: candidateText.slice(0, 1000),
+    reply: candidateText.slice(0, REPLY_CHAR_CAP),
     provider: 'gemini',
-    model
+    model,
+    finishReason: truncation.finishReason,
+    truncated: truncation.truncated,
+    truncationReason: truncation.reason,
+    candidateChars: truncation.candidateChars,
+    sentChars: truncation.sentChars,
+    maxOutputTokens: EDGE_MAX_OUTPUT_TOKENS
   };
+}
+
+/** Local policy replies are never model-truncated; they still report the same fields so every reply is countable. */
+function withTruncationFacts(result) {
+  const truncation = classifyReplyTruncation({ finishReason: null, candidateText: result.reply, charCap: REPLY_CHAR_CAP });
+  return {
+    ...result,
+    reply: String(result.reply).slice(0, REPLY_CHAR_CAP),
+    finishReason: null,
+    truncated: truncation.truncated,
+    truncationReason: truncation.reason,
+    candidateChars: truncation.candidateChars,
+    sentChars: truncation.sentChars,
+    maxOutputTokens: null
+  };
+}
+
+/** Writes the metric row for a reply that actually went out; failures are returned, never thrown. */
+export async function recordEdgeReplyMetric(env, { providerMessageId, source, ai, at }) {
+  return recordReplyMetric(env, {
+    providerMessageId,
+    source,
+    provider: ai?.provider || 'unknown',
+    model: ai?.model || null,
+    finishReason: ai?.finishReason || null,
+    candidateChars: Number.isInteger(ai?.candidateChars) ? ai.candidateChars : String(ai?.reply || '').length,
+    sentChars: Number.isInteger(ai?.sentChars) ? ai.sentChars : String(ai?.reply || '').length,
+    truncated: Boolean(ai?.truncated),
+    truncationReason: ai?.truncationReason || null,
+    maxOutputTokens: Number.isInteger(ai?.maxOutputTokens) ? ai.maxOutputTokens : null,
+    at
+  });
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1187,6 +1230,8 @@ export async function handleWhatsAppWebhookPost({
             )
             .bind(outId, msg.from, 'outbound', 'text', ai.reply, 'sent', at)
             .run();
+          // WP-1.4: the truncation facts are stored with the message id (counts only, no text/phone).
+          await recordEdgeReplyMetric(env, { providerMessageId: outId, source: 'webhook', ai, at });
         }
       }
     }

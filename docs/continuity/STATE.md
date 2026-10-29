@@ -6,9 +6,10 @@
 > والإصدار `40719074453` والجودة `40719074375`. المتبقي حصرًا لإجراء المالك: رابط استدعاء Google، وأسرار Meta الاختيارية.
 > انظر [سجل جلسة النشر الحي](sessions/2026-10-28-live-edge-publication.md). ما يلي توثيق الجلسة السابقة كما كُتب، محفوظ بلا حذف.
 
-**آخر مراجعة:** 29 أكتوبر 2026 · **نوع الجلسة الحالية:** **ما بعد دمج #82 (WP-1.3 → `main@0357442`) + فحص PR #80 المتعارض** — على الفرع
-`arena/69672f71-phone-google` (من `main@0357442`؛ وثائق ما بعد الدمج منقولة بـcherry-pick من `arena/1003f0da-phone-google@649c655`) ·
-سجل الجلسة الحالي: [2026-10-29-wp-1-3-theme-tokens](sessions/2026-10-29-wp-1-3-theme-tokens.md) ·
+**آخر مراجعة:** 29 أكتوبر 2026 · **نوع الجلسة الحالية:** **«ابدأ» → WP-1.4 قياس القصّ وزمن D1 (DEC-050) — منفَّذ ومختبر على الفرع، بانتظار PR/دمج بكلمة المالك** — على الفرع
+`arena/69672f71-phone-google` (من `main@0357442`؛ وثائق ما بعد الدمج منقولة بـcherry-pick من `arena/1003f0da-phone-google@649c655`؛ PR #80 أُغلق بلا دمج بقرار المالك) ·
+سجل الجلسة الحالي: [2026-10-29-wp-1-4-measurements](sessions/2026-10-29-wp-1-4-measurements.md) ·
+سجل WP-1.3: [2026-10-29-wp-1-3-theme-tokens](sessions/2026-10-29-wp-1-3-theme-tokens.md) ·
 سجل WP-1.2: [2026-10-29-wp-1-2-execution-trace](sessions/2026-10-29-wp-1-2-execution-trace.md) ·
 سجل النقد والخطة وWP-1.1: [2026-10-29-architecture-critique-2026](sessions/2026-10-29-architecture-critique-2026.md) ·
 سجل ضوابط المالك (DEC-046 مُرجَع): [2026-10-29-security-controls-apply-script](sessions/2026-10-29-security-controls-apply-script.md) ·
@@ -67,6 +68,16 @@
   `workers/`؛ **الحافة على `0357442` منشورة بحسب خطوة الرفع، غير متحققة ببوابة القبول** — يفتح المالك الأثر `edge-live-acceptance-0357442…` أو يعيد
   تشغيل الوظيفة. تفاصيل في سجل الجلسة §7.
   **التالي:** WP-1.4 (عدّاد `reply_truncated` + سلسلة زمن D1 في `verify:live`) على هذا الفرع بكلمة «ابدأ».
+- **«ابدأ» → WP-1.4 منفَّذ (DEC-050)** على `arena/69672f71-phone-google`: ترحيل `0004_reply_metrics` (عبارتان idempotent → 16) + جدول `whatsapp_reply_metrics`
+  بمفتاح معرّف رسالة Meta (ربط بـ`whatsapp_messages` لا عمود — الترحيلات تُعاد كلها في كل رفع؛ لا نص ولا هاتف)؛ `workers/celia-edge/reply-metrics.js`
+  (مصنّف: `MAX_TOKENS` و/أو قصّ 1000 حرف؛ تسجيل لا يرمي؛ ملخص بنسبة `null` عند صفر ردود)؛ `generateEdgeAiReply` يحمل الحقائق مع كل رد والويبهوك يسجّلها بعد
+  نجاح الإرسال؛ `/api/ai/reply` تحت `source: api`؛ مسار المالك `GET /api/whatsapp/reply-metrics?days=`؛ Express: `src/reply-metrics.js` (تكافؤ مختبر) +
+  `generateWhatsAppReplyDetailed` + `truncation` في `generateCeliaReply` (دوام القياس هناك ينتظر HOST-003)؛ `verify:live --mode edge`: `d1_latency_series`
+  (`--d1-samples` افتراضيًا 5 → أدنى/وسيط/أقصى/`spreadRatio`؛ لا عتبة بعد) و`edge_reply_metrics` و`::error` باسم كل فحص فاشل على GitHub Actions؛
+  `docs/service-reality.md` §«أرقام مقاسة» (130 ms `40823425686`، 189 ms `40830998982`؛ السلسلة والنسبة «لم تُقَس بعد») يحرسه اختبار يرفض أي `ms`/`%` بلا تشغيلة.
+  اختبارات RM-01..06 + فحصا `verify:live` + بوابة الوثيقة؛ البوابات محليًا: **589/589**، تغطية 91.55/74.77/86.00، `check` 152، `check:continuity` ✅، `check:secrets` ✅.
+  **الأرقام الحية (السلسلة ونسبة القصّ) تُقرأ من أول تشغيلة `Cloudflare Edge` بعد الدمج** — لا رقم قبلها؛ الـ1400 ms في النقد بلا تشغيلة فلا تُثبت ولا تُنفى.
+  **التالي:** PR لهذا الفرع على رسالة المنصة/كلمة المالك → «ادمج» → نسخ السلسلة والنسبة من التشغيلة إلى «أرقام مقاسة». بعدها الخطوة 2 (WP-2.1 سياسة السياق).
 - **PR #80 (لقطة شاشة المالك 09:52، «تعارضات يجب حلها»):** فتحه المالك بنفسه (04:05Z، قالب الوصف فارغ) من الفرع القديم `arena/90163669-phone-google@1c3bc79`
   (3 كوميتات: إصلاح DEC-044 + وثائقه). **قياس:** الملفات الست غير الوثائقية (`scripts/deploy-cloudflare-edge.mjs`، `scripts/verify-live.mjs`، ثلاثة اختبارات،
   سجل الجلسة `2026-10-29-merge-74-and-edge-deploy-fix.md`) **مطابقة حرفيًا لما على `main`** (وصلت عبر PR #75)، وDEC-044 على `main`؛ الملفات الأربعة
