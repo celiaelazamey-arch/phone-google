@@ -21,6 +21,7 @@ export const RISK = Object.freeze({
 import { documentAutomationToolDefinitions } from './automation/index.js';
 import { auditProductCatalog, buildCreativeWorkflowPlan } from './evaluation.js';
 import { gmailToolDefinitions } from './gmail.js';
+import { googleReadToolDefinitions } from './google-read.js';
 
 const EXECUTABLE = new Set([RISK.read, RISK.internalWrite]);
 const FORBIDDEN_SECRET_KEYS = new Set([
@@ -297,7 +298,8 @@ export function defaultToolDefinitions({
   modelRouter = null,
   ledgerStore = null,
   plannerSafe = false,
-  gmail = null
+  gmail = null,
+  googleReaders = {}
 } = {}) {
   return [
     {
@@ -350,6 +352,7 @@ export function defaultToolDefinitions({
       }
     },
     ...gmailToolDefinitions({ gmail }),
+    ...googleReadToolDefinitions(googleReaders),
     {
       name: 'google.calendar_create_event',
       description: 'إنشاء موعد في Google Calendar — أثر خارجي يمرّ بـ outbox بعد موافقة صريحة',

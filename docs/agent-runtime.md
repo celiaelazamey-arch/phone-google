@@ -1,6 +1,6 @@
 # حلقة الوكيل M1 — ما نُفِّذ فعلًا وما لم يُنفَّذ
 
-**التاريخ:** 27 أكتوبر 2026 (محدَّث: 29 أكتوبر 2026 — WP-2.4 / AI-001 / DEC-054 + شريحة AI-002 المحلية + GOOG-004) · **المهمة:** AGENT-001 (M1) + الحوكمة + AGENT-002 + GOOG-004 + ذاكرة الوكيل + تقييم المهمة الذهبية + Planner المزود المحلي
+**التاريخ:** 27 أكتوبر 2026 (محدَّث: 29 أكتوبر 2026 — WP-2.4 / AI-001 / DEC-054 + شريحة AI-002 المحلية + GOOG-004/GOOG-005) · **المهمة:** AGENT-001 (M1) + الحوكمة + AGENT-002 + GOOG-004/GOOG-005 + ذاكرة الوكيل + تقييم المهمة الذهبية + Planner المزود المحلي
 **الحالة:** منفّذ ومختبر محليًا على مخزن SQLite صريح — **المسار الافتراضي لا يشغّل نموذجًا لغويًا؛ توجد شريحة Planner/Tool Use بمزود وهمي فقط، والأثر الخارجي لا يخرج إلا عبر outbox وبموصل صريح؛ الذاكرة حتمية وبلا متجهات، وتقييم AI-001 وهمي بلا شبكة**.
 **الإصدار:** `0.2.1` بلا تغيير · **مخطط الجداول الخمسة الأساسية:** `schema 1` بلا تغيير.
 
@@ -26,6 +26,7 @@
 | ذاكرة طويلة الأمد بلا متجهات (WP-2.3) | `src/agent/memory.js` + `agent_thread_summaries`/`agent_owner_facts`؛ ملخص خيط وحقائق `owner.*` تُشتق حتميًا من الخطوات عند `run.finished`، وفحص `findSecret` قبل حفظ نص التسليم | MEM-01..05: الحتمية، الملكية/404، الحذف النهائي مع `memory_deleted` وسلسلة سليمة، ومسارا HTTP؛ `context_memory` يعلن `summaries:true, facts:true` |
 | Planner + Tool Use بمزود قابل للحقن (شريحة AI-002) | `src/agent/planner-provider.js` + `plannerToolAllowlist` في Runtime؛ 2–4 قراءات فقط، JSON مغلق، `tool_result` يعود للمزود، وأحداث قرار/تنفيذ مستقلة | `test/agent-planner-provider.test.js`: حالات عربية/إنجليزية، رفض قبل الأثر، فشل آمن، منع إعادة التخطيط، واستئناف بلا تكرار؛ مزود وهمي فقط |
 | Gmail read-only (GOOG-004) | `src/agent/gmail.js` + `google.gmail_read`؛ تسجيل صريح بـ`CELIA_AGENT_CONNECTORS=gmail` أو حقن reader، وإعادة استخدام OAuth المشفر و`gmail.readonly`؛ intent حتمي ضيق في `demo` عند التفعيل | `test/agent-gmail.test.js`: 7/7 Mock/SQLite؛ آخر 1–5 رسائل بmetadata فقط، صفر outbox/approvals، ولا اتصال Google حي |
+| Google read-only suite (GOOG-005) | `src/agent/google-read.js` + `google.drive_read`/`google.calendar_read`/`google.contacts_read` مع Gmail؛ تفعيل صريح بـ`google_read`، وعقود Drive/People/Calendar قابلة للحقن | `test/agent-google-read.test.js`: 8/8 Mock/SQLite؛ Drive ≤10، Calendar ≤20 ونافذة ≤31 يومًا، Contacts ≤20؛ صفر outbox/approvals؛ لا اتصال حي. التفاصيل في [حدود 2026](google-readonly-2026.md) |
 | تقييم المهمة الذهبية العربية (WP-2.4) | `src/agent/ai-eval*.js` + 120 حالة ثابتة؛ الحلقة والموافقات وoutbox وموصل Calendar والمُتحقّق والأدلة حقيقية، والنقل وهمي بلا شبكة | AI-EVAL-01..08 و`npm run eval:ai`: 120/120، مواعيد مؤهلة 109/109، صفر تكرار/كتابة غير مصرح بها/إعادة عمياء، و`unknown` 2/2 إلى مصالحة |
 | شفافية تشغيل | خطوات مخزنة + بث SSE + عدادات استخدام | `GET /api/agent/runs/:id/events` يبدأ بلقطة ثم أحداثًا |
 | أزمنة مُثبَتة (WP-1.1، DEC-047) | `src/agent/timing.js`: مدة استدعاء الأداة = `updated_at − created_at` للصفوف التي سوّاها الوقت الحقيقي فقط؛ `null` للجارية/`unknown`/المسوّاة يدويًا؛ p50/p95 بأقرب رتبة | MET-01..05: ساعة وهمية تتقدم 7 ms فكل مدة مضاعف لـ7؛ خطوات `decide`/`deliver` بلا مدة |
@@ -91,6 +92,7 @@ npm run migrate -- --status
 | صندوق الأثر الخارجي | `src/agent/outbox.js` · `agent_outbox` | نية واحدة بمفتاح idempotency قبل القرار؛ ادعاء شرطي واحد؛ `dispatching` لا يُدعى ثانية ويُسوّى `unknown` عند انتهاء المهلة؛ لا إعادة إرسال تلقائية |
 | موصلات الأثر الخارجي | `src/agent/connectors.js` · `CELIA_AGENT_CONNECTORS` | Calendar/WhatsApp/Drive فقط عبر outbox وموافقة؛ `iCalUID`/مفاتيح idempotency؛ `failed` فقط عند إثبات عدم الوصول |
 | قارئ Gmail | `src/agent/gmail.js` · `google.gmail_read` | قراءة metadata ومقتطف ≤500 حرف عبر OAuth المشفر القائم؛ لا `send()` أو outbox أو body/attachments، ولا يسجل افتراضيًا |
+| قرّاء Google الآخرون | `src/agent/google-read.js` · `google_read` | Drive metadata وCalendar events وContacts projections بعقود read مغلقة؛ لا يدخلون registry ذي `send()`، ولا يغيّرون معنى `drive`/`calendar` approval-gated |
 | سجل الأدلة | `src/agent/evidence.js` · `agent_evidence` | إضافي فقط، `prev_hash`+`hash` من SHA-256 وجذر genesis لكل تشغيل؛ العبث يُكشف عند `verifyEvidenceChain` |
 | المصالحة البشرية | `runtime.reconcile()` · `POST /runs/:id/reconcile` | تُحلّ فقط صفوف `unknown`/`started` (أو `dispatching` بlease منتهٍ) بقرار مالك مسجل في السلسلة؛ لا نوش على نتيجة محسومة، ولا إرسال من هذا المسار |
 | المُتحقِّق المستقل | `src/agent/verifier.js` | منفصل عن المنتِج، بلا كتابة؛ أحكام `PASS`/`BLOCK`/`UNKNOWN`؛ لا خطوة `deliver` بلا `verify`؛ فحص `reconciliation_evidence` يمنع تحصيل نتيجة بلا شاهد في السلسلة |
@@ -126,6 +128,18 @@ CELIA_AGENT_CONNECTORS=gmail       # الافتراضي none: لا تسجيل و
 `id/from/subject/date/snippet/unread` (المقتطف ≤500 حرف)، وتسجل كنتيجة أداة وEvidence hash chain، لا كـoutbox أو أثر خارجي. غياب إعداد
 Google أو pool الدائم يفشل الإعداد برمز `agent_connector_unconfigured`. هذه الوثيقة لا تفعّل الحساب الحي؛ الاختبار
 الحالي Mock فقط، والتفعيل الفعلي قرار لاحق.
+
+### تفعيل قرّاء Google الأربعة (اختياري وصريح — GOOG-005)
+
+```bash
+CELIA_AGENT_CONNECTORS=google_read
+```
+
+يسجّل هذا الخيار Gmail وDrive وCalendar وContacts للقراءة فقط، بلا outbox connector ولا scopes جديدة.
+Drive يعيد أحدث 1–10 ملفات غير محذوفة بـ`id/name/mimeType/modifiedTime`، وCalendar يقرأ حتى 20 حدثًا في
+نافذة صريحة لا تتجاوز 31 يومًا، وContacts يقرأ صفحة أولى محدودة حتى 20 جهة مع فلترة محلية اختيارية.
+التفاصيل والعقود وحدود `calendar.events` الحالي موثقة في [Google read-only ضمن حدود 2026](google-readonly-2026.md).
+لا يعني التسجيل أن حسابًا حيًا مربوط أو أن أسماء ملفات المالك ظهرت؛ الاختبارات الحالية Mock فقط.
 
 ### الاستعادة عند الإقلاع (اختيارية وصريحة — DEC-018)
 
@@ -216,6 +230,7 @@ node --test test/agent-comprehension-gate.test.js  # 10/10 بوابة الفهم
 node --test test/agent-store.test.js               # 6/6
 node --test test/agent-runtime.test.js             # 16/16
 node --test test/agent-gmail.test.js               # 7/7 Gmail read-only · Mock/SQLite
+node --test test/agent-google-read.test.js         # 8/8 Google read-only suite · Mock/SQLite
 node --test test/agent-routes.test.js              # 3/3
 node --test test/agent-memory.test.js              # MEM-01..04: حتمية/أسرار/ملكية/حذف/انتهاء
 node --test test/agent-memory-routes.test.js       # MEM-05: عرض وحذف HTTP وسلسلة الأدلة

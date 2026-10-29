@@ -50,6 +50,17 @@ import {
 } from './connectors.js';
 import { createGmailReadConnector, GMAIL_CONNECTOR, GMAIL_TOOL, GMAIL_MAX_RESULTS } from './gmail.js';
 import {
+  createDriveReadConnector,
+  createCalendarReadConnector,
+  createContactsReadConnector,
+  DRIVE_READ_TOOL,
+  CALENDAR_READ_TOOL,
+  CONTACTS_READ_TOOL,
+  DRIVE_READ_CONNECTOR,
+  CALENDAR_READ_CONNECTOR,
+  CONTACTS_READ_CONNECTOR
+} from './google-read.js';
+import {
   CELIA_SEVEN_STAGE_LOOP,
   TASK_CATEGORIES,
   recommendTaskStrategy,
@@ -108,6 +119,15 @@ export {
   GMAIL_CONNECTOR,
   GMAIL_TOOL,
   GMAIL_MAX_RESULTS,
+  createDriveReadConnector,
+  createCalendarReadConnector,
+  createContactsReadConnector,
+  DRIVE_READ_TOOL,
+  CALENDAR_READ_TOOL,
+  CONTACTS_READ_TOOL,
+  DRIVE_READ_CONNECTOR,
+  CALENDAR_READ_CONNECTOR,
+  CONTACTS_READ_CONNECTOR,
   CELIA_SEVEN_STAGE_LOOP,
   TASK_CATEGORIES,
   recommendTaskStrategy,
@@ -165,20 +185,21 @@ export function readAgentLimits(env = process.env) {
 }
 
 /**
- * External-effect connectors and the Gmail reader are opt-in and explicit:
+ * External-effect connectors and read-only Google readers are opt-in and explicit:
  * `none` (default) keeps every external effect refused with
- * `external_connector_unavailable` and does not register Gmail. `calendar` and
- * `drive` use the owner's existing Google grant; `gmail` uses that same grant for
- * metadata-only reads and never enters the outbox. Missing configuration is an
- * error, never a silent downgrade.
+ * `external_connector_unavailable` and does not register Google readers. `calendar`
+ * and `drive` retain their approval-gated write/export meaning; `gmail` enables only
+ * Gmail reads, while `google_read` enables Gmail, Drive, Calendar, and Contacts reads
+ * without registering an outbox connector. Missing configuration is an error, never
+ * a silent downgrade.
  */
 export function readAgentConnectors(env = process.env) {
   const raw = String(env.CELIA_AGENT_CONNECTORS || 'none').trim().toLowerCase();
   const names = raw === '' ? [] : raw.split(',').map((name) => name.trim()).filter(Boolean);
-  const allowed = new Set(['none', 'calendar', 'whatsapp', 'drive', 'gmail']);
+  const allowed = new Set(['none', 'calendar', 'whatsapp', 'drive', 'gmail', 'google_read']);
   for (const name of names) {
     if (!allowed.has(name)) {
-      throw new Error('CELIA_AGENT_CONNECTORS must be one of: none, calendar, whatsapp, drive, gmail');
+      throw new Error('CELIA_AGENT_CONNECTORS must be one of: none, calendar, whatsapp, drive, gmail, google_read');
     }
   }
   return [...new Set(names.filter((name) => name !== 'none'))];
@@ -193,15 +214,15 @@ function buildConnectors({ env, pool, config, logger }) {
   }
   if (!requested.length) return createEmptyConnectorRegistry();
 
-  const needsGoogle = requested.some((name) => ['calendar', 'drive', 'gmail'].includes(name));
+  const needsGoogle = requested.some((name) => ['calendar', 'drive', 'gmail', 'google_read'].includes(name));
   if (needsGoogle) {
     if (!config.google?.clientId || !config.google?.clientSecret) {
-      throw Object.assign(new Error('CELIA_AGENT_CONNECTORS=calendar|drive|gmail requires Google OAuth configuration'), {
+      throw Object.assign(new Error('CELIA_AGENT_CONNECTORS=calendar|drive|gmail|google_read requires Google OAuth configuration'), {
         code: 'agent_connector_unconfigured'
       });
     }
     if (!pool || pool.isMemory) {
-      throw Object.assign(new Error('CELIA_AGENT_CONNECTORS=calendar|drive|gmail requires a durable pool for stored grants'), {
+      throw Object.assign(new Error('CELIA_AGENT_CONNECTORS=calendar|drive|gmail|google_read requires a durable pool for stored grants'), {
         code: 'agent_connector_unconfigured'
       });
     }
@@ -222,8 +243,8 @@ function buildConnectors({ env, pool, config, logger }) {
   }
 
   const userId = config.userId || env.APP_USER_ID || 'owner';
-  // Gmail is a read tool, not an outbox/send connector; it is wired separately below.
-  const definitions = requested.filter((name) => name !== 'gmail').map((name) => {
+  // Read tools are wired separately below; only effect connectors enter the outbox registry.
+  const definitions = requested.filter((name) => !['gmail', 'google_read'].includes(name)).map((name) => {
     if (name === 'calendar') {
       const transport = createGoogleCalendarTransport({
         getCalendar: async () => {
@@ -293,6 +314,37 @@ function buildGmailReader({ pool, config, env }) {
   });
 }
 
+function buildGoogleReaders({ pool, config, env }) {
+  const userId = config.userId || env.APP_USER_ID || 'owner';
+  return {
+    gmail: buildGmailReader({ pool, config, env }),
+    drive: createDriveReadConnector({
+      transport: {
+        async listFiles({ maxResults, signal }) {
+          const { fetchDriveFiles } = await import('../google.js');
+          return fetchDriveFiles({ pool, config, userId, maxResults, signal });
+        }
+      }
+    }),
+    calendar: createCalendarReadConnector({
+      transport: {
+        async listEvents({ timeMin, timeMax, maxResults, signal }) {
+          const { listAgendaEvents } = await import('../google.js');
+          return listAgendaEvents({ pool, config, userId, timeMin, timeMax, maxResults, signal });
+        }
+      }
+    }),
+    contacts: createContactsReadConnector({
+      transport: {
+        async listContacts({ query, maxResults, signal }) {
+          const { fetchGoogleContacts } = await import('../google.js');
+          return fetchGoogleContacts({ pool, config, userId, query, maxResults, signal });
+        }
+      }
+    })
+  };
+}
+
 /**
  * A host keeps agent initialization out of the request path of unrelated routes.
  * `ready` resolves to the runtime, or to `null` when the mode is `off`.
@@ -307,8 +359,9 @@ export function createAgentHost({
   // Explicit injection seam: tests and embedders pass a registry; production builds
   // it from CELIA_AGENT_CONNECTORS. Never a silent fallback — `null` means "build it".
   connectors: injectedConnectors = null,
-  // Read-only Gmail has its own injection seam; it is never an outbox connector.
-  gmail: injectedGmail = null
+  // Read-only Google readers have their own injection seam; they are never outbox connectors.
+  gmail: injectedGmail = null,
+  googleReaders: injectedGoogleReaders = null
 } = {}) {
   let mode = 'off';
   let failure = null;
@@ -356,13 +409,25 @@ export function createAgentHost({
     const store = createAgentStore({ driver });
     const kb = kbHost && kbHost.mode === 'sqlite' ? kbHost : null;
     const connectors = injectedConnectors || buildConnectors({ env, pool, config, logger });
-    const gmail = injectedGmail || (!injectedConnectors && readAgentConnectors(env).includes('gmail')
+    const requestedConnectors = readAgentConnectors(env);
+    const googleReaders = injectedGoogleReaders || (!injectedConnectors && requestedConnectors.includes('google_read')
+      ? buildGoogleReaders({ pool, config, env })
+      : {});
+    const gmail = injectedGmail || googleReaders.gmail || (!injectedConnectors && requestedConnectors.includes('gmail')
       ? buildGmailReader({ pool, config, env })
       : null);
     const runtime = createAgentRuntime({
       store,
-      tools: createToolRegistry(defaultToolDefinitions({ statusProvider, kb, gmail })),
-      planner: createDemoPlanner({ knowledge: Boolean(kb), gmail: Boolean(gmail) }),
+      tools: createToolRegistry(defaultToolDefinitions({ statusProvider, kb, gmail, googleReaders })),
+      planner: createDemoPlanner({
+        knowledge: Boolean(kb),
+        gmail: Boolean(gmail),
+        googleReaders: {
+          drive: Boolean(googleReaders.drive),
+          calendar: Boolean(googleReaders.calendar),
+          contacts: Boolean(googleReaders.contacts)
+        }
+      }),
       connectors,
       ownerId: config.userId || env.APP_USER_ID || 'owner',
       limits: readAgentLimits(env),
