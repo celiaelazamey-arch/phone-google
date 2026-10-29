@@ -63,6 +63,14 @@ export function createAgentRouter({ agent, authorize, logger = console }) {
     res.set('Cache-Control', 'no-store').json(await agent.status());
   });
 
+  // M-C/C1-b: حالة الوصول إلى الويب — الوضع والقائمة وأعداد القرارات.
+  // لا رمز منحة ولا ترويسة ولا URL لمضيف غير مسموح في أي رد هنا.
+  router.get('/egress', async (_req, res) => {
+    if (typeof agent.egress !== 'function') return res.status(404).json({ error: 'agent_egress_unavailable' });
+    await runtime(res); // يبقى العقد: 503 حين لا يكون الوكيل ممكنًا أصلًا.
+    return res.set('Cache-Control', 'no-store').json(agent.egress());
+  });
+
   router.get('/harness', async (_req, res) => {
     const current = await runtime(res);
     if (!current) return undefined;

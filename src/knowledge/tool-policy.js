@@ -36,6 +36,9 @@ export const CANONICAL_TOOLS = Object.freeze({
   'product.catalog_audit': { risk: 'read', requiresApproval: false, surface: 'agent' },
   'creative.workflow_plan': { risk: 'read', requiresApproval: false, surface: 'agent' },
   'sandbox.exec': { risk: 'irreversible', requiresApproval: true, surface: 'agent' },
+  // M-C/C2a: الوصول إلى الويب داخل فقط وعبر وسيط الخروج دائمًا؛ بيانات المالك
+  // لا تخرج (dataEgress=false بالبناء).
+  'web.fetch': { risk: 'read', requiresApproval: false, surface: 'agent' },
 
   // Knowledge network tools (M1.1) — read-only by construction.
   'kb.search': { risk: 'read', requiresApproval: false, surface: 'agent' },

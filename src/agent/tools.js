@@ -24,6 +24,7 @@ import { documentAutomationToolDefinitions } from './automation/index.js';
 import { auditProductCatalog, buildCreativeWorkflowPlan } from './evaluation.js';
 import { gmailToolDefinitions } from './gmail.js';
 import { googleReadToolDefinitions } from './google-read.js';
+import { webToolDefinitions } from './web-tools.js';
 
 const EXECUTABLE = new Set([RISK.read, RISK.internalWrite]);
 const FORBIDDEN_SECRET_KEYS = new Set([
@@ -353,7 +354,10 @@ export function defaultToolDefinitions({
   artifacts = null,
   // تفعيل الخيوط العنكبوتية: قارئ فهرس Celia Google Spider (createSpiderReader).
   // قراءة محلية فقط وصفر شبكة؛ الافتراض null لا يضيف أدوات spider.* أصلًا.
-  spider = null
+  spider = null,
+  // M-C/C1-b+C2a: خدمة «الوصول إلى الويب» خلف وسيط الخروج (createWebAccess).
+  // الافتراضي null لا يضيف web.fetch أصلًا — سطح الأدوات القائم يبقى حرفيًا.
+  web = null
 } = {}) {
   return [
     {
@@ -406,6 +410,7 @@ export function defaultToolDefinitions({
       }
     },
     ...gmailToolDefinitions({ gmail }),
+    ...webToolDefinitions({ web }),
     ...googleReadToolDefinitions(googleReaders),
     {
       name: 'google.calendar_create_event',
