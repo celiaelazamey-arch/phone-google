@@ -6,9 +6,10 @@
 > والإصدار `40719074453` والجودة `40719074375`. المتبقي حصرًا لإجراء المالك: رابط استدعاء Google، وأسرار Meta الاختيارية.
 > انظر [سجل جلسة النشر الحي](sessions/2026-10-28-live-edge-publication.md). ما يلي توثيق الجلسة السابقة كما كُتب، محفوظ بلا حذف.
 
-**آخر مراجعة:** 29 أكتوبر 2026 · **نوع الجلسة الحالية:** **دمج PR #74 → `main@c3cc9ba` + إصلاح فشل نشر الحافة (DEC-044، OPS-007)** —
-على الفرع `arena/90163669-phone-google` (كل ما قبل الإصلاح مدمج في `main`؛ الإصلاح `8e3641b` ينتظر PR و«ادمج») ·
-سجل الجلسة الحالي: [2026-10-29-merge-74-and-edge-deploy-fix](sessions/2026-10-29-merge-74-and-edge-deploy-fix.md) ·
+**آخر مراجعة:** 29 أكتوبر 2026 · **نوع الجلسة الحالية:** **«نفّذ الستة» — إصلاح نشر الحافة حيًّا + إغلاق #38 + قراءة ضوابط المالك (DEC-044، DEC-045، OPS-007، SEC-006)** —
+على الفرع `arena/2f11f424-phone-google` (نظيف من `main@c3cc9ba`؛ يحمل إصلاح DEC-044 منقولًا من الفرع السابق المقفول `pr_merged`) ·
+سجل الجلسة الحالي: [2026-10-29-execute-six-deploy-fix-live](sessions/2026-10-29-execute-six-deploy-fix-live.md) ·
+سجل دمج #74 وتشخيص الفشل: [2026-10-29-merge-74-and-edge-deploy-fix](sessions/2026-10-29-merge-74-and-edge-deploy-fix.md) ·
 سجل SEC-006 + LEARN-001 (DEC-043): [2026-10-29-security-posture-and-video-record](sessions/2026-10-29-security-posture-and-video-record.md) ·
 سجل OPS-007 (DEC-042): [2026-10-29-edge-cron-outbox](sessions/2026-10-29-edge-cron-outbox.md) ·
 سجل QA-009 (DEC-041): [2026-10-29-qa-009-ci-failure-notify](sessions/2026-10-29-qa-009-ci-failure-notify.md) ·
@@ -22,7 +23,17 @@
 [docs/computer-use.md](../computer-use.md) · حوكمة المشكلات: [docs/issue-triage.md](../issue-triage.md) ·
 واقع الخدمات: [docs/service-reality.md](../service-reality.md) · خطة المحافظة: [docs/preservation-plan.md](../preservation-plan.md)
 
-## الطلب الحالي — «ادمج #74» → مدمج؛ نشر الحافة رُفض (`cron.js` خارج حزمة الرفع) → إصلاح جاهز ينتظر PR (DEC-044، OPS-007)
+## الطلب الحالي — «نفّذ الستة» (DEC-044 حيًّا، DEC-045، OPS-007، SEC-006)
+
+- **1 ✓ النقل:** الفرع السابق قُفل (`pr_merged`) فنُقل الإصلاح إلى `arena/2f11f424-phone-google` بـcherry-pick (`ea078f4` كود، `ebef990`/`3bdc6f4`
+  وثائق) — الشجرة مطابقة بايتًا لما كان مدفوعًا؛ 564/564 محليًا.
+- **5 ✓ ضوابط المالك — قراءة قبل التصديق (DEC-045):** الواجهة تقول إن `main` **غير محمي** (`protected: false`، لا rulesets)، و**Dependabot
+  alerts معطّلة** (نص الرسالة)، و**لا CodeQL** (لا workflow ديناميكي)؛ Secret scanning وWorkflow permissions 403. لذلك لا `VERIFIED`؛
+  سُجِّلت `NOT ENABLED (2026-10-29)` حيث القراءة سلبية و`UNKNOWN` حيث لا قراءة، وSP-12 يقبل الحالة الثالثة ويرفض الادعاء بلا تاريخ.
+  **مطلوب من المالك:** تنفيذ خطوات §2 في `docs/security-posture.md` ثم «تم» بالاسم.
+- **2، 3، 4:** PR الإصلاح ودمجه ومراقبة النشر وإغلاق #38 — تُسجَّل في سجل الجلسة §4/§5 فور تنفيذها.
+
+## الطلب السابق (0) — «ادمج #74» → مدمج؛ نشر الحافة رُفض (`cron.js` خارج حزمة الرفع) → الإصلاح نُقل إلى الفرع الجديد (DEC-044، OPS-007)
 
 - **ما نُفِّذ بالكلمة:** `gh pr merge 74 --merge` → **MERGED** `2026-10-29T02:53Z`، التزام الدمج **`c3cc9ba7247ac4c1211f2ef0b3871dfc3a2b0564`**؛
   الفرع لم يُحذف؛ #38 ما زال مفتوحًا. على `main` الآن: OPS-007/DEC-042 + SEC-006/DEC-043 + LEARN-001.

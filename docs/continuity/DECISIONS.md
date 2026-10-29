@@ -986,3 +986,24 @@
   فيها؛ والدليل الحي لقرار DEC-042 يجب أن يكون جزءًا من بوابة النشر لا مهمة يدوية تُنسى.
 - **الأثر:** 564/564 اختبارًا، تغطية 91.21/73.72/85.46. **القيد المعلن:** لم يثبت الإصلاح حيًّا بعد؛ الدليل سيكون تشغيلة
   `cloudflare-deploy.yml` على `main` بعد الدمج تُظهر `modules: […cron.js…]` و`status: deployed` و`edge_cron_governed: pass`.
+
+## DEC-045 — ضوابط المالك تُقرأ من الواجهة قبل تصديق كلمة التأكيد: القراءة السلبية المؤرَّخة حالة ثالثة `NOT ENABLED (تاريخ)` في وثيقة الوضع الأمني وSP-12
+
+- **التاريخ:** 29 أكتوبر 2026 · **الحالة:** منفذ ومختبر على الفرع `arena/2f11f424-phone-google` · **المهمة:** SEC-006 · **الوثائق:**
+  `docs/security-posture.md` §2/§4، `test/security-posture.test.js` SP-12، سجل الجلسة `sessions/2026-10-29-execute-six-deploy-fix-live.md`.
+- **السياق:** قال المالك «اوك تم» ردًّا على طلب تأكيد تفعيل Branch protection / Dependabot alerts / Secret scanning / CodeQL. قبل تحديث
+  الوثيقة إلى `VERIFIED` فُحص ما تسمح الصلاحيات بقراءته (بلا صلاحية إدارة): `GET /branches/main → protected: false`، `GET /rulesets → []`،
+  `GET /rules/branches/main → []`، `GET /dependabot/alerts → 403 «Dependabot alerts are disabled for this repository»`، ولا workflow
+  ديناميكي `dynamic/github-code-scanning/codeql` في `GET /actions/workflows`؛ أما `secret-scanning/alerts` و`code-scanning/default-setup`
+  و`actions/permissions/workflow` فـ403 بلا معلومة. أي أن ضابطين على الأقل (الحماية والتنبيهات) **غير مفعَّلين فعلًا** رغم كلمة التأكيد
+  (الأرجح أن «تم» كانت موافقة على الخطة لا إخبارًا بالتفعيل).
+- **البدائل المرفوضة:** (أ) تسجيل `VERIFIED (2026-10-29)` اعتمادًا على الكلمة — ادعاء تكذّبه الواجهة؛ (ب) إبقاء `UNKNOWN` — إخفاء
+  معلومة سلبية مؤكدة؛ (ج) حذف SP-12 — يعيد الوثيقة إلى «قابلة للادعاء بصمت».
+- **القرار:** (1) الحالة في جدول owner-only واحدة من ثلاث: `UNKNOWN` (لا قراءة)، `VERIFIED (YYYY-MM-DD)` (قراءة إيجابية أو تأكيد مالك
+  مؤرَّخ لما لا يُقرأ)، `NOT ENABLED (YYYY-MM-DD)` (قراءة سلبية صريحة)؛ SP-12 يقبل الثلاث ويرفض `ENABLED`/`VERIFIED` بلا تاريخ
+  (تعديل الاختبار في الـPR نفسه — قاعدة DEC-043 §2). (2) الوثيقة تذكر أوامر الفحص القابلة للإعادة ونتيجتها الأخيرة بتاريخ. (3) كلمة
+  تأكيد من المالك تُصدَّق فقط للضوابط التي لا تُقرأ (403)؛ ما يُقرأ تحكمه القراءة.
+- **السبب:** الوثيقة أداة قرار لا سجل مجاملة؛ والقراءة السلبية الرخيصة (طلب GET) تمنع «وضعًا أمنيًا» ورقيًا لا وجود له.
+- **الأثر:** `docs/security-posture.md`: Branch protection وDependabot alerts وCodeQL → `NOT ENABLED (2026-10-29)`؛ Secret scanning
+  وWorkflow permissions → `UNKNOWN (403)`. اختبار الطفرات: `ENABLED` أو `VERIFIED` بلا تاريخ يُفشل SP-12. المطلوب من المالك خطوات §2
+  ثم «تم» مع ما فعّله بالاسم؛ عندها تُعاد القراءة وتُحدَّث الحالات بتاريخ.
