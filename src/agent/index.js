@@ -2,8 +2,10 @@ import { createAgentRuntime, PLAN_LIFECYCLE_STATE } from './runtime.js';
 import { createAgentStore } from './store.js';
 import { createMysqlDriver, createSqliteDriver } from './drivers.js';
 import { createToolRegistry, defaultToolDefinitions } from './tools.js';
-import { createDemoPlanner } from './planner.js';
+import { createDemoPlanner, DEMO_PLANNER_TOOL_SURFACE } from './planner.js';
 import { createProviderPlanner, PROVIDER_PLAN_SCHEMA, validateProviderPlan } from './planner-provider.js';
+import { createGeminiPlannerProvider } from './gemini-planner-provider.js';
+import { createGovernedFallbackPlanner, PLANNER_FALLBACK_CODES } from './planner-fallback.js';
 import {
   HARNESS_LIFECYCLE_STAGES,
   HARNESS_COMPONENT_IDS,
@@ -77,6 +79,10 @@ export {
   createProviderPlanner,
   PROVIDER_PLAN_SCHEMA,
   validateProviderPlan,
+  createGeminiPlannerProvider,
+  createGovernedFallbackPlanner,
+  PLANNER_FALLBACK_CODES,
+  DEMO_PLANNER_TOOL_SURFACE,
   HARNESS_LIFECYCLE_STAGES,
   HARNESS_COMPONENT_IDS,
   inspectAgentHarness,
@@ -361,7 +367,9 @@ export function createAgentHost({
   connectors: injectedConnectors = null,
   // Read-only Google readers have their own injection seam; they are never outbox connectors.
   gmail: injectedGmail = null,
-  googleReaders: injectedGoogleReaders = null
+  googleReaders: injectedGoogleReaders = null,
+  // A1 injection seam: tests pass a mock provider; production builds Gemini from config.
+  plannerProvider: injectedPlannerProvider = null
 } = {}) {
   let mode = 'off';
   let failure = null;
@@ -382,10 +390,19 @@ export function createAgentHost({
   const ready = (async () => {
     if (failure) throw Object.assign(new Error(failure.message), { code: failure.code });
     if (mode === 'off') return null;
-    if (String(env.CELIA_AGENT_PLANNER || 'demo').trim().toLowerCase() !== 'demo') {
-      throw Object.assign(new Error('Only the deterministic demo planner is implemented (AGENT-001)'), {
-        code: 'agent_planner_unavailable'
-      });
+    const plannerMode = String(env.CELIA_AGENT_PLANNER || 'demo').trim().toLowerCase();
+    if (plannerMode !== 'demo' && plannerMode !== 'gemini') {
+      throw Object.assign(
+        new Error('CELIA_AGENT_PLANNER must be "demo" (default, deterministic) or "gemini" (A1 provider planner with governed fallback)'),
+        { code: 'agent_planner_unavailable' }
+      );
+    }
+    if (plannerMode === 'gemini' && !injectedPlannerProvider && !config?.gemini?.apiKey) {
+      // لا ارتداد صامت إلى demo: طلب gemini بلا مفتاح خطأ تهيئة صريح.
+      throw Object.assign(
+        new Error('CELIA_AGENT_PLANNER=gemini requires GEMINI_API_KEY (config.gemini.apiKey); the default planner stays "demo"'),
+        { code: 'agent_planner_misconfigured' }
+      );
     }
     let driver;
     if (mode === 'mysql') {
@@ -416,18 +433,45 @@ export function createAgentHost({
     const gmail = injectedGmail || googleReaders.gmail || (!injectedConnectors && requestedConnectors.includes('gmail')
       ? buildGmailReader({ pool, config, env })
       : null);
+    const toolRegistry = createToolRegistry(defaultToolDefinitions({
+      statusProvider,
+      kb,
+      gmail,
+      googleReaders,
+      plannerSafe: plannerMode === 'gemini'
+    }));
+    const demoPlanner = createDemoPlanner({
+      knowledge: Boolean(kb),
+      gmail: Boolean(gmail),
+      googleReaders: {
+        drive: Boolean(googleReaders.drive),
+        calendar: Boolean(googleReaders.calendar),
+        contacts: Boolean(googleReaders.contacts)
+      }
+    });
+    let planner = demoPlanner;
+    if (plannerMode === 'gemini') {
+      // A1: المزوّد يقترح فقط ضمن 2-4 أدوات قراءة؛ الحلقة تبقى المنفّذ والبوابات كما هي.
+      const allowedTools = [
+        'celia.thread_context',
+        'celia.system_status',
+        'celia.draft_outline',
+        ...(kb ? ['kb.search'] : [])
+      ];
+      const provider = injectedPlannerProvider || createGeminiPlannerProvider({
+        apiKey: config.gemini.apiKey,
+        model: config.gemini.model
+      });
+      planner = createGovernedFallbackPlanner({
+        primary: createProviderPlanner({ provider, tools: toolRegistry, allowedTools }),
+        fallback: demoPlanner,
+        extraAllowedTools: [...DEMO_PLANNER_TOOL_SURFACE]
+      });
+    }
     const runtime = createAgentRuntime({
       store,
-      tools: createToolRegistry(defaultToolDefinitions({ statusProvider, kb, gmail, googleReaders })),
-      planner: createDemoPlanner({
-        knowledge: Boolean(kb),
-        gmail: Boolean(gmail),
-        googleReaders: {
-          drive: Boolean(googleReaders.drive),
-          calendar: Boolean(googleReaders.calendar),
-          contacts: Boolean(googleReaders.contacts)
-        }
-      }),
+      tools: toolRegistry,
+      planner,
       connectors,
       ownerId: config.userId || env.APP_USER_ID || 'owner',
       limits: readAgentLimits(env),

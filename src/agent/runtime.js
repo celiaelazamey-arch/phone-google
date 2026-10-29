@@ -564,6 +564,29 @@ export function createAgentRuntime({
             claimed: true
           };
         }
+        if (decision?.plannerFallback) {
+          // A1: فشل مزوّد قابل للتحويل — يُسجَّل علنًا خطوةً ودليل BLOCK قبل متابعة القرار الحتمي.
+          const fb = decision.plannerFallback;
+          const fallbackStep = await addStep(runId, {
+            kind: 'decide',
+            title: 'planner_fallback',
+            summary: `فشل مزوّد التخطيط (${fb.code})؛ تحويل مرئي إلى المسار الحتمي (${fb.mode}).`
+          });
+          await recordProviderEvent({
+            runId,
+            stepId: fallbackStep.id,
+            kind: EVIDENCE_KIND.planCreated,
+            input: fb.providerTrace?.request ?? { provider: fb.provider || null },
+            output: {
+              valid: false,
+              code: fb.code,
+              details: fb.details || [],
+              plan: fb.providerTrace?.plan ?? null,
+              fallback: { stage: fb.stage, mode: fb.mode, provider: fb.provider || null }
+            },
+            verdict: VERDICT.block
+          });
+        }
         if (decision?.providerTrace) {
           const planStep = await addStep(runId, {
             kind: 'decide',

@@ -12,9 +12,9 @@
 ## 2. التركيز النشط وسجل الحالة ([STATE.md](STATE.md))
 
 - **آخر مراجعة مسجّلة:** 29 أكتوبر 2026
-- **الجلسة النشطة:** GOOG-005 Google read-only ضمن حدود 2026 على `arena/d44070e0-phone-google`؛ تنفيذ محلي/Mock لقراءات Gmail وDrive وCalendar وContacts عبر `CELIA_AGENT_CONNECTORS=google_read`، بلا OAuth حي أو scopes جديدة أو كتابة خارجية أو ربط Sandbox بـRuntime. Drive يعرض metadata لأحدث 10 ملفات، وCalendar نافذة محدودة، وContacts صفحة محدودة، مع planner حتمي يفصل القراءة عن create/export. نجح `test/agent-google-read.test.js` 8/8، والفحص المشترك 28/28، و`npm run test:coverage` 647/661 ناجحًا، 0 فشل، 14 skipped بتغطية 90.70% أسطر / 75.45% فروع / 86.90% دوال؛ لا اتصال Google حي ولا ادعاء ظهور بيانات المالك أو جاهزية إنتاجية
-- **آخر سجل جلسة مؤرَّخ:** [2026-10-29-google-readonly-2026](sessions/2026-10-29-google-readonly-2026.md)
-- **حجم [STATE.md](STATE.md) النشط:** 75 سطرًا (13244 بايت)
+- **الجلسة النشطة:** MANUS-A1 — اعتماد خطة «منافس مانوس» وتنفيذ شريحتها الأولى على `arena/718068f3-phone-google`؛ المالك اعتمد [خطة منافس مانوس](../manus-competitor-plan.md) نصًا، ونُفِّذ الشق الهيكلي لـA1: `CELIA_AGENT_PLANNER=gemini` خلف علم (الافتراضي `demo` بلا تغيير)، محوّل `src/agent/gemini-planner-provider.js`، و`planner_fallback` حتمي مرئي (`src/agent/planner-fallback.js` + خطوة ودليل BLOCK في runtime)؛ `test/agent-gemini-planner.test.js` 24/24 بلا شبكة، الحزمة 670 ناجحًا والتغطية 90.67/75.62/86.79 فوق الأرضية؛ فشل واحد معروف بيئيًا (N/N-1 يحتاج كائن Git تاريخيًا غير موجود في الاستنساخ المضغوط — ثبت على خط الأساس النظيف). لا تشغيل Gemini حي ولا نشر ولا ترحيل؛ التشغيلة الحية المعزولة قرار مالك. سجل الجلسة: [2026-10-29-manus-a1-gemini-planner](sessions/2026-10-29-manus-a1-gemini-planner.md)
+- **آخر سجل جلسة مؤرَّخ:** [2026-10-29-manus-a1-gemini-planner](sessions/2026-10-29-manus-a1-gemini-planner.md)
+- **حجم [STATE.md](STATE.md) النشط:** 76 سطرًا (14403 بايت)
 - **الأرشيف التاريخي المحفوظ بلا حذف:**
 - [STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md) — الأساس `9f6f8b2` · **983 سطرًا** محفوظًا حرفيًا (بصمة `f2674637e82e…`)
 
