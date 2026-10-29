@@ -58,12 +58,16 @@
 
 ## 4) خطوات التفعيل النهائية من طرفك (دون إدخال أي بطاقة فيزا)
 
-### الخطوة أ — النشر التلقائي (يعمل تلقائيًا بمجرد دمج PR `#70` في `main`)
-لا تحتاج إلى إنشاء أي حساب جديد أو دفع أي مبلغ:
-- أسرار Cloudflare (`CLOUDFLARE_API_TOKEN` و`CLOUDFLARE_ACCOUNT_ID`) والأسرار الـ 18 موجودة بالفعل في **GitHub Actions Secrets**.
-- فور دمج الفرع في `main`، يشغّل GitHub Actions تلقائيًا:
-  1. `cloudflare-deploy.yml`: يطبّق ترحيلات D1 الـ 12، ويرفع الخادم الرباعي الوحدات، ويتحقق حيًّا عبر `verify-live.mjs --mode edge` من عمل الأدوات الـ 12 وقاعدة D1 وبوابة `401`.
-  2. `pages.yml`: يحدّث واجهة GitHub Pages مربوطةً بالخادم الحي.
+### الخطوة أ — النشر التلقائي — ✅ **مُنفَّذ ومتحقَّق حيًّا (`DEC-038`)**
+
+لم تحتج إلى إنشاء أي حساب جديد أو دفع أي مبلغ:
+- أسرار Cloudflare (`CLOUDFLARE_API_TOKEN` و`CLOUDFLARE_ACCOUNT_ID`) والأسرار الـ 18 كانت موجودة بالفعل في **GitHub Actions Secrets** واسُتخدمت كما هي.
+- بعد دمج PR `#70` في `main` (`0ebf8cac86faaea67e6f969c273549b2f8b33220`) شغّل GitHub Actions تلقائيًا وأخضر بالكامل:
+  1. `cloudflare-deploy.yml` — التشغيلة **`40719074394`**: طبّق ترحيلات D1 الـ 12، ورفع الخادم الرباعي الوحدات،
+     وتحقق حيًّا عبر `verify-live.mjs --mode edge` من عمل الأدوات الـ 12 وقاعدة D1 وبوابة `401`.
+  2. `pages.yml` — التشغيلة **`40719074587`**: حدّث واجهة GitHub Pages (12/12 مسارًا حيًّا `HTTP 200`) مربوطةً بالخادم الحي.
+  3. `release.yml` — التشغيلة **`40719074453`**:زامن الإصدار `v0.2.1` الموثّق بـOIDC على نفس الالتزام.
+  4. `celia-mcp.yml` — التشغيلة **`40719074375`**: بوابة الجودة خضراء على `main`.
 
 ### الخطوة ب — تفعيل ربط Google OAuth على النطاق المجاني (دقيقتان في Google Cloud Console)
 في إعداد عميل OAuth الخاص بك داخل [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials) (المجاني بلا بطاقة):
@@ -106,3 +110,28 @@ CELIA_MCP_API_TOKEN="<رمزك_السري>" npm run verify:edge
 3. نجاح `/readyz` وإثبات الكتابة الفعلية في قاعدة Cloudflare D1 (`storage.mode = "d1"`, `durable = true`).
 4. رفض الوصول غير المصرح به إلى `/mcp` بكود `401`.
 5. استرجاع قائمة أدوات MCP الـ 12 كاملة عبر `POST /mcp` دون تسريب أي سر في التقرير الناتج.
+
+---
+
+## 6) أدلة النشر الحي بعد دمج PR `#70` (`DEC-038`)
+
+| الدليل | القيمة الفعلية من الرابط العام (2026-10-28) |
+|---|---|
+| حالة النشر (`cloudflare-deploy.yml` **`40719074394`**) | `status: "deployed"` · `liveReady: true` · `secretBindingsInjected: 18/18` · `version: "0.2.1"` · `commit: "0ebf8cac86faaea67e6f969c273549b2f8b33220"` |
+| ترحيلات D1 | `d1: { ok: true, id: "f63ccd9f-49b1-4eca-861b-fd478c433518", name: "celia-edge-state", migrations: { statements: 12 } }` |
+| دوام القاعدة الحي | `storage: { mode: "d1", durable: true, latencyMs: 50 }` من `/readyz` داخل التشغيلة |
+| بوابة القبول الحية | `verify:live --mode edge` **ناجحة** داخل نفس التشغيلة + تقرير `edge-live-acceptance-<sha>` مرفوع كـartifact |
+| `GET /health` | `200` · `fullEdgeRuntimeMounted: true` · `capabilities.mcpToolsCount: 12` · `secretsConfiguredCount: 18` |
+| `GET /readyz` | `200` · `durable: true` · `latencyMs: 423` (`durabilityVerifiedBy: "this endpoint: write + read-back of a fresh token"`) |
+| `GET /version` | `200` · `version: "0.2.1"` · `commit: "0ebf8cac86faaea67e6f969c273549b2f8b33220"` |
+| `GET /mcp` بلا رمز حامل | `401` · `{"error":"unauthorized"}` — بوابة المصادقة تعمل |
+| واجهة GitHub Pages (`pages.yml` **`40719074587`**) | **12/12** مسارًا حيًا `HTTP 200` على `https://celiaelazamey-arch.github.io/phone-google` |
+| الإصدار (`release.yml` **`40719074453`**) | `Release v0.2.1 synced and OIDC-attested` على الالتزام `0ebf8cac…` |
+| الجودة (`celia-mcp.yml` **`40719074375`**) | كل الوظائف خضراء على `main` (Node 22/24، MySQL 8.4، الحاوية، RTL، Python) |
+
+## 7) ما يتبقى حصريًا لك (دقيقتان، بلا أي بطاقة)
+
+1. **ربط Google:** أضف رابط الاستدعاء في Google Cloud Console، ثم نفّذ أمر `/auth/google/link` المذكور في الخطوة ب. بعدها يصير `/api/google/status` → `"connected": true`.
+2. **واتساب (اختياري):** اضبط webhook Meta وأضف أسرار `WHATSAPP_*` الأربعة، ثم أعد تشغيل workflow **Deploy Cloudflare Edge** يدويًا من تبويب Actions.
+
+> كل ما عداهما منشور ويعمل الآن: الـ12 أداة، وقاعدة D1 الدائمة، والواجهة، والإصدار الموثّق — بـ`0$` وبدون أي بطاقة دفع. قاعدة «منشور» في هذا المشروع: لا يُكتب النشر إلا ببوابة حية ناجحة (`verify:live --mode edge`) على الرابط العام داخل نفس تشغيلة النشر؛ وقد نجحت في `40719074394`.

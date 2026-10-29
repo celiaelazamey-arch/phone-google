@@ -27,6 +27,7 @@
     "database": "Aiven Free MySQL, a dedicated empty database",
     "url": "provider-assigned HTTPS onrender.com subdomain, not yet created",
     "accountAuthorizationAvailable": false,
+    "primaryPath": "cardFreePrimaryRuntime (DEC-037) — Cloudflare Workers + D1 + GitHub Pages, live on main@0ebf8cac86faaea67e6f969c273549b2f8b33220 since 2026-10-28; the Render/Aiven entry above stays as the deferred, card-gated alternative for HOST-003",
     "cardFreePrimaryRuntime": {
       "decision": "DEC-037",
       "guide": "docs/no-visa-deployment.md",
@@ -38,17 +39,40 @@
     }
   },
   "publication": {
-    "permanentPublicUrl": null,
-    "permanentPublicUrlNote": "The full Express + MySQL service has no public URL yet: no Render service and no Aiven database exist (owner accounts required).",
+    "permanentPublicUrl": "https://celia-phone-google.celiaelazamey.workers.dev",
+    "permanentPublicUrlNote": "Card-free production runtime (DEC-037), live since 2026-10-28: the full Celia runtime — 12 MCP tools, Google OAuth2/Workspace, WhatsApp Cloud API webhook and Gemini replies — is served from this Cloudflare Workers URL with Cloudflare D1 as its durable store, at 0 USD/month with no payment card and no sleeping instance. The separate Express + MySQL service (HOST-003) still has no public URL: Render creation is blocked by a $1 card authorization (DEC-034) and no Aiven database exists.",
     "staticSiteUrl": "https://celiaelazamey-arch.github.io/phone-google/",
-    "staticSiteVerifiedBy": "GitHub Pages workflow run 40706047514 (success) on main@44532f4552c20b8fb51402e14cff8fc15356b97c, 2026-10-28 (12/12 routes verified in pages.yml)",
+    "staticSiteVerifiedBy": "GitHub Pages workflow run 40719074587 (success) on main@0ebf8cac86faaea67e6f969c273549b2f8b33220, 2026-10-28: 12/12 live routes HTTP 200 verified in pages.yml (earlier evidence: run 40706047514 on main@44532f4552c20b8fb51402e14cff8fc15356b97c)",
     "edgeUrl": "https://celia-phone-google.celiaelazamey.workers.dev",
-    "edgeVerifiedBy": "workflow run 40706047781 on main@44532f4552c20b8fb51402e14cff8fc15356b97c: status deployed, liveReady true, 18/18 secret bindings, D1 celia-edge-state (f63ccd9f-49b1-4eca-861b-fd478c433518, 4 SQL migration statements) verified with storage.mode=d1, durable=true",
+    "edgeVerifiedBy": "workflow run 40719074394 on main@0ebf8cac86faaea67e6f969c273549b2f8b33220 (merge of PR #70): status deployed, liveReady true, 18/18 secret bindings, D1 celia-edge-state (f63ccd9f-49b1-4eca-861b-fd478c433518) with 12 idempotent SQL statements applied, /readyz storage.mode=d1 durable=true latencyMs=423 (fresh token written and read back), /version commit 0ebf8cac86faaea67e6f969c273549b2f8b33220 equal to the deployed commit, and unauthenticated GET /mcp answered 401",
+    "edgeFullRuntime": {
+      "mounted": true,
+      "cardFree": true,
+      "monthlyCostUsd": 0,
+      "mcpToolsCount": 12,
+      "googleOAuth": true,
+      "whatsappWebhook": true,
+      "aiReply": true,
+      "deployedCommit": "0ebf8cac86faaea67e6f969c273549b2f8b33220",
+      "deployedAt": "2026-10-28T15:45:12.367Z",
+      "verifyLiveModeEdge": {
+        "passed": true,
+        "command": "node scripts/verify-live.mjs --mode edge --url https://celia-phone-google.celiaelazamey.workers.dev --expect-commit <sha>",
+        "workflow": ".github/workflows/cloudflare-deploy.yml",
+        "workflowRun": "40719074394"
+      },
+      "postDeployProbes": [
+        "GET /health → 200 · fullEdgeRuntimeMounted true · capabilities.mcpToolsCount 12 · secretsConfiguredCount 18/18",
+        "GET /readyz → 200 · storage.mode=d1 · durable true · latencyMs 423 (write + read-back of a fresh token)",
+        "GET /version → 200 · version 0.2.1 · commit 0ebf8cac86faaea67e6f969c273549b2f8b33220",
+        "GET /mcp without a bearer token → 401 {\"error\":\"unauthorized\"}"
+      ]
+    },
     "containerImage": "ghcr.io/celiaelazamey-arch/phone-google:v0.2.1",
     "containerImageVisibility": "public",
     "release": "https://github.com/celiaelazamey-arch/phone-google/releases/tag/v0.2.1",
-    "externallyVerified": false,
-    "externallyVerifiedNote": "Static site and edge gateway are verified by GitHub Actions probes; the full backend is not deployed, so verify:live has never passed on a public URL.",
+    "externallyVerified": true,
+    "externallyVerifiedNote": "The card-free edge runtime is externally verified: the in-workflow `verify:live --mode edge` acceptance gate (run 40719074394) plus the live probes listed in edgeFullRuntime.postDeployProbes. Still not verified live: the Express + MySQL full backend (no host without a card), the Google account link (owner must add the redirect URI) and the WhatsApp Cloud API (owner must add the four Meta secrets).",
     "googleLiveConnectionVerified": false,
     "whatsappLiveConnectionVerified": false,
     "productionBackupRestored": false,
@@ -64,7 +88,7 @@
     "githubActionsSecretsValuesExposed": false,
     "databaseSchemaChanges": false
   },
-  "remainingOwnerAction": "Create the FREE Render web service (Blueprint from render.yaml) and a dedicated Aiven MySQL Free database in your own dashboards, paste the MySQL credentials into Render only, then add the repository variable CELIA_LIVE_URL plus the secrets RENDER_API_KEY + RENDER_SERVICE_ID (or RENDER_DEPLOY_HOOK_URL). From then on .github/workflows/deploy-render.yml deploys after every green CI run on main, runs `npm run verify:live -- --url $CELIA_LIVE_URL --expect-commit <sha>`, uploads the token-free report, and keeps the instance awake via cron-job.org; manual §5 items still need a session record. Never paste credentials or payment information into chat.",
+  "remainingOwnerAction": "Card-free path (DEC-037) — two console actions, no card, everything else deploys automatically on push to main: (1) add https://celia-phone-google.celiaelazamey.workers.dev/auth/google/callback as an Authorized redirect URI of the OAuth client in Google Cloud Console (free, no card), then start the link with `curl -sS -X POST https://celia-phone-google.celiaelazamey.workers.dev/auth/google/link -H \"Authorization: Bearer $CELIA_MCP_API_TOKEN\"`; (2) optional — point the Meta WhatsApp webhook at https://celia-phone-google.celiaelazamey.workers.dev/webhooks/whatsapp and add WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_APP_SECRET and WHATSAPP_VERIFY_TOKEN to GitHub Actions secrets, then re-run the 'Deploy (Cloudflare Edge)' workflow. The Render + Aiven path remains available but is blocked by the $1 card authorization (DEC-034), so HOST-003 stays open for a card-free container-host decision; if it is ever unblocked, add the variable CELIA_LIVE_URL plus the secrets RENDER_API_KEY + RENDER_SERVICE_ID (or RENDER_DEPLOY_HOOK_URL) and .github/workflows/deploy-render.yml will deploy after every green CI run on main. Never paste credentials or payment information into chat.",
   "automationAfterOwnerAccounts": {
     "workflow": ".github/workflows/deploy-render.yml",
     "script": "scripts/deploy-render.mjs",

@@ -6,7 +6,9 @@ export default defineConfig({
   fullyParallel: true,
   workers: process.env.CI ? 2 : 2,
   retries: process.env.CI ? 1 : 0,
-  reporter: "list",
+  // In GitHub Actions every failing browser test is also emitted as a `::error file=…,title=…` annotation
+  // (DEC-039: failures must name themselves — step logs are unreadable to the automation, annotations are not).
+  reporter: process.env.GITHUB_ACTIONS === "true" ? [["list"], ["github"]] : "list",
   use: {
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
