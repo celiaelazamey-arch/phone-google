@@ -5,7 +5,7 @@ These instructions preserve project context between coding sessions. They do not
 ## Start every session
 
 1. Run `pwd`, `git branch --show-current`, `git status --short`, and `git log -5 --oneline`. Preserve uncommitted user work. Use the branch assigned by the environment; never infer a branch from an old report. In a branch-pinned environment, do not create, switch, rename, or push another branch.
-2. Read `docs/continuity/STATE.md`, then `BACKLOG.md`, `DECISIONS.md`, and `README.md` in that directory. Read the current plan and `docs/compatibility-contract.md` before implementation.
+2. Read `docs/continuity/NOW.md` (generated read-only summary) and `docs/continuity/STATE.md` (active focus; earlier history is preserved verbatim in `docs/continuity/STATE-ARCHIVE-2026-10.md`), then `BACKLOG.md`, `DECISIONS.md`, and `README.md` in that directory. Read the current plan (`docs/agent-2026-execution-plan.md`) and `docs/compatibility-contract.md` before implementation. `CLAUDE.md` is a thin pointer to this file (`DEC-052`), and `.agents/skills/` holds the 4 repository workflow skills.
 3. Resolve stale claims against actual files, Git, and live GitHub results. Historical Arabic reports and prior chat/Google Docs are snapshots, not current deployment evidence.
 4. Select a backlog task and its acceptance criteria. Unknown production settings are blockers, not permission to guess. A plan or documentation request is not authorization to deploy or migrate production.
 
@@ -32,6 +32,7 @@ Use relevant checks; distinguish current execution from historical results and s
 npm ci
 npm run check
 npm run release:check
+npm run now:check
 npm run check:continuity
 npm test
 CELIA_MCP_DISABLE_MYSQL=true CELIA_DISABLE_OLLAMA=true npm run celia:mcp:verify
@@ -40,6 +41,6 @@ npm audit --omit=dev --audit-level=moderate
 # Browser/runtime changes also require Chromium setup and npm run test:browser.
 ```
 
-Before ending or changing task: update STATE, the affected backlog rows, decisions when changed, and a dated session record using SESSION_TEMPLATE. Record changed files, tests actually run, blockers, unsafe operations not performed, and the exact next task. Commit/save and, when authorized, push only the environment-assigned branch. If remote persistence fails, say so explicitly; do not claim a local commit is pushed.
+Before ending or changing task: update STATE, the affected backlog rows, decisions when changed, and a dated session record using SESSION_TEMPLATE, then regenerate `docs/continuity/NOW.md` (`npm run now`). Record changed files, tests actually run, blockers, unsafe operations not performed, and the exact next task. Commit/save and, when authorized, push only the environment-assigned branch. If remote persistence fails, say so explicitly; do not claim a local commit is pushed.
 
 Keep one authority per fact: STATE for current focus; BACKLOG for task status; DECISIONS for rationale; the development plan for scope; runbooks for implemented commands; GitHub for current PR/CI/deployment status. Do not erase historical records to resolve contradictions.

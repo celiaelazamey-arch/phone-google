@@ -3,6 +3,7 @@ import { readFile, readdir, stat } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { syncNowFile } from './generate-now.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const directory = 'docs/continuity';
@@ -16,7 +17,10 @@ async function list(dir) {
   }
   return files;
 }
-const files = ['AGENTS.md', 'README.md', 'docs/2026-development-plan.md', 'docs/agent-runtime-plan.md', 'docs/google-connect.md', 'docs/compatibility-contract.md', 'docs/free-hosting.md', ...await list(directory)];
+const skillFiles = (await stat(path.join(root, '.agents/skills')).catch(() => null))?.isDirectory()
+  ? await list('.agents/skills')
+  : [];
+const files = ['AGENTS.md', 'CLAUDE.md', 'README.md', 'docs/2026-development-plan.md', 'docs/agent-runtime-plan.md', 'docs/agent-2026-execution-plan.md', 'docs/google-connect.md', 'docs/compatibility-contract.md', 'docs/free-hosting.md', ...skillFiles, ...await list(directory)];
 const sources = new Map(await Promise.all(files.map(async (file) => [file, await readFile(path.join(root, file), 'utf8')])));
 let links = 0;
 for (const [file, content] of sources) {
@@ -59,6 +63,8 @@ function visit(id) {
   active.delete(id); visited.add(id);
 }
 for (const id of tasks.keys()) visit(id);
+const nowCheck = await syncNowFile({ root, check: true });
+if (!nowCheck.ok) errors.push(nowCheck.message);
 const base = process.env.CELIA_CONTINUITY_BASE;
 if (base) {
   if (!/^[a-f0-9]{40}$/i.test(base)) errors.push('Continuity base must be an immutable commit SHA');
