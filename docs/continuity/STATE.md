@@ -26,6 +26,7 @@
   2. **مولّد `NOW.md` الحتمي (`scripts/generate-now.mjs`):** سكربت Node ESM نقي بلا ساعة حائط وبلا شبكة يولّد [NOW.md](NOW.md) من المصادر الحاكمة الوحيدة، مع أوامر `npm run now` و`npm run now:check` وربط الفحص داخل `npm run check:continuity` حتى يفشل CI تلقائيًا عند أي انحراف دون تعديل `.github/workflows/`.
   3. **بوابة [CLAUDE.md](../../CLAUDE.md) بلا ازدواج:** ملف توجيه رقيق في جذر المستودع يحيل مباشرةً إلى [AGENTS.md](../../AGENTS.md) بوصفه المرجع الحاكم الوحيد دون نسخ قواعد قابلة للانحراف (`R0-03`).
   4. **المهارات الإجرائية الأربع بمعيار Agent Skills 2026 (`.agents/skills/*/SKILL.md`):** [session-orient](../../.agents/skills/session-orient/SKILL.md)، و[continuity-handoff](../../.agents/skills/continuity-handoff/SKILL.md)، و[quality-gates](../../.agents/skills/quality-gates/SKILL.md)، و[governed-pr-merge](../../.agents/skills/governed-pr-merge/SKILL.md) — مربوطة فعليًا بأوامر `package.json` ومحروسة باختبار `R0-04`.
+- **دليل التحقق على الفرع (`5a988cc`):** محليًا `602/602` (تغطية `91.71 / 75.10 / 86.40`)، وفي CI الفرع تشغيلة **`40845408890`** خضراء بالكامل (الوظائف الست ✅، Playwright `32/32`).
 - **الالتزام الصارم بحدود النطاق:** لم يُبدأ أي عمل في **R1**، ولا في تعديلات بروتوكول **MCP** (`MCP-001` و`MCP-002` تبقيان «مخطط»)، ولا في **`gh-aw`** (`GitHub Agentic Workflows`)، ولم يُمسّ أي ملف وقت تشغيل في `src/` أو `workers/` أو `public/` (`R0-06`).
 
 ## 3. تقدّم الخطة التنفيذية ([agent-2026-execution-plan.md](../agent-2026-execution-plan.md))
