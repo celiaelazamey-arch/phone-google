@@ -6,6 +6,7 @@ import { createDemoPlanner, DEMO_PLANNER_TOOL_SURFACE } from './planner.js';
 import { createProviderPlanner, PROVIDER_PLAN_SCHEMA, validateProviderPlan } from './planner-provider.js';
 import { createGeminiPlannerProvider } from './gemini-planner-provider.js';
 import { createGovernedFallbackPlanner, PLANNER_FALLBACK_CODES } from './planner-fallback.js';
+import { createReplanPolicy, REPLAN_LIMITS, REVISION_STEP_TITLE } from './replanner.js';
 import {
   HARNESS_LIFECYCLE_STAGES,
   HARNESS_COMPONENT_IDS,
@@ -83,6 +84,9 @@ export {
   createGovernedFallbackPlanner,
   PLANNER_FALLBACK_CODES,
   DEMO_PLANNER_TOOL_SURFACE,
+  createReplanPolicy,
+  REPLAN_LIMITS,
+  REVISION_STEP_TITLE,
   HARNESS_LIFECYCLE_STAGES,
   HARNESS_COMPONENT_IDS,
   inspectAgentHarness,
@@ -463,7 +467,8 @@ export function createAgentHost({
         model: config.gemini.model
       });
       planner = createGovernedFallbackPlanner({
-        primary: createProviderPlanner({ provider, tools: toolRegistry, allowedTools }),
+        // A2: نافذة مراجعة واحدة محكومة (maxPerStep=1 + حارس حلقة maxPerRun=1، قراءة فقط).
+        primary: createProviderPlanner({ provider, tools: toolRegistry, allowedTools, revisionPolicy: createReplanPolicy() }),
         fallback: demoPlanner,
         extraAllowedTools: [...DEMO_PLANNER_TOOL_SURFACE]
       });

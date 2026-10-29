@@ -12,9 +12,9 @@
 ## 2. التركيز النشط وسجل الحالة ([STATE.md](STATE.md))
 
 - **آخر مراجعة مسجّلة:** 29 أكتوبر 2026
-- **الجلسة النشطة:** MANUS-A1 — اعتماد خطة «منافس مانوس» وتنفيذ شريحتها الأولى على `arena/718068f3-phone-google`؛ المالك اعتمد [خطة منافس مانوس](../manus-competitor-plan.md) نصًا، ونُفِّذ الشق الهيكلي لـA1: `CELIA_AGENT_PLANNER=gemini` خلف علم (الافتراضي `demo` بلا تغيير)، محوّل `src/agent/gemini-planner-provider.js`، و`planner_fallback` حتمي مرئي (`src/agent/planner-fallback.js` + خطوة ودليل BLOCK في runtime)؛ `test/agent-gemini-planner.test.js` 24/24 بلا شبكة، الحزمة 670 ناجحًا والتغطية 90.67/75.62/86.79 فوق الأرضية؛ فشل واحد معروف بيئيًا (N/N-1 يحتاج كائن Git تاريخيًا غير موجود في الاستنساخ المضغوط — ثبت على خط الأساس النظيف). لا تشغيل Gemini حي ولا نشر ولا ترحيل؛ التشغيلة الحية المعزولة قرار مالك. سجل الجلسة: [2026-10-29-manus-a1-gemini-planner](sessions/2026-10-29-manus-a1-gemini-planner.md)
-- **آخر سجل جلسة مؤرَّخ:** [2026-10-29-manus-a1-gemini-planner](sessions/2026-10-29-manus-a1-gemini-planner.md)
-- **حجم [STATE.md](STATE.md) النشط:** 76 سطرًا (14403 بايت)
+- **الجلسة النشطة:** MANUS-A2 — إعادة التخطيط المحكومة `plan.revised` على `arena/718068f3-phone-google`؛ بتوجيه هندسي صريح من المالك: `src/agent/replanner.js` (maxPerStep=1 + حارس حلقة maxPerRun=1، قراءة فقط، عدّ حتمي من خطوات السلسلة)، توصيل `revisionPolicy` في `createProviderPlanner` (الافتراض null يحفظ `automatic_replan_disabled` حرفيًا)، تسجيل `plan.revised` في سلسلة SHA-256، `max_replan_exceeded`/`replan_requires_read_tool` ضمن التحويل المرئي، وتضييق `goal_contract` في المُتحقِّق لفشل القراءة المستدرَك بمراجعة ناجحة حصرًا؛ `test/agent-replan.test.js` 9/9 بالطفرتين السلبيتين الإلزاميتين؛ التغطية 90.71/75.70/86.88؛ الفشل البيئي الوحيد (N/N-1) كما هو. سجل الجلسة: [2026-10-29-manus-a2-governed-replan](sessions/2026-10-29-manus-a2-governed-replan.md)
+- **آخر سجل جلسة مؤرَّخ:** [2026-10-29-manus-a2-governed-replan](sessions/2026-10-29-manus-a2-governed-replan.md)
+- **حجم [STATE.md](STATE.md) النشط:** 77 سطرًا (15453 بايت)
 - **الأرشيف التاريخي المحفوظ بلا حذف:**
 - [STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md) — الأساس `9f6f8b2` · **983 سطرًا** محفوظًا حرفيًا (بصمة `f2674637e82e…`)
 

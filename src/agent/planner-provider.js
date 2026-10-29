@@ -241,10 +241,16 @@ export function createProviderPlanner({
   tools,
   allowedTools,
   timeoutMs = 20_000,
-  name = 'provider-structured-v1'
+  name = 'provider-structured-v1',
+  // A2: سياسة إعادة التخطيط المحكومة (createReplanPolicy). الافتراض null يحفظ
+  // السلوك السابق حرفيًا: أي call بعد فشل → automatic_replan_disabled.
+  revisionPolicy = null
 } = {}) {
   if (!provider || typeof provider.createPlan !== 'function') {
     throw new Error('Provider planner requires provider.createPlan(request)');
+  }
+  if (revisionPolicy !== null && typeof revisionPolicy?.evaluate !== 'function') {
+    throw new Error('revisionPolicy must be null or expose evaluate({ plan, context, tools })');
   }
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error('Provider planner timeout must be positive');
   const definitions = plannerTools(tools, allowedTools);
@@ -273,10 +279,18 @@ export function createProviderPlanner({
       const validation = validateProviderPlan(plan, { allowedTools: names });
       if (!validation.ok) throw codedError('invalid_provider_plan', trace, validation.errors);
       const failedRead = (context.toolRuns || []).find((toolRun) => toolRun.status !== 'succeeded');
+      let planRevision = null;
       if (failedRead && plan.action === 'call') {
-        // WP-3.2 owns any future revision policy. This slice may observe a
-        // failure and finish/clarify, but may not silently choose another call.
-        throw codedError('automatic_replan_disabled', trace, [`failed_tool:${failedRead.toolName}`]);
+        if (!revisionPolicy) {
+          // بلا سياسة (الافتراض): فشل ملحوظ يسمح بـfinish/clarify فقط — لا اختيار صامت لنداء آخر.
+          throw codedError('automatic_replan_disabled', trace, [`failed_tool:${failedRead.toolName}`]);
+        }
+        // A2: نافذة مراجعة واحدة محكومة؛ أي تجاوز يُرفع بكود صريح مع أثر المزوّد كاملًا.
+        try {
+          planRevision = revisionPolicy.evaluate({ plan, context, tools }).revision;
+        } catch (error) {
+          throw codedError(error.code || 'max_replan_exceeded', trace, error.details || []);
+        }
       }
       if (plan.action === 'call') {
         const inputCheck = tools.validateInput(plan.tool, plan.args);
@@ -294,7 +308,8 @@ export function createProviderPlanner({
         successCriteria: plan.successCriteria,
         tokens: usage.totalTokens,
         costMicros: usage.costMicros,
-        providerTrace: { ...trace, usage }
+        providerTrace: { ...trace, usage },
+        ...(planRevision ? { planRevision } : {})
       };
     }
   };

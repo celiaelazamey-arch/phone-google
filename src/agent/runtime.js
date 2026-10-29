@@ -588,10 +588,15 @@ export function createAgentRuntime({
           });
         }
         if (decision?.providerTrace) {
+          // A2: مراجعة محكومة تُعنون `plan.revised` وتُربط بالخطوة الفاشلة في السلسلة —
+          // العنوان نفسه هو مصدر العدّ الحتمي لسياسة إعادة التخطيط (REVISION_STEP_TITLE).
+          const revision = decision.planRevision || null;
           const planStep = await addStep(runId, {
             kind: 'decide',
-            title: `خطة النموذج: ${decision.providerTrace.plan?.action || decision.action}`,
-            summary: String(decision.reason || '').slice(0, 900),
+            title: revision ? 'plan.revised' : `خطة النموذج: ${decision.providerTrace.plan?.action || decision.action}`,
+            summary: revision
+              ? `مراجعة محكومة ${revision.attempt}/${revision.maxPerStep} بعد فشل ${revision.failedTool}: ${String(decision.reason || '').slice(0, 700)}`
+              : String(decision.reason || '').slice(0, 900),
             toolName: decision.action === 'call' ? decision.tool : null
           });
           planEvidence = await recordProviderEvent({
@@ -599,7 +604,12 @@ export function createAgentRuntime({
             stepId: planStep.id,
             kind: EVIDENCE_KIND.planCreated,
             input: decision.providerTrace.request,
-            output: { valid: true, plan: decision.providerTrace.plan, usage: decision.providerTrace.usage },
+            output: {
+              valid: true,
+              plan: decision.providerTrace.plan,
+              usage: decision.providerTrace.usage,
+              ...(revision ? { revision } : {})
+            },
             verdict: VERDICT.pass
           });
           if (decision.costMicros > 0 || decision.tokens > 0) {

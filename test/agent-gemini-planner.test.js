@@ -264,7 +264,8 @@ test('FBK-01: the governed wrapper enforces its own construction contract', () =
   assert.deepEqual([...wrapper.allowedTools], ['read.alpha', 'read.beta', 'celia.thread_context']);
   assert.deepEqual([...PLANNER_FALLBACK_CODES].sort(), [
     'invalid_provider_plan', 'invalid_provider_tool_arguments',
-    'planner_provider_timeout', 'planner_provider_unavailable'
+    'planner_provider_timeout', 'planner_provider_unavailable',
+    'max_replan_exceeded', 'replan_requires_read_tool'
   ].sort());
 });
 

@@ -20,7 +20,10 @@ export const PLANNER_FALLBACK_CODES = Object.freeze([
   'invalid_provider_plan',
   'invalid_provider_tool_arguments',
   'planner_provider_unavailable',
-  'planner_provider_timeout'
+  'planner_provider_timeout',
+  // A2: تجاوز نافذة المراجعة المحكومة — توقف فوري ثم تحويل مرئي (لا محاولة ثانية أبدًا).
+  'max_replan_exceeded',
+  'replan_requires_read_tool'
 ]);
 
 const FALLBACK_CODE_SET = new Set(PLANNER_FALLBACK_CODES);
