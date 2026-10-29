@@ -13,6 +13,8 @@
  *      - `unverified` (ما لم يثبت بعد: يبقى غير متحقق حتى لو بدا الناتج مقنعًا)
  */
 
+import { SETTLED_TOOL_STATUSES, summarizeDurations, toolRunDurationMs } from './timing.js';
+
 export const CELIA_SEVEN_STAGE_LOOP = Object.freeze([
   'Goal',
   'Plan',
@@ -542,7 +544,8 @@ export function computeAgentMetrics(runDetails = []) {
       dataAccuracyRate: 1,
       averageDurationMs: 0,
       costPerCompletedTaskMicros: 0,
-      humanReviewCount: 0
+      humanReviewCount: 0,
+      durations: { runs: summarizeDurations([]), tools: {}, unmeasuredToolRuns: 0 }
     };
   }
 
@@ -555,6 +558,10 @@ export function computeAgentMetrics(runDetails = []) {
   let humanReviewCount = 0;
   let validatedDocsCount = 0;
   let validDocsCount = 0;
+  // WP-1.1 (AGENT-008): distributions, not just a mean — every sample is an observed duration.
+  const runDurations = [];
+  const toolDurations = new Map();
+  let unmeasuredToolRuns = 0;
 
   for (const item of list) {
     const run = item?.run || item;
@@ -579,6 +586,18 @@ export function computeAgentMetrics(runDetails = []) {
     if (Number.isFinite(startMs) && Number.isFinite(endMs) && endMs >= startMs) {
       totalDurationMs += endMs - startMs;
       durationSamples += 1;
+      runDurations.push(endMs - startMs);
+    }
+
+    for (const tr of toolRuns) {
+      const durationMs = Number.isFinite(tr?.durationMs) ? tr.durationMs : toolRunDurationMs(tr);
+      if (durationMs === null) {
+        if (SETTLED_TOOL_STATUSES.includes(tr?.status)) unmeasuredToolRuns += 1;
+        continue;
+      }
+      const name = String(tr?.toolName || 'unknown');
+      if (!toolDurations.has(name)) toolDurations.set(name, []);
+      toolDurations.get(name).push(durationMs);
     }
 
     let neededHumanReview =
@@ -610,6 +629,13 @@ export function computeAgentMetrics(runDetails = []) {
     averageDurationMs: durationSamples > 0 ? Math.round(totalDurationMs / durationSamples) : 0,
     costPerCompletedTaskMicros:
       succeededRuns > 0 ? Math.round(completedCostMicros / succeededRuns) : 0,
-    humanReviewCount
+    humanReviewCount,
+    durations: {
+      runs: summarizeDurations(runDurations),
+      tools: Object.fromEntries(
+        [...toolDurations.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([name, values]) => [name, summarizeDurations(values)])
+      ),
+      unmeasuredToolRuns
+    }
   };
 }

@@ -23,6 +23,7 @@
 | بوابة مخاطر لكل أداة | `read` / `internal_write` / `external_effect` / `irreversible` | أداتان خارجيتان تُوقفان التشغيل بصف موافقة مسجل قابل للقرار |
 | ملكية على كل صف | `owner_id` في الخيوط والتشغيلات وكل قراءة | مالك آخر لا يقرأ ولا يلغي |
 | شفافية تشغيل | خطوات مخزنة + بث SSE + عدادات استخدام | `GET /api/agent/runs/:id/events` يبدأ بلقطة ثم أحداثًا |
+| أزمنة مُثبَتة (WP-1.1، DEC-047) | `src/agent/timing.js`: مدة استدعاء الأداة = `updated_at − created_at` للصفوف التي سوّاها الوقت الحقيقي فقط؛ `null` للجارية/`unknown`/المسوّاة يدويًا؛ p50/p95 بأقرب رتبة | MET-01..05: ساعة وهمية تتقدم 7 ms فكل مدة مضاعف لـ7؛ خطوات `decide`/`deliver` بلا مدة |
 | عقد هدف لكل تشغيل | `src/agent/goal-contract.js` + `agent_goal_contracts` | العقد بيانات قابلة للفحص (أهداف/معايير/قيود/ميزانية/موعد) ويعرضه تفصيل التشغيل |
 | بوابة موافقات قابلة للاستئناف | `agent_approvals` + `POST /runs/:id/approval` (DEC-014) | موافقة تُسجَّل وتُستأنف، ورفض يلغي بلا أثر، واستئناف استدعاء `unknown` مرفوض 409 |
 | سجل أدلة مسلسل | `src/agent/evidence.js` + `agent_evidence` | سلسلة بصمات SHA-256؛ العبث أو الحذف يُكشف بالرقم والسبب في الاختبارات |
@@ -54,6 +55,7 @@ npm run migrate -- --status
 | المسار | الوظيفة |
 |---|---|
 |GET `/api/agent/status` | هل الحلقة مفعلة، المخزن، المخطط، السقوف، الأدوات |
+| `GET /api/agent/metrics` | المؤشرات الستة + **`durations`** (WP-1.1): `runs{count,p50Ms,p95Ms,maxMs}`، `tools[name]{…}`، `unmeasuredToolRuns` (صفوف مسوّاة بلا مدة مُثبَتة) — من آخر 20 خيطًا × 10 تشغيلات للمالك |
 | `GET /api/agent/harness` | فحص المكونات العشرة لـAgent Harness ودورة التنفيذ الـ10 مراحل (DEC-019) |
 | `POST /api/agent/threads` | خيط جديد `{title}` |
 | `GET /api/agent/threads` · `GET /api/agent/threads/:id` | الخيوط، الرسائل، التشغيلات |

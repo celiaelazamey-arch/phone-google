@@ -35,3 +35,14 @@
 - BACKLOG: صفوف جديدة «بانتظار اعتماد» AGENT-008 (قياس + أثر مرئي)، AGENT-009 (سياسة السياق + ذاكرة الوكيل)، AGENT-010 (إعادة تخطيط محكومة + `call_many`)،
   UX-003 (سمات بالرموز)، WA-006 (WhatsApp بنافذة ومعرفة خلف علم). AI-001 (مجموعة التقييم) وAI-002 (المخطط المزوّدي — كما يسمّيه تعليق `planner.js`) تبقيان مرجع الخطوة 3.
 - لم يُنفَّذ أي كود ولم يُحجز قرار مرقّم: الاعتماد كلمة المالك.
+
+## 7. «اعتمد الخطة» → DEC-047 + WP-1.1
+- **القرار:** DEC-047 يعتمد الخطة ويثبّت افتراضات ما لم يقرره المالك (سمة تتبع النظام، `CELIA_WA_CONTEXT` مطفأ، الخطوة 3 بانتظار المزوّد).
+- **WP-1.1 المنفَّذ:** `src/agent/timing.js` (`toolRunDurationMs`، `percentile` بأقرب رتبة، `summarizeDurations`، `timeSteps`)؛ `store.mapToolRun` يضيف `durationMs`؛
+  `runtime.detail()` يُلحق بالخطوات `startedAt/finishedAt/durationMs/toolRunId`؛ `computeAgentMetrics` يضيف `durations` (runs/tools/unmeasuredToolRuns)
+  دون تغيير المتوسط؛ `GET /api/agent/metrics` يعرضه. **بلا ترحيل، بلا تقدير:** الصف المسوّى يدويًا (`outcome.reconciled`) والجاري و`unknown` = `null`.
+- **الاختبارات:** `test/agent-metrics-percentiles.test.js` MET-01..05 — بينها تشغيل حقيقي على SQLite بساعة وهمية تتقدم 7 ms (كل مدة مضاعف لـ7)،
+  ومسار HTTP بـ401 للغريب. البوابات: 569/569، تغطية 91.31/73.94/85.63، `check` 146 ملفًا، `check:secrets` ✅، `check:continuity` ✅.
+- **ملاحظة بيئة:** أُعيد ضبط الصندوق في بداية الدور السابق (الفرع على أساسه و`node_modules` فارغ) فظهر 31 فشلًا وهميًا؛ `git reset --soft` إلى آخر دفع
+  (الشجرة مطابقة بالبايت) ثم `npm ci` → أخضر. ليس عيبًا في الكود.
+- **PR #79** يحوي الآن: سجل #77/#78، النقد، الخطة، وكود WP-1.1 — الدمج بكلمة المالك.

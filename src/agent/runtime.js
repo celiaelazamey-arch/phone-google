@@ -26,6 +26,7 @@ import {
   computeAgentMetrics,
   recommendTaskStrategy
 } from './evaluation.js';
+import { timeSteps } from './timing.js';
 
 export { PLAN_LIFECYCLE_STATE };
 
@@ -804,7 +805,7 @@ export function createAgentRuntime({
     async detail(runId, requesterId = ownerId) {
       const run = await store.getRunForOwner(runId, requesterId);
       if (!run) throw httpError(404, 'run_not_found', 'run_not_found');
-      const [steps, rawToolRuns, goalContract, approvals, evidence, evidenceChain, outboxEntries] = await Promise.all([
+      const [rawSteps, rawToolRuns, goalContract, approvals, evidence, evidenceChain, outboxEntries] = await Promise.all([
         store.listSteps(runId),
         store.listToolRuns(runId),
         store.getGoalContract(runId),
@@ -814,6 +815,8 @@ export function createAgentRuntime({
         store.listOutbox(runId)
       ]);
       const toolRuns = rawToolRuns.map((toolRun) => ({ ...toolRun, outcome: parseOutcome(toolRun.outcome) }));
+      // WP-1.1: every step carries the duration its tool run proves (or null) — nothing is estimated.
+      const steps = timeSteps(rawSteps, toolRuns);
       const verificationEntry = [...evidence].reverse().find((entry) => entry.kind === EVIDENCE_KIND.verification) || null;
       const verification = verificationEntry
         ? { seq: verificationEntry.seq, verdict: verificationEntry.verdict, at: verificationEntry.createdAt, hash: verificationEntry.hash }
