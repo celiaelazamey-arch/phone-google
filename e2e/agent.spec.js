@@ -326,3 +326,113 @@ test.describe('أثر التنفيذ في /agent (WP-1.2): شجرة الخطة،
     }
   });
 });
+
+test.describe('سمات الواجهة (WP-1.3، UX-003): تتبع النظام افتراضيًا، ثلاث سمات بلا انتهاك تباين، الاختيار يبقى، والحركة المخفَّضة تُحترم', () => {
+  const textColour = (page) => page.evaluate(() => getComputedStyle(document.body).color);
+  const colourScheme = (page) => page.evaluate(() => getComputedStyle(document.documentElement).colorScheme);
+  const token = (page, name) => page.evaluate((n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim(), name);
+
+  test('بلا اختيار مخزّن تتبع الصفحة prefers-color-scheme (فاتح ثم داكن) قبل الرسم وبلا انتهاكات WCAG', async ({ page }, testInfo) => {
+    const { diagnostics, flush } = attachChromiumDiagnostics(page);
+    try {
+      await page.emulateMedia({ colorScheme: 'light' });
+      await page.goto(`${LIVE}/agent`, { waitUntil: 'networkidle' });
+      await expect(page.locator('html')).not.toHaveAttribute('data-theme', /.+/);
+      await expect(page.locator('html')).toHaveAttribute('data-theme-resolved', 'light');
+      expect(await colourScheme(page)).toBe('light');
+      expect(await textColour(page)).toBe('rgb(18, 26, 51)'); // --t-text (light) = #121a33
+      expect(await token(page, '--t-bg')).toBe('#f4f6fb');
+      await expect(page.locator('select[data-theme-switcher]')).toHaveValue('system');
+      await expectNoA11yViolations(page);
+
+      await page.emulateMedia({ colorScheme: 'dark' });
+      await page.reload({ waitUntil: 'networkidle' });
+      await expect(page.locator('html')).not.toHaveAttribute('data-theme', /.+/);
+      await expect(page.locator('html')).toHaveAttribute('data-theme-resolved', 'dark');
+      expect(await colourScheme(page)).toBe('dark');
+      expect(await textColour(page)).toBe('rgb(232, 236, 255)'); // --t-text (dark) = #e8ecff
+      expect(await page.evaluate(() => localStorage.getItem('celia_theme'))).toBeNull();
+      expect(diagnostics, diagnostics.join('\n')).toEqual([]);
+    } finally {
+      await flush(testInfo);
+    }
+  });
+
+  test('المبدّل المشترك: كل سمة (light/dark/oled) تمرّ axe مع محتوى تشغيل حقيقي؛ الاختيار يبقى بعد إعادة التحميل وعبر /kb و/cron', async ({ page }, testInfo) => {
+    const { diagnostics, flush } = attachChromiumDiagnostics(page);
+    try {
+      await mockAgentApi(page);
+      await page.emulateMedia({ colorScheme: 'dark' });
+      await page.goto(`${LIVE}/agent`, { waitUntil: 'networkidle' });
+      await page.fill('#token', TOKEN);
+      await page.click('#connect');
+      await expect(page.locator('#auth-status')).toContainText('متصل — الوكيل جاهز');
+      await page.fill('#message', 'استخرج بيانات الفاتورة invoice-valid-1042.csv');
+      await page.click('#run');
+      await expect(page.locator('#now-line')).toHaveAttribute('data-state', 'executing_tool');
+      await page.click('#run');
+      await expect(page.locator('#now-line')).toHaveAttribute('data-state', 'finished', { timeout: 5000 });
+      await expect(page.locator('#verification-badge')).toContainText('PASS');
+
+      const expectations = {
+        light: { scheme: 'light', bg: '#f4f6fb', text: 'rgb(18, 26, 51)' },
+        dark: { scheme: 'dark', bg: '#0b1020', text: 'rgb(232, 236, 255)' },
+        oled: { scheme: 'dark', bg: '#000000', text: 'rgb(242, 242, 242)' }
+      };
+      for (const theme of ['light', 'dark', 'oled']) {
+        await page.selectOption('select[data-theme-switcher]', theme);
+        await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+        await expect(page.locator('html')).toHaveAttribute('data-theme-resolved', theme);
+        expect(await colourScheme(page)).toBe(expectations[theme].scheme);
+        expect(await token(page, '--t-bg')).toBe(expectations[theme].bg);
+        expect(await textColour(page)).toBe(expectations[theme].text);
+        // صفر انتهاكات لكل سمة — بما فيها color-contrast على الشارات والعقد والأزرار بمحتوى التشغيل المعروض.
+        await expectNoA11yViolations(page);
+      }
+
+      // الاختيار الأخير (oled) يبقى بعد إعادة التحميل ويُطبَّق قبل الرسم في الصفحات الشقيقة.
+      await page.reload({ waitUntil: 'networkidle' });
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'oled');
+      await expect(page.locator('select[data-theme-switcher]')).toHaveValue('oled');
+      expect(await page.evaluate(() => localStorage.getItem('celia_theme'))).toBe('oled');
+      for (const path of ['/kb', '/cron']) {
+        await page.goto(`${LIVE}${path}`, { waitUntil: 'networkidle' });
+        await expect(page.locator('html')).toHaveAttribute('data-theme', 'oled');
+        expect(await token(page, '--t-bg')).toBe('#000000');
+        await expect(page.locator('select[data-theme-switcher]')).toHaveValue('oled');
+        await expectNoA11yViolations(page);
+      }
+      // العودة إلى «يتبع النظام» تزيل المفتاح والسمة الصريحة.
+      await page.selectOption('select[data-theme-switcher]', 'system');
+      await expect(page.locator('html')).not.toHaveAttribute('data-theme', /.+/);
+      expect(await page.evaluate(() => localStorage.getItem('celia_theme'))).toBeNull();
+      await page.selectOption('select[data-theme-switcher]', 'light');
+      await page.goto(`${LIVE}/kb`, { waitUntil: 'networkidle' });
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+      await expectNoA11yViolations(page);
+
+      expect(diagnostics, diagnostics.join('\n')).toEqual([]);
+    } finally {
+      await flush(testInfo);
+    }
+  });
+
+  test('prefers-reduced-motion: reduce يلغي الانتقالات (مقاسة من الأنماط المحسوبة، قبل وبعد)', async ({ page }, testInfo) => {
+    const { diagnostics, flush } = attachChromiumDiagnostics(page);
+    try {
+      const transitionOf = (selector) => page.evaluate((s) => getComputedStyle(document.querySelector(s)).transitionDuration, selector);
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      await page.goto(`${LIVE}/agent`, { waitUntil: 'networkidle' });
+      expect(await transitionOf('#connect')).toBe('0.12s, 0.12s');
+
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await page.reload({ waitUntil: 'networkidle' });
+      expect(await transitionOf('#connect')).toBe('0s');
+      expect(await transitionOf('.bar-fill')).toBe('0s');
+      expect(await page.evaluate(() => getComputedStyle(document.documentElement).scrollBehavior)).toBe('auto');
+      expect(diagnostics, diagnostics.join('\n')).toEqual([]);
+    } finally {
+      await flush(testInfo);
+    }
+  });
+});

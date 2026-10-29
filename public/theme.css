@@ -1,0 +1,134 @@
+/*
+ * رموز السمات المشتركة (WP-1.3، UX-003، DEC-049) — المصدر الوحيد للألوان في الصفحات التي تستوردها.
+ *
+ * ثلاث سمات عبر `data-theme` على <html>: `dark` (الافتراضي)، `oled` (أسود حقيقي للهاتف)، `light`.
+ * بلا سمة مخزّنة تتبع الصفحة النظام (`prefers-color-scheme`) — افتراض DEC-047 لأن المالك لم يختر سمة.
+ * يقرأ theme.js الاختيار قبل الرسم ويضع السمة، فلا وميض. الملفات التي تقرأ هذه الرموز: agent.css (ومعه kb.css وcron.css).
+ *
+ * قاعدة التباين: كل زوج نص/خلفية هنا يُقاس في test/theme-tokens.test.js بصيغة WCAG (≥ 4.5:1 للنص، ≥ 3:1 للحدود
+ * والتركيز) — لا يُنشر رمز يكسرها. الشفافيات المشتقة تُصنع في الصفحات بـ color-mix من هذه الرموز لا بأرقام ثابتة.
+ */
+
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --t-bg: #0b1020;
+  --t-bg-soft: #121933;
+  --t-card: #151d38;
+  --t-field: #0e1530;
+  --t-line: #273154;
+  --t-text: #e8ecff;
+  --t-muted: #9aa5c9;
+  --t-accent: #7c9cff;
+  --t-accent-ink: #ffffff;
+  --t-primary-a: #2d4ec8;
+  --t-primary-b: #4338ca;
+  --t-ok: #3ddc97;
+  --t-warn: #ffcb6b;
+  --t-bad: #ff7b8a;
+  --t-glow: #1b2650;
+  --t-shadow: rgba(0, 0, 0, 0.25);
+  --t-header: rgba(11, 16, 32, 0.75);
+}
+
+:root[data-theme="oled"] {
+  color-scheme: dark;
+  --t-bg: #000000;
+  --t-bg-soft: #050505;
+  --t-card: #0a0a0a;
+  --t-field: #050505;
+  --t-line: #2a2a2a;
+  --t-text: #f2f2f2;
+  --t-muted: #a8a8a8;
+  --t-accent: #8ab4ff;
+  --t-accent-ink: #ffffff;
+  --t-primary-a: #2d4ec8;
+  --t-primary-b: #4338ca;
+  --t-ok: #3ddc97;
+  --t-warn: #ffcb6b;
+  --t-bad: #ff8a96;
+  --t-glow: #000000;
+  --t-shadow: rgba(0, 0, 0, 0.6);
+  --t-header: rgba(0, 0, 0, 0.82);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --t-bg: #f4f6fb;
+  --t-bg-soft: #ffffff;
+  --t-card: #ffffff;
+  --t-field: #ffffff;
+  --t-line: #cfd6e8;
+  --t-text: #121a33;
+  --t-muted: #525d7a;
+  --t-accent: #3451c6;
+  --t-accent-ink: #ffffff;
+  --t-primary-a: #2d4ec8;
+  --t-primary-b: #4338ca;
+  --t-ok: #0a7a4f;
+  --t-warn: #8a5a00;
+  --t-bad: #b42334;
+  --t-glow: #dfe6ff;
+  --t-shadow: rgba(16, 24, 64, 0.12);
+  --t-header: rgba(244, 246, 251, 0.82);
+}
+
+/* بلا اختيار مخزّن: اتبع النظام. (theme.js يزيل data-theme عند اختيار «يتبع النظام».) */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    color-scheme: light;
+    --t-bg: #f4f6fb;
+    --t-bg-soft: #ffffff;
+    --t-card: #ffffff;
+    --t-field: #ffffff;
+    --t-line: #cfd6e8;
+    --t-text: #121a33;
+    --t-muted: #525d7a;
+    --t-accent: #3451c6;
+    --t-accent-ink: #ffffff;
+    --t-primary-a: #2d4ec8;
+    --t-primary-b: #4338ca;
+    --t-ok: #0a7a4f;
+    --t-warn: #8a5a00;
+    --t-bad: #b42334;
+    --t-glow: #dfe6ff;
+    --t-shadow: rgba(16, 24, 64, 0.12);
+    --t-header: rgba(244, 246, 251, 0.82);
+  }
+}
+
+/* مبدّل السمة المشترك (نفس العنصر في كل صفحة تقرأ الرموز). */
+.theme-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--t-muted);
+}
+.theme-switch select {
+  width: auto;
+  padding: 0.3rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--t-line);
+  background: var(--t-field);
+  color: var(--t-text);
+  font: inherit;
+  font-size: 0.85rem;
+}
+.theme-switch select:focus-visible {
+  outline: 2px solid var(--t-accent);
+  outline-offset: 2px;
+}
+
+/* حركة مخفَّضة: تفضيل المستخدم يلغي كل انتقال وحركة في الصفحات التي تستورد الرموز. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

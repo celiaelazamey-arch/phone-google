@@ -2,7 +2,7 @@
 
 .brand .dot.kb {
   background: var(--accent);
-  box-shadow: 0 0 0 6px rgba(124, 156, 255, 0.14);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 .search-card, .graph-card { grid-column: span 2; }
@@ -23,7 +23,7 @@ select {
   padding: 0.55rem 0.7rem;
   border-radius: 10px;
   border: 1px solid var(--line);
-  background: #0e1530;
+  background: var(--field);
   color: var(--text);
   font: inherit;
 }
@@ -40,7 +40,7 @@ select {
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 0.7rem 0.85rem;
-  background: rgba(14, 21, 48, 0.65);
+  background: color-mix(in srgb, var(--field) 65%, transparent);
 }
 
 .results .title {
@@ -65,8 +65,8 @@ select {
   border-radius: 999px;
   padding: 0.08rem 0.5rem;
 }
-.results .meta span.risk-external { color: var(--warn); border-color: rgba(255, 203, 107, 0.45); }
-.results .meta span.risk-read { color: var(--ok); border-color: rgba(61, 220, 151, 0.4); }
+.results .meta span.risk-external { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
+.results .meta span.risk-read { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
 
 .entities li {
   display: flex;
@@ -74,7 +74,7 @@ select {
   gap: 0.5rem;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px dashed rgba(39, 49, 84, 0.8);
+  border-bottom: 1px dashed color-mix(in srgb, var(--line) 80%, transparent);
   padding: 0.45rem 0;
   font-size: 0.86rem;
 }
@@ -93,7 +93,7 @@ select {
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 0.8rem;
-  background: rgba(14, 21, 48, 0.6);
+  background: color-mix(in srgb, var(--field) 60%, transparent);
   font-size: 0.85rem;
 }
 .detail h3 { margin: 0 0 0.4rem; font-size: 0.95rem; }

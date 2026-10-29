@@ -91,6 +91,9 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, oper
   router.get('/agent.js', (_req, res) => res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'agent.js')));
   // WP-1.2: pure trace helpers imported by agent.js as an ES module (also unit-tested in Node).
   router.get('/agent-trace.js', (_req, res) => res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'agent-trace.js')));
+  // WP-1.3 (DEC-049): رموز السمات ومُحلّلها قبل الرسم — مشتركان بين /agent و/kb و/cron.
+  router.get('/theme.css', (_req, res) => res.type('text/css').sendFile(path.join(PUBLIC_DIR, 'theme.css')));
+  router.get('/theme.js', (_req, res) => res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'theme.js')));
 
   router.get(['/protocol', '/protocol.html'], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'protocol.html')));
   router.get('/protocol.css', (_req, res) => res.type('text/css').sendFile(path.join(PUBLIC_DIR, 'protocol.css')));
