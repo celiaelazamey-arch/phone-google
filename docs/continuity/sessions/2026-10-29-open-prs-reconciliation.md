@@ -33,7 +33,7 @@
   `GITHUB_ACTIONS=true npm run test:coverage:ci` → `520 tests · 520 passed · 0 failed · coverage lines 90.84% · branches 72.76% · functions 85.15%
   (floor 89/71/82)`.
 - دليل DEC-038 ما زال صحيحًا على رأس `main` الحالي: Edge run `40797023547` على `c7723be` (`deployed`، `liveReady`, `durable`, 18/18).
-- CI على هذا الفرع: يُسجَّل في STATE بعد الدفع (المُبلِّغ `github` لـPlaywright لا يُختبر محليًا — لا متصفح هنا — بل في وظيفة `RTL dashboard`).
+- CI على هذا الفرع (`0366942`): run `40798428314` ✅ (7 وظائف) — `RTL dashboard` (`123200418899`) نجح مع مُبلِّغ Playwright `github` (لا متصفح محليًا)؛ Node 24 (`123200418839`) 520/520.
 
 ## ما لم يُفعل ولماذا
 
