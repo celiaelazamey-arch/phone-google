@@ -158,14 +158,16 @@ export function buildContext(input = {}, budgets = DEFAULT_CONTEXT_BUDGETS) {
   chars.knowledgeT2 = t2.used;
   remaining -= t2.used;
 
-  // Rendering (fixed order). With only instructions + business + message this is byte-identical to the pre-policy prompt.
+  // Rendering (fixed order). With only instructions + business + message both forms are byte-identical to the
+  // pre-policy prompts: `system`/`user` to the chat-style providers (business after a space), `text` to the MCP
+  // prompt (business on its own line, then «رسالة العميل: …»).
   const knowledgeLines = [...t1.kept, ...t2.kept].map((item) => item.rendered);
-  const systemParts = [`${instructions}${keptBusiness ? `${CONTEXT_HEADERS.business}${keptBusiness}` : ''}`];
-  if (knowledgeLines.length) systemParts.push(`${CONTEXT_HEADERS.knowledge}\n${knowledgeLines.join('\n')}`);
-  if (recent.kept.length) systemParts.push(`${CONTEXT_HEADERS.history}\n${recent.kept.map((item) => item.rendered).join('\n')}`);
-  const system = systemParts.join('\n\n');
+  const blocks = [];
+  if (knowledgeLines.length) blocks.push(`${CONTEXT_HEADERS.knowledge}\n${knowledgeLines.join('\n')}`);
+  if (recent.kept.length) blocks.push(`${CONTEXT_HEADERS.history}\n${recent.kept.map((item) => item.rendered).join('\n')}`);
+  const system = [`${instructions}${keptBusiness ? `${CONTEXT_HEADERS.business}${keptBusiness}` : ''}`, ...blocks].join('\n\n');
   const user = keptMessage;
-  const text = `${system}\n${CONTEXT_HEADERS.message} ${user}`;
+  const text = [`${instructions}${keptBusiness ? `\n${CONTEXT_HEADERS.business.trim()} ${keptBusiness}` : ''}`, ...blocks].join('\n\n') + `\n${CONTEXT_HEADERS.message} ${user}`;
 
   const total = Object.values(chars).reduce((sum, value) => sum + value, 0);
   return {

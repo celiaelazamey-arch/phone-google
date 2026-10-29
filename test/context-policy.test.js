@@ -139,17 +139,34 @@ test('CP-04 deterministic output, budget never exceeded, injected items can neve
   assert.equal(flattenLine('a\r\n\n b\u0000c\t\td'), 'a bc d', 'newlines become one space, control characters vanish');
 });
 
-test('CP-05 acceptance: no scattered `slice(0, 4000)` in the provider adapters or the MCP prompt — the policy is the only cut', () => {
+test('CP-05 acceptance: no hand-made cut of prompt inputs in the adapters or the MCP prompt — by any method, any length — the policy is the only cut', () => {
+  // Any cut method on any prompt input, with any length: `.slice(0, N)`, `.substring(0, N)`, `.substr(0, N)`,
+  // `.slice(-N)`, on `customerMessage`, `businessContext`, `business`, `message`, `knowledge`, `history`, or `String(...)` of them.
+  const inputName = '(?:customerMessage|businessContext|business|message|knowledge|history)';
+  const handCut = new RegExp(`(?:\\b${inputName}\\b|String\\(\\s*${inputName}\\b[^)]*\\))(?:\\?\\.|\\.)(?:slice|substring|substr)\\s*\\(`);
+  const anyLegacy = /(?:slice|substring|substr)\(\s*0\s*,\s*4000\s*\)/;
   for (const file of ['src/gemini.js', 'src/ai-providers.js', 'src/ollama.js']) {
     const source = fs.readFileSync(path.join(root, file), 'utf8');
-    assert.equal(/slice\(0,\s*4000\)/.test(source), false, `${file} still slices context by hand`);
+    assert.equal(anyLegacy.test(source), false, `${file} still carries the legacy 4000 cut`);
+    const offending = source.split('\n').filter((line) => handCut.test(line));
+    assert.deepEqual(offending, [], `${file} cuts a prompt input by hand`);
     assert.match(source, /from '\.\/context-policy\.js'/, `${file} imports the policy`);
     assert.match(source, /buildContext\(\{ instructions: DEFAULT_POLICY/, `${file} builds its prompt through the policy`);
+    assert.match(source, /context\.system/, `${file} sends the policy's system text`);
+    assert.match(source, /context\.user/, `${file} sends the policy's user text`);
   }
   const mcp = fs.readFileSync(path.join(root, 'src/celia-mcp.js'), 'utf8');
-  const promptBlock = mcp.slice(mcp.indexOf("case 'prompts/get'"), mcp.indexOf("case 'prompts/get'") + 1500);
-  assert.equal(/slice\(0,\s*4000\)/.test(promptBlock), false, 'the MCP prompt no longer slices by hand');
+  const start = mcp.indexOf("case 'prompts/get'");
+  const promptBlock = mcp.slice(start, mcp.indexOf('break;', start));
+  assert.equal(anyLegacy.test(promptBlock), false, 'the MCP prompt no longer carries the legacy 4000 cut');
+  assert.deepEqual(promptBlock.split('\n').filter((line) => handCut.test(line)), [], 'the MCP prompt cuts nothing by hand');
   assert.match(promptBlock, /buildContext\(/);
+  assert.match(promptBlock, /promptContext\.text/);
+  // The guard itself catches what it is meant to catch (so a green CP-05 means something).
+  for (const sample of ['String(customerMessage).slice(0, 4000)', 'businessContext.substring(0, 1500)', 'message?.slice(0, 200)', 'String(businessContext || "").substr(0, 99)', 'knowledge.slice(0, 3)']) {
+    assert.ok(handCut.test(sample), `guard catches: ${sample}`);
+  }
+  assert.equal(handCut.test('text.slice(0, REPLY_CHAR_CAP)'), false, 'the measured reply cap (WP-1.4) is not a prompt-input cut');
 });
 
 test('CP-06 on the wire: byte-identical prompts for today\'s inputs, knowledge/history framed as data, and the cut reported with the reply', async () => {
@@ -177,6 +194,12 @@ test('CP-06 on the wire: byte-identical prompts for today\'s inputs, knowledge/h
 
     await generateOllamaReply({ businessContext: business, customerMessage: 'مرحبا' });
     assert.deepEqual(captured[2].body.messages, [{ role: 'system', content: legacySystem }, { role: 'user', content: 'مرحبا' }]);
+
+    // The MCP prompt (4th builder) renders byte-identically to its own legacy single-text format — newline before the
+    // business line, «رسالة العميل: …» on the last line — and without business context the line is simply absent.
+    const legacyMcp = (ctx, msg) => `${DEFAULT_POLICY}${ctx ? `\nسياق النشاط المعتمد: ${ctx}` : ''}\nرسالة العميل: ${msg}`;
+    assert.equal(buildContext({ instructions: DEFAULT_POLICY, business, message: 'كم السعر؟' }).text, legacyMcp(business, 'كم السعر؟'));
+    assert.equal(buildContext({ instructions: DEFAULT_POLICY, business: '', message: 'كم السعر؟' }).text, legacyMcp('', 'كم السعر؟'));
 
     // With knowledge + history the blocks are framed as data and the oversize message is cut and reported.
     const rich = await generateWhatsAppReplyDetailed({
