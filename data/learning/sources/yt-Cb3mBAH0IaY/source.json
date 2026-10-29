@@ -17,9 +17,23 @@
   "recorded_by": "arena-agent · session 2026-10-27-learning-protocol-and-publish-links",
   "extraction": {
     "channel": "hosted page reader (fetch_page) over the public watch page: title, channel, upload date, length, description, and caption text WITHOUT timestamps",
-    "coverage": "partial",
-    "coverage_estimate": "≈ النصف الأول من الفيديو تقريبًا (ينتهي داخل مقطع التعلم العميق عند «وتفهم الكلام وتترج…»)؛ الحد الدقيق UNKNOWN",
+    "coverage": "full",
+    "coverage_note": "نص التسميات كاملًا من الجملة الافتتاحية («في كل مكان تنظر إليه اليوم…») إلى الجملة الختامية («بداية بسيطة لثورة غيرت تاريخ البشرية.»)؛ 481 سطرًا / 16838 حرفًا بلا طوابع زمنية. فجوة واحدة مشتبه بها في التسميات التلقائية عند السطرين 317–318 (قفزة من الصور إلى «ويبدو صوته طبيعيًا») لا يُنسب للمصدر شيء عبرها.",
     "timestamps": "unavailable",
+    "passes": [
+      {
+        "pass": 1,
+        "at": "2026-10-28",
+        "result": "chunk 0 فقط من قارئ الصفحات: 180 سطرًا / 6395 حرفًا، ينتهي عند «وتفهم الكلام وتترج…» (حد القطعة لا حد الفيديو)",
+        "sha256": "c7747dbc4b2cb3b7cef998d3d6a962435f78f5d45d69eac430d17e7ac57a55d6"
+      },
+      {
+        "pass": 2,
+        "at": "2026-10-29",
+        "result": "القطع 0 و1 و2 من قارئ الصفحات نفسه (totalChunks=3). القطعة 0 أعادت بايتات المرور الأول نفسها (SHA-256 مطابق) فبقيت بصمات S01–S11 كما هي؛ القطعة 1 أضافت 228 سطرًا والقطعة 2 أضافت 73 سطرًا؛ الكلمة المقطوعة عند حد القطعة («وتترج» + «م») أُعيد وصلها في السطر 180 فتغيرت بصمة S12 وحدها. القارئ لا يعيد نص التسميات في كل طلب (بعض الطلبات تعيد قشرة المشغّل أو صفحة خطأ 401) فاحتاج الأمر 5 طلبات.",
+        "sha256": "9b561ef46d1beda252ef9eafa88b7cc9cba27a2d3c2a3f9d82e79394a40475a6"
+      }
+    ],
     "attempts": [
       {
         "target": "web_search youtube Cb3mBAH0IaY",
@@ -27,7 +41,7 @@
       },
       {
         "target": "https://www.youtube.com/watch?v=Cb3mBAH0IaY",
-        "result": "metadata + description + partial caption text (same bytes on two separate fetches)"
+        "result": "pass 1 (2026-10-28): metadata + description + caption text chunk 0 only (same bytes on two fetches); pass 2 (2026-10-29): chunks 0–2 = full caption text, chunk 0 byte-identical to pass 1"
       },
       {
         "target": "https://www.youtube.com/api/timedtext?v=Cb3mBAH0IaY&lang=ar&fmt=json3",
@@ -50,14 +64,14 @@
         "result": "network denied by allow-list"
       }
     ],
-    "to_complete": "الصق نص «إظهار النص» (Show transcript) الكامل من YouTube بصيغة mm:ss نص، أو ارفع ملف .srt؛ عندها تُعاد المرحلة 2 بطوابع زمنية ويُحدَّث source_url لكل وحدة إلى #t=<ثانية>."
+    "to_complete": "اختياري: طوابع زمنية — الصق نص «إظهار النص» بصيغة mm:ss نص أو ارفع ملف .srt؛ عندها يُحدَّث source_url لكل وحدة إلى #t=<ثانية>. النص نفسه مكتمل."
   },
   "transcript": {
     "file": "transcript.txt",
     "committed": false,
-    "chars": 6395,
-    "lines": 180,
-    "sha256": "c7747dbc4b2cb3b7cef998d3d6a962435f78f5d45d69eac430d17e7ac57a55d6"
+    "chars": 16838,
+    "lines": 481,
+    "sha256": "9b561ef46d1beda252ef9eafa88b7cc9cba27a2d3c2a3f9d82e79394a40475a6"
   },
   "segments": [
     {
@@ -176,9 +190,179 @@
         174,
         180
       ],
-      "topic": "لماذا نجح التعلم العميق متأخرًا: الإنترنت والحوسبة السحابية وبطاقات الرسومات (النص مبتور هنا)",
-      "chars": 265,
-      "sha256": "4fe074399c0482f2580682239d5e6330124c12b16d400dfd3799772a297b0e0e"
+      "topic": "لماذا نجح التعلم العميق متأخرًا: الإنترنت والحوسبة السحابية وبطاقات الرسومات؛ ثم تعرف الصور وفهم الكلام والترجمة",
+      "chars": 266,
+      "sha256": "33946c0404bef9d5962ff1c2d1360e685b475f2652d55e692fc259c3009a766e"
+    },
+    {
+      "id": "S13",
+      "lines": [
+        181,
+        199
+      ],
+      "topic": "ما صارت الشبكات العميقة تفعله (صور، كلام، ترجمة، توليد صور ومقالات وموسيقى وفيديو)؛ الشبكات العصبية الالتفافية CNN للرؤية: فتح الهاتف بالوجه، إدراك السيارة ذاتية القيادة؛ كيف «ترى» الصورة أرقامًا ثم حوافًا فأشكالًا فوجوهًا طبقةً بعد طبقة",
+      "chars": 707,
+      "sha256": "6ce73d51fb06aeff686a9161fec417f5f4e6d7e485be8ec69c1794cda6f215dd"
+    },
+    {
+      "id": "S14",
+      "lines": [
+        200,
+        214
+      ],
+      "topic": "الشبكات العصبية المتكررة RNN للتسلسل واللغة: ترتيب الكلمات يغير المعنى؛ الترجمة الآلية وتحويل الكلام إلى نص والتنبؤ بالكلمات والمساعدات الصوتية الأولى؛ عيبها نسيان السياق الطويل",
+      "chars": 555,
+      "sha256": "d01cc390c2a5994c7dbfc9056c9728502fffb90b1d696a5c523e6ca4ce040245"
+    },
+    {
+      "id": "S15",
+      "lines": [
+        215,
+        222
+      ],
+      "topic": "تمهيد: المحول Transformer هو الأساس الذي بُنيت عليه ChatGPT وClaude وGemini (نهاية الجزء الثاني)",
+      "chars": 269,
+      "sha256": "88419eefe555fc3d3250571d1a872026497167459a9ccf56501280f47c7cdac2"
+    },
+    {
+      "id": "S16",
+      "lines": [
+        223,
+        238
+      ],
+      "topic": "حاجز اللغة: الإنسان يفهم العلاقة بين الكلمات والسياق (مثال «عين»)؛ الحاسوب القديم كان يرى الكلمة فقط فبقيت الترجمة والمحادثة دون مستوى البشر",
+      "chars": 602,
+      "sha256": "b195e7d5c6a7dda3746f3d9090ae5b90fb5c0e1cff7e86333df1734ec546566d"
+    },
+    {
+      "id": "S17",
+      "lines": [
+        239,
+        247
+      ],
+      "topic": "ورقة 2017 من باحثين في جوجل بعنوان «Attention is all you need» قدّمت نموذج المحول Transformer وبدأت عصرًا جديدًا",
+      "chars": 282,
+      "sha256": "c8eaea1df608b28c3ae431ac4b44fafbda18bc73396616a080e22daff79cee88"
+    },
+    {
+      "id": "S18",
+      "lines": [
+        248,
+        266
+      ],
+      "topic": "ما يميز المحول: قراءة الجملة كلها دفعة واحدة لا كلمة بعد كلمة؛ آلية الانتباه Attention تحدد أي الكلمات أهم (مثال الضمير في الرواية)؛ نتائجها: نصوص طويلة وتلخيص وأسئلة ومقالات وأكواد",
+      "chars": 644,
+      "sha256": "50c6ee1f7a1a18523a996fb368bcb0f61a6fd06c8250c159ebb5c4c4c22ff05d"
+    },
+    {
+      "id": "S19",
+      "lines": [
+        267,
+        281
+      ],
+      "topic": "النماذج اللغوية الكبيرة LLMs: تدرّبت على كميات هائلة من النصوص وتعلمت الأنماط؛ لا تبحث في قاعدة بيانات بل تتوقع الكلمة التالية؛ أمثلة: ChatGPT وClaude وGemini وLlama وMistral",
+      "chars": 551,
+      "sha256": "f758e5d9e7a88e2996b78ec6d27db6ba67739168228941757f44f9ce65606eb5"
+    },
+    {
+      "id": "S20",
+      "lines": [
+        282,
+        292
+      ],
+      "topic": "حدود النماذج اللغوية: ليست واعية ولا تفهم العالم كالإنسان بل أنماط إحصائية؛ الهلوسة Hallucination = إجابة مقنعة لكنها غير صحيحة؛ الخبراء: تُستخدم كمساعد لا كمصدر وحيد للحقيقة",
+      "chars": 376,
+      "sha256": "6d206a297b1ac2effcd1324dd789ccdaa50042492d146534a2730dde599b0473"
+    },
+    {
+      "id": "S21",
+      "lines": [
+        293,
+        318
+      ],
+      "topic": "الذكاء الاصطناعي التوليدي Generative AI يصنع بيانات جديدة (صور، شعارات، مشاهد)؛ نماذج الانتشار Diffusion تبدأ من ضوضاء وتزيل التشويش تدريجيًا (تشبيه النحات)؛ فجوة مشتبه بها في التسميات عند السطرين 317–318",
+      "chars": 951,
+      "sha256": "a455dc53684ae90644082bb28c9a20591aa828cbd5127e399f6e3c0fcf63b10b"
+    },
+    {
+      "id": "S22",
+      "lines": [
+        319,
+        326
+      ],
+      "topic": "سؤال الانتقال إلى الجزء الرابع: هل اقتربنا من ذكاء يضاهي الإنسان أو يفوقه؟",
+      "chars": 270,
+      "sha256": "43c6a1edbe27a90106f8a84dcde3b75995d525a8687c64d508cbcd7b79e07f6f"
+    },
+    {
+      "id": "S23",
+      "lines": [
+        327,
+        348
+      ],
+      "topic": "الذكاء الاصطناعي الضيق ANI: كل الأنظمة الحالية تقريبًا (ChatGPT وGemini وClaude والقيادة الذاتية والتشخيص والترجمة والوجوه وتوليد الصور) بارعة في مهمة واحدة وعاجزة خارجها، كالإنسان المتخصص",
+      "chars": 788,
+      "sha256": "259686159fad1c88ebb2c7c0eabc29a0381688b12210cd54eaa90287c087c44f"
+    },
+    {
+      "id": "S24",
+      "lines": [
+        349,
+        371
+      ],
+      "topic": "الذكاء الاصطناعي العام AGI: حلم منذ أكثر من 70 عامًا؛ آلة حاسبة مقابل عقل إنسان؛ تعلم وانتقال بين المجالات دون إعادة برمجة؛ أهم اختراع عند بعضهم وأخطره عند آخرين لأنه قد يطور نفسه",
+      "chars": 852,
+      "sha256": "fa0fcff343e2c1c9b0b8fd0713c78a0bf6ebbaf27d081096f4f604299e553eb7"
+    },
+    {
+      "id": "S25",
+      "lines": [
+        372,
+        396
+      ],
+      "topic": "الذكاء الاصطناعي الفائق ASI: لم يوجد بعد ولا أحد يعرف إن كان سيظهر؛ فكرة التحسين الذاتي المتكرر ونمو القدرات أسرع من فهم البشر وفي كل المجالات",
+      "chars": 693,
+      "sha256": "3d497d72f5fa5a8f67c1bffff63941ce8f9d5fa75de035d536f77f8ed769522f"
+    },
+    {
+      "id": "S26",
+      "lines": [
+        397,
+        412
+      ],
+      "topic": "خيال علمي؟ العلماء مختلفون في موعد AGI (سنوات/عقود أو بعيد جدًا) لكنهم متفقون على سرعة التطور غير المسبوقة (قبل 10 سنوات أخطاء في صور بسيطة، اليوم برامج وموسيقى وفيديو وبحث علمي)",
+      "chars": 565,
+      "sha256": "b18611d018189dd20f9358944f1d650f636db8d48c35b27fc36661bc7abe5fb7"
+    },
+    {
+      "id": "S27",
+      "lines": [
+        413,
+        436
+      ],
+      "topic": "التحديات: الخصوصية (من يملك البيانات وكيف تُستخدم)، التحيز (بيانات منحازة تنتج قرارات منحازة؛ جودة البيانات ركن أساسي)، الوظائف (كل تقنية ألغت وظائف وخلقت أخرى؛ سيُستبدل من لا يستخدم الذكاء الاصطناعي بمن يعرف استخدامه)",
+      "chars": 848,
+      "sha256": "53ca410e502054971de7393bbdec7905a11077bfe93e4eac9a26e0f4fa2494b7"
+    },
+    {
+      "id": "S28",
+      "lines": [
+        437,
+        452
+      ],
+      "topic": "هل يمكن أن يصبح واعيًا؟ لا دليل علمي واحد على وعي أي نظام؛ يعالج بيانات ويحسب احتمالات؛ حديث طبيعي بلا عقل ولا مشاعر ولا إدراك ذات؛ والتطور مستمر شهريًا",
+      "chars": 482,
+      "sha256": "dc582118bad4b7cd01d3b68303f0e23a824d756541d36291708b8d7fd7ed6c68"
+    },
+    {
+      "id": "S29",
+      "lines": [
+        453,
+        481
+      ],
+      "topic": "الخاتمة: السؤال كيف يتغير العالم عندما يدخل الذكاء الاصطناعي كل قرار وصناعة ومنزل؛ فرص (أمراض مستعصية، اكتشافات) مقابل تحديات أخلاقية وقانونية وتقنية؛ فهم الأنواع والقدرات والحدود شرط للاستخدام الواعي الآمن؛ تشبيه أول الحواسيب",
+      "chars": 990,
+      "sha256": "41f565df880bb321bae4cedd79d1feff695cc485eb422b2955e354a89f5265fe"
     }
   ],
   "description_topics_announced": [
@@ -198,21 +382,20 @@
   ],
   "topics_extracted": [
     "ما هو الذكاء الاصطناعي؟",
-    "الذكاء المحدود (ANI)",
-    "التعلم الآلي (Machine Learning)",
+    "الذكاء المحدود (ANI) — القائم على القواعد (S02–S03) وبوصفه فئة كل الأنظمة الحالية (S23)",
+    "التعلم الآلي (Machine Learning): الخاضع وغير الخاضع للإشراف",
     "التعلم المعزز (Reinforcement Learning)",
-    "التعلم العميق (Deep Learning) — جزئيًا"
-  ],
-  "topics_unknown": [
-    "معالجة اللغة الطبيعية (NLP)",
-    "الرؤية الحاسوبية (Computer Vision)",
-    "الروبوتات الذكية",
+    "التعلم العميق (Deep Learning) والشبكات العصبية",
+    "الشبكات الالتفافية CNN (الرؤية) والشبكات المتكررة RNN (التسلسل)",
+    "المحول Transformer وآلية الانتباه Attention (ورقة 2017)",
+    "النماذج اللغوية الكبيرة LLMs والهلوسة Hallucination",
+    "الذكاء الاصطناعي التوليدي Generative AI ونماذج الانتشار Diffusion",
     "الذكاء العام (AGI)",
-    "الذكاء الفائق (ASI)",
-    "تطبيقات في الطب والتعليم والصناعة والأمن والسيارات ذاتية القيادة",
-    "هل يمكن أن يتفوق الذكاء الاصطناعي على الإنسان؟",
-    "أثر الذكاء الاصطناعي على الوظائف ومستقبل العالم"
+    "الذكاء الفائق (ASI) والخلاف حول المواعيد",
+    "التحديات: الخصوصية والتحيز والوظائف",
+    "هل يمكن أن يصبح واعيًا؟ (لا دليل) والخاتمة"
   ],
+  "topics_unknown": [],
   "claims": [
     {
       "unit": "kb-learn-ai-not-one-thing",
@@ -281,23 +464,110 @@
         "S12"
       ],
       "status": "supported",
-      "note": "المقطع S12 مبتور؛ لا يُنسب للمصدر ما بعد «وتفهم الكلام»"
+      "note": "كان S12 مبتورًا في المرور الأول؛ اكتمل في المرور الثاني (بصمة S12 الجديدة في segments)"
+    },
+    {
+      "unit": "kb-learn-cnn-vision",
+      "segments": [
+        "S13"
+      ],
+      "status": "supported"
+    },
+    {
+      "unit": "kb-learn-rnn-sequences",
+      "segments": [
+        "S14"
+      ],
+      "status": "supported"
+    },
+    {
+      "unit": "kb-learn-transformer-attention",
+      "segments": [
+        "S15",
+        "S16",
+        "S17",
+        "S18"
+      ],
+      "status": "supported"
+    },
+    {
+      "unit": "kb-learn-llm-next-word-prediction",
+      "segments": [
+        "S19"
+      ],
+      "status": "supported"
+    },
+    {
+      "unit": "kb-learn-hallucination-assistant-not-oracle",
+      "segments": [
+        "S20"
+      ],
+      "status": "supported"
+    },
+    {
+      "unit": "kb-learn-generative-ai-diffusion",
+      "segments": [
+        "S21"
+      ],
+      "status": "supported"
+    },
+    {
+      "unit": "kb-learn-ani-all-current-systems",
+      "segments": [
+        "S22",
+        "S23"
+      ],
+      "status": "supported"
+    },
+    {
+      "unit": "kb-learn-agi-general-flexibility",
+      "segments": [
+        "S24"
+      ],
+      "status": "supported"
+    },
+    {
+      "unit": "kb-learn-asi-recursive-self-improvement",
+      "segments": [
+        "S25",
+        "S26"
+      ],
+      "status": "supported"
+    },
+    {
+      "unit": "kb-learn-challenges-privacy-bias-jobs",
+      "segments": [
+        "S27"
+      ],
+      "status": "supported"
+    },
+    {
+      "unit": "kb-learn-no-evidence-of-consciousness",
+      "segments": [
+        "S28",
+        "S29"
+      ],
+      "status": "supported"
     },
     {
       "unit": null,
-      "topic": "NLP / Computer Vision / الروبوتات / AGI / ASI / التطبيقات / الوظائف",
+      "topic": "NLP / Computer Vision / الروبوتات الذكية / قسم التطبيقات",
       "segments": [],
       "status": "unknown",
-      "note": "أعلن عنها وصف الفيديو فقط؛ لم يُستخرج نصها فلا تُنسب للمصدر ولا تُكتب وحدات لها"
+      "note": "أعلنها وصف الفيديو لكن لا مقطع لها في نص التسميات الكامل (انظر topics_announced_not_in_captions)؛ تبقى UNKNOWN ولا تُنسب للمصدر ولا تُكتب لها وحدات"
     }
   ],
   "units": {
     "knowledge": {
       "registry": "data/kb/learned_registry.csv",
       "tag": "learn:yt-Cb3mBAH0IaY",
-      "count": 9,
+      "count": 20,
       "trust_level": "T1",
-      "license": "internal-owner"
+      "license": "internal-owner",
+      "added": {
+        "2026-10-27": 9,
+        "2026-10-29": 11
+      }
     },
     "procedures": {
       "count": 0,
@@ -312,7 +582,10 @@
     "طبقات CeliaOS الحتمية (tool-policy، verifier، بوابات KB) هي ذكاء ضيق قائم على القواعد بالتصميم: متوقع، لكنه يتوقف أمام الجديد؛ لذلك الجديد يُحال UNKNOWN/موافقة المالك لا تخمينًا.",
     "«البيانات أهم من الخوارزمية» = بوابات المصدر والترخيص والثقة والقِدَم في شبكة المعرفة تسبق أي تعلم؛ مصدر رديء يصنع مساعدًا رديئًا.",
     "التعلم بالتعزيز في المصدر تعلم من مكافآت وعقوبات؛ مقابله في CeliaOS (المرحلة 7) تغذية راجعة محكومة من نتائج التنفيذ تُسجَّل كأدلة — دون أي تعديل لأوزان نموذج.",
-    "التعلم العميق يحتاج بيانات وحوسبة ضخمة؛ طبقة النموذج في CeliaOS خارجية عبر Model Router ولا تُدرَّب داخل النظام."
+    "التعلم العميق يحتاج بيانات وحوسبة ضخمة؛ طبقة النموذج في CeliaOS خارجية عبر Model Router ولا تُدرَّب داخل النظام.",
+    "الهلوسة في المصدر = سبب وجود المُتحقِّق والأدلة وبوابات KB: أي ادعاء من النموذج بلا دليل UNKNOWN ولا أثر خارجي بناءً عليه.",
+    "كل الأنظمة الحالية ذكاء ضيق (ANI) بحسب المصدر؛ CeliaOS تسجل حدود كل نموذج ومزوّد صراحةً ولا تَعِد بعموم (AGI) ولا بتطوير ذاتي (ASI) — التغيير يمر عبر PR واختبارات وموافقة المالك.",
+    "لا دليل علمي على وعي أي نظام؛ هوية Celia لا تدّعي مشاعر أو وعيًا وتنقل الحالة الحقيقية."
   ],
   "approval": {
     "gate": "PR review and merge by the repository owner (registry rows are code-governed; `kb import --apply` is idempotent)",
@@ -323,8 +596,8 @@
   "rollback": "git revert <merge-commit> && npm run kb:manifest && npm run kb -- import --apply",
   "status": {
     "SOURCE": "VERIFIED",
-    "EXTRACTION": "PARTIAL",
-    "COMPREHENSION": "PARTIAL",
+    "EXTRACTION": "FULL",
+    "COMPREHENSION": "VERIFIED",
     "KNOWLEDGE": "CANDIDATE",
     "PROCEDURE": "NONE",
     "CAPABILITY": "NONE",
@@ -334,5 +607,14 @@
     "patterns": 7,
     "findings": []
   },
-  "regression_evidence": "test/learning-protocol.test.js LS-01..LS-10 (10/10) + npm test 295/295 on 2026-10-27 (full git history required for the N/N-1 MCP baseline test)"
+  "regression_evidence": "test/learning-protocol.test.js LS-01..LS-10 (10/10; LS-06 re-verified against the local transcript) + test/learn-source.test.js 6/6 + npm test 561/561 on 2026-10-29 (coverage 91.19/73.57/85.42; kb -- verify: learned_registry 20 rows, 0 rejected)",
+  "updated_at": "2026-10-29T02:30:00Z",
+  "updated_by": "arena-agent · session 2026-10-29-security-posture-and-video-record (pass 2: full caption text)",
+  "topics_announced_not_in_captions": [
+    "معالجة اللغة الطبيعية (NLP): المصطلح لا يرد في نص التسميات؛ اللغة تُعالج تحت RNN/Transformer/LLM (S14–S20)",
+    "الرؤية الحاسوبية (Computer Vision): المصطلح لا يرد؛ الرؤية تحت CNN (S13)",
+    "الروبوتات الذكية: لا مقطع لها (تُذكر كلمة روبوت عرضًا فقط في S01 وS29)",
+    "تطبيقات في الطب والتعليم والصناعة والأمن والسيارات ذاتية القيادة: لا مقطع مخصص؛ أمثلة متناثرة فقط (تشخيص الأمراض، القيادة الذاتية، مساعدة الأطباء)"
+  ],
+  "comprehension_note": "VERIFIED هنا بمعنى بوابة الفهم الحتمية للبروتوكول: نص كامل ببصمة، 29 مقطعًا متصلًا بلا فجوات، 20 ادعاءً مدعومًا كلٌّ مربوط بمقاطع مبصومة وبصف واحد في السجل، والمواضيع المعلنة الغائبة UNKNOWN. لا فهم دلالي بنموذج (AI-002) ولا مصدر مستقل بعد (الثقة T1)."
 }

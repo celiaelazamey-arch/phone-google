@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>المهام المجدولة — سيليا</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./fonts.css">
+  <link rel="stylesheet" href="./agent.css">
+  <link rel="stylesheet" href="./cron.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="dot cron" aria-hidden="true"></span>
+      <div>
+        <h1>المهام المجدولة (cron-job.org)</h1>
+        <p class="sub">قراءة مباشرة من الحافة · كل كتابة نيّة في صندوق صادر تنتظر موافقتك (DEC-042)</p>
+      </div>
+    </div>
+    <nav aria-label="روابط">
+      <a href="./agent">مساحة الوكيل</a>
+      <a href="./kb">شبكة المعرفة</a>
+      <a href="./system">حالة النظام</a>
+    </nav>
+  </header>
+
+  <main class="layout">
+    <section class="card auth" aria-labelledby="auth-title">
+      <h2 id="auth-title">اتصال بالحافة</h2>
+      <p class="hint">المتصفح يتحدث مع عامل Cloudflare مباشرة. الرمز يبقى في هذا التبويب فقط ولا يُرسل إلى أي خادم آخر. مفتاح cron-job.org نفسه لا يغادر الحافة أبدًا.</p>
+      <label class="field">
+        <span>عنوان الحافة</span>
+        <input id="edge" type="url" inputmode="url" autocomplete="off" spellcheck="false" value="https://celia-phone-google.celiaelazamey.workers.dev">
+      </label>
+      <label class="field">
+        <span>رمز المالك (CELIA_MCP_API_TOKEN)</span>
+        <input id="token" type="password" autocomplete="off" spellcheck="false" placeholder="Bearer">
+      </label>
+      <button id="connect" class="primary" type="button">اتصال</button>
+      <p id="auth-status" class="status" role="status">غير متصل</p>
+    </section>
+
+    <section class="card" aria-labelledby="status-title">
+      <h2 id="status-title">حالة الخدمة</h2>
+      <p class="badge" id="cron-badge">أدخل الرمز لعرض الحالة</p>
+      <ul class="facts">
+        <li><span>المفتاح</span><b id="fact-key">—</b></li>
+        <li><span>التخزين الدائم (D1)</span><b id="fact-durable">—</b></li>
+        <li><span>القراءة</span><b id="fact-reads">—</b></li>
+        <li><span>الكتابة</span><b id="fact-writes">—</b></li>
+        <li><span>بانتظار الموافقة</span><b id="fact-pending">—</b></li>
+        <li><span>مجهولة المصير</span><b id="fact-unknown">—</b></li>
+      </ul>
+      <p class="hint" id="cron-note">إن غاب المفتاح أو D1 تقول الصفحة ذلك صراحة؛ لا يوجد وضع تجريبي ولا بيانات مُصطنعة.</p>
+    </section>
+
+    <section class="card wide" aria-labelledby="jobs-title">
+      <div class="row">
+        <h2 id="jobs-title">المهام</h2>
+        <button id="reload-jobs" class="ghost" type="button" disabled>تحديث</button>
+      </div>
+      <p class="hint">الروابط تُعرض بلا سلسلة الاستعلام، وبلا ترويسات ولا بيانات دخول — هكذا يعيدها العامل.</p>
+      <div class="table-wrap">
+        <table class="jobs" aria-live="polite">
+          <thead><tr><th>#</th><th>العنوان</th><th>الهدف</th><th>الحالة</th><th>آخر تنفيذ</th><th>التالي</th><th>إجراء (نيّة)</th></tr></thead>
+          <tbody id="jobs-body"><tr><td colspan="7" class="empty">—</td></tr></tbody>
+        </table>
+      </div>
+      <div id="history" class="history" hidden></div>
+    </section>
+
+    <section class="card" aria-labelledby="create-title">
+      <h2 id="create-title">نيّة إنشاء مهمة</h2>
+      <p class="hint">لا يُنشأ شيء على cron-job.org من هنا؛ يُسجَّل طلب ينتظر موافقتك في القسم المجاور.</p>
+      <label class="field"><span>العنوان</span><input id="new-title" type="text" maxlength="120" autocomplete="off" placeholder="مثال: celia keep-alive"></label>
+      <label class="field"><span>الرابط (https فقط)</span><input id="new-url" type="url" autocomplete="off" spellcheck="false" placeholder="https://…"></label>
+      <label class="field"><span>التكرار</span>
+        <select id="new-every">
+          <option value="5">كل 5 دقائق</option>
+          <option value="10" selected>كل 10 دقائق</option>
+          <option value="15">كل 15 دقيقة</option>
+          <option value="30">كل 30 دقيقة</option>
+          <option value="60">كل ساعة</option>
+        </select>
+      </label>
+      <label class="field"><span>ملاحظة (اختياري)</span><input id="new-note" type="text" maxlength="280" autocomplete="off"></label>
+      <button id="create-intent" class="primary" type="button" disabled>سجّل النيّة</button>
+      <p class="hint" id="create-status"></p>
+    </section>
+
+    <section class="card wide" aria-labelledby="intents-title">
+      <div class="row">
+        <h2 id="intents-title">صندوق الصادر</h2>
+        <div class="row actions">
+          <select id="intent-filter" aria-label="تصفية حسب الحالة">
+            <option value="">الكل</option>
+            <option value="pending_approval" selected>بانتظار الموافقة</option>
+            <option value="unknown">مجهولة المصير</option>
+            <option value="applied">مُطبَّقة</option>
+            <option value="failed">مرفوضة من المزوّد</option>
+            <option value="rejected">رفضها المالك</option>
+            <option value="not_applied">لم تُطبَّق (تسوية)</option>
+          </select>
+          <button id="reload-intents" class="ghost" type="button" disabled>تحديث</button>
+        </div>
+      </div>
+      <p class="hint">الموافقة مربوطة ببصمة الحمولة المعروضة؛ أي تغيير بعد العرض يُرفض. النيّة المجهولة المصير لا تُعاد تلقائيًا — تُسوّى يدويًا بعد التحقق في لوحة cron-job.org.</p>
+      <ul id="intents" class="intents" aria-live="polite"></ul>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p>عامل واحد، مفتاح واحد، مسار واحد للكتابة: نيّة ← موافقة ← إرسال مرة واحدة ← نتيجة صادقة (مُطبَّقة / فشلت / مجهولة). كل انتقال يُسجَّل في سلسلة التدقيق على D1 كبصمة فقط.</p>
+  </footer>
+
+  <script src="./cron.js" type="module"></script>
+</body>
+</html>

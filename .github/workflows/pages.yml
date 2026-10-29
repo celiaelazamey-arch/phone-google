@@ -110,7 +110,7 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
-      - name: Verify live GitHub Pages deployment (10/10 routes HTTP 200 OK)
+      - name: Verify live GitHub Pages deployment (13/13 routes HTTP 200 OK)
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
         run: |
@@ -121,6 +121,7 @@ jobs:
               "/protocol.html",
               "/agent.html",
               "/kb.html",
+              "/cron.html",
               "/system.html",
               "/deploy.html",
               "/live.html",

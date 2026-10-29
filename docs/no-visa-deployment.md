@@ -29,6 +29,7 @@
 
 1. **قاعدة بيانات SQLite دائمة وكاملة على Cloudflare D1 (`workers/celia-edge/migrations/0002_runtime.sql`):**
    - إضافة الجداول الإنتاجية المطابقة لمخطط النظام (`app_users`، `oauth_states`، `google_credentials`، `whatsapp_contacts`، `whatsapp_messages`، `edge_idempotency`) إلى جانب جداول الحالة وسلسلة التدقيق المشفّرة (`0001_state.sql`) بإجمالي **12 جملة SQL idempotent** تُطبَّق تلقائيًا عند كل نشر.
+   - **تحديث 2026-10-29 (DEC-042):** هجرة ثالثة `0003_cron_outbox.sql` تضيف جدول `edge_cron_outbox` (صندوق صادر لنيّات cron-job.org: `pending_approval → dispatching → applied / failed / unknown`، `rejected`، `not_applied`) وفهرسه — المجموع **14 جملة** تُطبَّق بالآلية نفسها في أول نشر من `main` بعد الدمج.
 2. **تشفير رموز OAuth بمعيار WebCrypto `AES-256-GCM` مع عزل المفاتيح (`workers/celia-edge/crypto.js`):**
    - تشفير رموز Google (`refresh_token` / `access_token`) بصيغة مغلف موثّق `v2.<keyId>.<iv>.<tag>.<ciphertext>` عبر `TOKEN_ENCRYPTION_KEY` أو اشتقاق مفتاح معزول بـ **HKDF-SHA-256** تلقائيًا دون تخزين أي رمز نصي في D1، مع توافق رجعي كامل مع مغلفات `v1.*`، وتوقيع تذاكر ربط المتصفح قصيرة العمر (`10` دقائق)، والتحقق من توقيع Meta `X-Hub-Signature-256` على البايتات الخام (`raw bytes`) بزمن ثابت.
 3. **خادم MCP كامل يضم الأدوات الـ 12 الرسمية (`POST /mcp` و`GET /mcp` في `workers/celia-edge/runtime.js`):**
