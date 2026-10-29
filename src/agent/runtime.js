@@ -26,7 +26,7 @@ import {
   computeAgentMetrics,
   recommendTaskStrategy
 } from './evaluation.js';
-import { timeSteps } from './timing.js';
+import { deriveNow, timeSteps } from './timing.js';
 
 export { PLAN_LIFECYCLE_STATE };
 
@@ -149,9 +149,27 @@ export function createAgentRuntime({
     });
   }
 
-  async function addStep(runId, step) {
+  /**
+   * Record a step and emit it (WP-1.2 enriched `step` event). Besides the step itself the event carries what the
+   * trace needs without a round trip, all of it readable again from `GET /runs/:id`: the run's `usage`/`limits`
+   * (budget bar), `now` (what the loop is doing at this instant) and — when a tool run has just settled —
+   * `settledStep`: the earlier `act` step with the duration its tool run proves (`null` when nothing is provable).
+   */
+  async function addStep(runId, step, { settled = null } = {}) {
     const stored = await store.appendStep({ runId, ...step });
-    emit(runId, { type: 'step', step: stored });
+    const run = await store.getRun(runId);
+    const [timed] = timeSteps([stored], []);
+    const settledStep =
+      settled?.step && settled?.toolRun ? timeSteps([settled.step], [settled.toolRun])[0] : null;
+    emit(runId, {
+      type: 'step',
+      step: timed,
+      settledStep,
+      status: run?.status ?? null,
+      usage: run?.usage ?? null,
+      limits: run?.limits ?? null,
+      now: run ? deriveNow({ run, steps: [timed], at: clock() }) : null
+    });
     return stored;
   }
 
@@ -646,7 +664,7 @@ export function createAgentRuntime({
             tool.timeoutMs || config.toolTimeoutMs,
             controller.signal
           );
-          await store.finishToolRun(toolRun.id, TOOL_RUN_STATUS.succeeded, JSON.stringify(outcome ?? null));
+          const settledToolRun = await store.finishToolRun(toolRun.id, TOOL_RUN_STATUS.succeeded, JSON.stringify(outcome ?? null));
           await store.appendEvidence({
             runId,
             stepId: step.id,
@@ -657,11 +675,15 @@ export function createAgentRuntime({
             verdict: VERDICT.pass
           });
           const preview = JSON.stringify(outcome ?? null).slice(0, 300);
-          await addStep(runId, { kind: 'observe', title: `${tool.name} ✓`, summary: preview, toolName: tool.name });
+          await addStep(
+            runId,
+            { kind: 'observe', title: `${tool.name} ✓`, summary: preview, toolName: tool.name },
+            { settled: { step, toolRun: settledToolRun } }
+          );
         } catch (error) {
           const cancelled = error?.code === 'cancelled' || controller.signal.aborted;
           const status = tool.risk === RISK.read ? TOOL_RUN_STATUS.failed : TOOL_RUN_STATUS.unknown;
-          await store.finishToolRun(toolRun.id, status, JSON.stringify({ error: error?.code || 'tool_failed' }));
+          const settledToolRun = await store.finishToolRun(toolRun.id, status, JSON.stringify({ error: error?.code || 'tool_failed' }));
           await store.appendEvidence({
             runId,
             stepId: step.id,
@@ -671,12 +693,16 @@ export function createAgentRuntime({
             sourceIds: [toolRun.id],
             verdict: status === TOOL_RUN_STATUS.unknown ? VERDICT.unknown : VERDICT.block
           });
-          await addStep(runId, {
-            kind: 'observe',
-            title: `${tool.name} ✗`,
-            summary: `فشل الاستدعاء (${error?.code || 'tool_failed'})؛ الحالة المسجلة ${status}.`,
-            toolName: tool.name
-          });
+          await addStep(
+            runId,
+            {
+              kind: 'observe',
+              title: `${tool.name} ✗`,
+              summary: `فشل الاستدعاء (${error?.code || 'tool_failed'})؛ الحالة المسجلة ${status}.`,
+              toolName: tool.name
+            },
+            { settled: { step, toolRun: settledToolRun } }
+          );
           if (cancelled) {
             return { run: await finish(runId, RUN_STATUS.cancelled), claimed: true };
           }
@@ -838,10 +864,13 @@ export function createAgentRuntime({
         verification,
         evidenceChain
       });
+      // WP-1.2: "now" is part of the detail so the trace UI never shows a fact that is not in GET /runs/:id.
+      const now = deriveNow({ run, steps, approvals, at: clock() });
       return {
         run,
         plan,
         truthPartition,
+        now,
         steps,
         toolRuns,
         goalContract,

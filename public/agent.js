@@ -1,4 +1,15 @@
 /* مساحة الوكيل — M1. الرمز يبقى في sessionStorage لهذه التبويبة فقط. */
+import {
+  STEP_NODE_LABELS,
+  STAGE_NODE_LABELS,
+  budgetRatios,
+  formatMs,
+  nowLabel,
+  stageNodes,
+  stepNodeStatus,
+  summarizeStepNodes
+} from './agent-trace.js';
+
 const $ = (id) => document.getElementById(id);
 const TOKEN_KEY = 'celia.agent.token';
 let state = {
@@ -6,7 +17,16 @@ let state = {
   threadId: null,
   runId: null,
   lastClientMessageId: null,
-  streaming: null
+  streaming: null,
+  // WP-1.2 — أثر التنفيذ: الخطوات بأزمنتها كما وصلت، وحالة التشغيل، و«الآن» كما أرسله الخادم.
+  runStatus: null,
+  steps: [],
+  limits: null,
+  plan: null,
+  approvals: [],
+  verification: null,
+  now: null,
+  nowTimer: null
 };
 
 const RUN_LABELS = {
@@ -77,19 +97,140 @@ function setRunState(status) {
   pill.className = `pill ${kind}`;
   $('cancel').disabled = !['queued', 'running'].includes(status);
   if ($('export-audit')) $('export-audit').disabled = !state.runId;
+  if (state.runStatus !== (status ?? null)) {
+    state.runStatus = status ?? null;
+    // حالة العقد تعتمد على حالة التشغيل (آخر خطوة «بانتظار» مثلًا)، فتُعاد رسمها عند كل انتقال.
+    rerenderStepNodes();
+  }
 }
 
-function setUsage(usage = {}) {
-  $('usage-steps').textContent = usage.steps ?? 0;
-  $('usage-cost').textContent = usage.costMicros ?? 0;
-  $('usage-tokens').textContent = usage.tokens ?? 0;
+function setBar(id, ratio) {
+  const track = $(id);
+  if (!track) return;
+  const percent = ratio.percent ?? 0;
+  track.setAttribute('aria-valuenow', String(percent));
+  track.setAttribute('aria-valuetext', ratio.max === null ? `${ratio.used} بلا سقف معلن` : `${ratio.used} من ${ratio.max} (${percent}٪)`);
+  track.dataset.level = percent >= 90 ? 'bad' : percent >= 70 ? 'warn' : 'ok';
+  const fill = track.querySelector('.bar-fill');
+  if (fill) fill.style.width = `${percent}%`;
 }
 
-function renderStep(step) {
-  const list = $('steps');
-  list.querySelector('.empty')?.remove();
+/* الميزانية من `usage`/`limits` الحقيقيين فقط؛ السقف يأتي مع التشغيل (run.limits) أو مع حدث step. */
+function setUsage(usage = {}, limits = null) {
+  const ratios = budgetRatios(usage || {}, limits || state.limits || {});
+  if (limits) state.limits = limits;
+  $('usage-steps').textContent = ratios.steps.used;
+  $('usage-cost').textContent = ratios.cost.used;
+  $('usage-tokens').textContent = ratios.tokens;
+  $('limit-steps').textContent = ratios.steps.max ?? '—';
+  $('limit-cost').textContent = ratios.cost.max ?? '—';
+  setBar('bar-steps', ratios.steps);
+  setBar('bar-cost', ratios.cost);
+}
+
+/* سطر «الآن» يُعرض كما أرسله الخادم (`detail.now` / `step.now`)؛ المنقضي يُحدَّث محليًا كل ثانية من `since`. */
+function renderNow(now) {
+  state.now = now || null;
+  const line = $('now-line');
+  if (!line) return;
+  line.textContent = nowLabel(state.now, Date.now());
+  line.dataset.state = state.now?.state || '';
+  line.dataset.status = state.now?.status || '';
+  const live = state.now && state.now.state !== 'finished';
+  if (live && !state.nowTimer) {
+    state.nowTimer = setInterval(() => {
+      if (!state.now || state.now.state === 'finished') {
+        clearInterval(state.nowTimer);
+        state.nowTimer = null;
+        return;
+      }
+      line.textContent = nowLabel(state.now, Date.now());
+    }, 1000);
+  } else if (!live && state.nowTimer) {
+    clearInterval(state.nowTimer);
+    state.nowTimer = null;
+  }
+}
+
+function renderTree(plan, run, { approvals = [], verification = null } = {}) {
+  const tree = $('plan-tree');
+  if (!tree) return;
+  const nodes = stageNodes(plan, run, { approvals, verification });
+  if (!nodes.length) {
+    tree.innerHTML = '<li class="empty">لا تظهر شجرة الخطة إلا بعد بدء تشغيل.</li>';
+    return;
+  }
+  const MARKS = { done: '✓', current: '▶', pending: '○', skipped: '–', stopped: '✕' };
+  tree.innerHTML = '';
+  const summary = summarizeStepNodes(state.steps, run?.status ?? null);
+  for (const node of nodes) {
+    const item = document.createElement('li');
+    item.dataset.stage = node.id;
+    item.dataset.status = node.status;
+    const mark = document.createElement('span');
+    mark.className = 'mark';
+    mark.setAttribute('aria-hidden', 'true');
+    mark.textContent = MARKS[node.status] || '○';
+    const label = document.createElement('span');
+    label.className = 'label';
+    label.textContent = node.title;
+    let note = node.note;
+    if (node.id === 'execute_and_verify' && summary.total) {
+      const parts = [`${summary.total} خطوة`, `${summary.act} استدعاء أداة`];
+      if (summary.done) parts.push(`${summary.done} تم`);
+      if (summary.running) parts.push(`${summary.running} قيد التنفيذ`);
+      if (summary.failed) parts.push(`${summary.failed} فشل`);
+      if (summary.unknown) parts.push(`${summary.unknown} غير محسوم`);
+      if (summary.measuredMs) parts.push(`زمن الأدوات المُثبَت ${formatMs(summary.measuredMs)}`);
+      note = [note, parts.join(' · ')].filter(Boolean).join(' — ');
+    }
+    if (note) {
+      const small = document.createElement('small');
+      small.className = 'note';
+      small.textContent = note;
+      label.append(small);
+    }
+    const pill = document.createElement('span');
+    pill.className = `pill stage-${node.status}`;
+    pill.textContent = STAGE_NODE_LABELS[node.status] || node.status;
+    item.append(mark, label, pill);
+    tree.append(item);
+  }
+  if (plan?.transitions?.length) {
+    const item = document.createElement('li');
+    item.className = 'transitions';
+    item.dataset.status = 'info';
+    const mark = document.createElement('span');
+    mark.className = 'mark';
+    mark.setAttribute('aria-hidden', 'true');
+    mark.textContent = '↦';
+    const label = document.createElement('span');
+    label.className = 'label';
+    label.textContent = `انتقالات الخطة: ${plan.transitions.join(' → ')}`;
+    const pill = document.createElement('span');
+    pill.className = 'pill idle';
+    pill.textContent = plan.state || '—';
+    item.append(mark, label, pill);
+    tree.append(item);
+  }
+}
+
+function rememberStep(step) {
+  if (!step || typeof step.index !== 'number') return;
+  const position = state.steps.findIndex((item) => item.index === step.index);
+  if (position === -1) {
+    state.steps.push(step);
+    state.steps.sort((a, b) => a.index - b.index);
+  } else {
+    state.steps[position] = { ...state.steps[position], ...step };
+  }
+}
+
+function buildStepItem(step, position) {
   const item = document.createElement('li');
   item.dataset.index = String(step.index);
+  const node = stepNodeStatus(step, { runStatus: state.runStatus, isLast: position === state.steps.length - 1 });
+  item.dataset.node = node;
   const head = document.createElement('div');
   head.className = 'head';
   const title = document.createElement('b');
@@ -105,14 +246,60 @@ function renderStep(step) {
     summary.textContent = step.summary;
     item.append(summary);
   }
-  const existing = list.querySelector(`[data-index="${step.index}"]`);
-  if (existing) existing.replaceWith(item);
-  else list.append(item);
-  item.scrollIntoView({ block: 'nearest' });
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  const pill = document.createElement('span');
+  pill.className = `pill node-${node}`;
+  pill.textContent = STEP_NODE_LABELS[node] || node;
+  const time = document.createElement('span');
+  time.className = 'time';
+  const measured = typeof step.durationMs === 'number';
+  time.textContent = `الزمن: ${formatMs(step.durationMs)}`;
+  time.title = measured
+    ? `مُثبَت من استدعاء الأداة ${step.toolRunId || ''}`.trim()
+    : step.kind === 'act'
+      ? `لا مدة مُثبَتة بعد (حالة الاستدعاء: ${step.toolRunStatus || 'لم يبدأ'})`
+      : 'المخزن يسجّل وقت كتابة هذه الخطوة لا مدتها';
+  meta.append(pill, time);
+  if (step.toolName && step.kind !== 'act') {
+    const tool = document.createElement('span');
+    tool.textContent = `الأداة: ${step.toolName}`;
+    meta.append(tool);
+  }
+  item.append(meta);
+  return item;
+}
+
+function rerenderStepNodes() {
+  const list = $('steps');
+  if (!list || !state.steps.length) return;
+  list.innerHTML = '';
+  state.steps.forEach((step, position) => list.append(buildStepItem(step, position)));
+}
+
+function renderStep(step) {
+  const list = $('steps');
+  list.querySelector('.empty')?.remove();
+  rememberStep(step);
+  // عقدة الخطوة السابقة قد تتغير حالتها (لم تعد الأخيرة)، فتُعاد رسمها كلها — عددها محدود بسقف الخطوات.
+  rerenderStepNodes();
+  const item = list.querySelector(`[data-index="${step.index}"]`);
+  item?.scrollIntoView({ block: 'nearest' });
+}
+
+/* استدعاء أداة حُسم للتو: الخادم يرسل خطوة `act` السابقة بمدتها المُثبَتة؛ تُحدَّث عقدتها دون انتظار التفاصيل. */
+function applySettledStep(settledStep) {
+  if (!settledStep || typeof settledStep.index !== 'number') return;
+  rememberStep(settledStep);
+  rerenderStepNodes();
 }
 
 function emptySteps() {
+  state.steps = [];
   $('steps').innerHTML = '<li class="empty">لم تبدأ أي خطوة بعد.</li>';
+  renderTree(null, null);
+  renderNow(null);
+  setUsage({}, null);
 }
 
 const DECISION_LABELS = {
@@ -434,16 +621,23 @@ function resetGovernancePanels() {
 function handleEvent(event) {
   if (event.type === 'snapshot') {
     setRunState(event.run?.status);
-    setUsage(event.run?.usage);
+    setUsage(event.run?.usage, event.run?.limits || null);
     renderContract(event.goalContract || null);
     renderApprovals(event.approvals || [], event.run?.status, event.plan || null, event.outbox || []);
     renderOutbox(event.outbox || []);
     renderReconcile(event, event.run?.status);
     renderTruthPartition(event.truthPartition || null, event.toolRuns || []);
     renderEvidence(event.evidence || [], event.evidenceChain || null, event.verification || null);
+    state.steps = [];
     $('steps').innerHTML = '';
-    (event.steps || []).forEach(renderStep);
-    if (!(event.steps || []).length) emptySteps();
+    (event.steps || []).forEach(rememberStep);
+    if (state.steps.length) rerenderStepNodes();
+    else $('steps').innerHTML = '<li class="empty">لم تبدأ أي خطوة بعد.</li>';
+    state.plan = event.plan || null;
+    state.approvals = event.approvals || [];
+    state.verification = event.verification || null;
+    renderTree(event.plan || null, event.run || null, { approvals: event.approvals || [], verification: event.verification || null });
+    renderNow(event.now || null);
     return;
   }
   if (
@@ -459,17 +653,22 @@ function handleEvent(event) {
     return;
   }
   if (event.type === 'step') {
+    if (event.status) setRunState(event.status);
     renderStep(event.step);
+    applySettledStep(event.settledStep || null);
+    if (event.usage) setUsage(event.usage, event.limits || null);
+    if (event.now) renderNow(event.now);
+    renderTree(state.plan || null, { status: state.runStatus }, { approvals: state.approvals || [], verification: state.verification || null });
     return;
   }
   if (event.type === 'run.started' || event.type === 'run.created' || event.type === 'run.cancel_requested') {
     setRunState(event.run?.status);
-    setUsage(event.run?.usage);
+    setUsage(event.run?.usage, event.run?.limits || null);
     return;
   }
   if (event.type === 'run.finished') {
     setRunState(event.run?.status);
-    setUsage(event.run?.usage);
+    setUsage(event.run?.usage, event.run?.limits || null);
     if (event.run?.status === 'succeeded') {
       const delivery = $('delivery');
       const last = [...document.querySelectorAll('#steps .summary')].pop();
@@ -529,13 +728,24 @@ async function refreshDetail() {
   try {
     const detail = await api(`/api/agent/runs/${state.runId}`);
     setRunState(detail.run?.status);
-    setUsage(detail.run?.usage);
+    setUsage(detail.run?.usage, detail.run?.limits || null);
     renderContract(detail.goalContract || null);
     renderApprovals(detail.approvals || [], detail.run?.status, detail.plan || null, detail.outbox || []);
     renderOutbox(detail.outbox || []);
     renderReconcile(detail, detail.run?.status);
     renderTruthPartition(detail.truthPartition || null, detail.toolRuns || []);
     renderEvidence(detail.evidence || [], detail.evidenceChain || null, detail.verification || null);
+    // الخطوات في التفاصيل تحمل الأزمنة المُثبَتة (WP-1.1)؛ تحل محل ما وصل عبر البث.
+    state.plan = detail.plan || null;
+    state.approvals = detail.approvals || [];
+    state.verification = detail.verification || null;
+    if (Array.isArray(detail.steps) && detail.steps.length) {
+      state.steps = [];
+      detail.steps.forEach(rememberStep);
+      rerenderStepNodes();
+    }
+    renderTree(detail.plan || null, detail.run || null, { approvals: detail.approvals || [], verification: detail.verification || null });
+    renderNow(detail.now || null);
   } catch (error) {
     setAuthStatus(`تعذّر تحديث التفاصيل: ${error.message}`, 'bad');
   }
@@ -795,7 +1005,13 @@ $('run').addEventListener('click', async () => {
     state.runId = started.runId;
     state.lastClientMessageId = clientMessageId;
     $('delivery').hidden = true;
+    state.steps = [];
+    state.plan = null;
+    state.approvals = [];
+    state.verification = null;
     $('steps').innerHTML = '';
+    renderTree(null, null);
+    renderNow(null);
     resetGovernancePanels();
     setRunState(started.status);
     setAuthStatus(started.duplicate ? 'طلب مكرر: أُعيد نفس التشغيل دون تكرار.' : 'بدأ التشغيل.', 'ok');

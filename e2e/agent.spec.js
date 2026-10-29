@@ -79,3 +79,250 @@ test.describe('مساحة الوكيل وشبكة المعرفة (/agent, /kb) �
     }
   });
 });
+
+/**
+ * WP-1.2 (AGENT-008, DEC-047) — أثر التنفيذ: شجرة الخطة وسطر «الآن» وشريط الميزانية.
+ * خادم e2e يعمل بالوكيل متوقفًا (CELIA_AGENT_RUNTIME غير مضبوط)، فتُعترض مسارات /api/agent/** بأجسام مطابقة لعقد
+ * الخادم الحقيقي (نفس المفاتيح التي يختبرها test/agent-trace.test.js: `now`، `settledStep`، `toolRunStatus`،
+ * `run.limits`)؛ الهدف هنا هو منطق الصفحة الحقيقي في المتصفح الحقيقي، لا الحلقة نفسها.
+ */
+const T0 = Date.parse('2026-10-29T10:00:00.000Z');
+const at = (offsetMs) => new Date(T0 + offsetMs).toISOString();
+const LIMITS = { maxSteps: 12, maxCostMicros: 100000 };
+const STAGES = (flags) => [
+  { id: 'understand', title: '1. الفهم (Goal & Constraints)', completed: flags[0] },
+  { id: 'plan', title: '2. التخطيط (Steps, Tools, Risks, Criteria)', completed: flags[1] },
+  { id: 'present_and_wait', title: '3. العرض والانتظار (WAITING_FOR_APPROVAL: Approve / Edit / Reject)', completed: flags[2] },
+  { id: 'execute_and_verify', title: '4. التنفيذ والتحقق المستقل (Execute & Independently Verify)', completed: flags[3] }
+];
+const PLAN = (flags, state, transitions) => ({
+  version: 'plan-v1',
+  revision: 1,
+  state,
+  transitions,
+  stages: STAGES(flags),
+  objective: 'استخرج بيانات الفاتورة',
+  successCriteria: [],
+  constraints: [],
+  dependencies: [],
+  toolName: null,
+  risk: null,
+  payload: null,
+  pendingApprovalId: null,
+  outboxId: null,
+  outboxStatus: null,
+  editCount: 0,
+  verificationVerdict: null
+});
+const step = (index, kind, title, extra = {}) => ({
+  id: `s${index}`,
+  runId: 'run',
+  index,
+  kind,
+  title,
+  summary: extra.summary ?? null,
+  toolName: extra.toolName ?? null,
+  createdAt: at(100 * index),
+  startedAt: at(100 * index),
+  finishedAt: extra.finishedAt ?? null,
+  durationMs: extra.durationMs ?? null,
+  toolRunId: extra.toolRunId ?? null,
+  toolRunStatus: extra.toolRunStatus ?? null
+});
+const openSteps = [
+  step(1, 'decide', 'فهم الطلب', { summary: 'عقد الهدف جاهز' }),
+  step(2, 'act', 'kb.search', { toolName: 'kb.search', summary: 'بحث في شبكة المعرفة', toolRunId: 't1', toolRunStatus: 'started' })
+];
+const settledAct = { ...openSteps[1], finishedAt: at(242), durationMs: 42, toolRunStatus: 'succeeded' };
+const doneSteps = [
+  openSteps[0],
+  settledAct,
+  step(3, 'observe', 'kb.search ✓', { toolName: 'kb.search', summary: '{"hits":2}' }),
+  step(4, 'verify', 'تحقق مستقل', { summary: 'PASS' }),
+  step(5, 'deliver', 'تسليم', { summary: 'مسودة مخطط جاهزة من بيانات الفاتورة.' })
+];
+const runRecord = (id, status, usage, extra = {}) => ({
+  id,
+  threadId: 'thr-e2e',
+  ownerId: 'owner',
+  status,
+  planner: 'demo',
+  limits: LIMITS,
+  usage,
+  cancelRequested: false,
+  createdAt: at(0),
+  updatedAt: at(extra.updatedMs ?? 150),
+  finishedAt: extra.finishedAt ?? null,
+  lastError: null
+});
+const sse = (events) => events.map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join('');
+const baseDetail = (runId) => ({
+  goalContract: null,
+  approvals: [],
+  outbox: [],
+  evidence: [],
+  evidenceChain: { ok: true, count: 0 },
+  truthPartition: null,
+  verification: null,
+  toolRuns: [{ id: 't1', runId, stepId: 's2', toolName: 'kb.search', risk: 'read', status: 'started', outcome: null, createdAt: at(200), updatedAt: at(200), durationMs: null }]
+});
+const liveSnapshot = (runId) => ({
+  type: 'snapshot',
+  runId,
+  at: at(300),
+  run: runRecord(runId, 'running', { steps: 2, costMicros: 0, tokens: 0 }),
+  plan: PLAN([true, true, false, false], 'EXECUTING', ['PLAN_READY', 'EXECUTING']),
+  now: { state: 'executing_tool', status: 'running', stepId: 's2', stepIndex: 2, toolName: 'kb.search', since: at(200), elapsedMs: 100, totalMs: 300 },
+  steps: openSteps,
+  ...baseDetail(runId)
+});
+const finishedRun = runRecord('run-done', 'succeeded', { steps: 5, costMicros: 0, tokens: 0 }, { updatedMs: 4200, finishedAt: at(4200) });
+const finishedDetail = {
+  run: finishedRun,
+  plan: PLAN([true, true, false, true], 'EXECUTING', ['PLAN_READY', 'EXECUTING']),
+  now: { state: 'finished', status: 'succeeded', stepId: 's5', stepIndex: 5, toolName: null, since: at(4200), elapsedMs: null, totalMs: 4200, terminal: true },
+  steps: doneSteps,
+  ...baseDetail('run-done'),
+  verification: { seq: 3, verdict: 'PASS', at: at(400), hash: 'a'.repeat(64) },
+  toolRuns: [{ id: 't1', runId: 'run-done', stepId: 's2', toolName: 'kb.search', risk: 'read', status: 'succeeded', outcome: { hits: 2 }, createdAt: at(200), updatedAt: at(242), durationMs: 42 }]
+};
+const stepEvent = (index, extra = {}) => ({
+  type: 'step',
+  runId: 'run-done',
+  at: at(100 * index),
+  step: doneSteps[index - 1],
+  settledStep: extra.settledStep ?? null,
+  status: 'running',
+  usage: { steps: index, costMicros: 0, tokens: 0 },
+  limits: LIMITS,
+  now: extra.now
+});
+const doneStream = sse([
+  liveSnapshot('run-done'),
+  stepEvent(3, { settledStep: settledAct, now: { state: 'planning', status: 'running', stepId: 's3', stepIndex: 3, toolName: null, since: at(300), elapsedMs: 0, totalMs: 300 } }),
+  stepEvent(4, { now: { state: 'planning', status: 'running', stepId: 's4', stepIndex: 4, toolName: null, since: at(400), elapsedMs: 0, totalMs: 400 } }),
+  stepEvent(5, { now: { state: 'planning', status: 'running', stepId: 's5', stepIndex: 5, toolName: null, since: at(500), elapsedMs: 0, totalMs: 500 } }),
+  { type: 'run.finished', runId: 'run-done', at: at(4200), status: 'succeeded', run: finishedRun }
+]);
+
+async function mockAgentApi(page) {
+  let threadCreated = false;
+  let runsStarted = 0;
+  const json = (route, body, status = 200) =>
+    route.fulfill({ status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' }, body: JSON.stringify(body) });
+  await page.route('**/api/agent/**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const pathname = url.pathname;
+    const method = request.method();
+    if (pathname.endsWith('/api/agent/status')) {
+      return json(route, {
+        enabled: true,
+        mode: 'sqlite',
+        dialect: 'sqlite',
+        planner: 'demo',
+        verifier: 'rules-v1',
+        approvalGate: true,
+        connectors: [],
+        limits: LIMITS,
+        tools: [],
+        durable: true,
+        note: 'e2e: استجابات معترَضة بعقد الخادم الحقيقي'
+      });
+    }
+    if (pathname.endsWith('/api/agent/threads') && method === 'GET') {
+      return json(route, { threads: threadCreated ? [{ id: 'thr-e2e', title: 'مهمة جديدة', createdAt: at(0) }] : [] });
+    }
+    if (pathname.endsWith('/api/agent/threads') && method === 'POST') {
+      threadCreated = true;
+      return json(route, { thread: { id: 'thr-e2e', title: 'مهمة جديدة', createdAt: at(0) } }, 201);
+    }
+    if (pathname.endsWith('/threads/thr-e2e/runs') && method === 'POST') {
+      runsStarted += 1;
+      const runId = runsStarted === 1 ? 'run-live' : 'run-done';
+      return json(route, { runId, status: 'queued', duplicate: false, eventsUrl: `/api/agent/runs/${runId}/events` }, 202);
+    }
+    if (pathname.endsWith('/runs/run-live/events')) {
+      return route.fulfill({ status: 200, headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-store' }, body: sse([liveSnapshot('run-live')]) });
+    }
+    if (pathname.endsWith('/runs/run-done/events')) {
+      return route.fulfill({ status: 200, headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-store' }, body: doneStream });
+    }
+    if (pathname.endsWith('/runs/run-done')) {
+      return json(route, finishedDetail);
+    }
+    if (pathname.endsWith('/runs/run-live')) {
+      return json(route, { ...liveSnapshot('run-live'), type: undefined });
+    }
+    return json(route, { error: `unmocked ${method} ${pathname}` }, 500);
+  });
+}
+
+test.describe('أثر التنفيذ في /agent (WP-1.2): شجرة الخطة، سطر «الآن»، شريط الميزانية — من بيانات التشغيل فقط', () => {
+  test('حدث SSE يظهر خلال أقل من ثانية؛ العقد تعكس PLAN_READY→EXECUTING ثم الانتهاء؛ 320px بلا تمرير أفقي؛ بلا انتهاكات WCAG', async ({ page }, testInfo) => {
+    const { diagnostics, flush } = attachChromiumDiagnostics(page);
+    try {
+      await mockAgentApi(page);
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await page.goto(`${LIVE}/agent`, { waitUntil: 'networkidle' });
+      await expect(page.locator('#now-line')).toHaveText('لا تشغيل');
+      await expect(page.locator('#bar-steps')).toHaveAttribute('aria-valuenow', '0');
+
+      await page.fill('#token', TOKEN);
+      await page.click('#connect');
+      await expect(page.locator('#auth-status')).toContainText('متصل — الوكيل جاهز');
+      await expect(page.locator('#fact-steps')).toHaveText('12');
+
+      // التشغيل الأول: البث يصل بلقطة واحدة والأداة ما زالت تعمل — السطر «الآن» والعقدة «قيد التنفيذ» خلال < 1 ث.
+      await page.fill('#message', 'استخرج بيانات الفاتورة invoice-valid-1042.csv');
+      const clickedAt = Date.now();
+      await page.click('#run');
+      await expect(page.locator('#now-line')).toContainText('الآن: ينفّذ kb.search منذ', { timeout: 1000 });
+      expect(Date.now() - clickedAt).toBeLessThan(1000);
+      await expect(page.locator('#now-line')).toHaveAttribute('data-state', 'executing_tool');
+      const actNode = page.locator('#steps li[data-index="2"]');
+      await expect(actNode).toHaveAttribute('data-node', 'running');
+      await expect(actNode).toContainText('قيد التنفيذ');
+      await expect(actNode).toContainText('الزمن: —');
+      await expect(page.locator('#plan-tree li[data-stage="understand"]')).toHaveAttribute('data-status', 'done');
+      await expect(page.locator('#plan-tree li[data-stage="plan"]')).toHaveAttribute('data-status', 'done');
+      await expect(page.locator('#plan-tree li[data-stage="present_and_wait"]')).toHaveAttribute('data-status', 'current');
+      await expect(page.locator('#plan-tree li[data-stage="execute_and_verify"]')).toHaveAttribute('data-status', 'pending');
+      await expect(page.locator('#plan-tree li.transitions')).toContainText('PLAN_READY → EXECUTING');
+      await expect(page.locator('#bar-steps')).toHaveAttribute('aria-valuenow', '17'); // 2 / 12
+      await expect(page.locator('#limit-steps')).toHaveText('12');
+      await expect(page.locator('#limit-cost')).toHaveText('100000');
+      await expect(page.locator('#bar-cost')).toHaveAttribute('aria-valuenow', '0');
+
+      // التشغيل الثاني: البث يحمل خطوات لاحقة؛ خطوة act تُستكمل بمدتها المُثبَتة من settledStep، ثم الانتهاء بالتفاصيل.
+      await page.click('#run');
+      await expect(page.locator('#now-line')).toContainText('انتهى (نُفذ) — الإجمالي 4.2 ث', { timeout: 5000 });
+      await expect(page.locator('#now-line')).toHaveAttribute('data-state', 'finished');
+      await expect(page.locator('#run-state')).toHaveText('نُفذ');
+      const settledNode = page.locator('#steps li[data-index="2"]');
+      await expect(settledNode).toHaveAttribute('data-node', 'done');
+      await expect(settledNode).toContainText('الزمن: 42 ms');
+      await expect(page.locator('#steps li[data-index="5"]')).toHaveAttribute('data-node', 'done');
+      await expect(page.locator('#steps li[data-index="4"]')).toContainText('الزمن: —');
+      await expect(page.locator('#plan-tree li[data-stage="present_and_wait"]')).toHaveAttribute('data-status', 'skipped');
+      await expect(page.locator('#plan-tree li[data-stage="execute_and_verify"]')).toHaveAttribute('data-status', 'done');
+      await expect(page.locator('#plan-tree li[data-stage="execute_and_verify"]')).toContainText('زمن الأدوات المُثبَت 42 ms');
+      await expect(page.locator('#bar-steps')).toHaveAttribute('aria-valuenow', '42'); // 5 / 12
+      await expect(page.locator('#delivery')).toBeVisible();
+      await expect(page.locator('#verification-badge')).toContainText('PASS');
+
+      await expectNoA11yViolations(page);
+
+      await page.setViewportSize({ width: 320, height: 640 });
+      const overflow320 = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+      );
+      expect(overflow320).toBeLessThanOrEqual(1);
+      await expectNoA11yViolations(page);
+
+      expect(diagnostics, diagnostics.join('\n')).toEqual([]);
+    } finally {
+      await flush(testInfo);
+    }
+  });
+});

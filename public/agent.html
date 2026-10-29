@@ -95,11 +95,22 @@
         <h2 id="run-title">التشغيل</h2>
         <span id="run-state" class="pill idle">لا تشغيل</span>
       </div>
-      <div class="usage">
-        <span>خطوات: <b id="usage-steps">0</b></span>
-        <span>تكلفة: <b id="usage-cost">0</b> ⨯ 10⁻⁶ $</span>
-        <span>رموز: <b id="usage-tokens">0</b></span>
+      <p id="now-line" class="now" role="status" aria-live="polite" data-state="">لا تشغيل</p>
+      <div class="budget" aria-label="الميزانية">
+        <div class="bar">
+          <div class="bar-head"><span>خطوات</span><b><span id="usage-steps">0</span> / <span id="limit-steps">—</span></b></div>
+          <div id="bar-steps" class="bar-track" role="progressbar" aria-label="استهلاك سقف الخطوات" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="bar-fill"></span></div>
+        </div>
+        <div class="bar">
+          <div class="bar-head"><span>تكلفة (⨯ 10⁻⁶ $)</span><b><span id="usage-cost">0</span> / <span id="limit-cost">—</span></b></div>
+          <div id="bar-cost" class="bar-track" role="progressbar" aria-label="استهلاك سقف التكلفة" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="bar-fill"></span></div>
+        </div>
+        <span class="tokens">رموز: <b id="usage-tokens">0</b></span>
       </div>
+      <ol id="plan-tree" class="tree" aria-label="شجرة الخطة">
+        <li class="empty">لا تظهر شجرة الخطة إلا بعد بدء تشغيل.</li>
+      </ol>
+      <p class="hint tree-hint" id="steps-summary">خطوات التنفيذ تظهر أدناه مع زمن كل استدعاء أداة كما أثبته المخزن؛ «—» تعني أن لا قياس (قرار، تسليم، أو استدعاء لم يُحسم). التكلفة تُسجَّل على مستوى التشغيل لا لكل خطوة.</p>
       <ol id="steps" class="steps" aria-live="polite"></ol>
       <pre id="delivery" class="delivery" hidden></pre>
 

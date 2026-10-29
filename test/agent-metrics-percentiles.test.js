@@ -84,8 +84,12 @@ test('MET-03 computeAgentMetrics adds per-tool and per-run distributions without
     [{ id: 's1', createdAt: iso(0) }, { id: 's2', createdAt: iso(10) }],
     [{ id: 't1', stepId: 's2', status: 'succeeded', createdAt: iso(10), updatedAt: iso(25) }]
   );
-  assert.deepEqual(timed[0], { id: 's1', createdAt: iso(0), startedAt: iso(0), finishedAt: null, durationMs: null, toolRunId: null });
-  assert.deepEqual(timed[1], { id: 's2', createdAt: iso(10), startedAt: iso(10), finishedAt: iso(25), durationMs: 15, toolRunId: 't1' });
+  assert.deepEqual(timed[0], {
+    id: 's1', createdAt: iso(0), startedAt: iso(0), finishedAt: null, durationMs: null, toolRunId: null, toolRunStatus: null
+  });
+  assert.deepEqual(timed[1], {
+    id: 's2', createdAt: iso(10), startedAt: iso(10), finishedAt: iso(25), durationMs: 15, toolRunId: 't1', toolRunStatus: 'succeeded'
+  });
 });
 
 test('MET-04 end to end: a real run on SQLite under a fake clock yields exact tool durations in detail() and metrics()', async (t) => {
