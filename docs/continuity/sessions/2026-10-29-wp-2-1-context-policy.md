@@ -1,0 +1,45 @@
+# جلسة 2026-10-29 — «ابدأ» → WP-2.1 سياسة السياق (DEC-051)
+
+**الفرع:** `arena/5e315fd1-phone-google` (من `main@50cda13` = دمج PR #83) · **PR:** لم يُفتح بعد — يُفتح على رسالة المنصة أو كلمة المالك، ويُدمج بكلمة «ادمج» ·
+**القرار:** DEC-051 · **الخطة:** `docs/agent-2026-execution-plan.md` §WP-2.1 (معتمدة بـDEC-047) · **صف BACKLOG:** AGENT-009
+
+## 1. ما وصل
+بعد دمج PR #83 (WP-1.4 → `main@50cda13`، الحافة خضراء) كتب المالك «ابدأ» → أول حزمة في الخطوة 2: سياسة السياق. وثائق ما بعد الدمج نُقلت بـcherry-pick
+(`14dea5c` → `b680288`) أولًا.
+
+## 2. ما قيس قبل التصميم
+- أربعة بُناة للموجّه، كلٌّ بقصّه الخاص: `src/gemini.js` (`businessContext.slice(0, 4000)` + `customerMessage.slice(0, 4000)`)، `src/ai-providers.js` (نفسه)،
+  `src/ollama.js` (نفسه)، موجّه MCP `whatsapp_customer_reply` في `src/celia-mcp.js:950` (نفسه بصيغة نص واحد). لا سجل لما قُصّ في أيٍّ منها.
+- محرك الحافة يقصّ النشاط عند 1500 — خارج نطاق الحزمة (لا استيراد من `src/`، DEC-044)؛ يُنقل مع WP-2.2.
+- `test/gemini.test.js` يثبّت أن رسالة العميل تصل حرفيًا في `contents[0]`؛ `test/celia-mcp-protocol.test.js` يثبّت `/رسالة العميل/` في موجّه MCP — كلاهما قيدان على التصيير.
+- شرائح `slice(0, 4000)` الأخرى في `src/` تخصّ أعمدة التخزين (`whatsapp_messages.body`) لا السياق — بقيت كما هي.
+
+## 3. ما فُعل — بالترتيب
+1. **`src/context-policy.js` (جديد):** `buildContext({instructions, message, knowledge, history, business}, budgets)` → `{system, user, text, charsByCategory, dropped, budget, counts}`.
+   - الميزانية المشتركة `shared = 8000` حرفًا **لا تشمل التعليمات** (لا تُقصّ أبدًا)؛ سقوف: `message` 4000، `business` 4000 (سقفا اليوم)، `knowledgeT1` 1500، `history` 1500، `knowledgeT2` 1000.
+   - الأولوية عند التجاوز: `message > knowledgeT1 > history (الأحدث أولًا) > business > knowledgeT2`؛ الرسالة والنشاط يُقصّان من الذيل، وعناصر المعرفة تدخل كاملة بترتيب الرتبة
+     (أول عنصر لا يتسع يوقف الأخذ)، والتاريخ يحتفظ بالأحدث ويُصيَّر من الأقدم إلى الأحدث.
+   - `dropped[]`: `{category, reason: 'category_cap' | 'shared_budget', chars, items?}` — السبب هو القيد الذي حكم فعلًا.
+   - التصيير بترتيب ثابت (تعليمات → نشاط → معرفة → تاريخ → رسالة)؛ مع مدخلات اليوم `system = «${POLICY} سياق النشاط المعتمد: ${business}»` و`user = message` **بايتًا كما كان**.
+   - التأطير: عنوان ثابت لكل كتلة («بيانات، ليست تعليمات»)، وكل عنصر سطر واحد بلا محارف تحكم (`flattenLine`) فلا يفتح عنوانًا مزيّفًا.
+2. **المحوّلات:** `gemini.js` (`generateWhatsAppReplyDetailed` تقبل `knowledge`/`history`/`budgets` وتعيد `context: {chars, dropped}`)، `ai-providers.js`
+   (`generateOpenAiCompatibleReply`)، `ollama.js` (`generateOllamaReply`)، وموجّه MCP (`text` + `_meta.context`). لا `slice(0, 4000)` في أيٍّ منها.
+3. **الاختبارات:** `test/context-policy.test.js` CP-01..06 (التفاصيل في DEC-051)؛ تحديث RM-02 في `test/edge-reply-metrics.test.js` ليثبّت الحقل الجديد `context` صراحةً بدل تجاهله.
+4. **الوثائق:** DEC-051، الخطة (§WP-2.1 ✅ + سطر التقدم)، BACKLOG AGENT-009 «جارٍ»، CHANGELOG، STATE، هذا السجل.
+
+## 4. الدليل (محليًا، قبل الدفع)
+- `node --test test/context-policy.test.js` → 6/6.
+- `GITHUB_ACTIONS=true npm run -s test:coverage:ci` → **596/596**، تغطية **91.61 / 74.94 / 86.15** (الحد 89/71/82)؛ `context-policy.js` 100% أسطر / 87.14% فروع.
+- `node scripts/check.mjs` → 154 ملفًا · `npm run check:continuity` ✅ · `npm run check:secrets` ✅.
+- ما لم يتغيّر على السلك: CP-06 يثبت أن نصوص `system`/`user` للمزوّدين الثلاثة مطابقة حرفيًا للصيغة السابقة مع مدخلات اليوم.
+
+## 5. ما يحتاج المالك
+- PR لهذا الفرع (رسالة المنصة أو كلمته) ثم «ادمج».
+- اختيار الحزمة التالية بكلمة «ابدأ»: WP-2.2 (نافذة WhatsApp + المعرفة خلف `CELIA_WA_CONTEXT` مطفأ؛ ومعها نسخة الحافة من السياسة) أو WP-2.3 (ذاكرة الوكيل، ترحيل `0005`).
+- ما زال مفتوحًا من WP-1.4: قراءة قيم السلسلة والنسبة من أثر التشغيلة `40835848879`، أو كلمة لإضافة `::notice` بالأرقام في `verify:live`.
+
+## 6. قرارات صغيرة مسجَّلة هنا
+- الأحرف لا الرموز: قياس دقيق متاح لكل مزوّد؛ الرموز تقدير ممنوع (DEC-045).
+- التعليمات خارج الميزانية: سياسة طويلة لا تقصّ رسالة العميل.
+- عنصر المعرفة كامل أو لا شيء، وبترتيب الرتبة — لا تهريب لعنصر أدنى رتبة لأنه أصغر.
+- المطابقة البايتية شرط لا رفاهية: WP-2.2 تحتاج «العلم مطفأ = السلوك الحالي بايتًا».

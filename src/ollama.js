@@ -1,4 +1,5 @@
 import { DEFAULT_POLICY, generateWhatsAppReplyDetailed } from './gemini.js';
+import { buildContext } from './context-policy.js';
 import { generateOpenAiCompatibleReply } from './ai-providers.js';
 import { generateLocalPolicyReply } from './policy.js';
 import { createServiceRegistry, safeError, UpstreamError } from './resilience.js';
@@ -57,6 +58,9 @@ export async function generateOllamaReply({
   model = 'qwen2.5:7b',
   businessContext = '',
   customerMessage,
+  knowledge = [],
+  history = [],
+  budgets,
   allowRemote = false,
   timeoutMs = 8000,
   signal
@@ -65,7 +69,8 @@ export async function generateOllamaReply({
     throw new Error('customerMessage is required');
   }
   const origin = normalizeOllamaBaseUrl(baseUrl, allowRemote);
-  const systemText = `${DEFAULT_POLICY}${businessContext ? ` سياق النشاط المعتمد: ${String(businessContext).slice(0, 4000)}` : ''}`;
+  // WP-2.1 (DEC-051): the context policy decides what the local model sees, same as the cloud providers.
+  const context = buildContext({ instructions: DEFAULT_POLICY, business: businessContext, message: customerMessage, knowledge, history }, budgets);
   const response = await fetch(`${origin}/api/chat`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -75,8 +80,8 @@ export async function generateOllamaReply({
       stream: false,
       options: { temperature: 0.2, num_predict: 180 },
       messages: [
-        { role: 'system', content: systemText },
-        { role: 'user', content: customerMessage.slice(0, 4000) }
+        { role: 'system', content: context.system },
+        { role: 'user', content: context.user }
       ]
     })
   });

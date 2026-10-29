@@ -125,7 +125,7 @@ test('RM-02 generateEdgeAiReply reports the facts with every reply: Gemini stop 
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => new Response(geminiBody('رد مقصوص', 'MAX_TOKENS'), { status: 200 });
   try {
-    const detailed = await generateWhatsAppReplyDetailed({ config: { gemini: { apiKey: 'k', model: 'gemini-test', businessContext: '' } }, customerMessage: 'مرحبا' });
+    const { context, ...detailed } = await generateWhatsAppReplyDetailed({ config: { gemini: { apiKey: 'k', model: 'gemini-test', businessContext: '' } }, customerMessage: 'مرحبا' });
     assert.deepEqual(detailed, {
       text: 'رد مقصوص',
       finishReason: 'MAX_TOKENS',
@@ -135,6 +135,10 @@ test('RM-02 generateEdgeAiReply reports the facts with every reply: Gemini stop 
       sentChars: 8,
       maxOutputTokens: GEMINI_MAX_OUTPUT_TOKENS
     });
+    // WP-2.1: the context policy's report rides along with the truncation facts (nothing dropped for a 5-char message).
+    assert.deepEqual(context.dropped, []);
+    assert.equal(context.chars.message, 5);
+    assert.equal(context.chars.total, context.chars.instructions + 5);
     assert.equal(GEMINI_MAX_OUTPUT_TOKENS, 180);
   } finally {
     globalThis.fetch = originalFetch;

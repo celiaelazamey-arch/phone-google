@@ -1,4 +1,5 @@
 import { DEFAULT_POLICY } from './gemini.js';
+import { buildContext } from './context-policy.js';
 import { UpstreamError } from './resilience.js';
 
 const PLACEHOLDER_RE = /^replace-with-/i;
@@ -240,6 +241,9 @@ export async function generateOpenAiCompatibleReply({
   model,
   businessContext = '',
   customerMessage,
+  knowledge = [],
+  history = [],
+  budgets,
   timeoutMs = 20_000,
   signal
 }) {
@@ -249,7 +253,8 @@ export async function generateOpenAiCompatibleReply({
   }
   const cleanBase = normalizeHttpsApiUrl(baseUrl, baseUrl, `${serviceName.toUpperCase()}_BASE_URL`);
   const endpoint = `${cleanBase}/chat/completions`;
-  const systemText = `${DEFAULT_POLICY}${businessContext ? ` سياق النشاط المعتمد: ${String(businessContext).slice(0, 4000)}` : ''}`;
+  // WP-2.1 (DEC-051): one context policy for every provider — no per-adapter slicing.
+  const context = buildContext({ instructions: DEFAULT_POLICY, business: businessContext, message: customerMessage, knowledge, history }, budgets);
 
   const response = await fetch(endpoint, {
     method: 'POST',
@@ -264,8 +269,8 @@ export async function generateOpenAiCompatibleReply({
       max_tokens: 180,
       stream: false,
       messages: [
-        { role: 'system', content: systemText },
-        { role: 'user', content: String(customerMessage).slice(0, 4000) }
+        { role: 'system', content: context.system },
+        { role: 'user', content: context.user }
       ]
     })
   });

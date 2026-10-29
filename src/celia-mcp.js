@@ -16,6 +16,7 @@ import { createOperations, mountOperations } from './operations.js';
 import { SERVER_INFO } from './version.js';
 import { installShutdown } from './lifecycle.js';
 import { DEFAULT_POLICY } from './gemini.js';
+import { buildContext } from './context-policy.js';
 import { loadExtendedIntegrationsConfig } from './ai-providers.js';
 import { createCeliaUiRouter } from './celia-ui.js';
 import { createAgentHost, scheduleBootRecovery } from './agent/index.js';
@@ -947,8 +948,12 @@ export function createCeliaMcpHandler({ pool, config, services = createServiceRe
           if (params?.name !== 'whatsapp_customer_reply') {
             return { jsonrpc: '2.0', id: id ?? null, error: { code: -32602, message: 'Unknown prompt' } };
           }
-          const msg = String(params?.arguments?.customerMessage || '').slice(0, 4000);
-          const ctx = String(params?.arguments?.businessContext || config.gemini.businessContext || '').slice(0, 4000);
+          // WP-2.1 (DEC-051): the MCP prompt is rendered by the same context policy as the live providers.
+          const promptContext = buildContext({
+            instructions: DEFAULT_POLICY,
+            business: String(params?.arguments?.businessContext || config.gemini.businessContext || ''),
+            message: String(params?.arguments?.customerMessage || '')
+          });
           result = {
             description: 'رد خدمة عملاء آمن وموجز',
             messages: [
@@ -956,10 +961,11 @@ export function createCeliaMcpHandler({ pool, config, services = createServiceRe
                 role: 'user',
                 content: {
                   type: 'text',
-                  text: `${DEFAULT_POLICY}${ctx ? `\nسياق النشاط المعتمد: ${ctx}` : ''}\nرسالة العميل: ${msg}`
+                  text: promptContext.text
                 }
               }
-            ]
+            ],
+            _meta: { context: { chars: promptContext.charsByCategory.total, dropped: promptContext.dropped } }
           };
           break;
         }
