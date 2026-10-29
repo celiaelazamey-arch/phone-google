@@ -39,6 +39,9 @@
   القراءة ويحدّث §2 بتاريخ؛ (ب) كلمة فتح PR لهذا الفرع («افتح PR») ثم «ادمج».
 - **«تم» الثانية (2026-10-29 03:47 UTC) غير منعكسة:** `--verify` ×2 + القراءة الخام (`rulesets` 0، `protected:false`، Dependabot معطّل، لا CodeQL)
   — لا تغيير في أي حالة؛ لا `VERIFIED`. المطلوب: ناتج `--verify` من جهاز المالك (بعد `gh auth status` بحسابه) أو لقطة الإعدادات (سجل الجلسة §6).
+- **مسار بلا طرفية (أُضيف لأن المالك يلصق الأوامر بدل ناتجها):** `docs/github/ruleset-main-quality-gate.json` → Settings → Rules → New ruleset ▾ →
+  **Import a ruleset** → Create؛ ثم `settings/security_analysis` → Enable ×5. SPA-08 يُبقي الملف مطابقًا لجسم `--apply`؛ الفحوص مثبّتة على
+  GitHub Actions (`integration_id` 15368). 572/572.
 
 ## الطلب السابق — «نفّذ الستة» (DEC-044 حيًّا، DEC-045، OPS-007، SEC-006) — **منجز ومدمج (PR #75 → `main@8ce7ded`، PR #76 → `main@f223648`)**
 

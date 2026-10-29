@@ -44,3 +44,15 @@
   لا `dynamic/github-code-scanning/codeql` بين 12 workflow. **أي: «تم» الثانية غير منعكسة في الواجهة أيضًا** — لم تُغيَّر أي حالة (DEC-045).
 - تشغيل الأوامر من بيئة الوكيل بعد الطلب أعاد `forbidden ×5` بنص السبب؛ السبب المرجّح لعدم الانعكاس: الأوامر لم تُشغَّل من جهاز المالك
   بـ`gh auth login` بحسابه (أو شُغّلت وفشلت ولم يُقرأ ناتجها). طُلب من المالك ناتج `--verify` من جهازه أو لقطة Settings → Rules / Advanced Security.
+
+## 7. مسار بلا طرفية + تثبيت الفحوص على GitHub Actions (إلحاق DEC-046)
+
+- المالك أعاد لصق `gh auth status` / `--verify` مرة ثالثة بدل ناتجهما؛ تنفيذهما من بيئة الوكيل يعطي الهوية `celiaelazamey-arch (GH_TOKEN)`
+  والقراءة نفسها (3 `NOT ENABLED`، 2 `UNKNOWN`). الاستنتاج العملي: المالك على الأرجح بلا طرفية (هاتف/متصفح) فبُني مسار لا يحتاجها.
+- **`docs/github/ruleset-main-quality-gate.json`**: الـruleset بصيغة الاستيراد التي تقبلها GitHub (`name/target/source_type/enforcement/conditions/rules/bypass_actors`
+  — الصيغة نفسها في `github/ruleset-recipes`)؛ يولّده `npm run -s security:posture -- --ruleset-json`، و**SPA-08** يُفشل CI إن اختلف بايتًا عن جسم `--apply`.
+- **`integration_id: 15368`** على كل فحص مطلوب: قُرئ حيًّا من `GET /apps/github-actions` (id 15368) ومن check-runs آخر التزام (`360663d`) حيث
+  التطبيق الوحيد المبلّغ عن السياقات الست هو `github-actions` — فلا يستطيع تطبيق آخر إرضاء البوابة. SPA-02 يثبته.
+- الوثيقة §2: فقرة «المسار بلا طرفية» بالروابط المباشرة (`settings/rules`، `settings/security_analysis`) والبديل اليدوي إن فشل الاستيراد.
+- البوابات: 572/572، تغطية 91.25/73.83/85.63؛ `check` 147؛ `check:secrets` ✅؛ `check:continuity` ✅. لم يُطبَّق شيء على GitHub (403 كما قبل)
+  ولم تتغير أي حالة في §2.

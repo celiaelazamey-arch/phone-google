@@ -6,7 +6,9 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  GITHUB_ACTIONS_APP_ID,
   REQUIRED_CHECK_CONTEXTS,
+  RULESET_IMPORT_FILE,
   RULESET_NAME,
   apply,
   classifyApply,
@@ -15,6 +17,8 @@ import {
   main,
   plan,
   qualityJobContexts,
+  rulesetBody,
+  rulesetImportJson,
   verify
 } from '../scripts/security-posture-apply.mjs';
 
@@ -60,7 +64,7 @@ const positiveReads = {
     body: [
       { type: 'deletion' },
       { type: 'non_fast_forward' },
-      { type: 'required_status_checks', parameters: { strict_required_status_checks_policy: false, required_status_checks: REQUIRED_CHECK_CONTEXTS.map((context) => ({ context })) } }
+      { type: 'required_status_checks', parameters: { strict_required_status_checks_policy: false, required_status_checks: REQUIRED_CHECK_CONTEXTS.map((context) => ({ context, integration_id: 15368 })) } }
     ]
   },
   [`GET ${R}/dependabot/alerts`]: { status: 200, body: [] },
@@ -100,6 +104,7 @@ test('SPA-02 the plan is a readable ruleset plus three security toggles — no r
   const checks = ruleset.body.rules[2].parameters;
   assert.equal(checks.strict_required_status_checks_policy, false);
   assert.deepEqual(checks.required_status_checks.map((entry) => entry.context), [...REQUIRED_CHECK_CONTEXTS]);
+  assert.ok(checks.required_status_checks.every((entry) => entry.integration_id === GITHUB_ACTIONS_APP_ID), 'every required check is pinned to the GitHub Actions app (15368) so no other app can satisfy it');
 
   assert.deepEqual(steps[1], { control: 'dependabot_alerts', method: 'PUT', path: `${R}/vulnerability-alerts`, body: null, success: [204] });
   assert.deepEqual(steps[2], { control: 'dependabot_security_updates', method: 'PUT', path: `${R}/automated-security-fixes`, body: null, success: [204] });
@@ -208,4 +213,18 @@ test('SPA-07 the posture document and package.json point at this script, and the
   const pkg = JSON.parse(read('package.json'));
   assert.equal(pkg.scripts['security:posture'], 'node scripts/security-posture-apply.mjs');
   assert.ok(!/\|\s*ENABLED\s*\|/.test(doc));
+});
+
+test('SPA-08 the committed importable ruleset (browser path: Settings → Rules → Import a ruleset) is byte-identical to what --apply would POST', async () => {
+  const committed = read(RULESET_IMPORT_FILE);
+  assert.equal(committed, rulesetImportJson(), `${RULESET_IMPORT_FILE} is stale — regenerate with: npm run -s security:posture -- --ruleset-json > ${RULESET_IMPORT_FILE}`);
+  const parsed = JSON.parse(committed);
+  assert.equal(parsed.source_type, 'Repository');
+  const { source_type: _ignored, ...withoutSource } = parsed;
+  assert.deepEqual(withoutSource, JSON.parse(JSON.stringify(rulesetBody())));
+  assert.equal(parsed.enforcement, 'active');
+  assert.deepEqual(parsed.bypass_actors, []);
+  assert.ok(!parsed.rules.some((rule) => rule.type === 'pull_request' || rule.type === 'required_linear_history'));
+  assert.equal(await main({ argv: ['--ruleset-json'] }), 0);
+  assert.match(read('docs/security-posture.md'), /Import a ruleset/);
 });

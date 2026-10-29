@@ -1035,3 +1035,8 @@
   (`forbidden`) لا يُلفّ بعلامة ✓.
 - **الأثر:** 571/571 اختبارًا (SPA-01..SPA-07)، `npm run security:posture`، `docs/security-posture.md` §2 يصف الخطة والفروق عن السكربت
   الخارجي ويعدّل التوصية (لا linear history). الحالات في §2 تبقى كما قرأتها DEC-045 حتى يشغّل المالك `--apply` ثم `--verify`.
+- **إلحاق (2026-10-29، الجلسة نفسها):** (أ) الفحوص المطلوبة مثبّتة على تطبيق GitHub Actions (`integration_id: 15368` — قُرئ من
+  `GET /apps/github-actions`، وهو التطبيق الوحيد الذي يبلّغ هذه السياقات على آخر التزام) فلا يُرضي الفحصَ تطبيقٌ آخر. (ب) **مسار بلا طرفية:**
+  `docs/github/ruleset-main-quality-gate.json` بصيغة الاستيراد (Settings → Rules → New ruleset ▾ → Import a ruleset)، يولّده `--ruleset-json`
+  ويُبقيه SPA-08 مطابقًا بايتًا لجسم `--apply` — لأن المالك أعاد لصق الأوامر مرتين بدل ناتجها، فالأرجح أنه بلا طرفية؛ بقية الضوابط
+  أزرار Enable في `settings/security_analysis`. (ج) «تم» الثانية (03:47 UTC) قُرئت ولم تنعكس — لا تغيير في أي حالة (سجل الجلسة §6).

@@ -5,6 +5,8 @@
  *   node scripts/security-posture-apply.mjs --plan            # print the exact API calls, no network
  *   node scripts/security-posture-apply.mjs --apply           # run them through `gh api` (needs an ADMIN token)
  *   node scripts/security-posture-apply.mjs --verify [--json] # read-only: what the API says today, in the three states
+ *   node scripts/security-posture-apply.mjs --ruleset-json    # the same ruleset as an importable file (Settings → Rules →
+ *                                                             # New ruleset → Import a ruleset) — the no-terminal path
  *
  * Why this exists: the controls below (branch ruleset on `main`, Dependabot alerts + security updates, CodeQL default
  * setup, secret scanning + push protection) can only be changed with repository-administration permission. The
@@ -34,6 +36,10 @@ export const REPOSITORY = 'celiaelazamey-arch/phone-google';
 export const QUALITY_WORKFLOW = '.github/workflows/celia-mcp.yml';
 export const RULESET_NAME = 'main — quality gate (Celia)';
 export const CODEQL_DYNAMIC_WORKFLOW = 'dynamic/github-code-scanning/codeql';
+/** GitHub Actions' app id (`GET /apps/github-actions` → 15368). Pinning it means only Actions can satisfy a required check. */
+export const GITHUB_ACTIONS_APP_ID = 15368;
+/** Importable copy of the ruleset, committed so the owner can apply it from a browser; SPA-08 keeps it equal to rulesetBody(). */
+export const RULESET_IMPORT_FILE = 'docs/github/ruleset-main-quality-gate.json';
 
 /**
  * The quality jobs every pull request must pass before merging into `main`. Matrix jobs are listed per leg, with the
@@ -87,11 +93,17 @@ export function rulesetBody({ contexts = REQUIRED_CHECK_CONTEXTS } = {}) {
         parameters: {
           strict_required_status_checks_policy: false,
           do_not_enforce_on_create: false,
-          required_status_checks: contexts.map((context) => ({ context }))
+          required_status_checks: contexts.map((context) => ({ context, integration_id: GITHUB_ACTIONS_APP_ID }))
         }
       }
     ]
   };
+}
+
+/** The ruleset in GitHub's import/export shape (what Settings → Rules → New ruleset → Import a ruleset accepts). */
+export function rulesetImportJson({ contexts = REQUIRED_CHECK_CONTEXTS } = {}) {
+  const body = rulesetBody({ contexts });
+  return `${JSON.stringify({ name: body.name, target: body.target, source_type: 'Repository', enforcement: body.enforcement, conditions: body.conditions, rules: body.rules, bypass_actors: body.bypass_actors }, null, 2)}\n`;
 }
 
 /** The exact calls, in order. Pure: nothing here touches the network. */
@@ -243,6 +255,10 @@ export async function main({ argv = process.argv.slice(2), log = console.log, ru
       return 1;
     }
     log('All controls applied. Run --verify to read them back.');
+    return 0;
+  }
+  if (argv.includes('--ruleset-json')) {
+    process.stdout.write(rulesetImportJson());
     return 0;
   }
   if (argv.includes('--verify')) {

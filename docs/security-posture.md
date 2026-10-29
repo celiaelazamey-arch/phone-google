@@ -70,6 +70,17 @@ check باسم `CI / build` غير موجود هنا فكان سيقفل كل د
 الوكيل أيضًا؛ في الطوارئ يعطّل المالك الـruleset من Settings → Rules → Rulesets → Enforcement: Disabled). ثم تنبيهات Dependabot +
 التحديثات الأمنية، وCodeQL بالإعداد الافتراضي، وSecret scanning + Push protection. لماذا ruleset لا حماية كلاسيكية: قواعد الـruleset
 تُقرأ بلا صلاحية إدارة (`GET /rules/branches/main`) فيستطيع الوكيل التحقق من أسماء الفحوص المطلوبة نفسها؛ تفاصيل الحماية الكلاسيكية 403.
+الفحوص المطلوبة مثبّتة على تطبيق GitHub Actions (`integration_id: 15368` — هو التطبيق الوحيد الذي يبلّغ هذه السياقات في المستودع)
+فلا يستطيع تطبيق آخر «إرضاء» الفحص.
+
+**المسار بلا طرفية (متصفح فقط — يصلح من الهاتف):** الملف **`docs/github/ruleset-main-quality-gate.json`** هو الـruleset نفسه بصيغة
+الاستيراد التي تقبلها GitHub (الاختبار SPA-08 يُبقيه مطابقًا بايتًا لما يرسله `--apply`؛ يُولَّد بـ`npm run -s security:posture -- --ruleset-json`).
+1. حمّل الملف إلى جهازك (زر **Download raw file** في صفحة الملف على GitHub).
+2. `https://github.com/celiaelazamey-arch/phone-google/settings/rules` → القائمة **New ruleset ▾** → **Import a ruleset** → اختر الملف →
+   راجع ثم **Create**. (إن فشل الاستيراد: **New branch ruleset** يدويًا كما في صف الجدول أدناه.)
+3. `https://github.com/celiaelazamey-arch/phone-google/settings/security_analysis` → **Enable** لكلٍّ من: Dependabot alerts، Dependabot security
+   updates، Code scanning → **Set up → Default**، Secret scanning، Push protection.
+4. قل «تم» → يعيد الوكيل `--verify` ويحدّث الجدول بتاريخ لما قُرئ إيجابيًا فقط.
 
 | الضابط | الحالة | لماذا يهم | خطوات التفعيل (Settings في GitHub) |
 |---|---|---|---|
@@ -109,7 +120,8 @@ grep -h "uses:" .github/workflows/*.yml | sort | uniq -c   # قائمة الإج
 npm run security:posture -- --plan
 npm run security:posture -- --apply
 npm run security:posture -- --verify            # exit 0 = كل الضوابط VERIFIED، 2 = شيء ما ليس كذلك
-node --test test/security-posture-apply.test.js # SPA-01..SPA-07
+npm run -s security:posture -- --ruleset-json > docs/github/ruleset-main-quality-gate.json   # ملف الاستيراد (مسار المتصفح)
+node --test test/security-posture-apply.test.js # SPA-01..SPA-08
 
 # نفس القراءات يدويًا (403 = لا قراءة، لا استنتاج)
 R=repos/celiaelazamey-arch/phone-google
