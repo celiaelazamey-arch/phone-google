@@ -8,7 +8,8 @@
 
 **آخر مراجعة:** 29 أكتوبر 2026 · **نوع الجلسة الحالية:** **ما بعد دمج PR #77 ثم إرجاعه بـPR #78 (DEC-046 مُرجَع، SEC-006) — وثائق فقط** — على الفرع
 `arena/b698a028-phone-google` (مدموج فيه `main@17862f2` = إرجاع #77 بيد المالك 2026-10-29T04:02Z؛ PR الوثائق **#79** مفتوح بكلمة المالك، لم يُدمج) ·
-سجل الجلسة الحالي: [2026-10-29-security-controls-apply-script](sessions/2026-10-29-security-controls-apply-script.md) ·
+سجل الجلسة الحالي: [2026-10-29-architecture-critique-2026](sessions/2026-10-29-architecture-critique-2026.md) ·
+سجل ضوابط المالك (DEC-046 مُرجَع): [2026-10-29-security-controls-apply-script](sessions/2026-10-29-security-controls-apply-script.md) ·
 سجل «نفّذ الستة» (DEC-044 حيًّا، DEC-045): [2026-10-29-execute-six-deploy-fix-live](sessions/2026-10-29-execute-six-deploy-fix-live.md) ·
 سجل دمج #74 وتشخيص الفشل: [2026-10-29-merge-74-and-edge-deploy-fix](sessions/2026-10-29-merge-74-and-edge-deploy-fix.md) ·
 سجل SEC-006 + LEARN-001 (DEC-043): [2026-10-29-security-posture-and-video-record](sessions/2026-10-29-security-posture-and-video-record.md) ·
@@ -24,7 +25,15 @@
 [docs/computer-use.md](../computer-use.md) · حوكمة المشكلات: [docs/issue-triage.md](../issue-triage.md) ·
 واقع الخدمات: [docs/service-reality.md](../service-reality.md) · خطة المحافظة: [docs/preservation-plan.md](../preservation-plan.md)
 
-## الطلب الحالي — سكربت خارجي لتفعيل ضوابط الأمان + إعلان «دستور/شخصية» (DEC-046، SEC-006) — **دُمج (PR #77 → `main@8aa4a15`) ثم أُرجع (PR #78 → `main@17862f2`) بيد المالك**
+## الطلب الحالي — نقد معماري بنّاء مقابل معايير وكلاء 2026 (وثيقة فقط)
+
+- **ما وصل:** برومبت «لجنة مراجعة معمارية» بأربعة محاور (الحلقة، الذاكرة، الواجهة/الأثر، الزمن/التكلفة) وجدول «ضعف × معيار × توصية» وخارطة 3 خطوات.
+- **ما فُعل:** [`docs/architecture-critique-2026.md`](../architecture-critique-2026.md) — 13 صفًا بدليل ملف/اختبار/قرار، تفصيل المحاور، خارطة طريق
+  (1 قياس + أثر مرئي + سمات → 2 ذاكرة موصولة → 3 مخطط مزوّدي بإعادة تخطيط محكومة = AI-002)، «ما لا يجب فعله»، وقرارات المالك. بلا كود،
+  بلا صفوف BACKLOG جديدة، بلا «مثل Manus». سجل الجلسة: [2026-10-29-architecture-critique-2026](sessions/2026-10-29-architecture-critique-2026.md).
+- **بانتظار المالك:** أي خطوة من الخارطة تبدأ بكلمته (الأولى بلا مزوّد جديد)؛ وأسئلة الجلسة السابقة (إرجاع #77؟ دمج #79؟ إعادة تشغيل الحافة).
+
+## الطلب السابق — سكربت خارجي لتفعيل ضوابط الأمان + إعلان «دستور/شخصية» (DEC-046، SEC-006) — **دُمج (PR #77 → `main@8aa4a15`) ثم أُرجع (PR #78 → `main@17862f2`) بيد المالك**
 
 - **ما وصل:** تحليل خارجي يقترح سكربت bash (`gh api`) يفعّل Branch protection / Dependabot / CodeQL / Secret scanning ويطلب من المالك تشغيله.
 - **ما فُعل:** (1) جرّب الوكيل الاستدعاءات الخمسة بنفسه → **403 ×5** (رمز تكامل بهوية المالك بلا صلاحية إدارة) — لا تغيير حدث؛
