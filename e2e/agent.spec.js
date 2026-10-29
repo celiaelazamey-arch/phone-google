@@ -270,6 +270,30 @@ async function mockAgentApi(page) {
     if (pathname.endsWith('/runs/run-live')) {
       return json(route, { ...liveSnapshot('run-live'), type: undefined });
     }
+    // B2: قسم «الملفات الناتجة» يجلب artifacts بعد كل تحديث تفاصيل — التشغيل المنتهي
+    // يعرض ملفًا واحدًا برابط موقّع، وما عداه قائمة فارغة (المخزن مفعّل بلا نواتج).
+    if (method === 'GET' && /\/runs\/[^/]+\/artifacts$/.test(pathname)) {
+      if (pathname.includes('run-done')) {
+        return json(route, {
+          enabled: true,
+          urlTtlMs: 900000,
+          artifacts: [{
+            id: 'art-e2e-1',
+            runId: 'run-done',
+            name: 'report.html',
+            bytes: 2048,
+            sha256: 'a'.repeat(64),
+            createdAt: at(4200),
+            download: {
+              path: `/api/agent/artifacts/art-e2e-1/download?exp=99999999999999&sig=${'b'.repeat(64)}`,
+              exp: 99999999999999,
+              expiresAt: '2026-10-30T00:00:00.000Z'
+            }
+          }]
+        });
+      }
+      return json(route, { enabled: true, urlTtlMs: 900000, artifacts: [] });
+    }
     return json(route, { error: `unmocked ${method} ${pathname}` }, 500);
   });
 }
@@ -326,6 +350,14 @@ test.describe('أثر التنفيذ في /agent (WP-1.2): شجرة الخطة،
       await expect(page.locator('#bar-steps')).toHaveAttribute('aria-valuenow', '42'); // 5 / 12
       await expect(page.locator('#delivery')).toBeVisible();
       await expect(page.locator('#verification-badge')).toContainText('PASS');
+
+      // B2: الملف الناتج يظهر بزر تنزيل موقّع — البصمة المختصرة والرابط من بيانات التشغيل فقط.
+      await expect(page.locator('#artifacts-badge')).toHaveText('1');
+      await expect(page.locator('#artifacts li')).toContainText('report.html');
+      await expect(page.locator('#artifacts a')).toHaveAttribute(
+        'href',
+        /\/api\/agent\/artifacts\/art-e2e-1\/download\?exp=\d+&sig=[0-9a-f]{64}$/
+      );
 
       await expectNoA11yViolations(page);
 

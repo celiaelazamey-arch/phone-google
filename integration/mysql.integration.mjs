@@ -261,17 +261,19 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
       '0002_agent-runtime.sql',
       '0003_agent-governance.sql',
       '0004_agent-outbox.sql',
-      '0005_agent-memory.sql'
+      '0005_agent-memory.sql',
+      '0006_agent-artifacts.sql'
     ]);
 
     const second = await runMigrations({ connection: migrationConnection, directory, apply: true });
     assert.deepEqual(second.pending, [], 'a second apply is a no-op');
     const status = await runMigrations({ connection: migrationConnection, directory, statusOnly: true });
-    assert.equal(status.applied.length, 4);
+    assert.equal(status.applied.length, 5);
     assert.equal(status.applied[0].version, 2);
     assert.equal(status.applied[1].version, 3);
     assert.equal(status.applied[2].version, 4);
     assert.equal(status.applied[3].version, 5);
+    assert.equal(status.applied[4].version, 6);
   } finally {
     await migrationConnection.end();
   }
@@ -282,7 +284,7 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
       cwd: root,
       env: { ...process.env, ...mysqlEnv }
     });
-    assert.equal(JSON.parse(stdout).applied.length, 4);
+    assert.equal(JSON.parse(stdout).applied.length, 5);
   } catch (error) {
     throw new Error(`migrate CLI failed: ${String(error?.stderr || error?.message || '').slice(0, 600)}`);
   }
