@@ -1,13 +1,26 @@
 # الحالة الحالية — ابدأ من هنا
 
-**آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** **خطة المحافظة على `main@715060a` (DEC-031، OPS-005)** على الفرع
-`arena/828764c2-phone-google` (متفرع من دمج PR #46) · سجل الجلسة:
-[2026-10-28-preservation-plan](sessions/2026-10-28-preservation-plan.md) · السجل السابق:
+**آخر مراجعة:** 28 أكتوبر 2026 · **نوع الجلسة الحالية:** **فشل CI يسمّي نفسه (DEC-032، QA-006)** على الفرع
+`arena/afd3acff-phone-google` (متفرع من `main@fc4d60f` = دمج PR #48) · سجل الجلسة:
+[2026-10-28-ci-test-annotations](sessions/2026-10-28-ci-test-annotations.md) · السجلات السابقة:
+[2026-10-28-preservation-plan](sessions/2026-10-28-preservation-plan.md) ·
 [2026-10-28-service-reality-audit](sessions/2026-10-28-service-reality-audit.md) ·
 الخطة: [docs/preservation-plan.md](../preservation-plan.md) · واقع الخدمات: [docs/service-reality.md](../service-reality.md) ·
 المرجع التشغيلي: [deploy/free-always-on/README.md](../../deploy/free-always-on/README.md)
 
-## الطلب الحالي (أعلى أولوية) — «خطط للمحافظة لما وصلنا له حتى الآن» (DEC-031، OPS-005)
+## الطلب الحالي — «نفّذ»: مُبلِّغ annotations لاختبارات CI (DEC-032، QA-006)
+
+- **لماذا:** فشلان أعميان في يوم واحد على commits خضراء في كل مكان آخر — ساق Node 24 في run `40662071493` ثم
+  `Publish verified release` run `40665130469` على `main@fc4d60f` (نفس الـSHA الذي نجح فيه Quality؛ `npm audit` نظيف محليًا؛
+  `npm test` ×3 تحت Node 24.22.1 محليًا 326/326). الـannotation الوحيدة «exit code 1»، والسجلات لا تُقرأ من هنا.
+- **ما نُفِّذ:** `scripts/test-reporter-gha.mjs` (مُبلِّغ ثانٍ إلى جانب `spec`: `::error title=<اسم الاختبار>` بالملف والسطر
+  والرسالة لكل فشل، `::error` لكل عتبة تغطية، سطر ختامي بالأعداد والتغطية وكل الفاشلين، جدول Step Summary؛ نص عادي خارج
+  Actions)؛ `npm run test:ci` / `test:coverage:ci` في `celia-mcp.yml` و`release.yml` و`pages.yml`؛ اختبار يمنع العودة إلى
+  `npm test` أعمى؛ تدقيق الواقع يضيف `failing` إلى annotation الحزمة offline. اختبارات 336/336 على Node 22 و24 محليًا.
+- **الدليل المنتظر:** أول run `Celia quality & resilience` على هذا الفرع → notice `node --test` على الساقين (يُسجَّل هنا).
+- **لم يُفتح PR** (الطلب «نفّذ» على الفرع)؛ الدمج/الـPR عند طلب صريح.
+
+## الطلب السابق — «خطط للمحافظة لما وصلنا له حتى الآن» (DEC-031، OPS-005) — مدموج في PR #47 و#48
 
 - **ما وصلنا إليه (مدموج في `main@715060a`):** 324/324 اختبارًا (تغطية 85.8/72/84)، MySQL حقيقي 11/11، Pages ✅ `40650636259`،
   Worker ✅ `40650636104` (`liveReady`، 18/18 + مفاتيح التقاعد)، Release ✅ `40650636330`، 10 خدمات متحققة / 4 متقاعدة في Git /
@@ -33,6 +46,8 @@
   المدقق صار يبلّغ «أقرب صوت مرئي» (حالة/خطأ كتابة/لم يُحدَّث) دون كشف القيمة.
 - **الخطوة التالية (المالك):** Settings → Secrets and variables → Actions → تبويب Secrets → Repository secrets →
   `CELIA_VOICE_ID` → Update → `AnsOWV53Mdx5fcIanRBB` → Update secret؛ ثم «تم» → run `[reality]` → عند ≥95% تحديث QA-005.
+- **مدموج:** PR #48 → `main@fc4d60f` (2026-10-28 09:33 UTC) بأمر المالك؛ بعده Edge/Quality/Pages/Render ✅ و`Publish verified
+  release` ❌ `40665130469` (تقلّب أعمى → DEC-032 أعلاه؛ v0.2.1 لم يتأثر، 5 أصول).
 
 ## الطلب السابق — «لا خدمة مجرد اسم أو موكب؛ خدمات حقيقية مختبرة ≥95%» (DEC-030، QA-005) — مدموج في PR #46
 
