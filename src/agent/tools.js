@@ -120,7 +120,7 @@ export function validateToolInput(tool, args) {
     }
     if ('mimeType' in args && args.mimeType !== null && args.mimeType !== undefined) {
       const normalizedMime = String(args.mimeType).trim().toLowerCase();
-      if (!['application/json', 'text/plain', 'text/markdown', 'text/csv'].includes(normalizedMime)) {
+      if (!['application/json', 'text/plain', 'text/markdown', 'text/csv', 'text/html'].includes(normalizedMime)) {
         return {
           ok: false,
           code: 'policy_violation_unsupported_mime_type',
@@ -292,6 +292,48 @@ export function knowledgeToolDefinitions({ kb, plannerSafe = false } = {}) {
   ];
 }
 
+/**
+ * M-B/B4 — عقد أداة تصدير Drive.
+ *
+ * داخل العقد القائم نفسه (external_effect + موافقة + outbox). حين يكون مخزن B2
+ * موصولًا يُضاف مسار `artifactId` وحده: مصدر واحد للبايتات، والموافقة تحدد
+ * المصدر تحديدًا. بلا مخزن يبقى العقد حرفيًا كما كان (محتوى مضمَّن فقط).
+ */
+function driveExportToolDefinition(artifacts = null) {
+  const artifactSource = Boolean(artifacts);
+  return {
+    name: 'google.drive_export_report',
+    description: artifactSource
+      ? 'رفع تقرير نصي إلى Google Drive (محتوى مضمَّن أو artifact مبصوم بالمعرّف) عبر outbox بعد موافقة صريحة ومنع التكرار'
+      : 'تصدير تقرير موثّق إلى Google Drive عبر outbox بعد موافقة صريحة ومنع التكرار',
+    risk: RISK.externalEffect,
+    requiresApproval: true,
+    connector: 'google.drive',
+    arguments: artifactSource
+      ? { title: 'string', content: 'string', mimeType: 'string', artifactId: 'string' }
+      : { title: 'string', content: 'string', mimeType: 'string' },
+    validate(args) {
+      const artifactId = args?.artifactId;
+      if (artifactId === undefined || artifactId === null || artifactId === '') {
+        return artifactId === ''
+          ? { ok: false, code: 'policy_violation_invalid_drive_artifact_id', message: 'artifactId must be a non-empty string' }
+          : { ok: true };
+      }
+      if (!artifactSource) {
+        return { ok: false, code: 'policy_violation_drive_artifact_unavailable', message: 'No artifact store is wired; only inline content can be exported' };
+      }
+      if (typeof artifactId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(artifactId.trim())) {
+        return { ok: false, code: 'policy_violation_invalid_drive_artifact_id', message: 'artifactId must be a 1..64 character artifact id' };
+      }
+      if (typeof args.content === 'string' && args.content.trim()) {
+        // مصدران لملف واحد: الموافقة لا تستطيع حسم أيهما يُرفع.
+        return { ok: false, code: 'policy_violation_drive_artifact_content_conflict', message: 'Send either content or artifactId, never both' };
+      }
+      return { ok: true };
+    }
+  };
+}
+
 export function defaultToolDefinitions({
   statusProvider,
   kb,
@@ -381,14 +423,7 @@ export function defaultToolDefinitions({
       connector: 'whatsapp.cloud',
       arguments: { phone: 'string', text: 'string' }
     },
-    {
-      name: 'google.drive_export_report',
-      description: 'تصدير تقرير موثّق إلى Google Drive عبر outbox بعد موافقة صريحة ومنع التكرار',
-      risk: RISK.externalEffect,
-      requiresApproval: true,
-      connector: 'google.drive',
-      arguments: { title: 'string', content: 'string', mimeType: 'string' }
-    },
+    driveExportToolDefinition(artifacts),
     // M-B/B1: أول «محوّل» جديد يُبنى داخل العقد القائم نفسه — التصنيف يتبع الضمانة لا الاسم:
     // مع منفّذ AGENT-003 (شبكة deny، جذر قراءة، غير جذري، workspace معزول يُدمَّر) التنفيذ
     // كتابة داخلية مسوّاة محليًا؛ بدونه يبقى التعريف الرافض القائم حرفيًا. لا host fallback أبدًا:
