@@ -65,5 +65,15 @@ npm run test:sandbox
 
 - **لا syscall audit شامل:** `strace`/`auditctl`/`bpftool` غير متاحة في بيئة التنفيذ الحالية. لذلك Evidence يثبت Probe الشبكة التي يملكها المنفذ، ولا يدّعي تسجيل كل syscall أو كل محاولة اكتشاف شبكي يمكن أن يجريها native code. الإنفاذ default-deny ما زال في network namespace.
 - هذا Backend يعتمد على namespaces/chroot/rlimits، وليس MicroVM. لا يثبت مقاومة kernel zero-day أو كل هروب ممكن؛ اختبار Escape هنا أساسي كما هو مطلوب، وليس ضمانًا أمنيًا مطلقًا.
-- لا egress allowlist بعد، ولا تفعيل لـShell/Git/ملفات المضيف/Computer Use. بقاء `sandbox.exec` مصنفًا `irreversible` و`requiresApproval` وبوابة الرفض الحالية مقصود حتى قرار ربط مستقل.
-- لا نشر ولا ترحيل إنتاج ولا ادعاء جاهزية عامة للوكيل أو جودة مزود حي. يلزم قرار مستقل قبل تشغيل هذا المنفذ من Runtime، مع multi-tenant quotas ومراجعة نشر واختبار بيئة الهدف.
+- لا egress allowlist بعد، ولا تفعيل لـShell/Git/ملفات المضيف/Computer Use. بدون التفعيل الصريح يبقى `sandbox.exec` هو التعريف الرافض القائم حرفيًا (`irreversible` + `requiresApproval` بلا `execute`).
+- لا نشر ولا ترحيل إنتاج ولا ادعاء جاهزية عامة للوكيل أو جودة مزود حي. الربط بالحلقة (B1 أدناه) خلف مفتاح بيئة افتراضيه `off`؛ يلزم قرار مستقل قبل تشغيله في بيئة الإنتاج، مع multi-tenant quotas ومراجعة نشر واختبار بيئة الهدف.
+
+## 6) الربط بالحلقة — B1 (`sandbox.exec` فعلي، 2026-10-29)
+
+- **التفعيل صريح وفاشل-مغلقًا:** `CELIA_AGENT_SANDBOX=exec` يبني المنفذ ويمرره إلى `defaultToolDefinitions({ sandbox })`. الافتراضي `off` يُبقي التعريف الرافض كما كان بايتًا ببايت، وأي قيمة أخرى تُفشل الإقلاع بـ`agent_sandbox_misconfigured`.
+- **المحوّل (`src/agent/tools.js`):** عند وجود المنفذ تصبح `sandbox.exec` بخطورة `internalWrite` مع `settledFailures: true` و`timeoutMs: 35000`؛ `execute` يستدعي `sandbox.run({ runId, code })`. أي حالة غير `succeeded` تُرفع بكود السبب الصريح — **لا host fallback أبدًا، ولا يُنفَّذ أي شيء على المضيف**.
+- **النتائج artifacts فقط:** المخرجات تُكتب داخل العزل إلى `/workspace/artifacts/` وتعود مبصومة `{id, runId, name, bytes, sha256, uri, expiresAt}`؛ لا stdout في الناتج، و`readArtifact` يتحقق من البصمة والحجم والصلاحية عند القراءة.
+- **الفشل المسوّى (`src/agent/runtime.js`):** أداة معلنة `settledFailures` يسجَّل فشلها `failed` قابلًا للقياس (لا `unknown` ولا مصالحة بشرية بلا داعٍ) وتستمر الحلقة؛ المُتحقِّق يحجب أي فشل غير مُستدرك (`verification_blocked`). الأدوات غير المعلنة بلا تغيير حرفي.
+- **السياسة:** سقف `workspaceBytes` رُفع إلى 256MiB (الافتراضي 8MiB بلا تغيير)؛ `CELIA_SANDBOX_ARTIFACT_ROOT` و`CELIA_SANDBOX_WORKSPACE_BYTES` و`CELIA_SANDBOX_CPU_SECONDS` و`CELIA_SANDBOX_WALL_MS` قابلة للضبط والقيم خارج الحدود تُفشل بناء السياسة.
+- **الإثبات:** `test/agent-sandbox-tool.test.js` — SBX-01..08 بلا شبكة، وSBX-09 تكامل حقيقي خلف `CELIA_SANDBOX_INTEGRATION=1`: مهمة «حلّل CSV واحسب» تمر كاملة (خطة → تنفيذ معزول → تحقق → تسليم) بمنفذ namespaces حقيقي، و`result.json` يُقرأ عبر `readArtifact` وسلسلة الأدلة سليمة.
+- **حد موثق:** المنفذ يقبل تشغيلة واحدة لكل `runId` (حجز `wx`)؛ استدعاء ثانٍ في نفس التشغيلة يفشل `sandbox_duplicate_run` — فاشل-مغلقًا، ورفع الحد قرار لاحق. كذلك allowlist أدوات المخطِّط الحي قراءات فقط، فلا يستطيع مزود حي استدعاء `sandbox.exec` قبل قرار حوكمة مستقل (SBX-08).

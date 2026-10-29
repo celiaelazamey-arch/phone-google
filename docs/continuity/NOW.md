@@ -12,9 +12,9 @@
 ## 2. التركيز النشط وسجل الحالة ([STATE.md](STATE.md))
 
 - **آخر مراجعة مسجّلة:** 29 أكتوبر 2026
-- **الجلسة النشطة:** MANUS-A3 — `call_many` للقراءات المستقلة على `arena/718068f3-phone-google`؛ تنفيذ صف A3 من خطة «منافس مانوس»: إجراء `call_many` في `PROVIDER_PLAN_SCHEMA` (خاصية `calls` اختيارية تحفظ التوافق الخلفي حرفيًا) وفرع runtime بتحقق ذري على الدفعة كلها قبل بدء أي toolRun (`call_many_requires_read_tools`/`call_many_batch_too_large`/`unknown_tool`/`planner_tool_not_allowed`/كود المدخلات/`step_budget_exhausted` — صفر تنفيذ جزئي وصفر موافقات وصفر outbox)، إطلاق متوازٍ بسقف بنيوي ≤ 4 وتسوية بترتيب الدفعة، و`call_many_after_failure` يمنع الدفعة كوسيلة استعادة (الاستعادة حصرًا عبر مراجعة A2 — التركيب مثبت CM-07)؛ `test/agent-call-many.test.js` 12/12 ومعيار القبول مقاس: p50 لمهمة 5 قراءات انخفض 57.9% (428ms←180ms بطوابع WP-1.1)؛ التغطية 90.75/75.88/86.91؛ الفشل البيئي الوحيد (N/N-1) كما هو. سجل الجلسة: [2026-10-29-manus-a3-call-many](sessions/2026-10-29-manus-a3-call-many.md)
-- **آخر سجل جلسة مؤرَّخ:** [2026-10-29-manus-a3-call-many](sessions/2026-10-29-manus-a3-call-many.md)
-- **حجم [STATE.md](STATE.md) النشط:** 79 سطرًا (16813 بايت)
+- **الجلسة النشطة:** MANUS-B1 — `sandbox.exec` موصول بالحلقة (S4 / M-B) على `arena/94838d66-phone-google` (من `main@a2879dd` بعد دمج PR #89)؛ تنفيذ صف B1: محوّل فعلي في `defaultToolDefinitions({ sandbox })` يستدعي منفذ AGENT-003 (`sandbox.run`) خلف بوابة `CELIA_AGENT_SANDBOX=exec` حصرًا (الافتراضي `off` يُبقي التعريف الرافض حرفيًا والقيمة غير الصالحة تُفشل الإقلاع)، `settledFailures` يسجل فشل العزل `failed` مستقرًا يحجبه المُتحقِّق بلا أي host fallback، سقف workspace بالسياسة 256MiB (الافتراضي 8MiB بلا تغيير) ومفاتيح `CELIA_SANDBOX_*` للضبط، والنتائج artifacts مبصومة SHA-256 حصرًا؛ `test/agent-sandbox-tool.test.js` 9/9 (منها SBX-09 تكامل حقيقي كامل الحلقة: CSV→حساب→`result.json` عبر `readArtifact` وسلسلة أدلة سليمة) + Sandbox القائم 17/17 = 26/26؛ الحزمة 699 ناجحًا والتغطية 90.72/75.84/86.93؛ الفشل البيئي الوحيد (N/N-1) كما هو؛ PR #90 (A4) ما زال مفتوحًا بانتظار المالك. سجل الجلسة: [2026-10-29-manus-b1-sandbox-exec](sessions/2026-10-29-manus-b1-sandbox-exec.md)
+- **آخر سجل جلسة مؤرَّخ:** [2026-10-29-manus-b1-sandbox-exec](sessions/2026-10-29-manus-b1-sandbox-exec.md)
+- **حجم [STATE.md](STATE.md) النشط:** 81 سطرًا (18183 بايت)
 - **الأرشيف التاريخي المحفوظ بلا حذف:**
 - [STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md) — الأساس `9f6f8b2` · **983 سطرًا** محفوظًا حرفيًا (بصمة `f2674637e82e…`)
 

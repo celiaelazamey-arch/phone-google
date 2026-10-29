@@ -1112,7 +1112,11 @@ export function createAgentRuntime({
           );
         } catch (error) {
           const cancelled = error?.code === 'cancelled' || controller.signal.aborted;
-          const status = tool.risk === RISK.read ? TOOL_RUN_STATUS.failed : TOOL_RUN_STATUS.unknown;
+          // B1: أداة تعلن `settledFailures` (تنفيذ محلي معزول بلا أثر خارجي جزئي ممكن —
+          // مثل sandbox.exec فوق AGENT-003) فشلها مسوّى بالتعريف: يُسجَّل `failed` قابلًا
+          // للقياس لا `unknown`، لأن `unknown` مخصص لأثر خارجي لم يُحسم مصيره فعلًا.
+          const settledFailure = tool.risk === RISK.read || tool.settledFailures === true;
+          const status = settledFailure ? TOOL_RUN_STATUS.failed : TOOL_RUN_STATUS.unknown;
           const settledToolRun = await store.finishToolRun(toolRun.id, status, JSON.stringify({ error: error?.code || 'tool_failed' }));
           const toolEvidenceInput = {
             runId,
@@ -1142,9 +1146,11 @@ export function createAgentRuntime({
           if (cancelled) {
             return { run: await finish(runId, RUN_STATUS.cancelled), claimed: true };
           }
-          if (tool.risk !== RISK.read) {
+          if (!settledFailure) {
             return { run: await finish(runId, RUN_STATUS.needsReconciliation, { error: 'outcome_unknown' }), claimed: true };
           }
+          // فشل مسوّى (قراءة أو settledFailures): الحلقة تواصل ليقرر المخطط بصدق —
+          // ولا تسليم ناجحًا فوق فشل غير مستدرَك: المُتحقِّق المستقل يحجبه (goal_contract).
         }
         if (!decision.providerTrace) {
           await store.recordCost(runId, { costMicros: Number(decision.costMicros) || 0, tokens: Number(decision.tokens) || 0 });

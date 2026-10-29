@@ -299,7 +299,10 @@ export function defaultToolDefinitions({
   ledgerStore = null,
   plannerSafe = false,
   gmail = null,
-  googleReaders = {}
+  googleReaders = {},
+  // M-B/B1: منفّذ عزل AGENT-003 (createSandboxExecutor). الافتراض null يحفظ
+  // تعريف الرفض القائم حرفيًا — التفعيل قرار استضافة معلن لا سلوك ضمني.
+  sandbox = null
 } = {}) {
   return [
     {
@@ -377,13 +380,61 @@ export function defaultToolDefinitions({
       connector: 'google.drive',
       arguments: { title: 'string', content: 'string', mimeType: 'string' }
     },
-    {
-      name: 'sandbox.exec',
-      description: 'تنفيذ كود داخل حاوية معزولة — غير متاح قبل AGENT-003',
-      risk: RISK.irreversible,
-      requiresApproval: true,
-      arguments: { code: 'string' }
-    },
+    // M-B/B1: أول «محوّل» جديد يُبنى داخل العقد القائم نفسه — التصنيف يتبع الضمانة لا الاسم:
+    // مع منفّذ AGENT-003 (شبكة deny، جذر قراءة، غير جذري، workspace معزول يُدمَّر) التنفيذ
+    // كتابة داخلية مسوّاة محليًا؛ بدونه يبقى التعريف الرافض القائم حرفيًا. لا host fallback أبدًا:
+    // أي حالة غير `succeeded` من المنفّذ تُرفع بكودها الصريح ولا يُنفَّذ أي شيء على المضيف.
+    sandbox
+      ? {
+          name: 'sandbox.exec',
+          description: 'تنفيذ Node داخل عزل AGENT-003 (شبكة deny، جذر قراءة فقط، غير جذري)؛ النتائج تصدر حصرًا كـartifacts مبصومة SHA-256 في سلسلة الأدلة',
+          risk: RISK.internalWrite,
+          // فشل العزل مسوّى محليًا بالتعريف (لا أثر خارجي جزئي ممكن) — الحلقة تسجله
+          // `failed` قابلًا للقياس لا `unknown`، ولا تفتح مصالحة بشرية بلا داعٍ.
+          settledFailures: true,
+          timeoutMs: 35_000,
+          arguments: { code: 'string' },
+          async execute(args, { run } = {}) {
+            const outcome = await sandbox.run({ runId: String(run?.id || ''), code: String(args?.code ?? '') });
+            if (outcome.status !== 'succeeded') {
+              throw Object.assign(new Error(outcome.reason || 'sandbox_execution_failed'), {
+                code: outcome.reason || 'sandbox_execution_failed',
+                sandbox: {
+                  status: outcome.status,
+                  verdict: outcome.verdict,
+                  exitCode: outcome.exitCode ?? null,
+                  signal: outcome.signal ?? null,
+                  policyHash: outcome.policyHash
+                }
+              });
+            }
+            return {
+              sandboxId: outcome.sandboxId,
+              status: outcome.status,
+              verdict: outcome.verdict,
+              exitCode: outcome.exitCode ?? null,
+              policyHash: outcome.policyHash,
+              network: outcome.network,
+              outputTruncated: Boolean(outcome.outputTruncated),
+              artifacts: (outcome.artifacts || []).map((artifact) => ({
+                id: artifact.id,
+                runId: artifact.runId ?? null,
+                name: artifact.name,
+                bytes: artifact.bytes,
+                sha256: artifact.sha256,
+                uri: artifact.uri,
+                expiresAt: artifact.expiresAt ?? null
+              }))
+            };
+          }
+        }
+      : {
+          name: 'sandbox.exec',
+          description: 'تنفيذ كود داخل حاوية معزولة — غير متاح قبل AGENT-003',
+          risk: RISK.irreversible,
+          requiresApproval: true,
+          arguments: { code: 'string' }
+        },
     {
       name: 'product.catalog_audit',
       description: 'تحليل ملف/قائمة المنتجات واكتشاف الحقول الناقصة وصياغة وصف أولي للمراجعة قبل النشر',

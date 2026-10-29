@@ -88,7 +88,9 @@ export function createSandboxPolicy(overrides = {}) {
   integer(resources.maxProcesses, 'sandbox_processes', 4, 128);
   integer(resources.maxOpenFiles, 'sandbox_open_files', 16, 1_024);
   integer(resources.maxFileBytes, 'sandbox_file_bytes', 1_024, 16_777_216);
-  integer(resources.workspaceBytes, 'sandbox_workspace_bytes', 1_048_576, 67_108_864);
+  // M-B/B1: الحد الأقصى القابل للطلب رُفع إلى 256MiB — الافتراضي يبقى 8MiB،
+  // والرفع قرار تهيئة معلن لكل نشر (لا يغيّره المخطط ولا أي مستدعٍ وقت التشغيل).
+  integer(resources.workspaceBytes, 'sandbox_workspace_bytes', 1_048_576, 268_435_456);
   integer(resources.tmpBytes, 'sandbox_tmp_bytes', 1_048_576, 67_108_864);
   integer(resources.wallTimeoutMs, 'sandbox_wall_timeout', 100, 30_000);
   integer(resources.maxConcurrent, 'sandbox_concurrency', 1, 8);
