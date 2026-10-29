@@ -230,6 +230,13 @@ function requestFor(context, definitions, names, planSchema) {
       toolResults
     },
     memory,
+    // A4: عقد الميزانية للموجّه — من صف التشغيل الحقيقي حصرًا، لا تقدير.
+    budget: context.run
+      ? {
+          maxCostMicros: Number(context.run.limits?.maxCostMicros) || null,
+          usedCostMicros: Number(context.run.usage?.costMicros) || 0
+        }
+      : null,
     allowedTools: [...names],
     tools: definitions,
     planSchema
@@ -253,7 +260,9 @@ function usageOf(envelope) {
     outputTokens,
     totalTokens,
     costMicros: finiteNonNegative(usage.costMicros),
-    measured: Boolean(usage.measured)
+    measured: Boolean(usage.measured),
+    // A4: قرار الموجّه (الطبقة/السبب/التسعير المعلن) يمر إلى الأدلة كما هو.
+    ...(isObject(usage.router) ? { router: usage.router } : {})
   };
 }
 

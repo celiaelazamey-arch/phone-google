@@ -553,6 +553,52 @@ function renderEvidence(evidence = [], chain, verification) {
   }
 }
 
+// M-B/B2: الملفات الناتجة — القائمة تأتي من /runs/:id/artifacts مع رابط تنزيل
+// موقّع يُولَّد لحظة الطلب؛ الرابط نفسه هو التفويض (لا Bearer في نقرة التنزيل)،
+// والخادم يعيد حساب البصمة عند كل تنزيل فيرفض أي عبث بعد التسليم.
+async function refreshArtifacts() {
+  const badge = $('artifacts-badge');
+  const list = $('artifacts');
+  if (!badge || !list || !state.runId) return;
+  try {
+    const result = await api(`/api/agent/runs/${state.runId}/artifacts`);
+    const items = Array.isArray(result.artifacts) ? result.artifacts : [];
+    if (result.enabled === false) {
+      list.innerHTML = '<li class="empty">مخزن artifacts غير مفعّل على هذا الخادم (يتطلب CELIA_AGENT_SANDBOX=exec).</li>';
+      badge.textContent = 'معطل';
+      badge.className = 'pill idle';
+      return;
+    }
+    if (!items.length) {
+      list.innerHTML = '<li class="empty">لا ملفات ناتجة بعد.</li>';
+      badge.textContent = '0';
+      badge.className = 'pill idle';
+      return;
+    }
+    list.innerHTML = '';
+    for (const artifact of items) {
+      const item = document.createElement('li');
+      item.innerHTML = `
+        <div class="head"><b>${escapeHtml(artifact.name)}</b><span class="ok">مبصوم</span></div>
+        <div class="meta hash">sha256:${shortHash(artifact.sha256)} · ${Number(artifact.bytes)} بايت · ينتهي الرابط: ${escapeHtml(artifact.download?.expiresAt || '—')}</div>`;
+      const row = document.createElement('div');
+      row.className = 'meta';
+      const link = document.createElement('a');
+      link.href = artifact.download?.path || '#';
+      link.textContent = 'تنزيل (رابط موقّع، تحقق بالبصمة عند التسليم)';
+      link.setAttribute('download', artifact.name);
+      row.append(link);
+      item.append(row);
+      list.append(item);
+    }
+    badge.textContent = `${items.length}`;
+    badge.className = 'pill ok';
+  } catch (error) {
+    badge.textContent = 'تعذّر الجلب';
+    badge.className = 'pill warn';
+  }
+}
+
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -792,6 +838,8 @@ async function refreshDetail() {
     renderReconcile(detail, detail.run?.status);
     renderTruthPartition(detail.truthPartition || null, detail.toolRuns || []);
     renderEvidence(detail.evidence || [], detail.evidenceChain || null, detail.verification || null);
+    // B2: فشل جلب artifacts لا يُسقط تحديث التفاصيل — القسم يعلن تعذره بنفسه.
+    refreshArtifacts();
     // الخطوات في التفاصيل تحمل الأزمنة المُثبَتة (WP-1.1)؛ تحل محل ما وصل عبر البث.
     state.plan = detail.plan || null;
     state.approvals = detail.approvals || [];

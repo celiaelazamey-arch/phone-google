@@ -264,6 +264,24 @@ function mapThreadSummary(row) {
   };
 }
 
+// M-B/B2: published artifact registry row — identity, digest and location only;
+// payload bytes never pass through this store.
+function mapArtifact(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    runId: row.run_id,
+    ownerId: row.owner_id,
+    sandboxRunId: row.sandbox_run_id,
+    sourceArtifactId: row.source_artifact_id,
+    name: row.name,
+    bytes: Number(row.bytes),
+    sha256: row.sha256,
+    storagePath: row.storage_path,
+    createdAt: row.created_at
+  };
+}
+
 function mapOwnerFact(row) {
   if (!row) return null;
   return {
@@ -715,6 +733,33 @@ export function createAgentStore({ driver, clock = Date.now, idFactory = crypto.
     async verifyEvidenceChain(runId) {
       const rows = await driver.all('SELECT * FROM agent_evidence WHERE run_id = ? ORDER BY seq ASC', [runId]);
       return verifyChain(rows, { runId });
+    },
+    // ── M-B/B2: owner-facing published artifacts ───────────────────────────
+    async insertArtifact({ id, runId, ownerId, sandboxRunId, sourceArtifactId, name, bytes, sha256, storagePath }) {
+      const at = nowIso(clock);
+      await driver.run(
+        `INSERT INTO agent_artifacts
+           (id, run_id, owner_id, sandbox_run_id, source_artifact_id, name, bytes, sha256, storage_path, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, runId, ownerId, sandboxRunId, sourceArtifactId, name, bytes, sha256, storagePath, at]
+      );
+      return store.getArtifact(id);
+    },
+    async getArtifact(id) {
+      return mapArtifact(await driver.get('SELECT * FROM agent_artifacts WHERE id = ?', [id]));
+    },
+    async findArtifactBySource(runId, sourceArtifactId) {
+      return mapArtifact(await driver.get(
+        'SELECT * FROM agent_artifacts WHERE run_id = ? AND source_artifact_id = ?',
+        [runId, sourceArtifactId]
+      ));
+    },
+    async listArtifacts(runId) {
+      const rows = await driver.all(
+        'SELECT * FROM agent_artifacts WHERE run_id = ? ORDER BY created_at ASC, id ASC',
+        [runId]
+      );
+      return rows.map(mapArtifact);
     },
     // ── WP-2.3: owner-scoped deterministic memory ──────────────────────────
     async getThreadSummary(threadId, ownerId) {

@@ -11,6 +11,8 @@
  * are declared so the runtime can refuse them visibly instead of pretending.
  */
 
+import { renderTemplate } from './output-templates.js';
+
 export const RISK = Object.freeze({
   read: 'read',
   internalWrite: 'internal_write',
@@ -302,7 +304,14 @@ export function defaultToolDefinitions({
   googleReaders = {},
   // M-B/B1: منفّذ عزل AGENT-003 (createSandboxExecutor). الافتراض null يحفظ
   // تعريف الرفض القائم حرفيًا — التفعيل قرار استضافة معلن لا سلوك ضمني.
-  sandbox = null
+  sandbox = null,
+  // M-B/B2: مخزن artifacts المواجه للمالك (createArtifactStore). يتطلب المنفّذ
+  // نفسه لأن المحتوى يأتي حصرًا من readArtifact المتحقق بالبصمة؛ الافتراض null
+  // لا يضيف أداة artifact.create أصلًا — سطح الأدوات القائم يبقى كما هو حرفيًا.
+  artifacts = null,
+  // تفعيل الخيوط العنكبوتية: قارئ فهرس Celia Google Spider (createSpiderReader).
+  // قراءة محلية فقط وصفر شبكة؛ الافتراض null لا يضيف أدوات spider.* أصلًا.
+  spider = null
 } = {}) {
   return [
     {
@@ -435,6 +444,111 @@ export function defaultToolDefinitions({
           requiresApproval: true,
           arguments: { code: 'string' }
         },
+    // M-B/B2: نشر artifact من مخرجات العزل إلى مخزن المالك. موجودة فقط حين يتوفر
+    // المنفّذ والمخزن معًا — القراءة عبر readArtifact (تحقق SHA-256/حجم/صلاحية)
+    // ثم النشر يعيد التحقق ويبصم `artifact_published` في سلسلة الأدلة. فشلها
+    // مسوّى محليًا: لا بايت واحد يُنشر عند أي خلل، ولا أثر خارجي ممكن.
+    ...(sandbox && artifacts
+      ? [{
+          name: 'artifact.create',
+          description: 'نشر ملف ناتج من العزل إلى مخزن artifacts المالك برابط تنزيل موقّع منتهي الصلاحية وبصمة SHA-256 في سلسلة الأدلة',
+          risk: RISK.internalWrite,
+          settledFailures: true,
+          timeoutMs: 15_000,
+          arguments: { runId: 'string', id: 'string', name: 'string' },
+          async execute(args, { run } = {}) {
+            const source = await sandbox.readArtifact({
+              runId: String(args?.runId ?? ''),
+              id: String(args?.id ?? '')
+            });
+            const published = await artifacts.publish({
+              runId: String(run?.id || ''),
+              ownerId: String(run?.ownerId || 'owner'),
+              name: typeof args?.name === 'string' && args.name ? args.name : source.name,
+              content: source.content,
+              declared: {
+                sha256: source.sha256,
+                bytes: source.bytes,
+                name: source.name,
+                sourceArtifactId: source.id,
+                sandboxRunId: source.runId
+              }
+            });
+            return {
+              artifactId: published.record.id,
+              name: published.record.name,
+              bytes: published.record.bytes,
+              sha256: published.record.sha256,
+              replayed: published.replayed,
+              download: published.download
+            };
+          }
+        }]
+      : []),
+    // M-B/B3: قوالب مخرجات حتمية — التصيير دالة نقية على المضيف (لا تنفيذ كود،
+    // لا ساعة، لا شبكة)، والنشر عبر مخزن artifacts نفسه ببصمة SHA-256 في السلسلة.
+    // sourceArtifactId مشتق من بصمة المحتوى فتكون إعادة التصيير idempotent بقاعدة البيانات.
+    ...(artifacts
+      ? [{
+          name: 'template.render',
+          description: 'توليد مخرج حتمي من قالب معلن (markdown_report | csv_table | static_page) ونشره كـartifact مبصومًا برابط تنزيل موقّع',
+          risk: RISK.internalWrite,
+          settledFailures: true,
+          deterministic: true,
+          timeoutMs: 15_000,
+          arguments: { kind: 'string', spec: 'object', name: 'string' },
+          async execute(args, { run } = {}) {
+            const rendered = renderTemplate(String(args?.kind ?? ''), args?.spec);
+            const published = await artifacts.publish({
+              runId: String(run?.id || ''),
+              ownerId: String(run?.ownerId || 'owner'),
+              name: String(args?.name || ''),
+              content: rendered.content,
+              declared: {
+                sha256: rendered.sha256,
+                bytes: rendered.bytes,
+                name: String(args?.name || ''),
+                sourceArtifactId: `tpl-${rendered.sha256.slice(0, 40)}`,
+                sandboxRunId: `template:${String(run?.id || 'unbound')}`.slice(0, 64)
+              }
+            });
+            return {
+              artifactId: published.record.id,
+              kind: String(args?.kind ?? ''),
+              name: published.record.name,
+              bytes: published.record.bytes,
+              sha256: published.record.sha256,
+              replayed: published.replayed,
+              download: published.download
+            };
+          }
+        }]
+      : []),
+    // تفعيل الخيوط العنكبوتية: قراءتان حتميتان من فهرس العنكبوت المحلي — لا مزامنة،
+    // لا كتابة، لا شبكة. غياب الفهرس فشل قراءة مرمّز صريح لا نتيجة فارغة صامتة.
+    ...(spider
+      ? [{
+          name: 'spider.search_knowledge',
+          description: 'بحث معجمي (عربي/إنجليزي مطبَّع) في شبكة معرفة العنكبوت المحلية المبنية من Google Drive — قراءة فقط مع مقتطف ومصدر لكل نتيجة',
+          risk: RISK.read,
+          deterministic: true,
+          arguments: { query: 'string' },
+          async execute(args) {
+            const results = spider.search(String(args?.query ?? ''), 10);
+            return { query: String(args?.query ?? ''), count: results.length, results };
+          }
+        },
+        {
+          name: 'spider.graph_stats',
+          description: 'إحصاءات شبكة معرفة العنكبوت المحلية: مستندات ومصطلحات وروابط وحجم الفهرس وآخر مزامنة',
+          risk: RISK.read,
+          deterministic: true,
+          arguments: {},
+          async execute() {
+            return spider.stats();
+          }
+        }]
+      : []),
     {
       name: 'product.catalog_audit',
       description: 'تحليل ملف/قائمة المنتجات واكتشاف الحقول الناقصة وصياغة وصف أولي للمراجعة قبل النشر',
