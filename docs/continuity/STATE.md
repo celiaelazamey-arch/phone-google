@@ -6,8 +6,8 @@
 > والإصدار `40719074453` والجودة `40719074375`. المتبقي حصرًا لإجراء المالك: رابط استدعاء Google، وأسرار Meta الاختيارية.
 > انظر [سجل جلسة النشر الحي](sessions/2026-10-28-live-edge-publication.md). ما يلي توثيق الجلسة السابقة كما كُتب، محفوظ بلا حذف.
 
-**آخر مراجعة:** 29 أكتوبر 2026 · **نوع الجلسة الحالية:** **سكربت تفعيل ضوابط المالك (DEC-046، SEC-006)** — على الفرع `arena/74ff3f8d-phone-google`
-(نظيف من `main@f223648` = دمج PR #76؛ لا PR بعد — بكلمة المالك) ·
+**آخر مراجعة:** 29 أكتوبر 2026 · **نوع الجلسة الحالية:** **ما بعد دمج PR #77 (DEC-046، SEC-006) — وثائق فقط** — على الفرع `arena/b698a028-phone-google`
+(نظيف من `main@8aa4a15` = دمج PR #77 بيد المالك 2026-10-29T03:58Z؛ لا PR من هذا الفرع بعد — بكلمة المالك) ·
 سجل الجلسة الحالي: [2026-10-29-security-controls-apply-script](sessions/2026-10-29-security-controls-apply-script.md) ·
 سجل «نفّذ الستة» (DEC-044 حيًّا، DEC-045): [2026-10-29-execute-six-deploy-fix-live](sessions/2026-10-29-execute-six-deploy-fix-live.md) ·
 سجل دمج #74 وتشخيص الفشل: [2026-10-29-merge-74-and-edge-deploy-fix](sessions/2026-10-29-merge-74-and-edge-deploy-fix.md) ·
@@ -24,7 +24,7 @@
 [docs/computer-use.md](../computer-use.md) · حوكمة المشكلات: [docs/issue-triage.md](../issue-triage.md) ·
 واقع الخدمات: [docs/service-reality.md](../service-reality.md) · خطة المحافظة: [docs/preservation-plan.md](../preservation-plan.md)
 
-## الطلب الحالي — سكربت خارجي لتفعيل ضوابط الأمان + إعلان «دستور/شخصية» (DEC-046، SEC-006)
+## الطلب الحالي — سكربت خارجي لتفعيل ضوابط الأمان + إعلان «دستور/شخصية» (DEC-046، SEC-006) — **مدمج: PR #77 → `main@8aa4a15` (دمجه المالك بنفسه)**
 
 - **ما وصل:** تحليل خارجي يقترح سكربت bash (`gh api`) يفعّل Branch protection / Dependabot / CodeQL / Secret scanning ويطلب من المالك تشغيله.
 - **ما فُعل:** (1) جرّب الوكيل الاستدعاءات الخمسة بنفسه → **403 ×5** (رمز تكامل بهوية المالك بلا صلاحية إدارة) — لا تغيير حدث؛
@@ -42,6 +42,12 @@
 - **مسار بلا طرفية (أُضيف لأن المالك يلصق الأوامر بدل ناتجها):** `docs/github/ruleset-main-quality-gate.json` → Settings → Rules → New ruleset ▾ →
   **Import a ruleset** → Create؛ ثم `settings/security_analysis` → Enable ×5. SPA-08 يُبقي الملف مطابقًا لجسم `--apply`؛ الفحوص مثبّتة على
   GitHub Actions (`integration_id` 15368). 572/572.
+- **PR #77 → MERGED** `8aa4a15507e4098ef2ce4b23ecad86ee035ff37a` — فُتح بكلمة المالك («أجّل هذا — افتح PR») ودمجه **المالك بنفسه** 2026-10-29T03:58Z
+  (3 التزامات: `360663d`، `d3a6433`، `bc55cab`). تشغيلات `main` عليه كلها خضراء: الجودة `40815077219` ✅ · الحافة `40815077156` ✅ · Pages
+  `40815077161` ✅ · الإصدار `40815077164` ✅ · Render `40815150451` ✅ · الإشعار `40815150464` ✅ · التدقيق `40815077125` متخطّى (كالمعتاد).
+- **`--verify` بعد الدمج (من الفرع الجديد):** لم يتغير شيء — 3 `NOT ENABLED (2026-10-29)`، 2 `UNKNOWN`. **التفعيل ما زال بند المالك الوحيد:**
+  استيراد `docs/github/ruleset-main-quality-gate.json` (Settings → Rules → New ruleset ▾ → Import a ruleset) + Enable ×5 في
+  `settings/security_analysis`، ثم «تم» → تُعاد القراءة ويُحدَّث §2 بتاريخ لما قُرئ إيجابيًا فقط.
 
 ## الطلب السابق — «نفّذ الستة» (DEC-044 حيًّا، DEC-045، OPS-007، SEC-006) — **منجز ومدمج (PR #75 → `main@8ce7ded`، PR #76 → `main@f223648`)**
 
