@@ -43,6 +43,9 @@ export const EVIDENCE_KIND = Object.freeze({
   sandboxFinished: 'sandbox_finished',
   sandboxNetworkAttempt: 'sandbox_network_attempt',
   sandboxArtifact: 'sandbox_artifact',
+  // M-C/C1: one row per egress decision, allowed or blocked, with bytes and status.
+  // It attests to what the proxy enforced; it never carries headers or query strings.
+  egressRequest: 'egress_request',
   // M-B/B2: publication of a sandbox artifact into the owner-facing store.
   // The SHA-256 recorded here is what later download verification attests against.
   artifactPublished: 'artifact_published'
