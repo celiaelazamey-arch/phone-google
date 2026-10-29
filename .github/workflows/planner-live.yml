@@ -7,6 +7,8 @@ name: Planner live run (isolated)
 # Trigger: manual (Actions → "Planner live run (isolated)" → Run workflow) or a push whose commit message contains
 # "[planner-live]". The report contains counts, latencies and token totals only — never the key, a prompt body or a
 # raw provider response; `scripts/planner-live.mjs` sanitizes and then scans its own output for every secret value.
+# The probe allows 45s per decision (the provider default stays 20s) because the first live run, 40936215392 on
+# 4c6fe35, timed out twice at 20s; the wider bound separates "slow" from "broken" and the report records the bound used.
 
 on:
   workflow_dispatch:
@@ -20,9 +22,9 @@ on:
         type: string
         default: "3"
       timeout_ms:
-        description: "Per-decision provider timeout in ms"
+        description: "Per-decision provider timeout in ms (20s is the provider default; the probe allows 45s)"
         type: string
-        default: "20000"
+        default: "45000"
   push:
     branches: ["**"]
 
@@ -53,7 +55,7 @@ jobs:
           CELIA_AGENT_RUNTIME: sqlite
           CELIA_KB: "off"
           CELIA_DISABLE_OLLAMA: "true"
-          CELIA_AGENT_PLANNER_TIMEOUT_MS: ${{ inputs.timeout_ms || '20000' }}
+          CELIA_AGENT_PLANNER_TIMEOUT_MS: ${{ inputs.timeout_ms || '45000' }}
           PLANNER_LIVE_WALL_MS: "300000"
         run: |
           if [ -z "$GEMINI_API_KEY" ]; then
