@@ -87,3 +87,15 @@ npm run test:sandbox
 - **الواجهة:** `/agent` يعرض قسم «الملفات الناتجة» بزر تنزيل لكل artifact (الاسم، الحجم، البصمة، أجل الرابط)؛ القائمة خلف توكن `/api/agent/runs/:id/artifacts` وملكية التشغيل نفسها التي تحمي `detail`.
 - **الضبط:** `CELIA_ARTIFACT_STORE_ROOT` (افتراضي `.data/agent-artifact-store`)، `CELIA_ARTIFACT_SIGNING_KEY` (غيابه = مفتاح عشوائي لهذا الإقلاع، فالروابط تموت مع إعادة التشغيل عمدًا)، `CELIA_ARTIFACT_URL_TTL_MS` (افتراضي 15 دقيقة؛ خارج 1s..24h يُفشل الإقلاع)؛ مفتاح أقصر من 32 حرفًا → `artifact_signing_key_weak` عند البناء.
 - **الإثبات:** `test/agent-artifact-store.test.js` ART-01..08 بلا شبكة (منها ART-08 عبر HTTP حقيقي: تنزيل البايتات بالضبط، 401 بلا توقيع، 409 بعد عبث)، وART-09 خلف `CELIA_SANDBOX_INTEGRATION=1`: عزل namespaces حقيقي → نشر → تنزيل `{"total":5}` بايتًا ببايت وسلسلة الأدلة سليمة.
+
+## 8) قوالب المخرجات — B3 (`template.render`، 2026-10-29)
+
+- **`src/agent/output-templates.js`:** ثلاثة قوالب حتمية معلنة — `markdown_report` (تقرير HTML RTL)، `csv_table` (RFC 4180)، `static_page` (صفحة واحدة). دوال نقية: لا ساعة ولا عشوائية ولا شبكة، فنفس الـspec ينتج نفس البايتات دائمًا؛ كل مدخل يُهرَّب HTML وsubset الـMarkdown مغلق (عناوين/قوائم/عريض/كود — HTML خام لا يمر أبدًا)، والصفحات المولدة بلا أي مورد خارجي.
+- **الأداة `template.render`:** مشروطة بمخزن B2 (`internalWrite` + `settledFailures`)؛ التصيير على المضيف دالة نقية — ليس تنفيذ كود ولا يحتاج عزلًا — والنشر عبر نفس مسار B2 المبصوم؛ `sourceArtifactId` مشتق من بصمة المحتوى فإعادة التصيير idempotent بقاعدة البيانات.
+- **البوابة الذهبية:** `npm run eval:templates` — 3 مهام تمر الحلقة الحقيقية كاملة (خطة → تصيير → نشر → تحقق → تنزيل موقّع) وتُقارن ببصمات مثبتة حرفيًا في `data/eval/b3-templates/golden.json`؛ انحراف بايت واحد يُفشلها، وTPL-06 يحرسها في CI.
+
+## 9) الخيوط العنكبوتية — قارئ فهرس Celia Google Spider (2026-10-29)
+
+- **`src/agent/spider-reader.js`:** قراءة فقط وصفر شبكة — يفتح `knowledge.sqlite3` الذي يبنيه العنكبوت (`celia-google-spider/`) بوضع read-only ويعيد تنفيذ دلالات Python حرفيًا: تطبيع `text_utils.py` (NFKC، التشكيل، الألف/التاء المربوطة/الألف المقصورة، الأرقام الهندية)، ترتيب `store.search` والدرجة `matched*10+min(freq,90)` والمقتطف (نصف قطر 90) — مثبت بمرآة اختبارية على نفس المخطط (SPD-01/02).
+- **أداتان قراءة حتميتان:** `spider.search_knowledge` و`spider.graph_stats` — موجودتان فقط مع `CELIA_AGENT_SPIDER=read` (الافتراضي `off`؛ قيمة أخرى → `agent_spider_misconfigured` عند الإقلاع). مسار الفهرس: `CELIA_SPIDER_DB_PATH` أو `CELIA_SPIDER_DATA_DIR` أو `~/.celia_spider/knowledge.sqlite3`.
+- **فاشل-مغلقًا:** فهرس غائب = `spider_index_unavailable` عند الإقلاع — لا أدوات تدّعي شبكة معرفة غير موجودة، ولا «بحثت فلم أجد» بلا فهرس مفتوح. المزامنة نفسها تبقى حصرًا في أدوات العنكبوت الست المستقلة (MCP/stdio) بقرار المالك — هذا القارئ لا يزامن ولا يكتب.

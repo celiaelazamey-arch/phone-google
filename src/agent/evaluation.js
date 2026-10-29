@@ -545,6 +545,7 @@ export function computeAgentMetrics(runDetails = []) {
       averageDurationMs: 0,
       costPerCompletedTaskMicros: 0,
       humanReviewCount: 0,
+      cost: { totalCostMicros: 0, totalTokens: 0, runsWithCost: 0 },
       durations: { runs: summarizeDurations([]), tools: {}, unmeasuredToolRuns: 0 }
     };
   }
@@ -552,6 +553,10 @@ export function computeAgentMetrics(runDetails = []) {
   let succeededRuns = 0;
   let failedOrBlockedRuns = 0;
   let retryCount = 0;
+  // A4: التكلفة الكلية من صفوف التشغيل الفعلية (recordCost) — لكل الحالات لا الناجح فقط.
+  let totalCostMicros = 0;
+  let totalTokens = 0;
+  let runsWithCost = 0;
   let totalDurationMs = 0;
   let durationSamples = 0;
   let completedCostMicros = 0;
@@ -575,6 +580,11 @@ export function computeAgentMetrics(runDetails = []) {
     } else if (['failed', 'cancelled', 'budget_exhausted'].includes(run?.status)) {
       failedOrBlockedRuns += 1;
     }
+    const runCostMicros = Number(run?.usage?.costMicros ?? run?.costMicros ?? 0) || 0;
+    const runTokens = Number(run?.usage?.tokens ?? run?.tokens ?? 0) || 0;
+    if (runCostMicros > 0 || runTokens > 0) runsWithCost += 1;
+    totalCostMicros += runCostMicros;
+    totalTokens += runTokens;
 
     for (const entry of outbox) {
       const attempts = Number(entry?.attempts || 0);
@@ -630,6 +640,7 @@ export function computeAgentMetrics(runDetails = []) {
     costPerCompletedTaskMicros:
       succeededRuns > 0 ? Math.round(completedCostMicros / succeededRuns) : 0,
     humanReviewCount,
+    cost: { totalCostMicros, totalTokens, runsWithCost },
     durations: {
       runs: summarizeDurations(runDurations),
       tools: Object.fromEntries(

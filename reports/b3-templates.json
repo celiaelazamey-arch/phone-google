@@ -1,0 +1,60 @@
+{
+  "suite": "B3-TEMPLATES",
+  "generatedAt": "2026-10-29T21:53:08.743Z",
+  "totalTasks": 3,
+  "passedTasks": 3,
+  "pass": true,
+  "tasks": [
+    {
+      "id": "B3-G1",
+      "title": "تقرير Markdown→HTML",
+      "name": "weekly-report.html",
+      "kind": "markdown_report",
+      "runStatus": "succeeded",
+      "expectedSha256": "61d0f51870d7de5f9328e18984fecaaac26dff093e2781690bb951cf3e40cf25",
+      "downloadedSha256": "61d0f51870d7de5f9328e18984fecaaac26dff093e2781690bb951cf3e40cf25",
+      "checks": {
+        "runSucceeded": true,
+        "artifactListed": true,
+        "digestMatchesGolden": true,
+        "publishedInEvidence": true,
+        "evidenceChainOk": true
+      },
+      "pass": true
+    },
+    {
+      "id": "B3-G2",
+      "title": "جدول CSV",
+      "name": "products.csv",
+      "kind": "csv_table",
+      "runStatus": "succeeded",
+      "expectedSha256": "6d28f278bcc9747638051478fe82b7fbebb342343e85092a8dc46ba91d1d8526",
+      "downloadedSha256": "6d28f278bcc9747638051478fe82b7fbebb342343e85092a8dc46ba91d1d8526",
+      "checks": {
+        "runSucceeded": true,
+        "artifactListed": true,
+        "digestMatchesGolden": true,
+        "publishedInEvidence": true,
+        "evidenceChainOk": true
+      },
+      "pass": true
+    },
+    {
+      "id": "B3-G3",
+      "title": "صفحة ويب ثابتة واحدة",
+      "name": "launch.html",
+      "kind": "static_page",
+      "runStatus": "succeeded",
+      "expectedSha256": "12f8d3fd91ab44dec7a17aac87e7b05f41fb86d846cce921812cbf87355aec75",
+      "downloadedSha256": "12f8d3fd91ab44dec7a17aac87e7b05f41fb86d846cce921812cbf87355aec75",
+      "checks": {
+        "runSucceeded": true,
+        "artifactListed": true,
+        "digestMatchesGolden": true,
+        "publishedInEvidence": true,
+        "evidenceChainOk": true
+      },
+      "pass": true
+    }
+  ]
+}
