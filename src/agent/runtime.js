@@ -27,6 +27,7 @@ import {
   recommendTaskStrategy
 } from './evaluation.js';
 import { deriveNow, timeSteps } from './timing.js';
+import { buildMemoryFromSteps, normalizeMemoryKind } from './memory.js';
 
 export { PLAN_LIFECYCLE_STATE };
 
@@ -111,18 +112,31 @@ export function createAgentRuntime({
   }
 
   async function contextFor(run, signal) {
-    const [messages, steps, approvals, goalContract, outboxEntries] = await Promise.all([
+    const [messages, steps, approvals, goalContract, outboxEntries, memory] = await Promise.all([
       store.listMessages(run.threadId),
       store.listSteps(run.id),
       store.listApprovals(run.id),
       store.getGoalContract(run.id),
-      store.listOutbox(run.id)
+      store.listOutbox(run.id),
+      store.listMemory(run.ownerId, { threadId: run.threadId, summaryLimit: 1, factLimit: 20 })
     ]);
     const toolRuns = (await store.listToolRuns(run.id)).map((toolRun) => ({
       ...toolRun,
       parsedOutcome: parseOutcome(toolRun.outcome)
     }));
-    return { run, messages, steps, toolRuns, approvals, outbox: outboxEntries, goalContract, signal, limits: config };
+    return {
+      run,
+      messages,
+      steps,
+      toolRuns,
+      approvals,
+      outbox: outboxEntries,
+      goalContract,
+      signal,
+      limits: config,
+      memory,
+      context_memory: { summaries: true, facts: true }
+    };
   }
 
   function withTimeout(promise, controller, timeoutMs, signal) {
@@ -398,9 +412,34 @@ export function createAgentRuntime({
     return null;
   }
 
+  /** Persist deterministic long-term memory immediately before run.finished. */
+  async function updateMemory(run) {
+    const steps = await store.listSteps(run.id);
+    const next = buildMemoryFromSteps({ run, steps });
+    const summary = await store.saveThreadSummary({
+      threadId: run.threadId,
+      ownerId: run.ownerId,
+      sourceRunId: run.id,
+      summary: next.summary,
+      expiresAt: null
+    });
+    const facts = [];
+    for (const fact of next.facts) {
+      facts.push(await store.saveOwnerFact({
+        ownerId: run.ownerId,
+        sourceRunId: run.id,
+        tag: fact.tag,
+        value: fact.value,
+        expiresAt: null
+      }));
+    }
+    return { summaries: true, facts: true, summary, savedFacts: facts };
+  }
+
   async function finish(runId, status, { error = null } = {}) {
     const run = await store.finishRun(runId, status, { error });
-    emit(runId, { type: 'run.finished', status, run });
+    const memory = await updateMemory(run);
+    emit(runId, { type: 'run.finished', status, run, memory });
     return run;
   }
 
@@ -903,6 +942,27 @@ export function createAgentRuntime({
           recommendTaskStrategy({ taskType: 'external_site_or_tool_actions' })
         ]
       };
+    },
+    async memory(requesterId = ownerId, options = {}) {
+      return store.listMemory(requesterId, options);
+    },
+    async memoryItem(kind, id, requesterId = ownerId, options = {}) {
+      const normalized = normalizeMemoryKind(kind);
+      const memoryId = typeof id === 'string' ? id.trim() : '';
+      if (!normalized) throw httpError(400, 'invalid_memory_kind', 'invalid_memory_kind');
+      if (!memoryId || memoryId.length > 128) throw httpError(400, 'invalid_memory_id', 'invalid_memory_id');
+      const item = await store.getMemoryItem(normalized, memoryId, requesterId, options);
+      if (!item) throw httpError(404, 'memory_not_found', 'memory_not_found');
+      return item;
+    },
+    async deleteMemory(kind, id, requesterId = ownerId) {
+      const normalized = normalizeMemoryKind(kind);
+      const memoryId = typeof id === 'string' ? id.trim() : '';
+      if (!normalized) throw httpError(400, 'invalid_memory_kind', 'invalid_memory_kind');
+      if (!memoryId || memoryId.length > 128) throw httpError(400, 'invalid_memory_id', 'invalid_memory_id');
+      const result = await store.deleteMemory(normalized, memoryId, requesterId);
+      if (!result.deleted) throw httpError(404, result.reason || 'memory_not_found', result.reason || 'memory_not_found');
+      return result;
     },
     harness() {
       return inspectAgentHarness({

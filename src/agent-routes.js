@@ -61,6 +61,45 @@ export function createAgentRouter({ agent, authorize, logger = console }) {
     }
   });
 
+  // WP-2.3: owner-only, non-vector memory. Expired rows are hidden by default.
+  router.get('/memory', async (req, res) => {
+    const current = await runtime(res);
+    if (!current) return undefined;
+    try {
+      const queryKind = req.query.kind || req.query.type;
+      const queryId = req.query.id || req.query.memoryId;
+      if (queryId || queryKind) {
+        if (!queryId || !queryKind) return res.status(400).json({ error: 'memory_kind_and_id_required' });
+        const item = await current.memoryItem(queryKind, queryId, current.status().ownerId, {
+          includeExpired: req.query.includeExpired === 'true'
+        });
+        return res.set('Cache-Control', 'no-store').json(item);
+      }
+      const memory = await current.memory(current.status().ownerId, {
+        threadId: typeof req.query.threadId === 'string' && req.query.threadId ? req.query.threadId : null,
+        includeExpired: req.query.includeExpired === 'true'
+      });
+      return res.set('Cache-Control', 'no-store').json(memory);
+    } catch (error) {
+      return fail(res, error);
+    }
+  });
+
+  // DELETE /api/agent/memory accepts { kind: 'summary'|'fact', id } (or query
+  // parameters), and never falls back to an owner-independent lookup.
+  router.delete('/memory', json, async (req, res) => {
+    const current = await runtime(res);
+    if (!current) return undefined;
+    try {
+      const kind = req.body?.kind || req.body?.type || req.query.kind || req.query.type;
+      const id = req.body?.id || req.body?.memoryId || req.query.id || req.query.memoryId;
+      const result = await current.deleteMemory(kind, id, current.status().ownerId);
+      return res.set('Cache-Control', 'no-store').json(result);
+    } catch (error) {
+      return fail(res, error);
+    }
+  });
+
   router.post('/threads', json, async (req, res) => {
     const current = await runtime(res);
     if (!current) return undefined;

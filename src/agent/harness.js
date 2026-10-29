@@ -333,6 +333,7 @@ export function inspectAgentHarness({
   return {
     ok: Boolean(store && planner && tools && verifier),
     version: 'agent-harness-v1',
+    context_memory: { summaries: true, facts: true },
     lifecycle: HARNESS_LIFECYCLE_STAGES,
     lifecycleStages: HARNESS_LIFECYCLE_STAGES,
     planStates: Object.values(PLAN_LIFECYCLE_STATE),
@@ -375,9 +376,12 @@ export function inspectAgentHarness({
         title: 'Context & Memory',
         wired: Boolean(store?.dialect),
         dialect: store?.dialect || 'off',
+        summaries: true,
+        facts: true,
         guarantees: [
           'حفظ الخيوط والرسائل والتشغيلات والخطوات في MySQL أو SQLite صريح (لا ذاكرة مؤقتة صامتة)',
-          'استمرارية الجلسة عبر معرفات فريدة وترتيب زمني وعقود هدف محفوظة في agent_goal_contracts'
+          'استمرارية الجلسة عبر معرفات فريدة وترتيب زمني وعقود هدف محفوظة في agent_goal_contracts',
+          'ملخص خيط وحقائق مالك موسومة، بلا متجهات أو نموذج، مع ملكية وحذف نهائي مسجل كدليل'
         ]
       },
       {

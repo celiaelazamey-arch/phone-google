@@ -208,6 +208,7 @@ const doneStream = sse([
 async function mockAgentApi(page) {
   let threadCreated = false;
   let runsStarted = 0;
+  let memory = { summaries: [], facts: [] };
   const json = (route, body, status = 200) =>
     route.fulfill({ status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' }, body: JSON.stringify(body) });
   await page.route('**/api/agent/**', async (route) => {
@@ -230,6 +231,17 @@ async function mockAgentApi(page) {
         note: 'e2e: استجابات معترَضة بعقد الخادم الحقيقي'
       });
     }
+    if (pathname.endsWith('/api/agent/memory')) {
+      if (method === 'GET') return json(route, memory);
+      if (method === 'DELETE') {
+        const body = request.postDataJSON();
+        memory = {
+          summaries: body.kind === 'summary' ? memory.summaries.filter((item) => item.id !== body.id) : memory.summaries,
+          facts: body.kind === 'fact' ? memory.facts.filter((item) => item.id !== body.id) : memory.facts
+        };
+        return json(route, { deleted: true, kind: body.kind, id: body.id, sourceRunId: 'run-done' });
+      }
+    }
     if (pathname.endsWith('/api/agent/threads') && method === 'GET') {
       return json(route, { threads: threadCreated ? [{ id: 'thr-e2e', title: 'مهمة جديدة', createdAt: at(0) }] : [] });
     }
@@ -246,6 +258,10 @@ async function mockAgentApi(page) {
       return route.fulfill({ status: 200, headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-store' }, body: sse([liveSnapshot('run-live')]) });
     }
     if (pathname.endsWith('/runs/run-done/events')) {
+      memory = {
+        summaries: [{ id: 'memory-summary-e2e', threadId: 'thr-e2e', sourceRunId: 'run-done', summary: 'حالة التشغيل الأخير: succeeded.\nآخر نتيجة محفوظة: مسودة مخطط جاهزة.', createdAt: at(4200), updatedAt: at(4200), expiresAt: null }],
+        facts: [{ id: 'memory-fact-e2e', ownerId: 'owner', sourceRunId: 'run-done', tag: 'owner.last_result', value: 'مسودة مخطط جاهزة.', createdAt: at(4200), updatedAt: at(4200), expiresAt: null }]
+      };
       return route.fulfill({ status: 200, headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-store' }, body: doneStream });
     }
     if (pathname.endsWith('/runs/run-done')) {
@@ -321,6 +337,34 @@ test.describe('أثر التنفيذ في /agent (WP-1.2): شجرة الخطة،
       await expectNoA11yViolations(page);
 
       expect(diagnostics, diagnostics.join('\n')).toEqual([]);
+    } finally {
+      await flush(testInfo);
+    }
+  });
+});
+
+test.describe('WP-2.3: قسم «ما يتذكره الوكيل» يعرض ويحذف الذاكرة من مسار المالك', () => {
+  test('الملخص والحقيقة يظهران بعد run.finished ويختفيان بعد الحذف النهائي', async ({ page }, testInfo) => {
+    const { diagnostics, flush } = attachChromiumDiagnostics(page);
+    try {
+      await mockAgentApi(page);
+      await page.setViewportSize({ width: 320, height: 640 });
+      await page.goto(`${LIVE}/agent`, { waitUntil: 'networkidle' });
+      await page.fill('#token', TOKEN);
+      await page.click('#connect');
+      await expect(page.locator('#auth-status')).toContainText('متصل — الوكيل جاهز');
+      await page.fill('#message', 'استخرج بيانات الفاتورة');
+      await page.click('#run');
+      await expect(page.locator('#now-line')).toHaveAttribute('data-state', 'executing_tool');
+      await page.click('#run');
+      await expect(page.locator('#memory-summaries')).toContainText('مسودة مخطط جاهزة', { timeout: 5000 });
+      await expect(page.locator('#memory-facts')).toContainText('owner.last_result');
+      await page.locator('#memory-facts button[data-memory-kind="fact"]').click();
+      await expect(page.locator('#memory-facts')).toContainText('لا حقائق محفوظة');
+      await page.locator('#memory-summaries button[data-memory-kind="summary"]').click();
+      await expect(page.locator('#memory-summaries')).toContainText('لا ملخصات محفوظة');
+      await expectNoA11yViolations(page);
+      expect(diagnostics, diagnostics.join('\\n')).toEqual([]);
     } finally {
       await flush(testInfo);
     }

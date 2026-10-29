@@ -42,6 +42,7 @@
     "computer:permissions": "node scripts/render-computer-permissions.mjs",
     "computer:permissions:check": "node scripts/render-computer-permissions.mjs --check",
     "test:mysql": "node --test integration/mysql.integration.mjs",
+    "eval:ai": "node scripts/eval-ai.mjs",
     "google:doctor": "node scripts/google-doctor.mjs",
     "now": "node scripts/generate-now.mjs",
     "now:check": "node scripts/generate-now.mjs --check",

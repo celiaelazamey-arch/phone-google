@@ -28,6 +28,7 @@ let state = {
   now: null,
   nowTimer: null
 };
+let memoryEpoch = 0;
 
 const RUN_LABELS = {
   queued: ['في الانتظار', 'running'],
@@ -319,7 +320,8 @@ const EVIDENCE_LABELS = {
   external_effect_enqueued: 'نية أثر خارجي',
   external_effect_settled: 'تسوية أثر خارجي',
   verification: 'حكم تحقق',
-  delivery: 'تسليم'
+  delivery: 'تسليم',
+  memory_deleted: 'حذف ذاكرة نهائي'
 };
 
 const OUTBOX_LABELS = {
@@ -556,6 +558,60 @@ function escapeHtml(value) {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 }
 
+function renderMemory(memory = { summaries: [], facts: [] }) {
+  const summaries = Array.isArray(memory.summaries) ? memory.summaries : [];
+  const facts = Array.isArray(memory.facts) ? memory.facts : [];
+  const summaryList = $('memory-summaries');
+  const factList = $('memory-facts');
+  if (!summaryList || !factList) return;
+  const deleteButton = (kind, id) =>
+    `<button type="button" class="danger memory-delete" data-memory-kind="${kind}" data-memory-id="${escapeHtml(id)}" aria-label="حذف ${kind === 'summary' ? 'الملخص' : 'الحقيقة'}">حذف نهائي</button>`;
+  summaryList.innerHTML = summaries.length
+    ? summaries.map((item) => `<li data-memory-id="${escapeHtml(item.id)}">
+        <p class="memory-text">${escapeHtml(item.summary)}</p>
+        <div class="meta">المصدر: ${escapeHtml(String(item.sourceRunId || '—').slice(0, 12))} · ${escapeHtml(item.updatedAt || item.createdAt || '—')} ${deleteButton('summary', item.id)}</div>
+      </li>`).join('')
+    : '<li class="empty">لا ملخصات محفوظة.</li>';
+  factList.innerHTML = facts.length
+    ? facts.map((item) => `<li data-memory-id="${escapeHtml(item.id)}">
+        <div class="head"><b>${escapeHtml(item.tag)}</b>${deleteButton('fact', item.id)}</div>
+        <p class="memory-text">${escapeHtml(item.value)}</p>
+        <div class="meta">المصدر: ${escapeHtml(String(item.sourceRunId || '—').slice(0, 12))} · ${escapeHtml(item.updatedAt || item.createdAt || '—')}</div>
+      </li>`).join('')
+    : '<li class="empty">لا حقائق محفوظة.</li>';
+  if ($('memory-status')) $('memory-status').textContent = `${summaries.length} ملخص · ${facts.length} حقيقة`;
+}
+
+async function refreshMemory() {
+  const epoch = ++memoryEpoch;
+  if (!state.token) {
+    renderMemory();
+    return;
+  }
+  try {
+    const result = await api('/api/agent/memory');
+    if (epoch === memoryEpoch) renderMemory(result);
+  } catch (error) {
+    if (epoch !== memoryEpoch) return;
+    if ([401, 403].includes(error.status)) renderMemory();
+    if ($('memory-status')) $('memory-status').textContent = `تعذّر تحميل الذاكرة: ${error.message}`;
+  }
+}
+
+async function deleteMemory(kind, id, button) {
+  if (!kind || !id) return;
+  button.disabled = true;
+  try {
+    await api('/api/agent/memory', { method: 'DELETE', body: JSON.stringify({ kind, id }) });
+    setAuthStatus('حُذف العنصر نهائيًا وسُجل الحذف في الأدلة.', 'ok');
+    await refreshMemory();
+    await refreshDetail();
+  } catch (error) {
+    button.disabled = false;
+    setAuthStatus(`تعذّر حذف الذاكرة: ${error.message}`, 'bad');
+  }
+}
+
 function renderTruthPartition(truthPartition, toolRuns = []) {
   const root = $('truth-partition');
   const compBadge = $('comprehension-badge');
@@ -669,6 +725,7 @@ function handleEvent(event) {
   if (event.type === 'run.finished') {
     setRunState(event.run?.status);
     setUsage(event.run?.usage, event.run?.limits || null);
+    refreshMemory();
     if (event.run?.status === 'succeeded') {
       const delivery = $('delivery');
       const last = [...document.querySelectorAll('#steps .summary')].pop();
@@ -835,6 +892,19 @@ $('reconcile').addEventListener('click', (event) => {
 $('approve').addEventListener('click', () => decide('approved'));
 if ($('edit-plan')) $('edit-plan').addEventListener('click', () => decide('edited'));
 $('reject').addEventListener('click', () => decide('rejected'));
+if ($('refresh-memory')) $('refresh-memory').addEventListener('click', refreshMemory);
+if ($('memory-facts')) {
+  $('memory-facts').addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-memory-kind]');
+    if (button) deleteMemory(button.dataset.memoryKind, button.dataset.memoryId, button);
+  });
+}
+if ($('memory-summaries')) {
+  $('memory-summaries').addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-memory-kind]');
+    if (button) deleteMemory(button.dataset.memoryKind, button.dataset.memoryId, button);
+  });
+}
 
 async function refreshThreadsList() {
   const select = $('thread-select');
@@ -888,13 +958,21 @@ async function connect() {
   if (!state.token) return setAuthStatus('أدخل رمز الوصول أولًا.', 'bad');
   sessionStorage.setItem(TOKEN_KEY, state.token);
   setAuthStatus('جارٍ التحقق…');
+  memoryEpoch += 1;
+  renderMemory();
+  if ($('memory-status')) $('memory-status').textContent = 'جارٍ تحميل الذاكرة…';
   try {
     const status = await api('/api/agent/status');
     renderStatus(status);
     setAuthStatus(status.enabled ? 'متصل — الوكيل جاهز' : 'متصل، لكن الوكيل متوقف', status.enabled ? 'ok' : 'bad');
     emptySteps();
     resetGovernancePanels();
-    if (status.enabled) await refreshThreadsList();
+    if (status.enabled) {
+      await refreshThreadsList();
+      await refreshMemory();
+    } else {
+      renderMemory();
+    }
   } catch (error) {
     setAuthStatus(error.status === 401 ? 'رمز غير صحيح (401).' : `تعذّر الاتصال: ${error.message}`, 'bad');
   }
