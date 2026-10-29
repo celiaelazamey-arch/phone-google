@@ -14,7 +14,7 @@
 - **آخر مراجعة مسجّلة:** 29 أكتوبر 2026
 - **الجلسة النشطة:** MANUS-C1b-C2a — الوصول إلى الويب (S5/M-C) على `arena/df8cbebc-phone-google` من `main@97078dc`: بوابة إقلاع صريحة `CELIA_AGENT_EGRESS=off|proxy` + `CELIA_AGENT_EGRESS_ALLOWLIST`، منحة واحدة لكل جلب تُسحب في `finally`، وأداة `web.fetch` الوحيدة (قراءة، بلا موافقة كتابة) تمر دائمًا عبر وسيط C1 وتحمل سقوفًا وميزانية لكل تشغيل، وتنقّي الحقن قبل أن يرى المخطِّط أي نص، وتشهد على كل محاولة بصف أدلة (`web_source`) بـ`PASS`/`BLOCK`. وبعد مطابقة مخطط 2026 (DEC-061): قائمة بصيغة `https://host` تُطبَّع إلى `host:443`، وسقف تزامن عام في الوسيط (`maxConnections`، 429 مسجَّل)، والسياسة المنفَّذة تُعلن في `/api/agent/egress`. طبقة المحوّلات في المخطط غير موجودة ولم تُبنَ. اختبارات: 15/15 (+1 سقف تزامن في EP-14 → 14/14 للوسيط) ([`test/agent-web-access.test.js`](../../test/agent-web-access.test.js)) وبوابة `npm run eval:web` 11/11. شبكة العزل ما زالت `deny` حرفيًا ولم تُفتح أي allowlist. سجل الجلسة: [2026-10-29-manus-c1b-c2a-web-access](sessions/2026-10-29-manus-c1b-c2a-web-access.md) · الدليل: [agent-egress.md](../agent-egress.md) · القرار: `DEC-060`.
 - **آخر سجل جلسة مؤرَّخ:** [2026-10-29-manus-c1b-c2a-web-access](sessions/2026-10-29-manus-c1b-c2a-web-access.md)
-- **حجم [STATE.md](STATE.md) النشط:** 54 سطرًا (8829 بايت)
+- **حجم [STATE.md](STATE.md) النشط:** 54 سطرًا (8982 بايت)
 - **الأرشيف التاريخي المحفوظ بلا حذف:**
 - [STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md) — الأساس `9f6f8b2` · **983 سطرًا** محفوظًا حرفيًا (بصمة `f2674637e82e…`)
 
