@@ -161,6 +161,42 @@ export function createArtifactStore({
       return { record, download: signedDownload(record), replayed: false };
     },
 
+    /**
+     * M-B/B4 — internal read for an approved external export (Drive upload).
+     *
+     * This path is signature-free by design: the caller is the agent host inside the
+     * dispatch of an approved effect, never a browser. What is *not* free is the
+     * digest — the bytes are re-hashed right here, so an artifact altered on disk
+     * after approval can never leave under the hash the owner approved. Every
+     * refusal is coded and definitive, which lets the connector settle `failed`
+     * without touching the provider.
+     */
+    async readForUpload({ id, runId = null } = {}) {
+      const artifactId = String(id || '');
+      if (!ID_SHAPE.test(artifactId)) throw coded('artifact_id_invalid', 400);
+      const record = await store.getArtifact(artifactId);
+      if (!record) throw coded('artifact_not_found', 404);
+      if (runId && record.runId !== runId) throw coded('artifact_run_mismatch', 403);
+      let content;
+      try {
+        content = await readFile(record.storagePath);
+      } catch (error) {
+        throw coded('artifact_payload_unavailable', 410, error);
+      }
+      const digest = crypto.createHash('sha256').update(content).digest('hex');
+      if (digest !== record.sha256 || content.length !== record.bytes) {
+        throw coded('artifact_tampered', 409);
+      }
+      return {
+        id: record.id,
+        runId: record.runId,
+        name: record.name,
+        bytes: record.bytes,
+        sha256: record.sha256,
+        content
+      };
+    },
+
     /** Owner-facing listing: public fields plus a fresh signed link per call. */
     async list(runId) {
       const records = await store.listArtifacts(runId);

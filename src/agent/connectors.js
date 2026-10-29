@@ -23,17 +23,41 @@ export const CONNECTOR = Object.freeze({
   drive: 'google.drive'
 });
 
+// B4 أضاف `text/html` وحده: قالب `static_page` في B3 يُنتج صفحة HTML حتمية،
+// ورفضها كان سيجعل نوعًا كاملًا من مخرجاتنا غير قابل للتسليم. لا نوع تنفيذي آخر.
 export const ALLOWED_DRIVE_MIME_TYPES = Object.freeze([
   'application/json',
   'text/plain',
   'text/markdown',
-  'text/csv'
+  'text/csv',
+  'text/html'
 ]);
+
+// امتداد الملف يحسم نوعه عند رفع artifact: لا تخمين صامت لنوع غير معروف.
+const MIME_BY_EXTENSION = Object.freeze({
+  json: 'application/json',
+  txt: 'text/plain',
+  text: 'text/plain',
+  md: 'text/markdown',
+  markdown: 'text/markdown',
+  csv: 'text/csv',
+  html: 'text/html',
+  htm: 'text/html'
+});
+
+/** النوع المشتق من الامتداد، أو null إن لم يكن الامتداد معلنًا. */
+export function driveMimeForName(name) {
+  const match = /\.([A-Za-z0-9]{1,8})$/.exec(String(name || '').trim());
+  return match ? MIME_BY_EXTENSION[match[1].toLowerCase()] || null : null;
+}
 
 const E164_RE = /^\+[1-9]\d{6,14}$/;
 const MAX_WHATSAPP_TEXT = 4096;
 const MAX_DRIVE_TITLE = 200;
 const MAX_DRIVE_CONTENT = 200_000;
+// نفس شكل معرفات مخزن B2: الحماية الفعلية في البصمة والموافقة، والشكل يمنع
+// تمرير مسار أو معرّف غريب إلى طبقة القراءة.
+const DRIVE_ARTIFACT_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
 export function createConnectorRegistry(definitions = []) {
   const map = new Map();
@@ -298,35 +322,92 @@ export function createWhatsAppCloudTransport({ sendText, pool = null } = {}) {
 }
 
 /**
- * Google Drive Report Export connector (AGENT-002).
+ * Google Drive Report Export connector (AGENT-002, extended by M-B/B4).
  *
  * Exports a verified report or artifact to Google Drive only after explicit owner
  * approval. Uses a deterministic `appProperties.celiaOutboxKey` derived from the
  * outbox idempotency key and queries Drive before creation so a retry or manual
  * reconciliation reconciles against the existing file instead of creating a duplicate.
+ *
+ * B4 payload shapes (exactly one, never both):
+ *   { title, content, mimeType }                 inline text (AGENT-002, unchanged)
+ *   { artifactId, title?, mimeType? }            an artifact from the B2 store
+ *
+ * The artifact shape is what makes "the file that lands in Drive is the file the
+ * owner was shown" true: the bytes are re-read and re-hashed by `resolveArtifact`
+ * *before* the provider is contacted, so a tampered or vanished artifact becomes a
+ * definitive `failed` with zero network effect — never an upload of other bytes.
  */
-export function createDriveExportConnector({ transport, folderId = null } = {}) {
+export function createDriveExportConnector({ transport, folderId = null, resolveArtifact = null } = {}) {
   if (!transport || typeof transport.createFile !== 'function') {
     throw new Error('The Drive export connector requires a createFile transport');
   }
   return {
     name: CONNECTOR.drive,
-    description: 'تصدير تقرير موثّق إلى Google Drive عبر outbox بعد موافقة صريحة ومنع تكرار الملف',
+    description: 'تصدير تقرير موثّق أو artifact مبصوم إلى Google Drive عبر outbox بعد موافقة صريحة ومنع تكرار الملف',
     tool: 'google.drive_export_report',
     requires: 'connected Google account with Drive file creation permission',
+    /** هل الرفع من مخزن artifacts مُوصَّل؟ يُعلن للمفتش بلا كشف مسار التخزين. */
+    artifactUploads: typeof resolveArtifact === 'function',
     async send(payload, { idempotencyKey, signal } = {}) {
-      const title = typeof payload?.title === 'string' ? payload.title.trim() : '';
+      const artifactId =
+        payload?.artifactId === undefined || payload?.artifactId === null || payload?.artifactId === ''
+          ? null
+          : String(payload.artifactId).trim();
+      let source = null;
+      let title;
+      let content;
+      let mimeType;
+
+      if (artifactId) {
+        if (typeof resolveArtifact !== 'function') throw definitiveError('drive_artifact_export_unavailable');
+        if (payload?.content !== undefined && payload?.content !== null && payload?.content !== '') {
+          // Two sources for one file is an ambiguity an approval cannot resolve.
+          throw definitiveError('drive_artifact_content_conflict');
+        }
+        if (!DRIVE_ARTIFACT_ID.test(artifactId)) throw definitiveError('invalid_drive_artifact_id');
+        let artifact;
+        try {
+          artifact = await resolveArtifact({ id: artifactId });
+        } catch (error) {
+          // لم يُلمس المزوّد بعد: كل رفض هنا «فشل مثبت» لا `unknown`.
+          throw definitiveError(error?.code || 'drive_artifact_unavailable');
+        }
+        if (!artifact || !Buffer.isBuffer(artifact.content)) throw definitiveError('drive_artifact_unavailable');
+        if (artifact.content.length > MAX_DRIVE_CONTENT) throw definitiveError('drive_artifact_too_large');
+        const text = artifact.content.toString('utf8');
+        if (Buffer.byteLength(text, 'utf8') !== artifact.content.length) {
+          // البايتات ليست نصًا صالحًا؛ رفعها كملف نصي سيكون تحريفًا صامتًا.
+          throw definitiveError('drive_artifact_not_text');
+        }
+        content = text;
+        title =
+          typeof payload?.title === 'string' && payload.title.trim() ? payload.title.trim() : String(artifact.name || '');
+        const explicitMime =
+          payload?.mimeType === undefined || payload?.mimeType === null || payload?.mimeType === ''
+            ? null
+            : String(payload.mimeType).trim().toLowerCase();
+        mimeType = explicitMime || driveMimeForName(artifact.name) || '';
+        source = {
+          artifactId: artifact.id ?? artifactId,
+          sha256: artifact.sha256 ?? null,
+          bytes: artifact.content.length
+        };
+      } else {
+        title = typeof payload?.title === 'string' ? payload.title.trim() : '';
+        content = typeof payload?.content === 'string' ? payload.content : '';
+        mimeType =
+          payload?.mimeType === undefined || payload?.mimeType === null || payload?.mimeType === ''
+            ? 'application/json'
+            : String(payload.mimeType).trim().toLowerCase();
+      }
+
       if (!title || title.length > MAX_DRIVE_TITLE) {
         throw definitiveError('invalid_drive_title');
       }
-      const content = typeof payload?.content === 'string' ? payload.content : '';
       if (!content.trim() || content.length > MAX_DRIVE_CONTENT) {
         throw definitiveError('invalid_drive_content');
       }
-      const mimeType =
-        payload?.mimeType === undefined || payload?.mimeType === null || payload?.mimeType === ''
-          ? 'application/json'
-          : String(payload.mimeType).trim().toLowerCase();
       if (!ALLOWED_DRIVE_MIME_TYPES.includes(mimeType)) {
         throw definitiveError('unsupported_drive_mime_type');
       }
@@ -341,6 +422,7 @@ export function createDriveExportConnector({ transport, folderId = null } = {}) 
               externalRef: existing.id,
               webViewLink: existing.webViewLink ?? null,
               outboxDigest,
+              ...(source ? { source } : {}),
               deduplicated: true,
               reconciledBy: 'outbox_key'
             };
@@ -359,6 +441,7 @@ export function createDriveExportConnector({ transport, folderId = null } = {}) 
           externalRef: file?.id ?? null,
           webViewLink: file?.webViewLink ?? null,
           outboxDigest,
+          ...(source ? { source } : {}),
           deduplicated: false
         };
       } catch (error) {
@@ -372,6 +455,7 @@ export function createDriveExportConnector({ transport, folderId = null } = {}) 
             externalRef: null,
             webViewLink: null,
             outboxDigest,
+            ...(source ? { source } : {}),
             deduplicated: true,
             reconciledBy: 'outbox_key'
           };

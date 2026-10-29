@@ -228,7 +228,7 @@ export function readAgentConnectors(env = process.env) {
   return [...new Set(names.filter((name) => name !== 'none'))];
 }
 
-function buildConnectors({ env, pool, config, logger }) {
+function buildConnectors({ env, pool, config, logger, resolveArtifact = null }) {
   let requested;
   try {
     requested = readAgentConnectors(env);
@@ -289,7 +289,11 @@ function buildConnectors({ env, pool, config, logger }) {
       });
       return createDriveExportConnector({
         transport,
-        folderId: env.CELIA_AGENT_DRIVE_FOLDER_ID || null
+        folderId: env.CELIA_AGENT_DRIVE_FOLDER_ID || null,
+        // B4: الرفع من مخزن artifacts يُركَّب فقط حين يوجد المخزن فعلًا (يُربط
+        // بعد بناء الموصلات في هذا الملف). الافتراض null يعني: مسار المحتوى
+        // المضمَّن وحده، بلا أي تغيير في السلوك القائم.
+        resolveArtifact
       });
     }
     if (name === 'whatsapp') {
@@ -442,7 +446,26 @@ export function createAgentHost({
     }
     const store = createAgentStore({ driver });
     const kb = kbHost && kbHost.mode === 'sqlite' ? kbHost : null;
-    const connectors = injectedConnectors || buildConnectors({ env, pool, config, logger });
+    // B4: الموصلات تُبنى قبل مخزن artifacts (الذي يعتمد على العزل)، فالربط
+    // يُحلّ عند الإرسال لا عند الإقلاع: لا دورة اعتماد ولا ترتيب هش.
+    const artifactBridge = { store: null };
+    const connectors = injectedConnectors || buildConnectors({
+      env,
+      pool,
+      config,
+      logger,
+      resolveArtifact: (args) => {
+        if (!artifactBridge.store) {
+          // لا مخزن = لا مسار artifact أصلًا؛ الرفض صريح ومثبت لا `null` صامت.
+          return Promise.reject(
+            Object.assign(new Error('drive_artifact_export_unavailable'), {
+              code: 'drive_artifact_export_unavailable'
+            })
+          );
+        }
+        return artifactBridge.store.readForUpload(args);
+      }
+    });
     const requestedConnectors = readAgentConnectors(env);
     const googleReaders = injectedGoogleReaders || (!injectedConnectors && requestedConnectors.includes('google_read')
       ? buildGoogleReaders({ pool, config, env })
@@ -486,6 +509,9 @@ export function createAgentHost({
           urlTtlMs: positiveInt(env.CELIA_ARTIFACT_URL_TTL_MS, 900_000)
         })
       : null;
+    // B4: الجسر يُغذّى الآن — وقبله كان `resolveArtifact` يُعيد null فيرفض
+    // الموصل مسار artifact رفضًا مثبتًا (`drive_artifact_export_unavailable`).
+    artifactBridge.store = artifactStore;
     // تفعيل الخيوط العنكبوتية: CELIA_AGENT_SPIDER=read يفتح فهرس العنكبوت المحلي
     // قراءةً فقط (صفر شبكة). الافتراض off؛ قيمة أخرى أو فهرس غائب = خطأ تهيئة
     // صريح عند الإقلاع — لا أدوات تدّعي شبكة معرفة غير موجودة.

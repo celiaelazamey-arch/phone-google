@@ -2,83 +2,50 @@
 
 > **حفظ التاريخ بلا حذف (`DEC-052` / `CONT-004`):** هذه نافذة الاستئناف النشطة؛ السجل التراكمي الكامل حتى ما بعد PR #84 (`main@738d832` / `9f6f8b2` — 983 سطرًا / 142,150 بايت) محفوظ حرفيًا في **[STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md)** وبصمته محروسة بـ`R0-02`. القراءة السريعة المشتقة: **[NOW.md](NOW.md)** (`npm run now`).
 
-**آخر مراجعة:** 29 أكتوبر 2026 · **نوع الجلسة الحالية:** **MANUS-B3 + إنقاذ A4 + الخيوط العنكبوتية** على `arena/a3caa0c8-phone-google` (أُضيفت فوق شريحة B2 في PR #92 نفسه بقرار تشغيلي معلن)؛ ثلاث جبهات: **(1) A4 أُنقذ من PR #90 المتعارض** بإعادة تطبيقه فوق main الحالي (`model-router.js` + MR-01..10 = 10/10؛ #90 يُغلق بعد الدمج)؛ **(2) B3 قوالب مخرجات حتمية** (`output-templates.js` دوال نقية مهرَّبة بصفر طلبات خارجية + أداة `template.render` فوق مخزن B2 + بوابة `eval:templates` الذهبية **PASS 3/3** ببصمات مثبتة في `data/eval/b3-templates/golden.json` — بوابة مستقلة عن `eval:ai` المجمّد عمدًا، و`eval:ai` أُعيد تشغيله PASS 120/120) 6/6 اختبارات؛ **(3) قارئ العنكبوت** (`spider-reader.js` read-only صفر شبكة، مرآة حرفية لدلالات `celia_spider` في التطبيع والترتيب والدرجة، أداتا قراءة خلف `CELIA_AGENT_SPIDER=read` والافتراضي `off` وفهرس غائب يُفشل الإقلاع) 5/5؛ الحزمة **745 اختبارًا، 729 ناجحًا، 0 فشل** وتغطية 91.11/75.82/87.18، و56/56 تحت بيئة التكامل. سجل الجلسة: [2026-10-29-manus-b3-templates-a4-spider](sessions/2026-10-29-manus-b3-templates-a4-spider.md) ·
+**آخر مراجعة:** 29 أكتوبر 2026 · **نوع الجلسة الحالية:** **MANUS-B4 — رفع artifact مبصوم إلى Drive المالك خلف الموافقة (S4/M-B)**: `google.drive_export_report` يقبل `{ artifactId }` بديلًا للنص حين يكون مخزن B2 موصولًا، والبايتات تُقرأ عبر `artifacts.readForUpload` الذي **يعيد حساب SHA-256 في كل قراءة**، والموصل يستلم `resolveArtifact` جسرًا يُركَّب بوجود المخزن فقط؛ كل رفض (معبوث/غائب/ضخم/ثنائي/نوع غير معلن/تعارض مصدرين) **مثبت قبل أي طلب** فيُسوَّى `failed` لا `unknown`؛ `text/html` أُضيف لأن قالب `static_page` من B3 ينتجه؛ **9/9** اختبارات، والحزمة **754 اختبارًا / 737 ناجحًا / 0 فشل حقيقي** وتغطية **91.01/75.98/87.10** (الفشل الوحيد N/N−1 بيئي: كائن Git مفقود في هذا الاستنساخ). **لا نطاق OAuth جديد** — الرفع الحي يحتاج منح كتابة `drive.file` وهو قرار مالك. سجل الجلسة: [2026-10-29-manus-b4-drive-artifact-upload](sessions/2026-10-29-manus-b4-drive-artifact-upload.md) · القرار: `DEC-058`.
 
-**الجلسة السابقة:** **MANUS-B2 — مخزن artifacts المواجه للمالك + التنزيل الموقّع (S4 / M-B)** على `arena/a3caa0c8-phone-google` (من `main@5c2a75b`)؛ `artifact-store.js` (تحقق SHA-256 قبل الكتابة، رابط HMAC منتهي الصلاحية هو التفويض، إعادة حساب البصمة عند كل تنزيل → `artifact_tampered`، idempotency بقاعدة البيانات)، جدول `agent_artifacts` (ترحيل 0006)، أداة `artifact.create`، مسارا القائمة/التنزيل، وزر تنزيل في `/agent`؛ ART-01..09 **9/9** (HTTP حقيقي + تكامل عزل فعلي) و35/35 تكاملًا؛ 707 ناجحًا، تغطية 90.75/75.76/87.01. التفاصيل الكاملة: [2026-10-29-manus-b2-artifact-store](sessions/2026-10-29-manus-b2-artifact-store.md) ·
+**الجلسة السابقة:** **MANUS-B3 + إنقاذ A4 + الخيوط العنكبوتية** على `arena/a3caa0c8-phone-google` (PR #92، دُمج في `main@bdfbb6b`): (1) A4 أُنقذ من PR #90 المتعارض بإعادة تطبيقه فوق main (`model-router.js`، MR-01..10 = 10/10، و#90 أُغلق)؛ (2) B3 قوالب مخرجات حتمية (`output-templates.js` + أداة `template.render` + بوابة `eval:templates` **PASS 3/3** ببصمات مثبتة — بوابة مستقلة عن `eval:ai` المجمّد عمدًا) 6/6؛ (3) قارئ العنكبوت (`spider-reader.js` read-only صفر شبكة خلف `CELIA_AGENT_SPIDER=read`) 5/5. السجل: [2026-10-29-manus-b3-templates-a4-spider](sessions/2026-10-29-manus-b3-templates-a4-spider.md) · **قبلها:** B2 مخزن artifacts (9/9، [سجل](sessions/2026-10-29-manus-b2-artifact-store.md)) · B1 `sandbox.exec` (9/9، [سجل](sessions/2026-10-29-manus-b1-sandbox-exec.md)) · A3 `call_many` (12/12، [سجل](sessions/2026-10-29-manus-a3-call-many.md)) · A2 `plan.revised` (9/9، [سجل](sessions/2026-10-29-manus-a2-governed-replan.md)) · A1 مزوّد Gemini (24/24، [سجل](sessions/2026-10-29-manus-a1-gemini-planner.md)) · GOOG-005 قراءات Google (8/8، [سجل](sessions/2026-10-29-google-readonly-2026.md)) · WP-1.4 قياسات · WP-1.3 سمتان · WP-1.2 تتبع · WP-2.1 سياسة سياق · WP-2.3 ذاكرة · WP-2.4 بوابة AI-001 · R0 استمرارية: روابطها في [NOW.md](NOW.md) وفي سجلاتها داخل `docs/continuity/sessions/`.
+**الأرشيف التاريخي الكامل:** [STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md) · **سجلات الجلسات السابقة كلها:** داخل `docs/continuity/sessions/` (مرتبطة أعلاه وفي NOW).
 
-**الجلسة السابقة:** **MANUS-B1 — `sandbox.exec` موصول بالحلقة (S4 / M-B)** على `arena/94838d66-phone-google` (من `main@a2879dd`)؛ محوّل فعلي خلف `CELIA_AGENT_SANDBOX=exec` حصرًا (الافتراضي `off` حرفيًا، غير الصالح يُفشل الإقلاع)، `settledFailures` يسجل فشل العزل `failed` يحجبه المُتحقِّق **بلا host fallback**، سقف workspace 256MiB بالسياسة، النتائج artifacts مبصومة حصرًا؛ SBX-01..09 **9/9** (منها تكامل حقيقي كامل الحلقة) + Sandbox 17/17؛ 699 ناجحًا، تغطية 90.72/75.84/86.93؛ دُمج في `main@5c2a75b` (PR #91). التفاصيل الكاملة: [2026-10-29-manus-b1-sandbox-exec](sessions/2026-10-29-manus-b1-sandbox-exec.md) ·
+## 1. خط الأساس المتحقق (`bdfbb6b`)
 
-**الجلسة السابقة:** **MANUS-A3 — `call_many` للقراءات المستقلة** على `arena/718068f3-phone-google`؛ دفعة قراءات ≤4 بتحقق ذري (صفر تنفيذ جزئي/موافقات/outbox عند أي مخالفة) و`call_many_after_failure` يمنعها كاستعادة؛ 12/12 اختبارًا وp50 انخفض **57.9%** (CM-01 يفرض ≥40% في CI)؛ دُمجت ضمن PR #89. التفاصيل الكاملة: [2026-10-29-manus-a3-call-many](sessions/2026-10-29-manus-a3-call-many.md) ·
+- **بداية جلسة B4:** الفرع `arena/dcb565df-phone-google` من `main@bdfbb6b` (دمج PR #92) بشجرة نظيفة؛ لا PR مفتوح من هذا الفرع، ولا نشر أو ترحيل.
+- **الإصدار:** `v0.2.1` · **مخطط القاعدة الأساسي:** `schema=1` (`destructiveMigration=false`) · **Node:** `>=22` · **قاعدة التوافق:** التغييرات إضافية فقط (ترحيل `0006` من B2 قائم؛ B4 لم يُضف ترحيلًا ولا جدولًا).
+- **الجودة عند خط الأساس:** 745 اختبارًا / 729 ناجحًا / 0 فشل و56/56 تحت بيئة التكامل. بعده: **754 / 737 / 0 فشل حقيقي** (10 اختبارات جديدة: 9 لـB4 + 1 ملف جديد) وتغطية **91.01/75.98/87.10** فوق الأرضية (`89/71/82`).
 
-**الجلسة السابقة:** **آخر مراجعة:** 29 أكتوبر 2026 · **نوع الجلسة الحالية:** **MANUS-A2 — إعادة التخطيط المحكومة `plan.revised`** على `arena/718068f3-phone-google`؛ بتوجيه هندسي صريح من المالك: `src/agent/replanner.js` (maxPerStep=1 + حارس حلقة maxPerRun=1، قراءة فقط، عدّ حتمي من خطوات السلسلة)، توصيل `revisionPolicy` في `createProviderPlanner` (الافتراض null يحفظ `automatic_replan_disabled` حرفيًا)، تسجيل `plan.revised` في سلسلة SHA-256، `max_replan_exceeded`/`replan_requires_read_tool` ضمن التحويل المرئي، وتضييق `goal_contract` في المُتحقِّق لفشل القراءة المستدرَك بمراجعة ناجحة حصرًا؛ `test/agent-replan.test.js` **9/9** بالطفرتين السلبيتين الإلزاميتين؛ التغطية 90.71/75.70/86.88؛ الفشل البيئي الوحيد (N/N-1) كما هو. سجل الجلسة: [2026-10-29-manus-a2-governed-replan](sessions/2026-10-29-manus-a2-governed-replan.md) ·
-**الشريحة السابقة (MANUS-A1):** اعتماد خطة «منافس مانوس» وتنفيذ شريحتها الأولى على `arena/718068f3-phone-google`؛ المالك اعتمد [خطة منافس مانوس](../manus-competitor-plan.md) نصًا، ونُفِّذ الشق الهيكلي لـA1: `CELIA_AGENT_PLANNER=gemini` خلف علم (الافتراضي `demo` بلا تغيير)، محوّل `src/agent/gemini-planner-provider.js`، و`planner_fallback` حتمي مرئي (`src/agent/planner-fallback.js` + خطوة ودليل BLOCK في runtime)؛ `test/agent-gemini-planner.test.js` **24/24** بلا شبكة، الحزمة 670 ناجحًا والتغطية 90.67/75.62/86.79 فوق الأرضية؛ فشل واحد معروف بيئيًا (N/N-1 يحتاج كائن Git تاريخيًا غير موجود في الاستنساخ المضغوط — ثبت على خط الأساس النظيف). لا تشغيل Gemini حي ولا نشر ولا ترحيل؛ التشغيلة الحية المعزولة قرار مالك. سجل الجلسة: [2026-10-29-manus-a1-gemini-planner](sessions/2026-10-29-manus-a1-gemini-planner.md) ·
-**الجلسة السابقة (GOOG-005):** Google read-only ضمن حدود 2026 على `arena/d44070e0-phone-google`؛ تنفيذ محلي/Mock لقراءات Gmail وDrive وCalendar وContacts عبر `CELIA_AGENT_CONNECTORS=google_read`، بلا OAuth حي أو scopes جديدة أو كتابة خارجية أو ربط Sandbox بـRuntime. Drive يعرض metadata لأحدث 10 ملفات، وCalendar نافذة محدودة، وContacts صفحة محدودة، مع planner حتمي يفصل القراءة عن create/export. نجح `test/agent-google-read.test.js` **8/8**، والفحص المشترك **28/28**، و`npm run test:coverage` **647/661 ناجحًا، 0 فشل، 14 skipped** بتغطية **90.70% أسطر / 75.45% فروع / 86.90% دوال**؛ لا اتصال Google حي ولا ادعاء ظهور بيانات المالك أو جاهزية إنتاجية ·
-**الشريحة السابقة:** PR `#87` دُمج، ونقطة بدء هذه الجلسة `b29d77f`؛ Sandbox السابق **17/17** وGmail السابق **7/7** محفوظان في سجليهما، ولا يُستأنف تفعيلهما أو نشرهما تلقائيًا ·
-سجل الجلسة الحالي: [2026-10-29-google-readonly-2026](sessions/2026-10-29-google-readonly-2026.md) ·
-سجل Sandbox السابق: [2026-10-29-agent003-sandbox](sessions/2026-10-29-agent003-sandbox.md) ·
-سجل KB السابق: [2026-10-29-ai002-kb-governance](sessions/2026-10-29-ai002-kb-governance.md) ·
-سجل Drive السابق: [2026-10-29-drive-selective-import](sessions/2026-10-29-drive-selective-import.md) ·
-سجل AI-002 السابق: [2026-10-29-ai-002-planner-provider](sessions/2026-10-29-ai-002-planner-provider.md) ·
-سجل WP-2.4/AI-001 السابق: [2026-10-29-wp-2-4-ai-001](sessions/2026-10-29-wp-2-4-ai-001.md) ·
-سجل WP-2.3 المحلي: [2026-10-29-wp-2-3-agent-memory](sessions/2026-10-29-wp-2-3-agent-memory.md) ·
-سجل R0 المدمج في `main@922ed4e`: [2026-10-29-r0-continuity-2026](sessions/2026-10-29-r0-continuity-2026.md) ·
-سجل WP-2.1 المدمج في `main@738d832`: [2026-10-29-wp-2-1-context-policy](sessions/2026-10-29-wp-2-1-context-policy.md) ·
-سجل WP-1.4: [2026-10-29-wp-1-4-measurements](sessions/2026-10-29-wp-1-4-measurements.md) ·
-سجل WP-1.3: [2026-10-29-wp-1-3-theme-tokens](sessions/2026-10-29-wp-1-3-theme-tokens.md) ·
-سجل WP-1.2: [2026-10-29-wp-1-2-execution-trace](sessions/2026-10-29-wp-1-2-execution-trace.md) ·
-الأرشيف التاريخي الكامل: [STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md)
+## 2. السلّم: أين نقف بالضبط
 
-## 1. خط الأساس المتحقق (`b29d77f`)
+- **S0** ✅ تثبيت القاعدة (PR #89) · **S1/A4** ✅ `model_router` منقذ على `main` · **S4 (M-B)** ✅ **مكتمل الآن**: B1 `sandbox.exec` ✅ → B2 artifacts مبصومة ✅ → B3 قوالب ✅ → **B4 Drive خلف الموافقة ✅**.
+- **مفتوح بقرار مالك:** **S2/S3** (القياس الحي بمزود حقيقي) — `GOV-001` (مفتاح + ميزانية) ما زال معلّقًا؛ لذلك لم يُقَس شيء بنموذج حي ولا يُدّعى رقم C1.
+- **التالي (لا يحجبها قرار):** **S5 — العينان (M-C)**: ابدأ بـ**egress proxy** المعتمد لكل run (أخطر مكوّن أمني في الخطة كلها) قبل أي `web.fetch`/`web.search`، ثم عامل المتصفح (`celia-google-spider`) ثم `/computer` حي ثم حوكمة حقن المحتوى (`DEC-020`).
+- **لوحة النتيجة §4 من الخطة:** artifacts مبصومة مسلَّمة = 3 أنواع مخرجات + رفع Drive محلي/Mock؛ «مهمة بعزل end-to-end» تعمل (SBX-09)؛ ما زال **0** لمهام الويب ومهام WhatsApp الكاملة والتشغيل الدوري.
 
-- **بداية جلسة GOOG-005:** الفرع `arena/d44070e0-phone-google` بدأ من `b29d77f` (Merge PR `#87`) بشجرة نظيفة؛ لم يُفتح PR جديد ولم يحدث نشر أو ترحيل في هذه الشريحة.
-- **آخر دمج موثق قبل هذه الجلسة:** PR `#85` (R0 / CONT-004 / DEC-052) دُمج بكلمة المالك إلى `main@922ed4e`؛ تشغيلات `main` الست خضراء، والجودة `40846567368` سجلت `602/602`. الحافة والواجهة الثابتة و`v0.2.1` منشورة كما في سجل R0؛ Express + MySQL (`HOST-003`) غير منشور.
-- **طلبات السحب المفتوحة عند خط الأساس:** صفر. لم تُقرأ حالة GitHub الحية مجددًا في جلستي WP-2.3/WP-2.4، ولم يُفتح PR من هذا الفرع.
-- **قاعدة التوافق:** إصدار `0.2.1` ومخطط التطبيق الأساسي `schema=1` بلا تغيير؛ جداول الوكيل وترحيلاتها مستقلة وإضافية. ملفات التقييم والتقرير لا تغيّر عقود HTTP أو المخطط.
+## 3. B4 — ما نُفِّذ فعليًا (بلا ادعاء حي)
 
-## 2. ما نُفِّذ سابقًا في هذه السلسلة — WP-2.4 / AI-001
+- **المشكلة:** الموصل موجود منذ AGENT-002 لكن حمولته نصٌّ يكتبه المخطط؛ مخرجات B2/B3 ملفات مبصومة في المخزن، فكانت الفجوة **مصدر البايتات**.
+- **الحل:** مسار `{ artifactId }` بديلًا للنص (وجود الاثنين = رفض)، قراءة داخلية `artifacts.readForUpload` تعيد البصمة في كل قراءة، و`resolveArtifact` جسرًا في الموصل يُركَّب بوجود المخزن فقط (`artifactBridge` في `index.js`). النتيجة تحمل `source: { artifactId, sha256, bytes }` في الأدلة.
+- **ما لم يتغير:** تصنيف الأداة `external_effect` + موافقة + outbox + `post_approval_payload_tampered`؛ الحمولة المعتمدة تبقى `args` فلا يكسر الربط بالبصمة، وصف حي واحد لكل (run، أداة) يعني **تصديرًا واحدًا لكل تشغيل** كما في نص B4.
+- **الحد الصريح:** `GOOGLE_SCOPES` لم يتغير. الرفع الحي يحتاج منح كتابة (`drive.file`) = **قرار مالك**؛ كل ما نُفِّذ ونُفِّذ اختباره محلي/Mock بناقل قابل للحقن، والمسار الحي على منح قراءة فقط يفشل بـ`drive_authorization_failed` بصدق.
 
-- **مجموعة ثابتة:** `data/eval/ai-001/cases.jsonl` فيها 120 حالة فريدة، بصمتها `687cb6ffda8b271de5cfbc745bf204bc30db491128dacf752e92c241e5e15944`؛ فصحى ومصرية، Cairo، أوقات نسبية وصريحة، جهات اتصال ومدد، سياق متعدد الأدوار، نقص/تعارض/حقن، موافقة، تكرار وفشل مزود و`unknown`.
-- **مشغّل حتمي بلا شبكة:** `npm run eval:ai` يستخدم مستخرج `src/agent/ai-eval-parser.js` والحلقة والموافقات وoutbox وموصل Calendar والمُتحقق والأدلة الحقيقية على SQLite مؤقت؛ النقل وحده وهمي. يختار آخر رسالة `user` من الخيط، ولا يمرر `expected` إلى المستخرج.
-- **تقرير قابل للفحص:** [reports/ai-001.json](../../reports/ai-001.json) يسجل لكل حالة القرار والمسودة والحمولة المعروضة وقرار المالك ومفتاح idempotency ومرجع الحدث وطلبات المزود وسلسلة الأدلة. القرارات البشرية مبرمجة في السيناريوهات، وليست مراجعة بشرية فعلية.
-- **البوابة والنتيجة:** الحدود ثُبتت قبل التشغيل في [docs/agent-ai-evaluation.md](../agent-ai-evaluation.md). النتيجة الأخيرة PASS: 120/120 حالة، 109/109 موعدًا مؤهلًا (100%)، p50=22.009ms، p95=33.283ms، تدخل إضافي 5%، صفر تكرار/كتابة غير مصرح بها/إعادة عمياء، و`unknown` 2/2 إلى مصالحة. التكلفة `null` لغياب مزود قابل للقياس.
-- **المراجعة البشرية المكتملة:** [عينة المراجعة](../../reports/ai-001-human-review.sample.json) أصبحت `completed_owner_review` بعد 20 قرار مالك فعليًا واحدًا واحدًا: 19 `approved` و1 `rejected` و0 `needs_clarification`؛ `reviewSummary.acceptanceRate=0.95` أي **95%**. الرفض `AI-001-0107` وسببه «معالجة التكرار غير مقبولة». تحقق فحص مستقل من تطابق المخرجات العشرين مع التقرير المجمد وبصمته `11a1f164587d2dc4ccf31de98cfe2346931f153805516b13f04b2e34f336af65` ومن وجود سبب للرفض؛ لم تتغير الأدلة.
-- **التحقق المتبقي:** وفق تأكيد المالك، **المفتاح موجود كـRepository secret، لكنه غير مهيأ للتنفيذ المحلي و/أو غير مُمرر في workflow التقييم الحالي؛ لذلك لم يُنفذ قياس حي.** لم تُكتب أحداث Calendar حقيقية ولم تُسجل تكلفة. يبقى AI-001 `جارٍ` إلى التشغيل الحي المعزول، ولا تُستنتج جاهزية المستخدمين من نسبة قبول العينة.
-- **الاختبارات:** `AI-EVAL-01..08` ناجحة 8/8 بعد التعديل الأخير؛ تغطي البوابتين السلبيتين وإعادة الإنتاج وطفرات تفشل حدود الجودة والزمن والتدخل والسلامة. الفحص الشامل الختامي **615/615** بتغطية **91.90% أسطر / 75.32% فروع / 87.09% دوال**؛ ونجح فحص 160 ملف JavaScript وبناء 12 صفحة وفحص 12 أداة MCP وبوابات الإصدار والاستمرارية والأسرار.
+## 4. الحدود والعوائق
 
-## 3. WP-2.3 المتراكمة على الفرع نفسه
+1. **لا نموذج حي ولا Drive حي:** `GOV-001` (مفتاح Gemini + ميزانية) ومنح كتابة Drive قراران مالكيان؛ لا يُستنتجان من نجاح الاختبارات.
+2. **MySQL/Chromium:** لا خدمة MySQL معزولة ولا Chromium مثبت في هذا الصندوق؛ بوابات `test:mysql` و`test:browser` لم تُشغَّل هنا، ولا يُدّعى نجاحهما.
+3. **N/N−1 البيئي:** اختبار توافق MCP يحتاج الكائن `2508893…` غير الموجود في هذا الاستنساخ — فشل واحد معروف ومُثبت على خط أساس نظيف.
+4. **قرارات مالك قائمة:** Branch protection/CodeQL (`SEC-006`)، ربط Google/Meta وRender/Aiven (`GOOG-001`/`WA-005`/`HOST-003`)، مزوّد التخطيط والميزانية (`GOV-001`/`AI-002`)، وترخيص/احتفاظ (`DATA-004`/`REL-001`).
+5. **لا دمج ذاتي:** هذه الجلسة على فرعها فقط؛ الدمج بكلمة المالك وبعد الفحوص الثلاثة (`governed-pr-merge`).
 
-- `0005_agent-memory.sql` و`src/agent/memory.js` والمخزن والحلقة ومسارات `GET/DELETE /api/agent/memory` وقسم `/agent` تنفذ ذاكرة حتمية مملوكة بلا نموذج أو متجهات، مع فحص أسرار وحذف نهائي ودليل `memory_deleted`.
-- قبول MySQL المحدّث واختبار Playwright موجودان، لكن خدمة MySQL المعزولة وChromium غير متوفرين في الصندوق؛ لم يُدّعَ نجاحهما. [خطة النشر](../agent-memory-deployment.md) توثيق مستقبلي فقط، ولا ترحيل إنتاج أو نشر منفّذ.
-- التفاصيل والنتيجة 607/607 الخاصة بتلك المرحلة محفوظة في [سجل WP-2.3](sessions/2026-10-29-wp-2-3-agent-memory.md) و`DEC-053`؛ لا تُخلط مع بوابة AI-001 المستقلة.
+## 5. الاستئناف والفحوص
 
-## 4. تقدّم الخطة والخطوة التالية
-
-- **الخطوة 1:** WP-1.1/WP-1.2/WP-1.3/WP-1.4 مدمجة؛ **WP-2.1** مدمجة في `main@738d832`.
-- **على فرع الجلسة فقط:** WP-2.3 وWP-2.4 منفّذتان محليًا وموثقتان بـDEC-053/DEC-054؛ لم تُدمجا أو تُنشرا.
-- **على فرع الجلسة الآن:** AGENT-003 Backend موثق في [سجله](sessions/2026-10-29-agent003-sandbox.md) و[دليل التشغيل](../agent-sandbox.md): 17/17 اختبارات عزل حقيقية، Artifact وEvidence، وحدود تدقيق صريحة. لم يُربط بـRuntime ولم يُنشر، و`sandbox.exec` وComputer Use ما زالا غير مفعّلين.
-- **GOOG-004 محلي/Mock:** `google.gmail_read` في `src/agent/gmail.js` يعيد آخر 1–5 رسائل بmetadata ومقتطف ≤500 حرف عبر OAuth المشفر القائم؛ الافتراضي `none`، ولا send/outbox/body/attachments. الاختبار 7/7 والفحص المشترك 56/56؛ لا Gmail حي ولا قرار تفعيل تلقائي. التفاصيل في [سجل Gmail](sessions/2026-10-29-gmail-read-connector.md).
-- **GOOG-005 محلي/Mock:** `google_read` في `src/agent/index.js` يفعّل الأربعة قرّاء فقط؛ التفاصيل والعقود في [سجل الجلسة](sessions/2026-10-29-google-readonly-2026.md) و[حدود 2026](../google-readonly-2026.md). النتيجة 8/8 و647/647 غير المتخطى في التغطية الكاملة؛ لا اتصال حي، و`calendar.events` يبقى أوسع من read-only على مستوى المنح.
-- **التالي بعد الشريحة:** لا تشغيل Google حي أو توسعة Sheets/Docs/YouTube/Photos ضمن هذا العمل؛ أي قبول حي قرار لاحق صريح ومعزول. تبقى مراجعة ربط/نشر Sandbox وإعادة التخطيط المحدودة مستقلة، ولا أدوات ملفات/Shell/Git/Computer Use تلقائيًا. لا R1 ولا MCP-001/002 ولا `gh-aw` ولا embeddings أو توجيه نماذج ضمن هذا العمل.
-
-## 5. العوائق وحدود الدليل
-
-1. **دليل AI-001 محلي فقط:** لا يثبت جودة Gemini/نموذج حي أو اتصال Google/Calendar أو تكلفة أو SLO إنتاجيًا أو مراجعة بشرية فعلية. أزمنة التقرير لمحاكاة حتمية على SQLite وليست قياس إنتاج.
-2. **MySQL:** لا خدمة معزولة متاحة؛ قبول `0005` مضاف لكنه لم يُشغّل، ولا ترحيل إنتاج أو Aiven.
-3. **Chromium:** executable غير مثبت؛ اختبار WP-2.3 في `e2e/agent.spec.js` لم يُقبل بصريًا في هذا الصندوق.
-4. **قرارات المالك القائمة:** Branch protection وCodeQL/Secret scanning (`SEC-006`)، وربط Google/Meta وRender/Aiven (`GOOG-001`/`WA-005`/`HOST-003`)، ومزوّد التخطيط (`GOV-001`/`AI-002`) خارج هذه الحزمة.
-
-## 6. الاستئناف والفحوص
-
-1. ابقَ على `arena/d44070e0-phone-google`؛ راجع [سجل GOOG-005](sessions/2026-10-29-google-readonly-2026.md) و[سجل Gmail](sessions/2026-10-29-gmail-read-connector.md) و[سجل AGENT-003](sessions/2026-10-29-agent003-sandbox.md). لا تفتح/تدمج PR ولا ترحّل أو تنشر أو تفعل مزودًا حيًا إلا بتفويض لاحق صريح.
-2. كل معرفة جديدة تحتاج `claim_type` و`review_due`؛ السجل التاريخي/غير المتحقق/المهجور أو المنتهي لا يُستخدم كتوجيه Planner. `kb.search` قراءة محلية فقط، ونتيجتها تُسجل في الأدلة.
-3. لا تُستأنف أدوات التنفيذ من خارطة Drive؛ نجاح Backend AGENT-003 لا يفتح Shell/Git/Computer Use ولا يربط `sandbox.exec` تلقائيًا. قراءة Drive الجديدة metadata فقط؛ لا استيراد/كتابة/حذف ولا embeddings.
+1. ابقَ على `arena/dcb565df-phone-google`؛ اقرأ [سجل B4](sessions/2026-10-29-manus-b4-drive-artifact-upload.md) و`DEC-058` قبل أي تعديل على مسار الرفع.
+2. لا تفعّل رفع Drive حيًا ولا تفتح نطاق OAuth ولا تنشر أو ترحّل بلا تفويض صريح.
+3. أول فحص آمن قبل أي شيء: `node --test test/agent-drive-artifact-upload.test.js` ثم `npm run check:continuity`.
 
 ```sh
 git branch --show-current && git status --short && git log -3 --oneline
-npm run kb:manifest && npm run kb -- verify
-node --test test/knowledge-governance.test.js test/agent-kb-planner.test.js test/agent-verifier.test.js
-npm run test:sandbox
-node --test test/agent-gmail.test.js
-node --test test/agent-google-read.test.js
-npm run check && npm run now:check && npm run check:continuity && npm run check:secrets
+node --test test/agent-drive-artifact-upload.test.js
+node --test test/agent-connectors.test.js test/agent-artifact-store.test.js test/agent-tool-validation.test.js test/agent-output-templates.test.js
+npm run test:coverage
+npm run check && npm run now && npm run now:check && npm run check:continuity && npm run check:secrets
+CELIA_SANDBOX_INTEGRATION=1 node --test test/agent-sandbox.test.js test/agent-sandbox-tool.test.js test/agent-artifact-store.test.js test/agent-output-templates.test.js test/agent-spider-reader.test.js test/agent-model-router.test.js
 ```
