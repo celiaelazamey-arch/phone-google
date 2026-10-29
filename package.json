@@ -45,6 +45,7 @@
     "test:mysql": "node --test integration/mysql.integration.mjs",
     "eval:ai": "node scripts/eval-ai.mjs",
     "eval:templates": "node scripts/eval-templates.mjs",
+    "eval:web": "node scripts/eval-web.mjs",
     "google:doctor": "node scripts/google-doctor.mjs",
     "now": "node scripts/generate-now.mjs",
     "now:check": "node scripts/generate-now.mjs --check",

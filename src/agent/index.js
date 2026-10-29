@@ -5,6 +5,8 @@ import { createMysqlDriver, createSqliteDriver } from './drivers.js';
 import { createToolRegistry, defaultToolDefinitions } from './tools.js';
 import { createSandboxExecutor } from './sandbox.js';
 import { createArtifactStore } from './artifact-store.js';
+import { createEgressAllowlist, createEgressProxy, createEvidenceEgressSink } from './egress-proxy.js';
+import { createWebAccess } from './web-tools.js';
 import { createSpiderReader, defaultSpiderDbPath } from './spider-reader.js';
 import { createDemoPlanner, DEMO_PLANNER_TOOL_SURFACE } from './planner.js';
 import { createProviderPlanner, PROVIDER_PLAN_SCHEMA, validateProviderPlan, CALL_MANY_LIMITS } from './planner-provider.js';
@@ -228,6 +230,43 @@ export function readAgentConnectors(env = process.env) {
   return [...new Set(names.filter((name) => name !== 'none'))];
 }
 
+/**
+ * M-C/C1-b — بوابة الوصول إلى الويب.
+ *
+ * `off` (الافتراضي) لا يضيف أي أداة ويب ولا يفتح أي مقبس. `proxy` يبني وسيط الخروج
+ * بقائمة مسموحة صريحة؛ وقائمة فارغة أو `*` تُفشل الإقلاع بدل أن تُقرأ كـ«كل شيء
+ * مسموح». لا يُفتح `network.allowlist` في العزل في أي وضع — الشبكة تبقى هناك `deny`.
+ */
+export function readAgentEgress(env = process.env) {
+  const mode = String(env.CELIA_AGENT_EGRESS || 'off').trim().toLowerCase();
+  if (mode !== 'off' && mode !== 'proxy') {
+    throw Object.assign(
+      new Error('CELIA_AGENT_EGRESS must be "off" (default) or "proxy" (governed web access through the egress proxy)'),
+      { code: 'agent_egress_misconfigured' }
+    );
+  }
+  if (mode === 'off') return { mode, hosts: [], allowlist: null };
+  const hosts = String(env.CELIA_AGENT_EGRESS_ALLOWLIST || '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  if (!hosts.length) {
+    throw Object.assign(
+      new Error('CELIA_AGENT_EGRESS=proxy requires CELIA_AGENT_EGRESS_ALLOWLIST (explicit hosts; "*" is refused)'),
+      { code: 'agent_egress_allowlist_required' }
+    );
+  }
+  let allowlist;
+  try {
+    allowlist = createEgressAllowlist({ hosts });
+  } catch (error) {
+    throw Object.assign(new Error(`CELIA_AGENT_EGRESS_ALLOWLIST is invalid: ${error?.code || error?.message}`), {
+      code: 'agent_egress_allowlist_invalid'
+    });
+  }
+  return { mode, hosts, allowlist };
+}
+
 function buildConnectors({ env, pool, config, logger, resolveArtifact = null }) {
   let requested;
   try {
@@ -406,6 +445,10 @@ export function createAgentHost({
     failure = failure || { code: 'invalid_agent_boot_recovery', message: error.message };
   }
   let lastBootRecovery = null;
+  let egressInfo = { mode: 'off', hosts: [], stats: null };
+  let webAccess = null;
+  // البوابة تُقرأ عند إنشاء المضيف لا عند أول جلب: إعداد خاطئ يُفشل الإقلاع فورًا.
+  const egressConfig = readAgentEgress(env);
   const nodeEnv = config.nodeEnv || env.NODE_ENV || 'development';
 
   const ready = (async () => {
@@ -525,6 +568,26 @@ export function createAgentHost({
     const spiderReader = spiderMode === 'read'
       ? createSpiderReader({ dbPath: env.CELIA_SPIDER_DB_PATH || defaultSpiderDbPath(env) })
       : null;
+    // M-C/C1-b: الوصول إلى الويب قرار نشر صريح. الوسيط يستمع على 127.0.0.1 فقط،
+    // وكل جلب يأخذ منحة معتمة تُسحب بعد الاستخدام؛ بلا هذا العلم لا أداة web.fetch.
+    let egressProxy = null;
+    if (egressConfig.mode === 'proxy') {
+      egressProxy = createEgressProxy({ onEvent: createEvidenceEgressSink({ store }) });
+      const address = await egressProxy.listen({ port: 0 });
+      webAccess = createWebAccess({
+        proxy: egressProxy,
+        proxyUrl: address.url,
+        allowlist: egressConfig.allowlist,
+        limits: {
+          maxFetchesPerRun: positiveInt(env.CELIA_AGENT_WEB_MAX_FETCHES, 6),
+          maxTotalCharsPerRun: positiveInt(env.CELIA_AGENT_WEB_MAX_CHARS, 80_000)
+        },
+        // صف `web_source` لكل محاولة: مصدر مجلوب أو منع صريح — بالبصمة لا بالنص.
+        store
+      });
+      egressInfo = { mode: 'proxy', hosts: egressConfig.hosts, url: address.url, stats: null };
+      logger.info?.(`Agent egress proxy on ${address.url} (allowlist: ${egressConfig.hosts.join(', ')})`);
+    }
     const toolRegistry = createToolRegistry(defaultToolDefinitions({
       statusProvider,
       kb,
@@ -533,7 +596,8 @@ export function createAgentHost({
       plannerSafe: plannerMode === 'gemini' || plannerMode === 'gemini-router',
       sandbox: sandboxExecutor,
       artifacts: artifactStore,
-      spider: spiderReader
+      spider: spiderReader,
+      web: webAccess
     }));
     const demoPlanner = createDemoPlanner({
       knowledge: Boolean(kb),
@@ -621,6 +685,13 @@ export function createAgentHost({
       return mode;
     },
     ready,
+    /** حالة الوصول إلى الويب: الوضع والقائمة وأعداد القرارات — بلا أي رمز منحة. */
+    egress() {
+      return {
+        ...egressInfo,
+        stats: webAccess ? webAccess.stats() : null
+      };
+    },
     async status() {
       if (mode === 'off') {
         return { enabled: false, mode, reason: 'agent_runtime_disabled', requiredEnv: 'CELIA_AGENT_RUNTIME=mysql|sqlite' };

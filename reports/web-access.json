@@ -1,0 +1,128 @@
+{
+  "version": "agent-web-eval-v1",
+  "pass": true,
+  "total": 11,
+  "passed": 11,
+  "scenarios": [
+    {
+      "id": "WEB-01",
+      "title": "مصدر مجلوب بالبصمة",
+      "pass": true,
+      "checks": {
+        "status200": true,
+        "titleRead": true,
+        "textHasClaim": true,
+        "scriptsDropped": true,
+        "digestOfWhatPlannerSaw": true,
+        "oneHop": true,
+        "notTainted": true
+      },
+      "detail": "http://127.0.0.1:<port>/article → 90 chars"
+    },
+    {
+      "id": "WEB-02",
+      "title": "مضيف غير مسموح يُرفض قبل الاتصال",
+      "pass": true,
+      "checks": {
+        "code": true,
+        "noContact": true
+      },
+      "detail": "web_url_not_allowed"
+    },
+    {
+      "id": "WEB-03",
+      "title": "redirect داخلي يُتبع",
+      "pass": true,
+      "checks": {
+        "finalUrl": true,
+        "bothHops": true
+      },
+      "detail": "2 hops"
+    },
+    {
+      "id": "WEB-04",
+      "title": "redirect خارج القائمة يُرفض",
+      "pass": true,
+      "checks": {
+        "code": true,
+        "targetNeverContacted": true
+      },
+      "detail": "web_url_not_allowed"
+    },
+    {
+      "id": "WEB-05",
+      "title": "سقف redirect",
+      "pass": true,
+      "checks": {
+        "code": true
+      },
+      "detail": "web_redirect_limit"
+    },
+    {
+      "id": "WEB-06",
+      "title": "نوع محتوى غير مدعوم",
+      "pass": true,
+      "checks": {
+        "code": true
+      },
+      "detail": "web_fetch_unsupported_content_type"
+    },
+    {
+      "id": "WEB-07",
+      "title": "سقف حجم الرد",
+      "pass": true,
+      "checks": {
+        "code": true
+      },
+      "detail": "web_response_too_large"
+    },
+    {
+      "id": "WEB-08",
+      "title": "حقن يُنقّى قبل المخطِّط",
+      "pass": true,
+      "checks": {
+        "tainted": true,
+        "rules": true,
+        "payloadGone": true,
+        "ordinaryKept": true,
+        "digestScrubbed": true
+      },
+      "detail": "override_ar,override_en,secret_request"
+    },
+    {
+      "id": "WEB-09",
+      "title": "ثلاثة مصادر لكل ادعاء",
+      "pass": true,
+      "checks": {
+        "threeRows": true,
+        "distinctUrls": true,
+        "everyRowDigested": true,
+        "digestsMatch": true
+      },
+      "detail": "3 sources"
+    },
+    {
+      "id": "WEB-10",
+      "title": "ميزانية لكل تشغيل ومنحة تُسحب",
+      "pass": true,
+      "checks": {
+        "budgetCode": true,
+        "noLiveGrants": true,
+        "otherRunUnaffected": true
+      },
+      "detail": "web_budget_exhausted"
+    },
+    {
+      "id": "WEB-11",
+      "title": "كل قرار خروج مسجّل",
+      "pass": true,
+      "checks": {
+        "anyAllowed": true,
+        "everyRowHasRun": true,
+        "everyRowHasReason": true,
+        "noTokenInEvidence": true
+      },
+      "detail": "16 forwarded"
+    }
+  ]
+}

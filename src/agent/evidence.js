@@ -46,6 +46,9 @@ export const EVIDENCE_KIND = Object.freeze({
   // M-C/C1: one row per egress decision, allowed or blocked, with bytes and status.
   // It attests to what the proxy enforced; it never carries headers or query strings.
   egressRequest: 'egress_request',
+  // M-C/C2a: صف لكل مصدر مجلوب — URL والحالة والبصمة وما رآه ماسح الحقن.
+  // النص نفسه لا يُضمَّن؛ بصمته فقط هي المشهودة.
+  webSource: 'web_source',
   // M-B/B2: publication of a sandbox artifact into the owner-facing store.
   // The SHA-256 recorded here is what later download verification attests against.
   artifactPublished: 'artifact_published'
