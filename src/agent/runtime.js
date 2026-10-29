@@ -88,6 +88,9 @@ export function createAgentRuntime({
   plannerToolAllowlist = null,
   ownerId = 'owner',
   limits = {},
+  // M-B/B2: مخزن artifacts المواجه للمالك. null يبقي قدرة الاستعراض والتنزيل
+  // معطلة بكود صريح — لا واجهة صامتة ولا تخمين.
+  artifacts = null,
   connectors = createEmptyConnectorRegistry(),
   clock = Date.now,
   workerId = `w-${crypto.randomBytes(4).toString('hex')}`,
@@ -1895,6 +1898,20 @@ export function createAgentRuntime({
         throw httpError(409, result.reason || 'thread_delete_blocked', result.reason || 'thread_delete_blocked');
       }
       return result;
+    },
+    // M-B/B2: استعراض artifacts تشغيلةٍ ما — خلف ملكية التشغيل نفسها التي تحمي
+    // detail()؛ روابط التنزيل تُوقَّع لحظة الطلب وتنتهي صلاحيتها ذاتيًا.
+    async listRunArtifacts(runId, requesterId = ownerId) {
+      const run = await store.getRunForOwner(runId, requesterId);
+      if (!run) throw httpError(404, 'run_not_found', 'run_not_found');
+      if (!artifacts) return { enabled: false, artifacts: [] };
+      return { enabled: true, urlTtlMs: artifacts.urlTtlMs, artifacts: await artifacts.list(runId) };
+    },
+    // M-B/B2: التنزيل الموقّع — التوقيع المنتهي الصلاحية هو التفويض كله، والبصمة
+    // يُعاد حسابها عند كل قراءة فيُكشف العبث بعد التسليم (artifact_tampered).
+    async openArtifactDownload(params) {
+      if (!artifacts) throw httpError(404, 'artifact_store_disabled', 'artifact_store_disabled');
+      return artifacts.open(params);
     },
     async exportAuditBundle(runId, requesterId = ownerId) {
       const detail = await runtime.detail(runId, requesterId);

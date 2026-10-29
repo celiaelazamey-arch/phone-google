@@ -77,3 +77,13 @@ npm run test:sandbox
 - **السياسة:** سقف `workspaceBytes` رُفع إلى 256MiB (الافتراضي 8MiB بلا تغيير)؛ `CELIA_SANDBOX_ARTIFACT_ROOT` و`CELIA_SANDBOX_WORKSPACE_BYTES` و`CELIA_SANDBOX_CPU_SECONDS` و`CELIA_SANDBOX_WALL_MS` قابلة للضبط والقيم خارج الحدود تُفشل بناء السياسة.
 - **الإثبات:** `test/agent-sandbox-tool.test.js` — SBX-01..08 بلا شبكة، وSBX-09 تكامل حقيقي خلف `CELIA_SANDBOX_INTEGRATION=1`: مهمة «حلّل CSV واحسب» تمر كاملة (خطة → تنفيذ معزول → تحقق → تسليم) بمنفذ namespaces حقيقي، و`result.json` يُقرأ عبر `readArtifact` وسلسلة الأدلة سليمة.
 - **حد موثق:** المنفذ يقبل تشغيلة واحدة لكل `runId` (حجز `wx`)؛ استدعاء ثانٍ في نفس التشغيلة يفشل `sandbox_duplicate_run` — فاشل-مغلقًا، ورفع الحد قرار لاحق. كذلك allowlist أدوات المخطِّط الحي قراءات فقط، فلا يستطيع مزود حي استدعاء `sandbox.exec` قبل قرار حوكمة مستقل (SBX-08).
+
+## 7) مخزن artifacts المواجه للمالك — B2 (`artifact.create` + تنزيل موقّع، 2026-10-29)
+
+- **المسار الكامل:** `sandbox.exec` → `artifact.create` (تقرأ عبر `readArtifact` المتحقق بالبصمة/الحجم/الصلاحية حصرًا) → `src/agent/artifact-store.js` يعيد التحقق من SHA-256 على البايتات المسلّمة قبل أي كتابة، يخزّن محليًا، يسجّل صف `agent_artifacts` (ترحيل `sql/migrations/0006` إضافي + DDL SQLite)، ويبصم `artifact_published` في سلسلة الأدلة.
+- **ثلاثة ثوابت فاشلة-مغلقة:** (1) بايت تغيّر بين التصدير والنشر → `artifact_hash_mismatch` ولا يُكتب شيء؛ (2) البصمة يُعاد حسابها عند **كل** تنزيل → العبث بعد التسليم `artifact_tampered` 409 ولا بايت معبوث يصل المالك؛ (3) رابط التنزيل الموقّع HMAC بمهلة صريحة هو التفويض كله — بلا توقيع صالح 401 دون كشف وجود الملف، وبعد المهلة 410.
+- **Idempotency في قاعدة البيانات لا الذاكرة:** مفتاح فريد `(run_id, source_artifact_id)` — إعادة النشر بنفس البصمة تعيد نفس الصف (`replayed`)، وببصمة مختلفة تُرفض `artifact_conflict`.
+- **الأداة مشروطة:** `artifact.create` (`internalWrite`, `settledFailures`) موجودة فقط حين يتوفر المنفّذ والمخزن معًا؛ بدونهما سطح الأدوات القائم بلا تغيير حرفي (ART-01).
+- **الواجهة:** `/agent` يعرض قسم «الملفات الناتجة» بزر تنزيل لكل artifact (الاسم، الحجم، البصمة، أجل الرابط)؛ القائمة خلف توكن `/api/agent/runs/:id/artifacts` وملكية التشغيل نفسها التي تحمي `detail`.
+- **الضبط:** `CELIA_ARTIFACT_STORE_ROOT` (افتراضي `.data/agent-artifact-store`)، `CELIA_ARTIFACT_SIGNING_KEY` (غيابه = مفتاح عشوائي لهذا الإقلاع، فالروابط تموت مع إعادة التشغيل عمدًا)، `CELIA_ARTIFACT_URL_TTL_MS` (افتراضي 15 دقيقة؛ خارج 1s..24h يُفشل الإقلاع)؛ مفتاح أقصر من 32 حرفًا → `artifact_signing_key_weak` عند البناء.
+- **الإثبات:** `test/agent-artifact-store.test.js` ART-01..08 بلا شبكة (منها ART-08 عبر HTTP حقيقي: تنزيل البايتات بالضبط، 401 بلا توقيع، 409 بعد عبث)، وART-09 خلف `CELIA_SANDBOX_INTEGRATION=1`: عزل namespaces حقيقي → نشر → تنزيل `{"total":5}` بايتًا ببايت وسلسلة الأدلة سليمة.

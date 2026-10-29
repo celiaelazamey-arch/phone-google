@@ -16,7 +16,6 @@ function fail(res, error) {
 export function createAgentRouter({ agent, authorize, logger = console }) {
   const router = express.Router();
   const json = express.json({ limit: '64kb' });
-  router.use(authorize);
 
   const runtime = async (res) => {
     const status = await agent.status();
@@ -31,6 +30,34 @@ export function createAgentRouter({ agent, authorize, logger = console }) {
       return null;
     }
   };
+
+  // M-B/B2: التنزيل الموقّع يسبق authorize عمدًا — توقيع HMAC المنتهي الصلاحية هو
+  // التفويض الكامل (زر التنزيل في /agent رابط مباشر لا يحمل ترويسة Bearer).
+  // بلا توقيع صالح: 401 دون كشف وجود الملف؛ بعد المهلة: 410؛ عبث بالبايتات: 409.
+  router.get('/artifacts/:id/download', async (req, res) => {
+    const current = await runtime(res);
+    if (!current) return undefined;
+    try {
+      const { record, content } = await current.openArtifactDownload({
+        id: req.params.id,
+        exp: req.query.exp,
+        sig: req.query.sig
+      });
+      return res
+        .set({
+          'Cache-Control': 'no-store',
+          'Content-Type': 'application/octet-stream',
+          'Content-Length': String(record.bytes),
+          'Content-Disposition': `attachment; filename="${record.name}"`,
+          'X-Artifact-SHA256': record.sha256
+        })
+        .send(content);
+    } catch (error) {
+      return fail(res, error);
+    }
+  });
+
+  router.use(authorize);
 
   router.get('/status', async (_req, res) => {
     res.set('Cache-Control', 'no-store').json(await agent.status());
@@ -176,6 +203,18 @@ export function createAgentRouter({ agent, authorize, logger = console }) {
     if (!current) return undefined;
     try {
       return res.json(await current.detail(req.params.id, current.status().ownerId));
+    } catch (error) {
+      return fail(res, error);
+    }
+  });
+
+  // M-B/B2: قائمة artifacts التشغيل خلف نفس ملكية detail؛ كل استدعاء يوقّع
+  // روابط تنزيل جديدة بمهلة صريحة.
+  router.get('/runs/:id/artifacts', async (req, res) => {
+    const current = await runtime(res);
+    if (!current) return undefined;
+    try {
+      return res.set('Cache-Control', 'no-store').json(await current.listRunArtifacts(req.params.id, current.status().ownerId));
     } catch (error) {
       return fail(res, error);
     }

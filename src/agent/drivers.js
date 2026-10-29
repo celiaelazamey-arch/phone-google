@@ -173,7 +173,23 @@ const SQLITE_DDL = [
   )`,
   'CREATE UNIQUE INDEX IF NOT EXISTS uq_agent_owner_facts_tag ON agent_owner_facts (owner_id, tag)',
   'CREATE INDEX IF NOT EXISTS idx_agent_owner_facts_source ON agent_owner_facts (source_run_id)',
-  'CREATE INDEX IF NOT EXISTS idx_agent_owner_facts_expiry ON agent_owner_facts (owner_id, expires_at)'
+  'CREATE INDEX IF NOT EXISTS idx_agent_owner_facts_expiry ON agent_owner_facts (owner_id, expires_at)',
+  // M-B/B2: owner-facing artifact registry. One row per published sandbox artifact;
+  // the unique (run_id, source_artifact_id) key makes publication idempotent by DB, not memory.
+  `CREATE TABLE IF NOT EXISTS agent_artifacts (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+    owner_id TEXT NOT NULL,
+    sandbox_run_id TEXT NOT NULL,
+    source_artifact_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    bytes INTEGER NOT NULL,
+    sha256 TEXT NOT NULL,
+    storage_path TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )`,
+  'CREATE UNIQUE INDEX IF NOT EXISTS uq_agent_artifacts_source ON agent_artifacts (run_id, source_artifact_id)',
+  'CREATE INDEX IF NOT EXISTS idx_agent_artifacts_run ON agent_artifacts (run_id, created_at)'
 ];
 
 const MYSQL_AGENT_TABLES = [
@@ -187,7 +203,8 @@ const MYSQL_AGENT_TABLES = [
   'agent_evidence',
   'agent_outbox',
   'agent_thread_summaries',
-  'agent_owner_facts'
+  'agent_owner_facts',
+  'agent_artifacts'
 ];
 
 function uniqueViolation(error) {

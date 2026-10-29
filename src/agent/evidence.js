@@ -42,7 +42,10 @@ export const EVIDENCE_KIND = Object.freeze({
   sandboxCreated: 'sandbox_created',
   sandboxFinished: 'sandbox_finished',
   sandboxNetworkAttempt: 'sandbox_network_attempt',
-  sandboxArtifact: 'sandbox_artifact'
+  sandboxArtifact: 'sandbox_artifact',
+  // M-B/B2: publication of a sandbox artifact into the owner-facing store.
+  // The SHA-256 recorded here is what later download verification attests against.
+  artifactPublished: 'artifact_published'
 });
 
 export const EVIDENCE_VERSION = 'evidence-v1';

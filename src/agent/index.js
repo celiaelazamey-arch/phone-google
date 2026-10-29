@@ -1,8 +1,10 @@
+import crypto from 'node:crypto';
 import { createAgentRuntime, PLAN_LIFECYCLE_STATE } from './runtime.js';
 import { createAgentStore } from './store.js';
 import { createMysqlDriver, createSqliteDriver } from './drivers.js';
 import { createToolRegistry, defaultToolDefinitions } from './tools.js';
 import { createSandboxExecutor } from './sandbox.js';
+import { createArtifactStore } from './artifact-store.js';
 import { createDemoPlanner, DEMO_PLANNER_TOOL_SURFACE } from './planner.js';
 import { createProviderPlanner, PROVIDER_PLAN_SCHEMA, validateProviderPlan, CALL_MANY_LIMITS } from './planner-provider.js';
 import { createGeminiPlannerProvider } from './gemini-planner-provider.js';
@@ -463,13 +465,26 @@ export function createAgentHost({
           }
         })
       : null;
+    // M-B/B2: مخزن artifacts يركب حصرًا فوق العزل المفعّل — المحتوى يأتي من
+    // readArtifact المتحقق بالبصمة لا من أي مسار آخر. مفتاح التوقيع من البيئة؛
+    // غيابه يولّد مفتاحًا عشوائيًا لهذا الإقلاع فقط (الروابط تموت مع إعادة التشغيل
+    // عمدًا — فاشل-مغلقًا، لا مفتاح ثابت مضمّن في الشيفرة أبدًا).
+    const artifactStore = sandboxExecutor
+      ? createArtifactStore({
+          store,
+          rootDir: env.CELIA_ARTIFACT_STORE_ROOT || '.data/agent-artifact-store',
+          signingKey: env.CELIA_ARTIFACT_SIGNING_KEY || crypto.randomBytes(32).toString('hex'),
+          urlTtlMs: positiveInt(env.CELIA_ARTIFACT_URL_TTL_MS, 900_000)
+        })
+      : null;
     const toolRegistry = createToolRegistry(defaultToolDefinitions({
       statusProvider,
       kb,
       gmail,
       googleReaders,
       plannerSafe: plannerMode === 'gemini',
-      sandbox: sandboxExecutor
+      sandbox: sandboxExecutor,
+      artifacts: artifactStore
     }));
     const demoPlanner = createDemoPlanner({
       knowledge: Boolean(kb),
@@ -504,6 +519,7 @@ export function createAgentHost({
       store,
       tools: toolRegistry,
       planner,
+      artifacts: artifactStore,
       connectors,
       ownerId: config.userId || env.APP_USER_ID || 'owner',
       limits: readAgentLimits(env),
