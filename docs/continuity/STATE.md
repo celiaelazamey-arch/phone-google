@@ -1,16 +1,57 @@
 # الحالة الحالية — ابدأ من هنا
 
-**آخر مراجعة:** 29 أكتوبر 2026 · **نوع الجلسة الحالية:** **فشل CI يسمّي نفسه — مُبلِّغ annotations لاختبارات `node --test` (DEC-039، QA-008)**
-على الفرع `arena/afd3acff-phone-google` (متفرع من `main@fc4d60f` بعد دمج PR #48، ثم دُمج فيه `main@0ebf8ca` = PR #70) · PR #72 مفتوح ·
-سجل الجلسة الحالي: [2026-10-28-ci-test-annotations](sessions/2026-10-28-ci-test-annotations.md) ·
-السجل السابق: [2026-10-28-executive-gap-closure](sessions/2026-10-28-executive-gap-closure.md) ·
+> **تحديث 2026-10-28 (جلسة النشر الحي — `DEC-038`):** دُمج PR `#70` في `main` (`0ebf8cac86faaea67e6f969c273549b2f8b33220`)
+> فانتشر محرك الحافة الكامل بلا فيزا تلقائيًا وتحقق حيًّا على الرابط العام في التشغيلة **`40719074394`**
+> (`verify:live --mode edge` PASS، D1 بـ12 عبارة SQL، `durable: true`، 18/18 سرًا) مع Pages `40719074587` (12/12 مسارًا)
+> والإصدار `40719074453` والجودة `40719074375`. المتبقي حصرًا لإجراء المالك: رابط استدعاء Google، وأسرار Meta الاختيارية.
+> انظر [سجل جلسة النشر الحي](sessions/2026-10-28-live-edge-publication.md). ما يلي توثيق الجلسة السابقة كما كُتب، محفوظ بلا حذف.
+
+**آخر مراجعة:** 29 أكتوبر 2026 · **نوع الجلسة الحالية:** **QA-009 — فشل `main` يفتح issue تسمّي الاختبار + مصفوفة مخاطر الوكيل (DEC-041)**
+على الفرع `arena/02b291bc-phone-google` (متفرع من `main@c7723be` = دمج PR #72؛ يحمل أيضًا DEC-040/OPS-006) ·
+سجل الجلسة الحالي: [2026-10-29-qa-009-ci-failure-notify](sessions/2026-10-29-qa-009-ci-failure-notify.md) ·
+سجل الـPRs المتعارضة (DEC-040): [2026-10-29-open-prs-reconciliation](sessions/2026-10-29-open-prs-reconciliation.md) ·
+سجل النشر الحي (DEC-038، أُعيد إنشاؤه هنا): [2026-10-28-live-edge-publication](sessions/2026-10-28-live-edge-publication.md) ·
+السجلات السابقة: [2026-10-28-ci-test-annotations](sessions/2026-10-28-ci-test-annotations.md) ·
+[2026-10-28-executive-gap-closure](sessions/2026-10-28-executive-gap-closure.md) ·
 الخطة التنفيذية الشاملة: [docs/executive-completion-plan.md](../executive-completion-plan.md) ·
 سجل D1 السابق: [2026-10-28-edge-d1-sql-splitter-and-pr-hygiene](sessions/2026-10-28-edge-d1-sql-splitter-and-pr-hygiene.md) ·
 الدليل: [docs/computer-permissions](../computer-permissions/README.md) · صفحة الكمبيوتر:
 [docs/computer-use.md](../computer-use.md) · حوكمة المشكلات: [docs/issue-triage.md](../issue-triage.md) ·
 واقع الخدمات: [docs/service-reality.md](../service-reality.md) · خطة المحافظة: [docs/preservation-plan.md](../preservation-plan.md)
 
-## الطلب الحالي — «نفّذ»: مُبلِّغ annotations لاختبارات CI (DEC-039، QA-008) — PR #72
+## الطلب الحالي — «نعم» على QA-009 ومصفوفة المخاطر (DEC-041)
+
+- **ما طُلب:** بعد مقترح خارجي بـ«وكيل إصلاح ذاتي مستقل» ومصفوفة مخاطر بأربعة أركان، أرفق المالك سكربت `qa_alert.js` ووثيقة
+  مصفوفة وقال «نعم». نُفِّذ الاثنان **بالشكل المتوافق مع النظام**: السكربت المرفق لم يُعتمد (يقرأ ملف سجل لا يكتبه شيء، لا يسمّي
+  الاختبار — «موكب» بمقياس DEC-030)؛ والوثيقة كُتبت مصحَّحة بإحالات.
+- **ما نُفِّذ:** `scripts/ci-failure-notify.mjs` + `.github/workflows/quality-failure-notify.yml` (`workflow_run` بعد «Celia quality &
+  resilience» على `main`، push فقط): أحمر → **issue واحدة** `ci-failure` تسمّي كل اختبار فاشل (ملف:سطر، وظيفة، رأس خطأ مُعقَّم،
+  تغطية، ملخص، أمر إعادة الإنتاج)، تعليق واحد لكل تشغيلة، معرّف التشغيلة لا يُسجَّل مرتين؛ أخضر → تعليق وإغلاق؛ PR/فرع آخر/ملغاة/
+  متجاوَزة → تخطٍّ. صلاحيات `contents/actions/checks: read` + `issues: write` فقط؛ `GITHUB_TOKEN` فقط؛ لا retry/رقعة/rollback/دمج.
+  `docs/ci-failure-notify.md` و`docs/agent-risk-matrix.md`؛ `npm run ci:notify`.
+- **الدليل:** CI على الفرع (`ae0dd98`) run **`40802365022`** ✅ (Node 24 `123213195228`: 537/537، تغطية 90.81/72.78/85.02)؛ محليًا 537/537؛
+  `test/ci-failure-notify.test.js` 17/17؛ قراءات حية بلا كتابة: `40797023396` → green، `40673613296` → red
+  بوظيفة صامتة (قبل DEC-039)، `40687283608` → متجاوَزة، `40798428314` → ليست `main`. التفاصيل في سجل الجلسة §3.
+- **القيد المعلن:** `workflow_run` يعمل من الفرع الافتراضي فقط → QA-009 «بانتظار الدمج»؛ أول تشغيلة Quality مكتملة على `main` بعد
+  الدمج هي الدليل الحي (حتى الخضراء تطبع `nothing to do`).
+- **PR مفتوح:** **#73** (`arena/02b291bc-phone-google` → `main`، بأمر المالك «افتَح الـPR فوراً») يحمل DEC-038 المعاد + DEC-040 + DEC-041؛
+  `MERGEABLE`. **بانتظار المالك:** كلمة الدمج («ادمج #73»)، ثم إغلاق #71 بوصفه متجاوَزًا، وقرار #38 (DEC-040 يوصي بالإغلاق)؛ بعد الدمج
+  أول تشغيلة Quality مكتملة على `main` تُطلق «Quality failure notify (main)» فتتحول QA-009 إلى «متحقق» برقمها؛ طبقة «يقترح»
+  (رقعة + PR عبر بوابة الموافقة) بعد قرار AI-002/GOV-001.
+
+## الطلب السابق — «السبب والحل بما يتوافق مع نظامي دون تعارض: PR #71 و#38 مفتوحان» (DEC-040، OPS-006)
+
+- **السبب:** #71 (`DEC-038`) متفرع من `0ebf8ca` وتعارض مع دمج PR #72 في النقاط الساخنة الثلاث فقط (رأس STATE، أول CHANGELOG، ذيل
+  DECISIONS) — محتواه صحيح وما زال صحيحًا على `c7723be` (Edge run `40797023547`: `liveReady`, `durable`, 18/18). #38 متفرع من
+  `4d4eb85` (99 commit خلف `main`)، معرّفاته DEC-016/017/018 مستهلكة، وبنيته (Worker ثانٍ بأسرار مستقلة، أفعال خارجية بلا outbox،
+  متجر محاكاة) تخالف DEC-037/DEC-015/DEC-030.
+- **الحل المنفذ:** محتوى #71 أُعيد إنشاؤه كاملًا فوق `main` في هذا الفرع بمعرّفه `DEC-038` (الملفات الثمانية + ملحق بدليل `c7723be`)؛
+  من #38 استُبقيت فكرته المتوافقة الوحيدة: مُبلِّغ Playwright `github` في Actions (`playwright.config.js`) ضمن DEC-039.
+- **بانتظار المالك:** «افتح PR» لهذا الفرع ثم دمجه ثم إغلاق #71؛ وقرار #38: «أغلق #38» (التوصية في DEC-040) أو إعادته مهمة جديدة
+  داخل `workers/celia-edge` عبر outbox.
+- **التحقق محليًا:** 520/520، تغطية 90.84/72.76/85.15، `check` 139 ملفًا، `check:continuity` 50 وثيقة. CI على الفرع (`0366942`): run `Celia quality & resilience` **`40798428314`** ✅ كله — Node 24 (`123200418839`) 520/520، Node 22 (`123200419068`)، RTL dashboard مع مُبلِّغ Playwright `github` (`123200418899`) ✅.
+
+## الطلب السابق — «نفّذ»: مُبلِّغ annotations لاختبارات CI (DEC-039، QA-008) — مدموج في PR #72 → `main@c7723be`
 
 - **لماذا:** فشلان أعميان في يوم واحد على commits خضراء في كل مكان آخر — ساق Node 24 في run `40662071493` ثم
   `Publish verified release` run `40665130469` على `main@fc4d60f`؛ الـannotation الوحيدة «exit code 1»، والسجلات لا تُقرأ من هنا.
@@ -59,8 +100,13 @@
 
 ### 4. ما يتبقى حصريًا لقرار أو لوحة المالك (لا يُغلق بكود)
 
-- دمج PR `#70` في `main` لينطلق النشر التلقائي لـCloudflare Edge + D1 (الـ12 أداة كاملة) وGitHub Pages بلا أي بطاقة دفع.
-- إضافة رابط الاستدعاء `https://celia-phone-google.celiaelazamey.workers.dev/auth/google/callback` في Google Cloud Console لإتمام ربط `GOOG-001` الحي، وإضافة أسرار Meta الأربعة عند الرغبة بتشغيل `WA-005`.
+- ~~دمج PR `#70` في `main` لينطلق النشر التلقائي لـCloudflare Edge + D1 (الـ12 أداة كاملة) وGitHub Pages بلا أي بطاقة دفع.~~
+  **✅ أُنجز في 2026-10-28:** دُمج PR `#70` في `main@0ebf8cac86faaea67e6f969c273549b2f8b33220`، وانتشر محرك الحافة الكامل
+  (MCP 12 أداة + Google OAuth2 + WhatsApp + Gemini) على `https://celia-phone-google.celiaelazamey.workers.dev` مع قاعدة D1
+  الدائمة، ونجحت بوابة `verify:live --mode edge` داخل التشغيلة `40719074394`، و Pages `40719074587` (12/12 مسارًا) والإصدار
+  `40719074453` والجودة `40719074375` كلها خضراء (`DEC-038`).
+- إضافة رابط الاستدعاء `https://celia-phone-google.celiaelazamey.workers.dev/auth/google/callback` في Google Cloud Console لإتمام ربط `GOOG-001` الحي، وإضافة أسرار Meta الأربعة عند الرغبة بتشغيل `WA-005` (خطوتان بلا أي بطاقة؛ التفاصيل في [docs/no-visa-deployment.md](../no-visa-deployment.md)).
+- مضيف حاويات مجاني بلا بطاقة لمحرك Express + MySQL الكامل (`HOST-003`) ونسخة إنتاجية مستعادة (`DATA-001`) — القراران الوحيدان اللذان لا يزالان يمنعان اكتمال الركنين 6 و8 من [docs/plan-100-percent.md](../plan-100-percent.md).
 - تفعيل حماية الفرع `main` في إعدادات GitHub (`Settings → Branches` — حالياً `protected: false`)، وقرار PR `#38` المفتوح، وبيانات `SPDR-002` وسياسات `DATA-004`/`GOV-001`/`REL-001` (ويظل `HOST-003` لخادم حاوية MySQL المستقل اختياريًا فقط بعد توفر البديل الكامل على Workers + D1).
 
 ## الطلب السابق — «إتمام دوام D1 الفعلي على الحافة وتنظيف الـPRs المفتوحة»
@@ -690,17 +736,34 @@ pass/warn/fail، بلا شبكة وبلا طباعة أي سر) · `npm run goog
 
 ## الخطوة التالية بالضبط
 
-1. **المالك — إنشاء ما لا يمكن إنشاؤه من الجلسة (بلا بطاقة):** Render → New → Blueprint من `render.yaml`
+> **مُحدَّث 2026-10-28 بعد النشر الحي (`DEC-038`):** البندان 1 و2 أدناه يخصّان **محرك Express + MySQL الكامل فقط** ولم
+> يَعُدا عائقًا أمام النظام العامل: محرك الحافة الكامل منشور ومتحقَّق حيًّا بلا فيزا على
+> `https://celia-phone-google.celiaelazamey.workers.dev` (التشغيلة `40719074394`). الخطوة التالية الفعلية الآن هي
+> البندان 0.أ و0.ب (إجراءان في لوحات المالك، بلا أي بطاقة).
+
+0. **المالك — الإجراءان المتبقيان للمسار بلا فيزا (دقيقتان، بلا بطاقة):**
+   1. **ربط Google (`GOOG-001`):** Google Cloud Console → Credentials → عميل OAuth → إضافة Authorized redirect URI
+      `https://celia-phone-google.celiaelazamey.workers.dev/auth/google/callback`، ثم
+      `curl -sS -X POST https://celia-phone-google.celiaelazamey.workers.dev/auth/google/link -H "Authorization: Bearer $CELIA_MCP_API_TOKEN"`
+      وفتح الرابط والموافقة. دليل الإغلاق: `GET /api/google/status` → `"connected": true`.
+   2. **واتساب (`WA-005`, اختياري):** webhook تطبيق Meta على
+      `https://celia-phone-google.celiaelazamey.workers.dev/webhooks/whatsapp` + الأسرار الأربعة `WHATSAPP_*` في GitHub
+      Secrets، ثم إعادة تشغيل workflow **Deploy (Cloudflare Edge)**. دليل الإغلاق: تحدي Meta ينجح + `whatsapp_cloud_api verified`.
+
+1. **المالك — المحرك الكامل بـMySQL (مؤجَّل، لا يعطّل النظام):** Render → New → Blueprint من `render.yaml`
    (تير Free) ← Aiven MySQL Free ← إدخال الستة `MYSQL_*` في Render Environment ← نسخ رابط الخدمة إلى `APP_BASE_URL`
-   وإعادة النشر ← `npm run migrate -- --apply` مرة واحدة.
-2. **المالك — تشغيل النشر المتحقَّق:** GitHub → Settings → Secrets and variables → Actions:
+   وإعادة النشر ← `npm run migrate -- --apply` مرة واحدة. **محجوب حاليًا ببوابة تفويض بطاقة `1$` (`DEC-034`)؛ البديل هو
+   اختيار مضيف حاويات مجاني بلا بطاقة لحاوية GHCR.**
+2. **المالك — تشغيل النشر المتحقَّق (خاص بمحرك MySQL):** GitHub → Settings → Secrets and variables → Actions:
    Variable `CELIA_LIVE_URL=https://<service>.onrender.com` · Secrets `RENDER_API_KEY` و`RENDER_SERVICE_ID`
    (أو `RENDER_DEPLOY_HOOK_URL`). أول push على `main` بعدها يشغّل `deploy-render.yml` تلقائيًا (نشر ← انتظار `/readyz`
-   بـ`storage.mode=mysql` ← `verify:live --expect-commit` ← keep-alive كل 10 دقائق). **حينها فقط** يُكتب «منشور».
+   بـ`storage.mode=mysql` ← `verify:live --expect-commit` ← keep-alive كل 10 دقائق). **حينها فقط** يُكتب «منشور» عن
+   المحرك الكامل؛ أما محرك الحافة فمنشور بالفعل بدليل `verify:live --mode edge` في `40719074394`.
 3. **بعد النشر:** لصق تقرير `verify:live` في سجل جلسة جديد وتحديث HOST-003 إلى «متحقق»، ثم `backup:verify` (DATA-001)،
    ثم موصل WhatsApp في الـoutbox (AGENT-002)، ثم AI-001/AI-002 بعد قرار المزوّد
    ([docs/go-live-plan.md](../go-live-plan.md)).
-4. **أي ادعاء «يعمل»:** شغّل `[reality]` واقرأ annotations الـrun؛ لا يُستبدل بدليل محلي أو محاكاة.
+4. **أي ادعاء «يعمل»:** شغّل `[reality]` واقرأ annotations الـrun؛ ولا يُكتب «منشور» عن أي نشر إلا ببوابة حية ناجحة على
+   الرابط العام داخل نفس التشغيلة (`verify:live` للمحرك الكامل، و`verify:live --mode edge` للحافة)؛ لا يُستبدل بدليل محلي أو محاكاة.
 
 ## التحقق من الحفظ في الجلسة التالية
 

@@ -196,6 +196,8 @@ test('CI never runs the suite blind: the :ci scripts carry the reporter and ever
     'release.yml': /name: Gate 3\/4 · offline test suite[^\n]*\n\s+if: [^\n]+\n\s+run: npm run test:ci\n/, // one named gate per step (REL-002); the suite gate carries the reporter
     'pages.yml': /npm run check && npm run release:check && npm run test:ci && npm run build:pages/,
   };
+  const playwright = fs.readFileSync(path.join(root, 'playwright.config.js'), 'utf8');
+  assert.match(playwright, /reporter: process\.env\.GITHUB_ACTIONS === "true" \? \[\["list"\], \["github"\]\] : "list"/, 'browser failures are annotated in Actions too (Playwright built-in github reporter)');
   for (const [file, expected] of Object.entries(workflows)) {
     const text = fs.readFileSync(path.join(root, '.github/workflows', file), 'utf8');
     assert.match(text, expected, `${file} must run the suite through the annotating reporter`);

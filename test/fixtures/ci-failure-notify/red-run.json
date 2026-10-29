@@ -1,0 +1,38 @@
+{
+  "run": {
+    "id": 41000000001,
+    "name": "Celia quality & resilience",
+    "event": "push",
+    "status": "completed",
+    "conclusion": "failure",
+    "head_branch": "main",
+    "head_sha": "0123456789abcdef0123456789abcdef01234567",
+    "created_at": "2026-10-29T03:00:00Z",
+    "html_url": "https://github.com/celiaelazamey-arch/phone-google/actions/runs/41000000001"
+  },
+  "latest": { "id": 41000000001, "conclusion": "failure", "created_at": "2026-10-29T03:00:00Z" },
+  "jobs": [
+    { "id": 901, "name": "Node 24 · tests & failure recovery", "conclusion": "failure", "html_url": "https://github.com/celiaelazamey-arch/phone-google/actions/runs/41000000001/job/901" },
+    { "id": 902, "name": "RTL dashboard · desktop / mobile / accessibility", "conclusion": "failure", "html_url": "https://github.com/celiaelazamey-arch/phone-google/actions/runs/41000000001/job/902" },
+    { "id": 903, "name": "Python 3.11 · Celia Google Spider tests", "conclusion": "success", "html_url": "https://github.com/celiaelazamey-arch/phone-google/actions/runs/41000000001/job/903" },
+    { "id": 904, "name": "MySQL 8.4 · persistence / N−1 / backup restore", "conclusion": "failure", "html_url": "https://github.com/celiaelazamey-arch/phone-google/actions/runs/41000000001/job/904" },
+    { "id": 905, "name": "Optional external provider availability probes", "conclusion": "skipped", "html_url": "https://github.com/celiaelazamey-arch/phone-google/actions/runs/41000000001/job/905" }
+  ],
+  "annotations": {
+    "901": [
+      { "path": "test/knowledge-store.test.js", "start_line": 88, "end_line": 88, "annotation_level": "failure", "title": "KnowledgeStore.stats() orders by lastRunAt", "message": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n+ actual - expected\n  [ 'b', 'a' ] | token: ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" },
+      { "path": "test/knowledge-store.test.js", "start_line": 88, "end_line": 88, "annotation_level": "failure", "title": "KnowledgeStore.stats() orders by lastRunAt", "message": "duplicate of the same failure (retry matrix leg)" },
+      { "path": ".github", "start_line": 0, "end_line": 0, "annotation_level": "failure", "title": "coverage threshold", "message": "coverage lines 88.90% is below the 89% floor" },
+      { "path": ".github", "start_line": 670, "end_line": 670, "annotation_level": "failure", "title": "node --test", "message": "521 tests · 520 passed · 1 failed · coverage lines 88.90% · branches 72.70% · functions 84.90% (floor 89/71/82)\nfailing: KnowledgeStore.stats() orders by lastRunAt (test/knowledge-store.test.js:88)" },
+      { "path": ".github", "start_line": 671, "end_line": 671, "annotation_level": "failure", "title": "", "message": "Process completed with exit code 1." },
+      { "path": ".github", "start_line": 1, "end_line": 1, "annotation_level": "notice", "title": "", "message": "\"The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026.\"" }
+    ],
+    "902": [
+      { "path": "e2e/agent.spec.js", "start_line": 12, "end_line": 12, "annotation_level": "failure", "title": "[chromium] › e2e/agent.spec.js:12:3 › agent page › shows the plan | with a pipe", "message": "Error: expect(locator).toBeVisible() failed\nLocator: getByRole('heading', { name: 'الخطة' })\nAuthorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U" },
+      { "path": ".github", "start_line": 40, "end_line": 40, "annotation_level": "failure", "title": "", "message": "Process completed with exit code 1." }
+    ],
+    "904": [
+      { "path": ".github", "start_line": 55, "end_line": 55, "annotation_level": "failure", "title": "", "message": "Process completed with exit code 1." }
+    ]
+  }
+}
