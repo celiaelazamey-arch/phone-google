@@ -526,7 +526,8 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
   // The five core tables are untouched by the additive migration.
   const [tables] = await pool.execute('SELECT TABLE_NAME AS name FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()');
   const names = tables.map((row) => row.name);
-  assert.equal(names.filter((name) => name.startsWith('agent_')).length, 11);
+  assert.equal(names.filter((name) => name.startsWith('agent_')).length, 12);
+  assert.ok(names.includes('agent_artifacts'));
   assert.ok(names.includes('agent_outbox'));
   assert.ok(names.includes('agent_thread_summaries'));
   assert.ok(names.includes('agent_owner_facts'));
