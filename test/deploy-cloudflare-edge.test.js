@@ -145,7 +145,7 @@ test('edge deploy: a failing /readyz probe keeps liveReady false instead of thro
   assert.equal(report.liveReady, false);
 });
 
-test('edge deploy: full D1 migration applies all 14 statements (0001_state + 0002_runtime + 0003_cron_outbox) and records live /readyz storage durability', async () => {
+test('edge deploy: full D1 migration applies all 16 statements (0001_state + 0002_runtime + 0003_cron_outbox + 0004_reply_metrics) and records live /readyz storage durability', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'celia-edge-ok-'));
   const summaryPath = path.join(directory, 'summary.md');
   const lines = [];
@@ -189,8 +189,8 @@ test('edge deploy: full D1 migration applies all 14 statements (0001_state + 000
   assert.equal(report.status, 'deployed');
   assert.equal(report.d1.ok, true);
   assert.equal(report.d1.id, 'db-live-1');
-  assert.equal(report.d1.migrations.statements, 14);
-  assert.equal(queriedStatements.length, 14);
+  assert.equal(report.d1.migrations.statements, 16);
+  assert.equal(queriedStatements.length, 16);
   assert.equal(queriedStatements.filter((stmt) => stmt.includes('edge_cron_outbox')).length, 2, 'the cron outbox table and its index ship with the deploy');
   assert.equal(queriedStatements.some((stmt) => stmt.includes('every statement is')), false);
   assert.equal(report.liveReady, true);

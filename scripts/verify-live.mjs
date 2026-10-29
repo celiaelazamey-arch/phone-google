@@ -44,7 +44,7 @@ export const MANUAL_CHECKS = Object.freeze([
 ]);
 
 function parseArgs(argv) {
-  const options = { url: null, mode: 'mysql', expectCommit: null, expectVersion: null, samples: 3, maxFirstMs: 10_000, out: DEFAULT_OUT, allowHttp: false, timeoutMs: 90_000 };
+  const options = { url: null, mode: 'mysql', expectCommit: null, expectVersion: null, samples: 3, d1Samples: 5, maxFirstMs: 10_000, out: DEFAULT_OUT, allowHttp: false, timeoutMs: 90_000 };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     const next = () => {
@@ -61,6 +61,7 @@ function parseArgs(argv) {
     else if (arg === '--expect-commit') options.expectCommit = next();
     else if (arg === '--expect-version') options.expectVersion = next();
     else if (arg === '--samples') options.samples = Number(next());
+    else if (arg === '--d1-samples') options.d1Samples = Number(next());
     else if (arg === '--max-first-ms') options.maxFirstMs = Number(next());
     else if (arg === '--timeout-ms') options.timeoutMs = Number(next());
     else if (arg === '--out') options.out = next();
@@ -91,6 +92,7 @@ export async function verifyLive({
   expectCommit = null,
   expectVersion = null,
   samples = 3,
+  d1Samples = 5,
   maxFirstMs = 10_000,
   timeoutMs = 90_000,
   allowHttp = false,
@@ -203,6 +205,40 @@ export async function verifyLive({
       add('ready_durable', '/readyz يعيد 200 مع storage.mode=d1 وdurable=true ومسارات الحافة الكاملة', 'fail', { reason: error?.code || error?.name || 'request_failed' });
     }
 
+    // 3f. D1 latency as a series, not a number (WP-1.4, DEC-050). Every /readyz call writes a fresh token and reads it
+    //     back, so `storage.latencyMs` is a real write+read round trip inside the worker; the client round trip is
+    //     reported next to it. Measurement first — no threshold is enforced yet (DEC-045).
+    const seriesTitle = `زمن D1 (كتابة + قراءة) كسلسلة من ${Math.max(2, Number(d1Samples) || 5)} قياسات متتالية: أدنى/وسيط/أقصى لا رقم واحد`;
+    try {
+      const count = Math.max(2, Math.min(20, Number(d1Samples) || 5));
+      const latencies = [];
+      const roundTrips = [];
+      let durableAll = true;
+      for (let index = 0; index < count; index += 1) {
+        const probe = await get('/readyz');
+        const storage = probe.body?.storage || {};
+        latencies.push(typeof storage.latencyMs === 'number' && Number.isFinite(storage.latencyMs) ? storage.latencyMs : null);
+        roundTrips.push(probe.elapsedMs);
+        if (!(probe.status === 200 && storage.durable === true)) durableAll = false;
+      }
+      const measured = latencies.filter((value) => typeof value === 'number');
+      const ok = durableAll && measured.length === latencies.length;
+      const stats = (values) => ({ minMs: Math.min(...values), medianMs: median(values), maxMs: Math.max(...values) });
+      const d1 = measured.length ? stats(measured) : { minMs: null, medianMs: null, maxMs: null };
+      add('d1_latency_series', seriesTitle, ok ? 'pass' : 'fail', {
+        samples: latencies.length,
+        latencyMs: latencies,
+        ...d1,
+        spreadRatio: d1.medianMs ? Math.round((d1.maxMs / d1.medianMs) * 100) / 100 : null,
+        roundTrip: stats(roundTrips),
+        durableAll,
+        reason: ok ? null : !durableAll ? 'not_durable_in_series' : 'latency_not_reported',
+        note: 'المصدر storage.latencyMs من /readyz (كتابة رمز + قراءته داخل العامل)؛ لا عتبة بعد — القياس أولًا.'
+      });
+    } catch (error) {
+      add('d1_latency_series', seriesTitle, 'fail', { reason: error?.code || error?.name || 'request_failed' });
+    }
+
     // 4e. Owner MCP surface is gated: no token → 401.
     try {
       const gate = await get('/mcp');
@@ -248,6 +284,7 @@ export async function verifyLive({
     const cronTitle = 'GET /api/cron/status يعيد writes=outbox-approval-only مع durable=true وجدول outbox موجود (DEC-042)';
     if (!token) {
       add('edge_cron_governed', cronTitle, 'skipped', { reason: 'CELIA_MCP_API_TOKEN not provided to this process' });
+      add('edge_reply_metrics', 'GET /api/whatsapp/reply-metrics يعيد عدد الردود ونسبة المقصوص منها بحسب السبب (DEC-050)', 'skipped', { reason: 'CELIA_MCP_API_TOKEN not provided to this process' });
       return finish();
     }
     try {
@@ -272,6 +309,37 @@ export async function verifyLive({
       });
     } catch (error) {
       add('edge_cron_governed', cronTitle, 'fail', { reason: error?.code || error?.name || 'request_failed' });
+    }
+
+    // 7e. Truncated-reply ratio (WP-1.4, DEC-050): the number that must be known before `maxOutputTokens` changes.
+    //     `replies: 0` with `truncatedRatio: null` is a valid measurement ("nothing generated yet"), never a failure;
+    //     a 404/503 means old code or a missing `0004_reply_metrics` migration and fails.
+    const metricsTitle = 'GET /api/whatsapp/reply-metrics يعيد عدد الردود ونسبة المقصوص منها بحسب السبب (DEC-050)';
+    try {
+      const metrics = await get('/api/whatsapp/reply-metrics?days=30', { authorization: `Bearer ${token}` });
+      const body = metrics.body || {};
+      const ok =
+        metrics.status === 200 &&
+        body.ok === true &&
+        Number.isInteger(body.replies) &&
+        Number.isInteger(body.truncated) &&
+        Number.isInteger(body.maxOutputTokens) &&
+        body.decision === 'DEC-050';
+      add('edge_reply_metrics', metricsTitle, ok ? 'pass' : 'fail', {
+        httpStatus: metrics.status,
+        replies: body.replies ?? null,
+        truncated: body.truncated ?? null,
+        truncatedRatio: body.truncatedRatio ?? null,
+        byReason: body.byReason ?? null,
+        byProvider: body.byProvider ?? null,
+        maxOutputTokens: body.maxOutputTokens ?? null,
+        charCap: body.charCap ?? null,
+        windowDays: body.windowDays ?? null,
+        lastAt: body.lastAt ?? null,
+        reason: ok ? null : body.reason ?? body.error ?? (metrics.status === 404 ? 'route_missing' : 'unexpected_shape')
+      });
+    } catch (error) {
+      add('edge_reply_metrics', metricsTitle, 'fail', { reason: error?.code || error?.name || 'request_failed' });
     }
 
     return finish();
@@ -354,7 +422,7 @@ export async function runCli(argv = process.argv.slice(2), { env = process.env, 
   }
   if (options.help || !options.url) {
     stderr.write(
-      'Usage: npm run verify:live -- --url https://<service> [--expect-commit <sha>] [--expect-version <semver>] ' +
+      'Usage: npm run verify:live -- --url https://<service> [--expect-commit <sha>] [--expect-version <semver>] [--d1-samples <n>] ' +
         '[--samples 3] [--max-first-ms 10000] [--timeout-ms 90000] [--out .validation-artifacts/live-acceptance.json]\n' +
         'Owner-only checks run when CELIA_MCP_API_TOKEN is set in the environment (never passed as an argument).\n'
     );
@@ -373,6 +441,7 @@ export async function runCli(argv = process.argv.slice(2), { env = process.env, 
     mode: options.mode,
     token: env.CELIA_MCP_API_TOKEN || null,
     expectCommit: options.expectCommit,
+    d1Samples: options.d1Samples,
     expectVersion,
     samples: options.samples,
     maxFirstMs: options.maxFirstMs,
@@ -389,6 +458,14 @@ export async function runCli(argv = process.argv.slice(2), { env = process.env, 
   await writeFile(outPath, `${serialized}\n`, 'utf8');
   stdout.write(`${serialized}\n`);
   stderr.write(`${report.verdict === 'pass' ? 'PASS' : 'FAIL'} — ${report.summary.pass} pass, ${report.summary.fail} fail, ${report.summary.skipped} skipped, ${report.summary.manual} manual. Report: ${path.relative(root, outPath)}\n`);
+  // On GitHub Actions every failed check becomes an annotation that names the check id and its reason, so a red
+  // deploy run says *which* gate failed on the run summary itself (the logs/artifacts are not always reachable).
+  if (env.GITHUB_ACTIONS === 'true') {
+    for (const check of report.checks.filter((entry) => entry.status === 'fail')) {
+      const reason = check.detail?.reason ?? check.detail?.httpStatus ?? '';
+      stdout.write(`::error title=verify-live ${check.id}::${check.id}${reason === '' ? '' : ` (${reason})`} — ${check.title}\n`);
+    }
+  }
   return report.verdict === 'pass' ? 0 : 1;
 }
 

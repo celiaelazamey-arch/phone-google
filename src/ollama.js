@@ -1,4 +1,4 @@
-import { DEFAULT_POLICY, generateWhatsAppReply } from './gemini.js';
+import { DEFAULT_POLICY, generateWhatsAppReplyDetailed } from './gemini.js';
 import { generateOpenAiCompatibleReply } from './ai-providers.js';
 import { generateLocalPolicyReply } from './policy.js';
 import { createServiceRegistry, safeError, UpstreamError } from './resilience.js';
@@ -123,11 +123,13 @@ export async function generateCeliaReply({ config, customerMessage, provider, bu
   const callGemini = async () => {
     if (!config.gemini?.apiKey) throw new Error('Gemini API is not configured');
     const model = config.gemini.model || 'gemini-2.5-flash';
-    const reply = await services.run('gemini', (signal) => generateWhatsAppReply({
+    const detailed = await services.run('gemini', (signal) => generateWhatsAppReplyDetailed({
       config: { gemini: { apiKey: config.gemini.apiKey, model, businessContext: context } },
       customerMessage, signal
     }));
-    return { reply, provider: 'gemini', model, degraded: failures.length > 0, policyEnforced: true };
+    // WP-1.4: truncation facts travel with the reply so the caller can count them.
+    const { text: reply, ...truncation } = detailed;
+    return { reply, provider: 'gemini', model, degraded: failures.length > 0, policyEnforced: true, truncation };
   };
   const callOpenAiProvider = async (serviceName, providerCfg, defaultModel) => {
     if (!providerCfg?.apiKey) throw new Error(`${serviceName} API is not configured`);

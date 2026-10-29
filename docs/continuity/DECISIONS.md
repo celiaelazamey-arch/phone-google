@@ -1081,3 +1081,33 @@
 - **الأثر:** 580/580 محليًا، تغطية 91.38/74.35/85.87، `check` 150؛ أدنى تباين مقيس 5.37:1 (light `ok` على البطاقة). لا ترحيل، لا مزوّد، لا كلفة. يبقى تحت
   UX-003: هجرة الأوراق الست؛ الاستوديو يحتفظ بمبدّله الثنائي (يعامل `oled` كـ`dark`) حتى تُهاجَر `styles.css`. `emerald` اختياري لم يُطلب فلم يُضف.
 
+## DEC-050 — WP-1.4: قياس القصّ وزمن D1 قبل أي تغيير — جدول `whatsapp_reply_metrics` مفتاحه معرّف الرسالة، سلسلة `/readyz`، وقسم «أرقام مقاسة» يحرسه اختبار
+
+- **التاريخ:** 2026-10-29 · **السياق:** الحزمة الرابعة من الخطة المعتمدة (DEC-047) بكلمة المالك «ابدأ». المطلوب (الخطة §WP-1.4): عدّاد `reply_truncated`
+  يُخزَّن مع الرسالة ليُعرف نصيب الردود المقصوصة قبل تغيير `maxOutputTokens`؛ سلسلة زمن D1 في `verify:live` (5 قياسات → وسيط وأقصى) تثبت تباين
+  «130→1400 ms» أو تنفيه؛ قسم «أرقام مقاسة» بتاريخ وتشغيلة. القيد الحاكم: الرد للعميل لا يتأخر ولا يفشل بسبب القياس.
+- **البدائل المرفوضة:** (أ) عمود جديد في `whatsapp_messages` عبر `ALTER TABLE` — الرفع يعيد تطبيق كل عبارات الترحيل في كل مرة (DEC-044)، و`ALTER TABLE
+  ADD COLUMN` ليس idempotent في SQLite/D1 فيكسر الرفع الثاني؛ (ب) قياس القصّ من طول النص المرسَل فقط — يخفي توقف النموذج عند حد الرموز في رد قصير، وهو السبب
+  الأرجح؛ (ج) تقدير النسبة من أحجام الردود المخزّنة — تقدير لا قياس (DEC-045)؛ (د) فرض عتبة على سلسلة D1 الآن — لا نملك توزيعًا بعد؛ العتبة بعد أول سلسلة
+  حقيقية؛ (هـ) مشاركة الملف بين `src/` و`workers/` — صورة Docker تنسخ `src/` وحدها (DEC-044 عكسًا)، فالمصنّف نسختان متطابقتان يحرسهما اختبار تكافؤ؛
+  (و) تخزين دائم في محرك Express — MySQL غير حي (HOST-003)؛ تُنقل الحقائق في النتيجة (`truncation`) ويقاس الدوام على الحافة.
+- **القرار:** (1) ترحيل `0004_reply_metrics.sql` (عبارتان idempotent → 16 عبارة): جدول `whatsapp_reply_metrics` بمفتاح فريد `provider_message_id`
+  (معرّف رسالة Meta نفسه في `whatsapp_messages` → «مع الرسالة» بربط لا بعمود)، المصدر (`webhook`/`api`)، المزوّد والنموذج، `finish_reason`،
+  `candidate_chars`/`sent_chars`، `truncated`/`truncation_reason`، `max_output_tokens`، التاريخ — **لا نص ولا هاتف**. (2) `workers/celia-edge/reply-metrics.js`:
+  مصنّف نقي `classifyReplyTruncation` يعدّ قصًّا شيئين فقط: `finishReason = MAX_TOKENS` (`max_tokens`) وتجاوز 1000 حرف (`char_cap`) أو كليهما؛ `recordReplyMetric`
+  لا يرمي أبدًا (`INSERT OR IGNORE`، `{ok:false, reason}`)؛ `summarizeReplyMetrics` يعيد `truncatedRatio: null` عند صفر ردود (لا صفرًا كاذبًا)، وبحسب السبب
+  والمزوّد/المصدر، بنافذة 1–365 يومًا. (3) `generateEdgeAiReply` يحمل الحقائق مع كل رد (`finishReason`, `truncated`, `truncationReason`, `candidateChars`,
+  `sentChars`, `maxOutputTokens = EDGE_MAX_OUTPUT_TOKENS = 220`)؛ الرد المحلي يبلّغ `truncated:false` و`maxOutputTokens:null`. الويبهوك يسجّل الصف بعد نجاح
+  الإرسال بمعرّف `wamid`؛ `/api/ai/reply` يسجّل تحت `source: api` بمعرّف `api:<uuid>` ويعيد `metricRecorded`. (4) مسار المالك `GET /api/whatsapp/reply-metrics?days=`
+  (تحت بادئة `/api/whatsapp` المحمية؛ 503 `d1_not_bound` بلا قاعدة). (5) محرك Express: `src/reply-metrics.js` نسخة المصنّف، `generateWhatsAppReplyDetailed`
+  (`GEMINI_MAX_OUTPUT_TOKENS = 180`) و`generateWhatsAppReply` يعيد `.text` كما كان؛ `generateCeliaReply` يعيد `truncation`. (6) `verify:live --mode edge`:
+  فحص `d1_latency_series` (`--d1-samples`، افتراضيًا 5 استدعاءات `/readyz` متتالية بعد `ready_durable`؛ `latencyMs[]`, أدنى/وسيط/أقصى، `spreadRatio = أقصى/وسيط`،
+  وزمن الذهاب والإياب؛ يفشل فقط إن غاب الرقم أو الدوام)، وفحص `edge_reply_metrics` (يمرّ على 200 + `ok` + أعداد صحيحة؛ `replies: 0` قياس صحيح؛ يُتخطّى بلا رمز)؛
+  وعلى GitHub Actions يطبع `::error title=verify-live <id>::` لكل فحص فاشل حتى تسمّي التشغيلة الحمراء بوابتها على ملخصها. (7) `docs/service-reality.md`
+  §«أرقام مقاسة»: صفّان مقيسان (130 ms تشغيلة `40823425686`، 189 ms تشغيلة `40830998982`) وصفّان «لم تُقَس بعد» للسلسلة والنسبة؛ اختبار في
+  `test/service-reality.test.js` يُسقط أي صف يحمل `ms`/`%` بلا تاريخ وتشغيلة وcommit، وأي صف غير مقيس يحمل رقمًا، ويطابق الحدود الموثّقة بالثوابت في الشيفرة.
+- **السبب:** النسبة التي تقرّر تغيير `maxOutputTokens` يجب أن تُقرأ من صفوف كُتبت لحظة الإرسال، لا أن تُستنتج؛ والرقم الواحد لزمن D1 لا يقول شيئًا عن التباين —
+  السلسلة بوسيطها وأقصاها تقوله؛ والقسم الذي يُطبَع فيه الرقم يجب أن يرفض بنفسه أي رقم بلا تشغيلة.
+- **الأثر:** 589/589 محليًا (RM-01..06 + فحصا `verify:live` + اختبار الوثيقة)، تغطية 91.55/74.77/86.00، `check` 152، `check:continuity` ✅. لا مزوّد جديد ولا كلفة؛
+  ترحيل D1 إضافي idempotent يطبَّق بأول رفع. **لم يُقَس بعد:** السلسلة ونسبة القصّ — تظهران في أول تشغيلة `Cloudflare Edge` بعد الدمج وتُنسخان إلى
+  «أرقام مقاسة» كما هي. الـ1400 ms المذكورة في النقد بلا تشغيلة فلا تُثبت ولا تُنفى قبل ذلك. ما بقي خارج الحزمة: دوام القياس في محرك Express (HOST-003).
