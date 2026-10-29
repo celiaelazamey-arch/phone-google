@@ -12,23 +12,23 @@
 ## 2. التركيز النشط وسجل الحالة ([STATE.md](STATE.md))
 
 - **آخر مراجعة مسجّلة:** 29 أكتوبر 2026
-- **الجلسة النشطة:** AGENT-003 Sandbox Backend + GOOG-004 Gmail read-only على `arena/0b72e456-phone-google`؛ عزل Linux حقيقي محلي وموصل Gmail محلي/Mock فقط، بلا Drive أو Gemini أو Gmail حي أو كتابة خارجية أو ربط Sandbox بـRuntime. أُضيف منفذ namespaces/chroot/rlimits بسياسة default-deny، mounts منفردة، UID/GID=1001، Capabilities صفرية، workspace tmpfs محدود، إتلاف descendants والجذر، وArtifact بSHA-256/TTL وEvidence. نجح `npm run test:sandbox` 17/17، و`test/agent-gmail.test.js` 7/7 مع فحص مشترك 56/56، و`npm run test:coverage` 639/653 ناجحًا، 0 فشل، 14 skipped بتغطية 90.61% أسطر / 75.42% فروع / 86.73% دوال؛ لا اتصال Gmail حي ولا تفعيل `sandbox.exec` أو جاهزية إنتاجية
-- **آخر سجل جلسة مؤرَّخ:** [2026-10-29-gmail-read-connector](sessions/2026-10-29-gmail-read-connector.md)
-- **حجم [STATE.md](STATE.md) النشط:** 72 سطرًا (12334 بايت)
+- **الجلسة النشطة:** GOOG-005 Google read-only ضمن حدود 2026 على `arena/d44070e0-phone-google`؛ تنفيذ محلي/Mock لقراءات Gmail وDrive وCalendar وContacts عبر `CELIA_AGENT_CONNECTORS=google_read`، بلا OAuth حي أو scopes جديدة أو كتابة خارجية أو ربط Sandbox بـRuntime. Drive يعرض metadata لأحدث 10 ملفات، وCalendar نافذة محدودة، وContacts صفحة محدودة، مع planner حتمي يفصل القراءة عن create/export. نجح `test/agent-google-read.test.js` 8/8، والفحص المشترك 28/28، و`npm run test:coverage` 647/661 ناجحًا، 0 فشل، 14 skipped بتغطية 90.70% أسطر / 75.45% فروع / 86.90% دوال؛ لا اتصال Google حي ولا ادعاء ظهور بيانات المالك أو جاهزية إنتاجية
+- **آخر سجل جلسة مؤرَّخ:** [2026-10-29-google-readonly-2026](sessions/2026-10-29-google-readonly-2026.md)
+- **حجم [STATE.md](STATE.md) النشط:** 75 سطرًا (13244 بايت)
 - **الأرشيف التاريخي المحفوظ بلا حذف:**
 - [STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md) — الأساس `9f6f8b2` · **983 سطرًا** محفوظًا حرفيًا (بصمة `f2674637e82e…`)
 
 ## 3. سجل القرارات المعمارية ([DECISIONS.md](DECISIONS.md))
 
-- **إجمالي القرارات المسجّلة:** 56 · **آخر قرار معتمد في السجل:** `DEC-056` · **المعرّف المتاح التالي (تحقّق قبل الحجز):** `DEC-057`
+- **إجمالي القرارات المسجّلة:** 57 · **آخر قرار معتمد في السجل:** `DEC-057` · **المعرّف المتاح التالي (تحقّق قبل الحجز):** `DEC-058`
 
 | المعرّف | العنوان المختصر |
 |---|---|
+| `DEC-057` | GOOG-005: حزمة Google read-only بعقود مستقلة وحدود 2026 بلا scopes جديدة |
 | `DEC-056` | GOOG-004: Gmail read-only داخل Runtime بعقد مستقل عن outbox وإعادة استخدام OAuth المشفر |
 | `DEC-055` | AGENT-003: Sandbox محلي لكل Run بفشل مغلق، مع استثناء spawn الوحيد وحدود تدقيق صريحة |
 | `DEC-054` | WP-2.4: بوابة AI-001 حتمية بلا شبكة فوق الحلقة الحقيقية، مع فشل فوري للسلامة وتكلفة غير مُدّعاة |
 | `DEC-053` | WP-2.3: ذاكرة وكيل حتمية مملوكة — ملخصات وحقائق موسومة بلا متجهات، وحذف نهائي داخل سلسلة الأدلة |
-| `DEC-052` | تأسيس R0 (2026) لسياق الاستمرارية وأدوات وكلاء التطوير: أرشفة `STATE` بلا حذف، مولّد `NOW.md` حتمي، بوابة `CLAUDE.md` بلا ازدواج، و4 مهارات إجرائية محروسة باختبار |
 
 ## 4. تقدّم الخطة التنفيذية 2026 ([agent-2026-execution-plan.md](../agent-2026-execution-plan.md))
 
@@ -51,9 +51,9 @@
 
 ## 5. ملخص قائمة العمل المرجعية ([BACKLOG.md](BACKLOG.md))
 
-- **إجمالي المهام الفريدة:** 76 — متحقق: **27** · جارٍ: **27** · مخطط: **12** · بانتظار قرار/معلومة: **7** · منجز توثيقيًا: **3** · منشور: **0**
+- **إجمالي المهام الفريدة:** 77 — متحقق: **27** · جارٍ: **28** · مخطط: **12** · بانتظار قرار/معلومة: **7** · منجز توثيقيًا: **3** · منشور: **0**
 
-### أ. المهام الجارية حاليًا (`جارٍ` — 27)
+### أ. المهام الجارية حاليًا (`جارٍ` — 28)
 
 | المعرّف | الأولوية | الملخص الحالي |
 |---|---|---|
@@ -75,6 +75,7 @@
 | WA-005 | P0 | جارٍ — الكود مدموج على main@b70f9149، CI وPages/Worker/Release ناجحة؛ Render غير مهيأ وتدقيق Meta الحي ينتظر… |
 | AGENT-001 | P0 | جارٍ — M1 منفذة ومختبرة محليًا وفي CI: حلقة Plan→Act→Observe→Deliver دائمة، استئناف بعد انقطاع، قفل lease، من… |
 | GOOG-004 | P1 | جارٍ — موصل Gmail read-only محلي/Mock منفذ: google.gmail_read يعيد آخر 1–5 رسائل بmetadata ومقتطف ≤500 حرف عب… |
+| GOOG-005 | P1 | جارٍ — حزمة Google read-only المحلية/Mock منفذة: google_read يسجل Gmail وDrive وCalendar وContacts بعقود قراء… |
 | AGENT-002 | P0 | جارٍ — الـoutbox والموصلات الثلاثة منفذة ومختبرة (DEC-015، DEC-022): جدول agent_outbox بمفتاح idempotency فري… |
 | AGENT-003 | P1 | جارٍ — Backend محلي منفذ ومختبر فعليًا على Linux (test:sandbox 17/17): namespaces/chroot/rlimits، UID/GID=100… |
 | AGENT-008 | P1 | جارٍ — WP-1.1 منفَّذ ومختبر (DEC-047): src/agent/timing.js (مدة الأداة من created_at→updated_at للصفوف المسوّ… |

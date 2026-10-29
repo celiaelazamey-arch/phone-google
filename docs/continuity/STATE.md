@@ -2,9 +2,9 @@
 
 > **حفظ التاريخ بلا حذف (`DEC-052` / `CONT-004`):** هذه نافذة الاستئناف النشطة؛ السجل التراكمي الكامل حتى ما بعد PR #84 (`main@738d832` / `9f6f8b2` — 983 سطرًا / 142,150 بايت) محفوظ حرفيًا في **[STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md)** وبصمته محروسة بـ`R0-02`. القراءة السريعة المشتقة: **[NOW.md](NOW.md)** (`npm run now`).
 
-**آخر مراجعة:** 29 أكتوبر 2026 · **نوع الجلسة الحالية:** **AGENT-003 Sandbox Backend + GOOG-004 Gmail read-only** على `arena/0b72e456-phone-google`؛ عزل Linux حقيقي محلي وموصل Gmail محلي/Mock فقط، بلا Drive أو Gemini أو Gmail حي أو كتابة خارجية أو ربط Sandbox بـRuntime. أُضيف منفذ namespaces/chroot/rlimits بسياسة default-deny، mounts منفردة، UID/GID=1001، Capabilities صفرية، workspace tmpfs محدود، إتلاف descendants والجذر، وArtifact بSHA-256/TTL وEvidence. نجح `npm run test:sandbox` **17/17**، و`test/agent-gmail.test.js` **7/7** مع فحص مشترك **56/56**، و`npm run test:coverage` **639/653 ناجحًا، 0 فشل، 14 skipped** بتغطية **90.61% أسطر / 75.42% فروع / 86.73% دوال**؛ لا اتصال Gmail حي ولا تفعيل `sandbox.exec` أو جاهزية إنتاجية ·
-**الشريحة السابقة:** حوكمة KB/AI-002 محفوظة في commit `2a78ce8` على هذا الفرع؛ نتائجها الحتمية 629/629، وAI-001 والتشغيل الحي ما زالا غير مغلقين ·
-سجل الجلسة الحالي: [2026-10-29-gmail-read-connector](sessions/2026-10-29-gmail-read-connector.md) ·
+**آخر مراجعة:** 29 أكتوبر 2026 · **نوع الجلسة الحالية:** **GOOG-005 Google read-only ضمن حدود 2026** على `arena/d44070e0-phone-google`؛ تنفيذ محلي/Mock لقراءات Gmail وDrive وCalendar وContacts عبر `CELIA_AGENT_CONNECTORS=google_read`، بلا OAuth حي أو scopes جديدة أو كتابة خارجية أو ربط Sandbox بـRuntime. Drive يعرض metadata لأحدث 10 ملفات، وCalendar نافذة محدودة، وContacts صفحة محدودة، مع planner حتمي يفصل القراءة عن create/export. نجح `test/agent-google-read.test.js` **8/8**، والفحص المشترك **28/28**، و`npm run test:coverage` **647/661 ناجحًا، 0 فشل، 14 skipped** بتغطية **90.70% أسطر / 75.45% فروع / 86.90% دوال**؛ لا اتصال Google حي ولا ادعاء ظهور بيانات المالك أو جاهزية إنتاجية ·
+**الشريحة السابقة:** PR `#87` دُمج، ونقطة بدء هذه الجلسة `b29d77f`؛ Sandbox السابق **17/17** وGmail السابق **7/7** محفوظان في سجليهما، ولا يُستأنف تفعيلهما أو نشرهما تلقائيًا ·
+سجل الجلسة الحالي: [2026-10-29-google-readonly-2026](sessions/2026-10-29-google-readonly-2026.md) ·
 سجل Sandbox السابق: [2026-10-29-agent003-sandbox](sessions/2026-10-29-agent003-sandbox.md) ·
 سجل KB السابق: [2026-10-29-ai002-kb-governance](sessions/2026-10-29-ai002-kb-governance.md) ·
 سجل Drive السابق: [2026-10-29-drive-selective-import](sessions/2026-10-29-drive-selective-import.md) ·
@@ -18,9 +18,10 @@
 سجل WP-1.2: [2026-10-29-wp-1-2-execution-trace](sessions/2026-10-29-wp-1-2-execution-trace.md) ·
 الأرشيف التاريخي الكامل: [STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md)
 
-## 1. خط الأساس المتحقق (`main@922ed4e`)
+## 1. خط الأساس المتحقق (`b29d77f`)
 
-- **آخر دمج موثق:** PR `#85` (R0 / CONT-004 / DEC-052) دُمج بكلمة المالك إلى `main@922ed4e`؛ تشغيلات `main` الست خضراء، والجودة `40846567368` سجلت `602/602`. الحافة والواجهة الثابتة و`v0.2.1` منشورة كما في سجل R0؛ Express + MySQL (`HOST-003`) غير منشور.
+- **بداية جلسة GOOG-005:** الفرع `arena/d44070e0-phone-google` بدأ من `b29d77f` (Merge PR `#87`) بشجرة نظيفة؛ لم يُفتح PR جديد ولم يحدث نشر أو ترحيل في هذه الشريحة.
+- **آخر دمج موثق قبل هذه الجلسة:** PR `#85` (R0 / CONT-004 / DEC-052) دُمج بكلمة المالك إلى `main@922ed4e`؛ تشغيلات `main` الست خضراء، والجودة `40846567368` سجلت `602/602`. الحافة والواجهة الثابتة و`v0.2.1` منشورة كما في سجل R0؛ Express + MySQL (`HOST-003`) غير منشور.
 - **طلبات السحب المفتوحة عند خط الأساس:** صفر. لم تُقرأ حالة GitHub الحية مجددًا في جلستي WP-2.3/WP-2.4، ولم يُفتح PR من هذا الفرع.
 - **قاعدة التوافق:** إصدار `0.2.1` ومخطط التطبيق الأساسي `schema=1` بلا تغيير؛ جداول الوكيل وترحيلاتها مستقلة وإضافية. ملفات التقييم والتقرير لا تغيّر عقود HTTP أو المخطط.
 
@@ -46,7 +47,8 @@
 - **على فرع الجلسة فقط:** WP-2.3 وWP-2.4 منفّذتان محليًا وموثقتان بـDEC-053/DEC-054؛ لم تُدمجا أو تُنشرا.
 - **على فرع الجلسة الآن:** AGENT-003 Backend موثق في [سجله](sessions/2026-10-29-agent003-sandbox.md) و[دليل التشغيل](../agent-sandbox.md): 17/17 اختبارات عزل حقيقية، Artifact وEvidence، وحدود تدقيق صريحة. لم يُربط بـRuntime ولم يُنشر، و`sandbox.exec` وComputer Use ما زالا غير مفعّلين.
 - **GOOG-004 محلي/Mock:** `google.gmail_read` في `src/agent/gmail.js` يعيد آخر 1–5 رسائل بmetadata ومقتطف ≤500 حرف عبر OAuth المشفر القائم؛ الافتراضي `none`، ولا send/outbox/body/attachments. الاختبار 7/7 والفحص المشترك 56/56؛ لا Gmail حي ولا قرار تفعيل تلقائي. التفاصيل في [سجل Gmail](sessions/2026-10-29-gmail-read-connector.md).
-- **التالي بعد الشريحة:** مراجعة مستقلة لقرار ربط/نشر Sandbox، ثم إعادة تخطيط محدودة للفشل الداخلي وفق الترتيب المعتمد؛ لا أدوات ملفات/Shell/Git/Computer Use تلقائيًا بسبب نجاح الـBackend. لا R1 ولا MCP-001/002 ولا `gh-aw` ولا embeddings أو توجيه نماذج ضمن هذا العمل. لا تُفعّل مواد Drive كودًا أو قدرة تلقائيًا.
+- **GOOG-005 محلي/Mock:** `google_read` في `src/agent/index.js` يفعّل الأربعة قرّاء فقط؛ التفاصيل والعقود في [سجل الجلسة](sessions/2026-10-29-google-readonly-2026.md) و[حدود 2026](../google-readonly-2026.md). النتيجة 8/8 و647/647 غير المتخطى في التغطية الكاملة؛ لا اتصال حي، و`calendar.events` يبقى أوسع من read-only على مستوى المنح.
+- **التالي بعد الشريحة:** لا تشغيل Google حي أو توسعة Sheets/Docs/YouTube/Photos ضمن هذا العمل؛ أي قبول حي قرار لاحق صريح ومعزول. تبقى مراجعة ربط/نشر Sandbox وإعادة التخطيط المحدودة مستقلة، ولا أدوات ملفات/Shell/Git/Computer Use تلقائيًا. لا R1 ولا MCP-001/002 ولا `gh-aw` ولا embeddings أو توجيه نماذج ضمن هذا العمل.
 
 ## 5. العوائق وحدود الدليل
 
@@ -57,9 +59,9 @@
 
 ## 6. الاستئناف والفحوص
 
-1. ابقَ على `arena/0b72e456-phone-google`؛ راجع [سجل Gmail](sessions/2026-10-29-gmail-read-connector.md) و[سجل AGENT-003](sessions/2026-10-29-agent003-sandbox.md). لا تفتح/تدمج PR ولا ترحّل أو تنشر أو تفعل مزودًا حيًا إلا بتفويض لاحق صريح.
+1. ابقَ على `arena/d44070e0-phone-google`؛ راجع [سجل GOOG-005](sessions/2026-10-29-google-readonly-2026.md) و[سجل Gmail](sessions/2026-10-29-gmail-read-connector.md) و[سجل AGENT-003](sessions/2026-10-29-agent003-sandbox.md). لا تفتح/تدمج PR ولا ترحّل أو تنشر أو تفعل مزودًا حيًا إلا بتفويض لاحق صريح.
 2. كل معرفة جديدة تحتاج `claim_type` و`review_due`؛ السجل التاريخي/غير المتحقق/المهجور أو المنتهي لا يُستخدم كتوجيه Planner. `kb.search` قراءة محلية فقط، ونتيجتها تُسجل في الأدلة.
-3. لا تُستأنف أدوات التنفيذ من خارطة Drive؛ نجاح Backend AGENT-003 لا يفتح Shell/Git/Computer Use ولا يربط `sandbox.exec` تلقائيًا. لا توسيع Drive ولا embeddings الآن.
+3. لا تُستأنف أدوات التنفيذ من خارطة Drive؛ نجاح Backend AGENT-003 لا يفتح Shell/Git/Computer Use ولا يربط `sandbox.exec` تلقائيًا. قراءة Drive الجديدة metadata فقط؛ لا استيراد/كتابة/حذف ولا embeddings.
 
 ```sh
 git branch --show-current && git status --short && git log -3 --oneline
@@ -67,5 +69,6 @@ npm run kb:manifest && npm run kb -- verify
 node --test test/knowledge-governance.test.js test/agent-kb-planner.test.js test/agent-verifier.test.js
 npm run test:sandbox
 node --test test/agent-gmail.test.js
+node --test test/agent-google-read.test.js
 npm run check && npm run now:check && npm run check:continuity && npm run check:secrets
 ```

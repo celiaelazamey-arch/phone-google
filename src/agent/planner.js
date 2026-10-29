@@ -18,6 +18,11 @@ const E164_IN_TEXT_RE = /(\+[1-9]\d{6,14})\b/;
 const DRIVE_EXPORT_HINTS = /(صدّر|تصدير|احفظ\s*في\s*درايف|google\s*drive|drive\s*export)/i;
 const GMAIL_HINTS = /(gmail|جيميل|إيميل|ايميل|بريد|الوارد)/i;
 const GMAIL_UNREAD_HINTS = /(غير\s+مقروء|رسائل\s+جديدة|إيميلات\s+جديدة|unread|new\s+emails?)/i;
+const DRIVE_READ_HINTS = /(درايف|google\s*drive|\bdrive\b)/i;
+const DRIVE_READ_ACTION_HINTS = /(أحدث|احدث|آخر|اخر|ملفات|ملف|قائمة|اعرض|أعرض|هات|latest|files?|list|read|show)/i;
+const GOOGLE_WRITE_HINTS = /(صدّر|تصدير|احفظ|إنشاء|انشاء|أنشئ|انشئ|ارفع|إرفع|\b(?:upload|export|create|write)\b)/i;
+const CALENDAR_READ_HINTS = /(جدولي|مواعيدي|أجندة|اجندة|أجندتي|اجندتي|agenda|(?:اعرض|أعرض|هات|list|show|read).{0,30}(?:تقويم|calendar)|(?:تقويم|calendar).{0,30}(?:اعرض|أعرض|هات|list|show|read))/i;
+const CONTACTS_READ_HINTS = /(جهات\s*الاتصال|جهات|contacts?)/i;
 const DOCUMENT_HINTS = /(فاتورة|فواتير|مستند|استخرج|invoice|receipt)/i;
 const DOCUMENT_FILE_RE = /\b([A-Za-z0-9._/-]+\.(?:csv|json|txt|md))\b/i;
 const COMMIT_LEDGER_HINTS = /(سجل\s*المشتريات|دفتر\s*المشتريات|purchase\s*ledger|commit\s*invoice)/i;
@@ -34,6 +39,15 @@ function proposedSlot(createdAt) {
   base.setUTCDate(base.getUTCDate() + 1);
   base.setUTCHours(10, 0, 0, 0);
   return { start: base.toISOString(), end: new Date(base.getTime() + SLOT_DURATION_MS).toISOString() };
+}
+
+function calendarReadWindow(createdAt) {
+  const base = new Date(createdAt);
+  if (!Number.isFinite(base.getTime())) return null;
+  return {
+    timeMin: base.toISOString(),
+    timeMax: new Date(base.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString()
+  };
 }
 
 function lastUserMessage(messages) {
@@ -70,12 +84,39 @@ function gmailOutcomeSummary(outcome) {
   return `رسائل Gmail المقروءة (${Number(outcome.count) || 0}):\n${lines.join('\n') || 'لا توجد رسائل في الوارد.'}`;
 }
 
-export function createDemoPlanner({ externalEffectTool = 'google.calendar_create_event', knowledge = false, gmail = false } = {}) {
+function cleanSummary(value, fallback = '') {
+  return String(value || fallback).replace(/\s+/g, ' ').trim().slice(0, 160);
+}
+
+function driveOutcomeSummary(outcome) {
+  if (!outcome) return null;
+  const lines = (Array.isArray(outcome.files) ? outcome.files : []).slice(0, 10).map((file, index) =>
+    `${index + 1}) ${cleanSummary(file.name, 'بدون اسم')} — ${cleanSummary(file.id, 'id غير متاح')}`);
+  return `ملفات Drive المقروءة (${Number(outcome.count) || 0}):\n${lines.join('\n') || 'لا توجد ملفات.'}`;
+}
+
+function calendarOutcomeSummary(outcome) {
+  if (!outcome) return null;
+  const lines = (Array.isArray(outcome.events) ? outcome.events : []).slice(0, 10).map((event, index) =>
+    `${index + 1}) ${cleanSummary(event.summary, 'بدون عنوان')} — ${cleanSummary(event.start?.dateTime || event.start?.date, 'وقت غير متاح')}`);
+  return `مواعيد Calendar المقروءة (${Number(outcome.count) || 0}):\n${lines.join('\n') || 'لا توجد مواعيد في النافذة.'}`;
+}
+
+function contactsOutcomeSummary(outcome) {
+  if (!outcome) return null;
+  const lines = (Array.isArray(outcome.contacts) ? outcome.contacts : []).slice(0, 10).map((person, index) =>
+    `${index + 1}) ${cleanSummary(person.name, 'بدون اسم')}`);
+  return `جهات Contacts المقروءة (${Number(outcome.count) || 0}):\n${lines.join('\n') || 'لا توجد جهات مطابقة.'}`;
+}
+
+export function createDemoPlanner({ externalEffectTool = 'google.calendar_create_event', knowledge = false, gmail = false, googleReaders = {} } = {}) {
   return {
     name: 'demo-deterministic',
     knowledge,
     async plan({ messages, toolRuns, approvals = [], outbox = [], run = null }) {
       const goal = lastUserMessage(messages);
+      const driveReadIntent = googleReaders.drive && DRIVE_READ_HINTS.test(goal) && DRIVE_READ_ACTION_HINTS.test(goal) && !GOOGLE_WRITE_HINTS.test(goal);
+      const calendarReadIntent = googleReaders.calendar && CALENDAR_READ_HINTS.test(goal) && !GOOGLE_WRITE_HINTS.test(goal);
       const externalApproval = approvals.find((approval) => approval.toolName === externalEffectTool);
 
       if (knowledge && !succeeded(toolRuns, 'kb.search')) {
@@ -207,6 +248,41 @@ export function createDemoPlanner({ externalEffectTool = 'google.calendar_create
         };
       }
 
+      if (driveReadIntent && !succeeded(toolRuns, 'google.drive_read')) {
+        if (failed(toolRuns, 'google.drive_read')) return this.giveUp(toolRuns, 'google.drive_read');
+        return {
+          action: DECISION.call,
+          tool: 'google.drive_read',
+          args: { maxResults: 10 },
+          reason: 'قراءة metadata لأحدث ملفات Drive فقط؛ لا محتوى أو رفع أو حذف ولا outbox'
+        };
+      }
+
+      if (calendarReadIntent && !succeeded(toolRuns, 'google.calendar_read')) {
+        if (failed(toolRuns, 'google.calendar_read')) return this.giveUp(toolRuns, 'google.calendar_read');
+        const window = calendarReadWindow(run?.createdAt);
+        if (!window) {
+          return { action: DECISION.finish, failed: true, summary: 'تعذر تحديد نافذة Calendar من زمن المهمة؛ لم يُنفَّذ أي اتصال خارجي.' };
+        }
+        return {
+          action: DECISION.call,
+          tool: 'google.calendar_read',
+          args: { ...window, maxResults: 20 },
+          reason: 'قراءة مواعيد Calendar في نافذة سبعة أيام فقط؛ لا إنشاء أو تعديل ولا outbox'
+        };
+      }
+
+      if (googleReaders.contacts && CONTACTS_READ_HINTS.test(goal) && !succeeded(toolRuns, 'google.contacts_read')) {
+        if (failed(toolRuns, 'google.contacts_read')) return this.giveUp(toolRuns, 'google.contacts_read');
+        const quotedQuery = /["“]([^"”\n]{1,100})["”]/.exec(goal);
+        return {
+          action: DECISION.call,
+          tool: 'google.contacts_read',
+          args: { maxResults: 20, ...(quotedQuery ? { query: quotedQuery[1] } : {}) },
+          reason: 'قراءة Contacts bounded فقط؛ لا إضافة أو تعديل أو حذف ولا outbox'
+        };
+      }
+
       const phoneMatch = E164_IN_TEXT_RE.exec(goal);
       const whatsappAttempted = toolRuns.some((toolRun) => toolRun.toolName === 'whatsapp.send_text');
       if (WHATSAPP_HINTS.test(goal) && phoneMatch && !whatsappAttempted) {
@@ -235,7 +311,7 @@ export function createDemoPlanner({ externalEffectTool = 'google.calendar_create
       }
 
       const driveAttempted = toolRuns.some((toolRun) => toolRun.toolName === 'google.drive_export_report');
-      if (DRIVE_EXPORT_HINTS.test(goal) && !driveAttempted) {
+      if (DRIVE_EXPORT_HINTS.test(goal) && !driveReadIntent && !driveAttempted) {
         const driveApproval = approvals.find((approval) => approval.toolName === 'google.drive_export_report');
         if (driveApproval?.decision === 'rejected') {
           return {
@@ -263,7 +339,7 @@ export function createDemoPlanner({ externalEffectTool = 'google.calendar_create
       }
 
       const externalAttempted = toolRuns.some((toolRun) => toolRun.toolName === externalEffectTool);
-      if (EXTERNAL_HINTS.test(goal) && !externalAttempted) {
+      if (EXTERNAL_HINTS.test(goal) && !calendarReadIntent && !externalAttempted) {
         if (externalApproval?.decision === 'rejected') {
           return {
             action: DECISION.finish,
@@ -292,6 +368,9 @@ export function createDemoPlanner({ externalEffectTool = 'google.calendar_create
       const status = outcomeOf(toolRuns, 'celia.system_status');
       const evidence = knowledge ? outcomeOf(toolRuns, 'kb.search') : null;
       const gmailOutcome = gmail ? outcomeOf(toolRuns, 'google.gmail_read') : null;
+      const driveOutcome = googleReaders.drive ? outcomeOf(toolRuns, 'google.drive_read') : null;
+      const calendarOutcome = googleReaders.calendar ? outcomeOf(toolRuns, 'google.calendar_read') : null;
+      const contactsOutcome = googleReaders.contacts ? outcomeOf(toolRuns, 'google.contacts_read') : null;
       const externalOutcome = outcomeOf(toolRuns, externalEffectTool);
       const sentEffect = outbox.find((entry) => entry.status === 'sent') || null;
       const failedEffect = outbox.find((entry) => entry.status === 'unknown') || null;
@@ -307,6 +386,9 @@ export function createDemoPlanner({ externalEffectTool = 'google.calendar_create
         evidence && !evidence.items?.length ? 'لم يجد البحث في شبكة المعرفة دليلًا مطابقًا؛ لم تُختلق مراجع.' : null,
         status ? `حالة النظام المقروءة: الإصدار ${status.version ?? 'غير متاح'}، التخزين ${status.storage ?? 'غير متاح'}.` : null,
         gmailOutcomeSummary(gmailOutcome),
+        driveOutcomeSummary(driveOutcome),
+        calendarOutcomeSummary(calendarOutcome),
+        contactsOutcomeSummary(contactsOutcome),
         sentEffect
           ? `أُرسل الأثر الخارجي مرة واحدة عبر outbox بعد موافقة مسجلة؛ المرجع ${sentEffect.externalRef || '—'}.`
           : failedEffect

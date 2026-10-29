@@ -74,6 +74,58 @@ export async function createGoogleDriveClient({ pool, config, userId }) {
 }
 
 /**
+ * People client over the same encrypted grant. It adds no OAuth scope or secret.
+ */
+export async function createGooglePeopleClient({ pool, config, userId }) {
+  const client = await getAuthenticatedClient(pool, config, userId);
+  return google.people({ version: 'v1', auth: client });
+}
+
+/**
+ * Latest non-trashed Drive files for the read-only agent connector. The client is
+ * injectable so tests never need Google or OAuth credentials.
+ */
+export async function fetchDriveFiles({ pool, config, userId = config.userId, maxResults = 10, signal, driveClient } = {}) {
+  const drive = driveClient || await createGoogleDriveClient({ pool, config, userId });
+  const limit = Math.max(1, Math.min(10, Number(maxResults) || 10));
+  const { data } = await drive.files.list({
+    q: 'trashed = false',
+    pageSize: limit,
+    orderBy: 'modifiedTime desc',
+    fields: 'files(id,name,mimeType,modifiedTime)'
+  }, { signal, retry: false, timeout: config.resilience?.timeoutMs || 8000 });
+  return (data?.files || []).map((file) => ({
+    id: file.id,
+    name: file.name || '',
+    mimeType: file.mimeType || '',
+    modifiedTime: file.modifiedTime || ''
+  }));
+}
+
+/**
+ * First-page Contacts read with optional local filtering. No People search scope or
+ * write method is used; the connector applies its own smaller output bound.
+ */
+export async function fetchGoogleContacts({ pool, config, userId = config.userId, query = '', maxResults = 20, signal, peopleClient } = {}) {
+  const people = peopleClient || await createGooglePeopleClient({ pool, config, userId });
+  const limit = Math.max(1, Math.min(20, Number(maxResults) || 20));
+  const normalizedQuery = String(query || '').trim().toLocaleLowerCase().slice(0, 100);
+  const { data } = await people.people.connections.list({
+    resourceName: 'people/me',
+    pageSize: 100,
+    personFields: 'names,phoneNumbers,emailAddresses'
+  }, { signal, retry: false, timeout: config.resilience?.timeoutMs || 8000 });
+  return (data?.connections || []).map((person) => ({
+    resourceName: person.resourceName || '',
+    name: person.names?.[0]?.displayName || '',
+    phones: (person.phoneNumbers || []).map((item) => item.value).filter(Boolean),
+    emails: (person.emailAddresses || []).map((item) => item.value).filter(Boolean)
+  })).filter((person) => !normalizedQuery || [person.name, ...person.phones, ...person.emails]
+    .some((value) => String(value).toLocaleLowerCase().includes(normalizedQuery)))
+    .slice(0, limit);
+}
+
+/**
  * Newest INBOX messages for the owner's WhatsApp commands ("لخص آخر إيميل", "الإيميلات الجديدة").
  * No `is:unread` filter unless asked: "the last email" must come back even when already read.
  * `gmailClient` is injectable so the command path is testable without Google.
