@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>خريطة أكواد CeliaOS 2026 — الواقع مقابل الهدف</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111a2e; --card:#16223a; --line:#24334f;
+    --ink:#e8eefb; --dim:#9fb0cc;
+    --ok:#22c55e; --part:#f59e0b; --todo:#64748b;
+    --g1:#3b82f6; --g2:#10b981; --g3:#f97316; --g4:#06b6d4; --g5:#8b5cf6; --g6:#ec4899;
+    --g7:#14b8a6; --g8:#eab308; --g9:#a78bfa; --g10:#6366f1; --g11:#f43f5e; --g12:#0ea5e9;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI",Tahoma,system-ui,sans-serif;line-height:1.5}
+  header{padding:28px 24px 10px;text-align:center;background:linear-gradient(180deg,#0e1730,#0b1220)}
+  header h1{margin:0 0 6px;font-size:28px}
+  header p{margin:4px auto;max-width:980px;color:var(--dim);font-size:14px}
+  .honest{display:inline-block;margin-top:10px;padding:8px 14px;border:1px solid var(--line);border-radius:10px;background:#0e1830;font-size:13px}
+  .legend{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin:14px 0 4px;font-size:13px}
+  .legend span{display:inline-flex;align-items:center;gap:6px;color:var(--dim)}
+  .dot{width:11px;height:11px;border-radius:3px;display:inline-block}
+  .stats{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:12px 0 0}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 18px;min-width:130px}
+  .stat b{font-size:22px;display:block}
+  .stat small{color:var(--dim)}
+  main{max-width:1500px;margin:0 auto;padding:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}
+  section.group{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+  .ghead{padding:10px 14px;font-weight:700;font-size:15px;display:flex;align-items:center;gap:10px;color:#fff}
+  .gnum{background:rgba(255,255,255,.22);border-radius:8px;min-width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;font-size:13px}
+  .gbar{font-size:11px;font-weight:400;opacity:.95;margin-inline-start:auto;background:rgba(0,0,0,.25);padding:3px 8px;border-radius:999px}
+  ul.items{list-style:none;margin:0;padding:8px}
+  ul.items li{display:flex;gap:8px;align-items:flex-start;padding:5px 8px;border-radius:8px;font-size:12.5px}
+  ul.items li:nth-child(odd){background:rgba(255,255,255,.025)}
+  .badge{flex:0 0 auto;width:16px;text-align:center;margin-top:1px}
+  .fname{font-family:ui-monospace,Consolas,monospace;direction:ltr;unicode-bidi:embed;color:#cfe3ff;white-space:nowrap}
+  .map{color:var(--dim)}
+  .map .real{font-family:ui-monospace,Consolas,monospace;direction:ltr;unicode-bidi:embed;color:#7ee2a8}
+  .map .phase{color:#93c5fd}
+  .st0 .badge{color:var(--ok)} .st1 .badge{color:var(--part)} .st2 .badge{color:var(--todo)}
+  .cycle{max-width:1500px;margin:6px auto 0;padding:0 18px}
+  .cycle .box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+  .cycle h2{margin:0 0 10px;font-size:16px}
+  .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .flow .node{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:12.5px}
+  .flow .node small{display:block;color:#7ee2a8;font-family:ui-monospace,Consolas,monospace;direction:ltr;font-size:10.5px}
+  .flow .arrow{color:var(--dim)}
+  .phases{max-width:1500px;margin:10px auto 0;padding:0 18px}
+  .phases .box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;font-size:13px}
+  .phases b.done{color:var(--ok)}
+  footer{text-align:center;color:var(--dim);font-size:12px;padding:20px}
+</style>
+</head>
+<body>
+<header>
+  <h1>خريطة أكواد CeliaOS لمنافسة Claude وManus في 2026</h1>
+  <p>نظام وكيل ذكي ينفذ المهام: يفهم الهدف، يخطط، يستخدم الأدوات والمتصفح والكمبيوتر، يتحقق من النتيجة، ويتعلم — بالأمان والحوكمة وسلسلة الأدلة.</p>
+  <div class="honest">⚖️ <b>خريطة صادقة:</b> كل ✅ يشير إلى ملف/وحدة <b>موجودة فعلًا</b> في المستودع اليوم بمسارها الحقيقي · 🟡 تغطية جزئية أو بديل قائم بفلسفة المستودع · ⬜ مقترح، مربوط بمرحلته في <b>خطة «منافس مانوس» المعتمدة</b> (M-A..M-F)</div>
+  <div class="legend">
+    <span><span class="dot" style="background:var(--ok)"></span> موجود ومختبر</span>
+    <span><span class="dot" style="background:var(--part)"></span> جزئي / بديل قائم</span>
+    <span><span class="dot" style="background:var(--todo)"></span> مقترح (المرحلة بين قوسين)</span>
+  </div>
+  <div class="stats" id="stats"></div>
+</header>
+
+<div class="cycle">
+  <div class="box">
+    <h2>دورة المهمة — كما تعمل في الكود الفعلي اليوم</h2>
+    <div class="flow" id="flow"></div>
+  </div>
+</div>
+
+<main id="groups"></main>
+
+<div class="phases">
+  <div class="box">
+    <b>حالة الخطة المعتمدة:</b>
+    <b class="done">M-A/A1 ✅</b> مخطط Gemini حي خلف علم + planner_fallback مرئي (24/24) ·
+    <b class="done">M-A/A2 ✅</b> إعادة التخطيط المحكومة plan.revised بحارس حلقة (9/9) ·
+    التالي: A3 call_many ← A4 model_router ← A5 تقييم ٢٠٠ حالة ← M-B اليدان (Sandbox+Artifacts) ← M-C العينان (متصفح) ← M-D الفم (WhatsApp/PWA) ← M-E الساعة (جدولة) ← M-F الجسد (استضافة وقياس علني).
+  </div>
+</div>
+
+<footer>CeliaOS … أكثر من إجابة، إنه وكيل يُنجز — وكل ادعاء في هذه الخريطة قابل للتدقيق في الكود · 2026</footer>
+
+<script>
+// status: 0=موجود، 1=جزئي، 2=مقترح — mapping: المسار الحقيقي أو مرحلة الخطة
+const GROUPS = [
+{n:1,title:"التخطيط والتفكير",color:"var(--g1)",items:[
+ ["agent-runtime.js",0,"src/agent/runtime.js — حلقة Plan→Act→Observe→Verify→Deliver دائمة"],
+ ["agent-orchestrator.js",0,"src/agent/index.js — createAgentHost يربط المخزن والأدوات والمخطط والموصلات"],
+ ["planner-provider.js",0,"src/agent/planner-provider.js + gemini-planner-provider.js (A1)"],
+ ["goal-parser.js",0,"src/agent/goal-contract.js — هدف ومعايير نجاح وقيود قابلة للفحص"],
+ ["task-decomposer.js",1,"src/agent/planner.js حتمي اليوم؛ التفكيك المزوّدي ضمن A3/A4"],
+ ["plan-builder.js",1,"harness.derivePlanView + شجرة الخطة في /agent (WP-1.2)"],
+ ["plan-validator.js",0,"validateProviderPlan — مخطط مغلق صارم قبل أي تنفيذ"],
+ ["plan-revision.js",0,"src/agent/replanner.js (A2) — مراجعة واحدة + حارس حلقة"],
+ ["model-router.js",2,"(M-A/A4) نموذج لكل نوع/خطر + تكلفة فعلية إلى recordCost"],
+ ["completion-judge.js",0,"src/agent/verifier.js — مُتحقِّق مستقل PASS/BLOCK/UNKNOWN"]
+]},
+{n:2,title:"التنفيذ والاستقلالية",color:"var(--g2)",items:[
+ ["execution-engine.js",0,"src/agent/runtime.js — المنفّذ الوحيد للخطوات"],
+ ["agent-loop.js",0,"runtime.js — التكرار محكوم بميزانيات خطوة/تكلفة/زمن"],
+ ["step-executor.js",0,"runtime addStep/act — عقد خطوة واحد"],
+ ["tool-call-dispatcher.js",0,"src/agent/tools.js — سجل أدوات + validateToolInput"],
+ ["execution-state.js",0,"src/agent/store.js — runs/steps/tool_runs دائمة"],
+ ["state-checkpoint.js",0,"قفل lease + استئناف من آخر خطوة مؤكدة بعد إعادة التشغيل"],
+ ["recovery-manager.js",1,"boot recovery + مصالحة بشرية (reconcile)؛ لا إصلاح ذاتي بالتصميم"],
+ ["retry-policy.js",0,"سياسة معاكسة مقصودة: لا إعادة إرسال عمياء أبدًا (DEC-007/015)"],
+ ["task-cancellation.js",0,"cancel + planner_cancelled ينتشر ولا يُحوَّل"],
+ ["result-verifier.js",0,"verifier.js — لا تسليم بلا خطوة تحقق في السلسلة"]
+]},
+{n:3,title:"وكيل الكمبيوتر Computer Use",color:"var(--g3)",items:[
+ ["computer-agent.js",2,"(M-C) — /computer.html اليوم شرح بصري صادق «غير مُفعَّل»"],
+ ["computer-provider.js",2,"(M-C)"],
+ ["desktop-session.js",2,"(M-C) فوق عزل AGENT-003 القائم"],
+ ["screenshot-capture.js",2,"(M-C) لقطات كـartifacts مبصومة"],
+ ["screen-observer.js",2,"(M-C)"],
+ ["vision-grounding.js",2,"(M-C)"],
+ ["mouse-controller.js",2,"(M-C)"],
+ ["keyboard-controller.js",2,"(M-C)"],
+ ["window-manager.js",2,"(M-C)"],
+ ["action-verifier.js",1,"مبدأه مطبق اليوم: observe + verifier لكل أداة؛ تخصيصه للرؤية في M-C"],
+ ["computer-session-recorder.js",1,"سلسلة agent_evidence تسجل كل شيء؛ بث اللقطات في M-C"],
+ ["computer-timeout-policy.js",0,"src/agent/sandbox-policy.js — حدود CPU/زمن/ذاكرة مجمّدة"]
+]},
+{n:4,title:"وكيل المتصفح Browser Agent",color:"var(--g4)",items:[
+ ["browser-agent.js",1,"celia-google-spider (Playwright) مشروع قائم غير مربوط بالحلقة — ربطه في M-C"],
+ ["browser-provider.js",2,"(M-C)"],
+ ["browser-session.js",2,"(M-C)"],
+ ["browser-navigator.js",2,"(M-C)"],
+ ["page-reader.js",2,"(M-C) web.fetch عبر egress proxy"],
+ ["dom-observer.js",2,"(M-C)"],
+ ["element-locator.js",2,"(M-C)"],
+ ["form-automation.js",2,"(M-C)"],
+ ["download-manager.js",2,"(M-C/M-B artifacts)"],
+ ["browser-state-verifier.js",2,"(M-C) بنفس عقد verifier القائم"],
+ ["browser-session-isolation.js",1,"عزل AGENT-003 (namespaces+chroot+شبكة deny) جاهز 17/17؛ المتصفح داخله في M-C"]
+]},
+{n:5,title:"الأدوات وMCP",color:"var(--g5)",items:[
+ ["tool-registry.js",0,"src/agent/tools.js — createToolRegistry بمستويات خطر"],
+ ["tool-schema-validator.js",0,"validateToolInput — رفض حجج مجهولة/أسرار"],
+ ["tool-permission-checker.js",0,"RISK + requiresApproval + plannerToolAllowlist"],
+ ["tool-execution-adapter.js",0,"عقد execute موحد لكل أداة"],
+ ["tool-result-normalizer.js",1,"parsedOutcome + tool_result موحد للمخطط"],
+ ["mcp-client.js",1,"جسر Copilot المحكوم (docs/copilot-mcp)؛ عميل MCP عام في INT-003"],
+ ["mcp-server-registry.js",2,"(INT-003) سجل موصلات بإصدارات وallowlist"],
+ ["mcp-session-manager.js",0,"src/celia-mcp.js — خادم MCP بـ12 أداة منشورة"],
+ ["connector-manager.js",0,"src/agent/connectors.js — كل أثر خارجي عبر outbox"],
+ ["connector-health-check.js",0,"resilience.js + service-reality (12/12 متحقق)"],
+ ["tool-capability-discovery.js",2,"(INT-003/MCP-001 server·discover)"]
+]},
+{n:6,title:"الذاكرة والسياق",color:"var(--g6)",items:[
+ ["memory-manager.js",0,"src/agent/memory.js (WP-2.3) — حتمية، بلا نموذج"],
+ ["conversation-memory.js",0,"threads/messages دائمة بملكية وترتيب"],
+ ["user-preferences-store.js",0,"حقائق مالك موسومة + حذف نهائي بدليل memory_deleted"],
+ ["episodic-memory.js",1,"ملخص خيط يُشتق من الخطوات عند انتهاء التشغيل"],
+ ["semantic-memory.js",2,"(لاحق) لا embeddings اليوم — حد معلن لا نقص مخفي"],
+ ["memory-retriever.js",0,"listMemory يصل المخطط في كل طلب (A1 يمرره للمزود)"],
+ ["memory-consolidator.js",1,"تلخيص حتمي؛ سياسة احتفاظ كاملة في DATA-004"],
+ ["context-builder.js",0,"src/context-policy.js (WP-2.1) — ميزانية لكل فئة"],
+ ["context-budget-manager.js",0,"قصّ بالأولوية + سجل ما قُصّ (dropped)"],
+ ["knowledge-indexer.js",0,"شبكة المعرفة KB: SQLite+FTS5 بسجلات موثثة"],
+ ["retrieval-pipeline.js",0,"kb.search بعربية + حزمة أدلة لكل نتيجة"],
+ ["source-attribution.js",0,"uri/licence/trust + claim_type/review_due لكل سجل"]
+]},
+{n:7,title:"أتمتة البيانات والمستندات",color:"var(--g7)",items:[
+ ["document-data-automation.js",0,"src/agent/automation/ — وحدة كاملة ببوابة فهم"],
+ ["document-parser.js",0,"readLocalDocument + extractStructuredDocument"],
+ ["structured-data-extractor.js",0,"استخراج حقول الفواتير بقياس دقة"],
+ ["data-cleaning-engine.js",1,"ضمن validateExtractedData"],
+ ["data-validation-engine.js",0,"validateExtractedData + شرح النتيجة"],
+ ["spreadsheet-engine.js",2,"(M-B) قوالب CSV/جداول كـartifacts"],
+ ["file-conversion-service.js",2,"(M-B) MD→HTML وتحويلات"],
+ ["report-generator.js",1,"buildAutomationReport؛ قوالب تقارير عامة في M-B"],
+ ["artifact-verifier.js",2,"(M-B) بصمة SHA-256 لكل ملف ناتج في السلسلة"],
+ ["document-provenance.js",1,"سلسلة الأدلة تسجل المصدر؛ تعميمه مع artifacts في M-B"]
+]},
+{n:8,title:"الأمان والحوكمة",color:"var(--g8)",items:[
+ ["policy-engine.js",0,"policy.js + sandbox-policy.js + computer-policy.js"],
+ ["permission-manager.js",0,"مصادقة مالك على كل أسطح /api/agent (SEC-001)"],
+ ["action-approval.js",0,"agent_approvals — الأثر الخارجي يوقف التشغيل حتى القرار"],
+ ["risk-classifier.js",0,"RISK read/externalEffect/irreversible لكل أداة"],
+ ["prompt-injection-guard.js",0,"scanUntrustedDocumentInjection (DEC-020) + حالات حقن في eval"],
+ ["untrusted-content-guard.js",1,"مطبق للمستندات/Issues؛ تعميمه لمحتوى الويب في M-C"],
+ ["secret-redactor.js",0,"check:secrets + فحص أسرار الذاكرة + safeError"],
+ ["credential-vault.js",0,"AES-256-GCM بمغلف v2.<keyId> وتدوير مفاتيح (SEC-005)"],
+ ["sandbox-manager.js",1,"src/agent/sandbox.js كامل ومختبر؛ ربطه بالحلقة في M-B"],
+ ["network-access-policy.js",1,"شبكة deny + حارس SSRF شامل؛ egress proxy بallowlist في M-C"],
+ ["action-risk-gate.js",0,"بوابة الموافقة + outbox نية واحدة/إرسال واحد (DEC-014/015)"]
+]},
+{n:9,title:"السجل والتدقيق",color:"var(--g9)",items:[
+ ["audit-ledger.js",0,"agent_evidence إضافي فقط بسلسلة SHA-256 (prev_hash)"],
+ ["decision-recorder.js",0,"خطوات decide مسجلة + DECISIONS.md للحوكمة"],
+ ["evidence-ledger.js",0,"src/agent/evidence.js — verifyChain يكشف أي عبث"],
+ ["tool-call-recorder.js",0,"agent_tool_runs بمفتاح idempotency وحالة unknown"],
+ ["execution-trace.js",0,"public/agent-trace.js + timing.js (p50/p95 لكل أداة)"],
+ ["task-history.js",0,"خيوط وتشغيلات دائمة في /agent"],
+ ["audit-integrity-check.js",0,"evidenceChain.ok في كل detail + اختبارات سلاسل"],
+ ["privacy-retention-policy.js",2,"(DATA-004) سياسة احتفاظ/حذف معتمدة — بانتظار قرار مالك"]
+]},
+{n:10,title:"الواجهات وAPI",color:"var(--g10)",items:[
+ ["api-server.js",0,"src/server.js + src/celia-mcp.js (الواجهة والMCP)"],
+ ["agent-controller.js",0,"src/agent-routes.js — بدء/إلغاء/موافقة/مصالحة"],
+ ["task-stream.js",1,"subscribe أحداث داخلية؛ SSE حي للواجهة في M-D"],
+ ["approval-controller.js",0,"POST /runs/:id/approval بمفتاح idempotency"],
+ ["session-controller.js",1,"ملكية مالك واحدة اليوم؛ تعدد المستخدمين قرار M-F"],
+ ["artifact-controller.js",2,"(M-B) تنزيل artifacts بروابط موقعة"],
+ ["authentication-middleware.js",0,"src/auth.js — رمز مالك على كل المسارات"],
+ ["authorization-middleware.js",0,"رفض 404 لأي مورد غير مملوك (مختبر سطحًا سطحًا)"],
+ ["rate-limiter.js",1,"حدود مدخلات وميزانيات؛ rate limiting عام في M-F"],
+ ["websocket-gateway.js",2,"(M-D) SSE/push للتتبع الحي وPWA"],
+ ["agent-workspace.tsx",1,"public/agent.html+js قائمة وتعمل؛ ترقية React/TSX خيار M-D"],
+ ["task-timeline.tsx",0,"شجرة الخطة وسطر «الآن» وشريط الميزانية (WP-1.2)"],
+ ["plan-review-panel.tsx",1,"عرض الخطة قائم؛ اعتماد مسبق تفاعلي في M-D"],
+ ["computer-live-view.tsx",1,"public/computer.html شرح صادق؛ البث الحي في M-C"],
+ ["approval-dialog.tsx",0,"لوحة الموافقات/المصالحة في /agent"],
+ ["execution-evidence-panel.tsx",0,"عرض سلسلة الأدلة والتحقق في /agent"],
+ ["artifact-gallery.tsx",2,"(M-B/M-D) صندوق المهام والمخرجات"],
+ ["agent-settings.tsx",1,"صفحات system/kb/cron قائمة؛ إعدادات موحدة في M-D"]
+]},
+{n:11,title:"التقييم والقياس",color:"var(--g11)",items:[
+ ["agent-evaluator.js",0,"src/agent/evaluation.js + verifier مستقل"],
+ ["benchmark-runner.js",0,"npm run eval:ai — 120 حالة عربية عبر الحلقة الفعلية"],
+ ["task-success-metrics.js",0,"computeAgentMetrics — p50/p95 لكل أداة وتشغيل"],
+ ["computer-use-evals.js",2,"(M-C/M-F) بعد تفعيل المحرك"],
+ ["browser-agent-evals.js",2,"(M-C/M-F) + مجموعة GAIA معرّبة في F3"],
+ ["tool-reliability-tests.js",0,"679 اختبارًا ناجحًا في الحزمة (منها 43 لـA1+A2)"],
+ ["security-regression-tests.js",0,"security-posture (SP-01..12) + تدقيق الأسطح الشامل"],
+ ["model-comparison-runner.js",2,"(A4/A5) مقارنة مزودين على نفس الحالات"],
+ ["cost-tracker.js",1,"recordCost قائم؛ رموز/تكلفة فعلية من المزود في A4"],
+ ["latency-tracker.js",0,"src/agent/timing.js (WP-1.1) — أرقام مقاسة لا مقدرة"],
+ ["failure-analysis.js",1,"تقرير eval لكل حالة بقرار وسبب؛ تصنيف آلي أعمق في A5"],
+ ["release-gate.js",0,"release.mjs + أرضية تغطية CI (89/71/82) + بوابات الصدق"]
+]},
+{n:12,title:"التشغيل والنشر والتعافي",color:"var(--g12)",items:[
+ ["health-check.js",0,"operations liveness — /health بحقائق لا ادعاءات"],
+ ["readiness-check.js",0,"/readyz مع durable وlatency مقاسة"],
+ ["job-queue.js",1,"قفل lease + استئناف؛ طابور عمال موزع في M-F"],
+ ["worker-manager.js",1,"workerId + heartbeat؛ تعدد عمال في M-F"],
+ ["distributed-lock.js",0,"claimRun بسباق ادعاء مختبر"],
+ ["persistence-adapter.js",0,"src/agent/drivers.js — MySQL/SQLite بلا وضع ذاكرة"],
+ ["database-migrations.js",0,"npm run migrate — سجل ترحيل ببصمات ورفض drift"],
+ ["metrics-exporter.js",1,"/api/agent/metrics + d1_latency_series؛ تصدير Prometheus في M-F"],
+ ["log-redaction.js",0,"safeError + منع الأسرار في السجلات (مختبر)"],
+ ["deployment-config.js",0,"render.yaml + workers/ (حافة Cloudflare منشورة بـ0$)"],
+ ["environment-validator.js",0,"config.js — رفض placeholders ومفاتيح قصيرة"],
+ ["backup-manager.js",1,"restore مصطنعة ناجحة في CI؛ نسخة الحساب الحية DATA-001"],
+ ["disaster-recovery.js",1,"releases-and-recovery.md + rollback موثق؛ تمرين RTO حي باقٍ"],
+ ["feature-flags.js",0,"loadFeatures — كل قدرة خلف علم صريح معطل افتراضيًا"],
+ ["release-manifest.js",0,"release.json موقع OIDC + SBOM + SHA256SUMS (v0.2.1)"]
+]}
+];
+
+const FLOW = [
+ ["هدف المستخدم","runtime.submit"],
+ ["عقد الهدف","goal-contract.js"],
+ ["الخطة","planner-provider / gemini (A1)"],
+ ["فحص السياسات","RISK + approvals + allowlist"],
+ ["تنفيذ الأدوات","tools.js → outbox للأثر الخارجي"],
+ ["الملاحظة","observe + tool_result"],
+ ["التحقق","verifier.js (مستقل)"],
+ ["الاستعادة أو الإكمال","replanner (A2) / reconcile / deliver"]
+];
+
+const BADGE = ["✅","🟡","⬜"];
+const groupsEl = document.getElementById("groups");
+let counts=[0,0,0];
+for (const g of GROUPS){
+  const done=g.items.filter(i=>i[1]===0).length, part=g.items.filter(i=>i[1]===1).length;
+  const sec=document.createElement("section"); sec.className="group";
+  sec.innerHTML=`<div class="ghead" style="background:${g.color}">
+      <span class="gnum">${g.n}</span>${g.title}
+      <span class="gbar">✅ ${done} · 🟡 ${part} · ⬜ ${g.items.length-done-part}</span>
+    </div><ul class="items">${
+    g.items.map(([name,st,map])=>{counts[st]++;return `<li class="st${st}">
+      <span class="badge">${BADGE[st]}</span>
+      <span><span class="fname">${name}</span><br><span class="map">${
+        st===0?`<span class="real">${map}</span>`:
+        st===2?map.replace(/\((M-[A-F][^)]*|INT-[^)]*|DATA-[^)]*|A[0-9][^)]*|MCP-[^)]*|لاحق)\)/,'<span class="phase">($1)</span>'):map
+      }</span></span></li>`}).join("")
+  }</ul>`;
+  groupsEl.appendChild(sec);
+}
+const total=counts[0]+counts[1]+counts[2];
+document.getElementById("stats").innerHTML=`
+  <div class="stat"><b>${total}</b><small>مكوّنًا في الخريطة</small></div>
+  <div class="stat" style="border-color:var(--ok)"><b style="color:var(--ok)">${counts[0]}</b><small>موجود ومختبر (${Math.round(counts[0]/total*100)}%)</small></div>
+  <div class="stat" style="border-color:var(--part)"><b style="color:var(--part)">${counts[1]}</b><small>جزئي / بديل قائم (${Math.round(counts[1]/total*100)}%)</small></div>
+  <div class="stat" style="border-color:var(--todo)"><b style="color:#b6c2d8">${counts[2]}</b><small>مقترح بمرحلة محددة (${Math.round(counts[2]/total*100)}%)</small></div>`;
+document.getElementById("flow").innerHTML = FLOW.map(([t,f],i)=>
+  `<span class="node">${t}<small>${f}</small></span>${i<FLOW.length-1?'<span class="arrow">←</span>':''}`).join("");
+</script>
+</body>
+</html>

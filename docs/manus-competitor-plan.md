@@ -2,7 +2,7 @@
 
 **التاريخ:** 29 أكتوبر 2026 · **الحالة:** مقترح بانتظار اعتماد المالك (لا يُنفَّذ منها شيء خارجي قبل القرار) ·
 **خط الأساس:** `main@05e2eb2` (دمج PR #88) · **المراجع:** [الخطة التنفيذية 2026](agent-2026-execution-plan.md) ·
-[BACKLOG](continuity/BACKLOG.md) · [نقد المعمارية](architecture-critique-2026.md) · [Sandbox](agent-sandbox.md) · [Computer Use](computer-use.md)
+[BACKLOG](continuity/BACKLOG.md) · [نقد المعمارية](architecture-critique-2026.md) · [Sandbox](agent-sandbox.md) · [Computer Use](computer-use.md) · **[الخريطة المعمارية الكاملة — الواقع مقابل الهدف](celiaos-architecture-map.html)**
 
 > **قاعدة هذه الوثيقة:** كل سطر «موجود» أدناه له ملف واختبار في المستودع اليوم؛ وكل سطر «مطلوب» هو عمل مستقبلي
 > لا يُدَّعى إنجازه. الخطة تحترم ثوابت `AGENTS.md`: لا إعادة إرسال عمياء، الأثر الخارجي عبر outbox + موافقة،
