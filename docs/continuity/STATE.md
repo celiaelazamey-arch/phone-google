@@ -31,7 +31,16 @@
   alerts معطّلة** (نص الرسالة)، و**لا CodeQL** (لا workflow ديناميكي)؛ Secret scanning وWorkflow permissions 403. لذلك لا `VERIFIED`؛
   سُجِّلت `NOT ENABLED (2026-10-29)` حيث القراءة سلبية و`UNKNOWN` حيث لا قراءة، وSP-12 يقبل الحالة الثالثة ويرفض الادعاء بلا تاريخ.
   **مطلوب من المالك:** تنفيذ خطوات §2 في `docs/security-posture.md` ثم «تم» بالاسم.
-- **2 (جزئيًا):** **PR #75** مفتوح (`arena/2f11f424-phone-google` → `main`). **2 (الدمج)، 3، 4:** الدمج ومراقبة النشر وإغلاق #38 — تُسجَّل في سجل الجلسة §4/§5 فور تنفيذها.
+- **2 ✓ PR #75 → MERGED** `main@8ce7ded1995693f60b509aaf20a81a6b881d5b14` (2026-10-29T03:18Z؛ CI الـPR `40811207864` ✅).
+- **3 ✓ النشر حيّ:** `Deploy (Cloudflare Edge)` run **`40811383082`** ✅ — `status: deployed`، **`modules: [state.js, crypto.js, runtime.js, cron.js, worker.js]`**،
+  `storage.durable: true`، 18/18 سرًا، 14 عبارة هجرة (تشمل `0003_cron_outbox`)، وخطوة التحقق الحي (`verify:live --mode edge` بالرمز، تشمل
+  `edge_cron_governed`) خضراء. بقية تشغيلات `main`: الجودة `40811383198` ✅، الإصدار `40811383079` ✅، Pages `40811383057` ✅، Render `40811478017` ✅.
+  **DEC-042 حيّ الآن** على `https://celia-phone-google.celiaelazamey.workers.dev`؛ OPS-007 → «متحقق».
+- **4 ✓ #38 CLOSED** بتعليق يحيل إلى OPS-007/DEC-042 وDEC-040 (الفرع لم يُحذف). **لا PR مفتوح في المستودع.**
+- **6 ✓ الوثائق:** هذا الملف، BACKLOG (OPS-007 متحقق، OPS-006 مكتمل، SEC-006 قراءة DEC-045)، CHANGELOG، `docs/deployment-profile.json → edgeFullRuntime.latestDeploy`،
+  سجل الجلسة. وثائق ما بعد الدمج في PR وثائق فقط (رقمه أدناه عند فتحه).
+- **المتبقي للمالك (بحكم طبيعته):** تفعيل ضوابط GitHub (خطوات `docs/security-posture.md` §2) ثم «تم» بالاسم؛ التجربة التفاعلية للوحة `/cron.html`
+  برمز المالك؛ رابط استدعاء Google (GOOG-001)؛ أسرار Meta الاختيارية؛ Aiven/Render المقيّدان بالبطاقة؛ AI-002/GOV-001.
 
 ## الطلب السابق (0) — «ادمج #74» → مدمج؛ نشر الحافة رُفض (`cron.js` خارج حزمة الرفع) → الإصلاح نُقل إلى الفرع الجديد (DEC-044، OPS-007)
 

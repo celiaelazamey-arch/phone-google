@@ -66,7 +66,19 @@
         "GET /readyz → 200 · storage.mode=d1 · durable true · latencyMs 423 (write + read-back of a fresh token)",
         "GET /version → 200 · version 0.2.1 · commit 0ebf8cac86faaea67e6f969c273549b2f8b33220",
         "GET /mcp without a bearer token → 401 {\"error\":\"unauthorized\"}"
-      ]
+      ],
+      "latestDeploy": {
+        "deployedCommit": "8ce7ded1995693f60b509aaf20a81a6b881d5b14",
+        "mergeOf": "PR #75 (fix DEC-044) on top of PR #74 (DEC-042 cron outbox, DEC-043 security posture)",
+        "workflowRun": "40811383082",
+        "deployedAt": "2026-10-29T03:18:42.314Z",
+        "modules": ["state.js", "crypto.js", "runtime.js", "cron.js", "worker.js"],
+        "d1MigrationStatements": 14,
+        "storage": "d1 · durable true (fresh token written and read back, latencyMs 1400)",
+        "secretBindings": "18/18",
+        "verifyLiveModeEdge": "step green with the owner token supplied — includes edge_cron_governed (GET /api/cron/status → governed-scheduler · outbox-approval-only · durable true · DEC-042 · outbox counts readable)",
+        "previousAttempt": "run 40809007805 on c3cc9ba rejected by Cloudflare (10021 No such module cron.js) — the hard-coded upload list lacked cron.js; fixed by deriving the upload from the import graph (DEC-044)"
+      }
     },
     "containerImage": "ghcr.io/celiaelazamey-arch/phone-google:v0.2.1",
     "containerImageVisibility": "public",
