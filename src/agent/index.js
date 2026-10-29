@@ -237,6 +237,44 @@ export function readAgentConnectors(env = process.env) {
  * بقائمة مسموحة صريحة؛ وقائمة فارغة أو `*` تُفشل الإقلاع بدل أن تُقرأ كـ«كل شيء
  * مسموح». لا يُفتح `network.allowlist` في العزل في أي وضع — الشبكة تبقى هناك `deny`.
  */
+const DEFAULT_EGRESS_PORT = Object.freeze({ http: '80', https: '443' });
+
+/**
+ * يقبل صيغتين لعنصر واحد: `host[:port]` (صيغة الوسيط الصارمة) أو
+ * `scheme://host[:port]` (صيغة الإعداد في المخطط). الثانية تُترجم إلى الأولى بمنفذ
+ * صريح — فتكون **أضيق** لا أوسع: `https://api.example.com` تعني 443 فقط.
+ * المسارات وquery والأسرار مرفوضة في العنصر نفسه.
+ */
+export function normalizeEgressEntry(raw) {
+  const text = String(raw ?? '').trim();
+  const match = /^([A-Za-z][A-Za-z0-9+.-]*):\/\/(.*)$/.exec(text);
+  if (!match) return text;
+  const scheme = match[1].toLowerCase();
+  const rest = match[2];
+  const port = DEFAULT_EGRESS_PORT[scheme];
+  if (!port) {
+    throw Object.assign(new Error(`allowlist entry scheme "${scheme}" is unsupported`), {
+      code: 'agent_egress_allowlist_invalid'
+    });
+  }
+  if (!rest || rest.includes('/') || rest.includes('?') || rest.includes('#')) {
+    throw Object.assign(new Error('an allowlist entry must be a host, not a URL with a path'), {
+      code: 'agent_egress_allowlist_invalid'
+    });
+  }
+  if (rest.startsWith('[')) {
+    const close = rest.indexOf(']');
+    if (close === -1) throw Object.assign(new Error('bracketed IPv6 entry is unterminated'), { code: 'agent_egress_allowlist_invalid' });
+    return rest.slice(close + 1).startsWith(':') ? rest : `${rest}:${port}`;
+  }
+  const parts = rest.split(':');
+  if (parts.length === 1) return `${rest}:${port}`;
+  if (parts.length === 2 && /^\d+$/.test(parts[1])) return rest;
+  throw Object.assign(new Error('an allowlist entry must be host[:port] or scheme://host[:port]'), {
+    code: 'agent_egress_allowlist_invalid'
+  });
+}
+
 export function readAgentEgress(env = process.env) {
   const mode = String(env.CELIA_AGENT_EGRESS || 'off').trim().toLowerCase();
   if (mode !== 'off' && mode !== 'proxy') {
@@ -245,11 +283,19 @@ export function readAgentEgress(env = process.env) {
       { code: 'agent_egress_misconfigured' }
     );
   }
-  if (mode === 'off') return { mode, hosts: [], allowlist: null };
-  const hosts = String(env.CELIA_AGENT_EGRESS_ALLOWLIST || '')
-    .split(',')
-    .map((entry) => entry.trim())
-    .filter(Boolean);
+  if (mode === 'off') return { mode, hosts: [], allowlist: null, deny: ['*'] };
+  let hosts;
+  try {
+    hosts = String(env.CELIA_AGENT_EGRESS_ALLOWLIST || '')
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .map((entry) => normalizeEgressEntry(entry));
+  } catch (error) {
+    throw Object.assign(new Error(`CELIA_AGENT_EGRESS_ALLOWLIST is invalid: ${error?.code || error?.message}`), {
+      code: 'agent_egress_allowlist_invalid'
+    });
+  }
   if (!hosts.length) {
     throw Object.assign(
       new Error('CELIA_AGENT_EGRESS=proxy requires CELIA_AGENT_EGRESS_ALLOWLIST (explicit hosts; "*" is refused)'),
@@ -264,7 +310,7 @@ export function readAgentEgress(env = process.env) {
       code: 'agent_egress_allowlist_invalid'
     });
   }
-  return { mode, hosts, allowlist };
+  return { mode, hosts, allowlist, deny: ['*'] };
 }
 
 function buildConnectors({ env, pool, config, logger, resolveArtifact = null }) {
@@ -572,7 +618,10 @@ export function createAgentHost({
     // وكل جلب يأخذ منحة معتمة تُسحب بعد الاستخدام؛ بلا هذا العلم لا أداة web.fetch.
     let egressProxy = null;
     if (egressConfig.mode === 'proxy') {
-      egressProxy = createEgressProxy({ onEvent: createEvidenceEgressSink({ store }) });
+      egressProxy = createEgressProxy({
+        limits: { maxConnections: positiveInt(env.CELIA_AGENT_EGRESS_MAX_CONNECTIONS, 16) },
+        onEvent: createEvidenceEgressSink({ store })
+      });
       const address = await egressProxy.listen({ port: 0 });
       webAccess = createWebAccess({
         proxy: egressProxy,
@@ -585,7 +634,14 @@ export function createAgentHost({
         // صف `web_source` لكل محاولة: مصدر مجلوب أو منع صريح — بالبصمة لا بالنص.
         store
       });
-      egressInfo = { mode: 'proxy', hosts: egressConfig.hosts, url: address.url, stats: null };
+      egressInfo = {
+        mode: 'proxy',
+        hosts: egressConfig.hosts,
+        url: address.url,
+        deny: egressConfig.deny,
+        maxConnections: egressProxy.limits.maxConnections,
+        stats: null
+      };
       logger.info?.(`Agent egress proxy on ${address.url} (allowlist: ${egressConfig.hosts.join(', ')})`);
     }
     const toolRegistry = createToolRegistry(defaultToolDefinitions({
@@ -685,10 +741,22 @@ export function createAgentHost({
       return mode;
     },
     ready,
-    /** حالة الوصول إلى الويب: الوضع والقائمة وأعداد القرارات — بلا أي رمز منحة. */
+    /**
+     * سياسة الوصول إلى الويب كما تُنفَّذ فعلًا: الوضع، قائمة السماح **بعد التطبيع**
+     * (كل عنصر بمنفذ صريح)، والمنع الافتراضي، وسقف التزامن، وأعداد القرارات.
+     * لا رمز منحة ولا ترويسة ولا نص مجلوب هنا.
+     */
     egress() {
       return {
         ...egressInfo,
+        policy: {
+          mode: egressInfo.mode,
+          allow: egressInfo.hosts ? [...egressInfo.hosts] : [],
+          deny: ['*'],
+          upstreamProxy: null,
+          maxConnections: egressInfo.maxConnections ?? null,
+          perRun: webAccess ? { ...webAccess.limits } : null
+        },
         stats: webAccess ? webAccess.stats() : null
       };
     },

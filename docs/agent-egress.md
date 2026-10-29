@@ -1,8 +1,8 @@
 # وسيط الخروج (egress proxy) — M-C / C1
 
 > **الحالة:** **C1-a** منفَّذة (الوسيط + سياسة per-run + التدقيق). **C1-b + C2-a** منفَّذتان على فرع `arena/df8cbebc-phone-google` (ربط الإقلاع + `web.fetch` + أدلة لكل مصدر). **C2-b** (`web.search`) **لم تُنفَّذ**: تحتاج قرار مزوّد من المالك.
-> **القرارات:** [DEC-059](continuity/DECISIONS.md) (الوسيط) · DEC-060 (الشبكة في العزل تبقى `deny` دائمًا، والويب على المضيف).
-> **الاختبارات:** `test/agent-egress-proxy.test.js` (EP-01..EP-13) · `test/agent-web-access.test.js` (WB-01..WB-14) · البوابة `npm run eval:web` (WEB-01..WEB-11).
+> **القرارات:** [DEC-059](continuity/DECISIONS.md) (الوسيط) · DEC-060 (الشبكة في العزل تبقى `deny` دائمًا، والويب على المضيف) · DEC-061 (مطابقة مخطط 2026: اعتُمدت الصيغ والسقوف، ولم تُعتمد طبقة المحوّلات).
+> **الاختبارات:** `test/agent-egress-proxy.test.js` (EP-01..EP-14) · `test/agent-web-access.test.js` (WB-01..WB-14، WB-03b) · البوابة `npm run eval:web` (WEB-01..WEB-11).
 
 ## 1. لماذا هذا المكوّن هو الأخطر في الخطة
 
@@ -72,6 +72,8 @@ const grant = proxy.issueGrant({ runId, allowlist: ['api.example.com:443', '*.cd
 ```
 CELIA_AGENT_EGRESS=off|proxy          # off افتراضيًا؛ أي قيمة أخرى تُفشل الإقلاع
 CELIA_AGENT_EGRESS_ALLOWLIST=a.com,*.cdn.example.com:443
+# تُقبل أيضًا صيغة المخطط: https://api.example.com → api.example.com:443 (منفذ مثبَّت)
+CELIA_AGENT_EGRESS_MAX_CONNECTIONS=16 # سقف الطلبات المتزامنة في الوسيط كله
 CELIA_AGENT_WEB_MAX_FETCHES=6         # لكل تشغيل
 CELIA_AGENT_WEB_MAX_CHARS=80000       # لكل تشغيل
 ```
@@ -104,3 +106,33 @@ CELIA_AGENT_WEB_MAX_CHARS=80000       # لكل تشغيل
 `npm run eval:web` → `WEB-ACCESS: PASS — 11/11` (`reports/web-access.json`، حتمي بلا طوابع زمنية). يغطي: مصدرًا كاملًا بالبصمة، رفض المضيف بلا اتصال، redirect داخلي/خارجي، سقف الحلقة، نوع المحتوى، الحجم، تنقية الحقن، ثلاثة مصادر، ميزانية كل تشغيل + سحب المنحة، وتسجيل كل قرار خروج.
 
 **ما لا تقيسه:** إنترنتًا حقيقيًا. كل المشاهد على `127.0.0.1`. أي اتصال فعلي بالعالم قرار نشر مستقل بتاريخه.
+
+## 9. مطابقة مخطط 2026 (`CELIA_AGENT_EGRESS`) بالكود — ادعاء بادعاء
+
+المخطط الهندسي المرفق يصف طبقة «مضيف + محوّل موحّد». هذا جدول يقابل كل عنصر بما هو **موجود فعلًا** وبما **ليس موجودًا**، حتى لا يُقرأ المخطط كأنه وصف للحالة:
+
+| عنصر المخطط | الحالة هنا |
+|---|---|
+| `mode: 'off'` افتراضيًا، `proxy` عند الطلب | ✅ `readAgentEgress(env)`؛ أي قيمة ثالثة تُفشل إنشاء المضيف |
+| `allow: ['https://api.example.com', 'https://*.trusted.com']` | ✅ **مقبولة الآن**: `normalizeEgressEntry` تترجمها إلى `api.example.com:443` و`*.trusted.com:443` — أي **أضيق** لا أوسع (المخطط يثبّت المنفذ) |
+| `deny: ['*']` | ✅ سلوكًا: كل ما ليس في `allow` محجوب؛ ويعود صريحًا في `/api/agent/egress` |
+| `proxy: null` (لا وسيط أعلى) | ✅ لا توجيه لوسيط أعلى بالبناء، ويُعلن `upstreamProxy: null` في الرد |
+| `maxConnections: 3` | ✅ **صار سقفًا حقيقيًا**: افتراضي 16، `CELIA_AGENT_EGRESS_MAX_CONNECTIONS`، وتجاوزه = 429 `egress_connection_limit` **مسجَّل** (EP-14) |
+| «فحص الإعدادات وتأكيد صحة القائمة» عند الإنشاء | ✅ `createEgressAllowlist` ترفض `*` والمسارات والاعتماديات؛ والإعداد الخاطئ يُفشل الإقلاع لا يُهمَل |
+| «منحة لكل عملية جلب» | ✅ منحة لكل `web.fetch` تُسحب في `finally` (WB-03/WB-03b) |
+| «تسجيل الأدلة» بنوع مستقل | ✅ `web_source` لكل محاولة + `egress_request` لكل قرار وسيط |
+| «التحقق النهائي / result-verifier» | ✅ بأسماء أخرى: `evidence.js` (سلسلة hash) و`verifier.js` و`harness.js` |
+| **`unified-converter.js` + `computer/browser/tool/mcp/data/service-converter.js`** | ❌ **غير موجودة إطلاقًا** في هذا المستودع (لا ملف واحد باسم `converter`). البنية الفعلية: `runtime.js` → `tools.js` (سجل أدوات مع سياسة لكل أداة) → تنفيذ الأداة |
+| **`agent-runtime.js`** | ❌ الاسم هنا `runtime.js` (الملف المقصود غير موجود) |
+| **عقد JSON موحّد للطلب/الاستجابة مع `trace_id` و`permissions`** | ❌ لا يوجد عقد موحّد. لكل أداة تعريفها ومخطط مدخلاتها، والخيط هو `runId`، والدليل هو `sha256` + سلسلة الأدلة |
+| **`checkPermissions()` كفحص مركزي قبل المحوّل** | ⚠️ موجود **بمعناه** لا بشكلِه: `tool-policy.js` (نوع الأداة وخطرها) + `web.fetch` بوصفها `read` + قائمة التشغيل + سقوف الميزانية |
+| **`createHost({ egress: CELIA_AGENT_EGRESS })` ثابتًا من `config.js`** | ⚠️ وجوديًا: لا `config.js` ولا معامل `egress` مُحقَن؛ `createAgentHost` يقرأ البيئة ويبني الوسيط بنفسه عند `proxy` |
+
+### ما أوصي به في شأن الجزء غير الموجود
+
+طبقة المحوّلات ليست «توصيلًا» بل **إعادة بناء**: لا شيء منها في المستودع، وكل ما تعِد به (توجيه حسب القدرة، عقد موحّد، فحص صلاحيات مركزي) موجود اليوم موزّعًا على `tools.js` + `runtime.js` + `evidence.js` + `verifier.js`. إضافتها الآن تعني:
+1. إعادة تسمية/تغليف كود عامل ومختبَر (مخاطرة انحدار بلا قدرة جديدة)،
+2. سطحًا ثانيًا للتحقق من الصلاحيات يمكن أن يخالف `tool-policy` (وهذا أسوأ من غيابه)،
+3. `trace_id` جديدًا بجانب `runId` بلا حسم أيّهما المرجع في الأدلة.
+
+**المقترح:** إن كان الهدف توحيد MCP/الأدوات، فالشريحة الصحيحة هي **عقد أدوات موحّد + `trace_id` مشتق من `runId`** فوق السجل القائم — لا استبداله. وإن كان الهدف فقط «شكل الإعداد» في المخطط، فقد صار مطابقًا الآن (الصيغة، `deny`, `proxy`, `maxConnections`). القرار في DEC-061.

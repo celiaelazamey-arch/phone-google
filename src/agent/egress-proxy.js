@@ -49,7 +49,9 @@ const DEFAULT_LIMITS = Object.freeze({
   maxRequestBytes: 1_048_576,
   maxResponseBytes: 8_388_608,
   timeoutMs: 15_000,
-  maxTunnelsPerGrant: 8
+  maxTunnelsPerGrant: 8,
+  // سقف الطلبات المتزامنة في الوسيط نفسه: تشغيل واحد لا يستطيع احتكار المقابس.
+  maxConnections: 16
 });
 const MIN_TTL_MS = 1_000;
 const MAX_TTL_MS = 3_600_000;
@@ -208,10 +210,13 @@ export function createEgressProxy({ clock = Date.now, limits = {}, agent = 'celi
   boundedInteger(config.maxResponseBytes, 'egress_max_response_bytes', 1_024, 268_435_456);
   boundedInteger(config.timeoutMs, 'egress_timeout_ms', 100, 120_000);
   boundedInteger(config.maxTunnelsPerGrant, 'egress_max_tunnels', 1, 64);
+  boundedInteger(config.maxConnections, 'egress_max_connections', 1, 256);
 
   const grants = new Map();
   const events = [];
   const stats = { requests: 0, allowed: 0, blocked: 0, bytesIn: 0, bytesOut: 0, auditFailures: 0 };
+  // الطلبات والأنفاق الجارية معًا: سقف واحد للوسيط كله، لا لكل منحة.
+  const connections = { active: 0 };
   let server = null;
   let closed = false;
 
@@ -584,6 +589,15 @@ export function createEgressProxy({ clock = Date.now, limits = {}, agent = 'celi
       if (closed) throw coded('egress_proxy_closed');
       if (server) throw coded('egress_proxy_already_listening');
       server = http.createServer((req, res) => {
+        if (connections.active >= config.maxConnections) {
+          // الرفض يُسجَّل ويُعدّ: السقف قرار إنفاذ لا خطأ داخلي.
+          deny(res, 429, 'egress_connection_limit', { method: req.method });
+          return;
+        }
+        connections.active += 1;
+        res.on('close', () => {
+          connections.active = Math.max(0, connections.active - 1);
+        });
         handleHttp(req, res).catch(() => {
           try {
             res.destroy();
@@ -593,6 +607,15 @@ export function createEgressProxy({ clock = Date.now, limits = {}, agent = 'celi
         });
       });
       server.on('connect', (req, socket, head) => {
+        if (connections.active >= config.maxConnections) {
+          void emit({ decision: EGRESS_DECISION.block, reason: 'egress_connection_limit', status: 429, method: 'CONNECT' });
+          socket.end('HTTP/1.1 429 Too Many Requests\r\n\r\n');
+          return;
+        }
+        connections.active += 1;
+        socket.once('close', () => {
+          connections.active = Math.max(0, connections.active - 1);
+        });
         try {
           handleConnect(req, socket, head);
         } catch {
@@ -630,7 +653,13 @@ export function createEgressProxy({ clock = Date.now, limits = {}, agent = 'celi
     },
 
     stats() {
-      return { ...stats, activeGrants: grants.size, version: EGRESS_PROXY_VERSION };
+      return {
+        ...stats,
+        activeGrants: grants.size,
+        activeConnections: connections.active,
+        maxConnections: config.maxConnections,
+        version: EGRESS_PROXY_VERSION
+      };
     }
   };
 }

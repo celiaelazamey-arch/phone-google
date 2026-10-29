@@ -12,23 +12,23 @@
 ## 2. التركيز النشط وسجل الحالة ([STATE.md](STATE.md))
 
 - **آخر مراجعة مسجّلة:** 29 أكتوبر 2026
-- **الجلسة النشطة:** MANUS-C1b-C2a — الوصول إلى الويب (S5/M-C) على `arena/df8cbebc-phone-google` من `main@97078dc`: بوابة إقلاع صريحة `CELIA_AGENT_EGRESS=off|proxy` + `CELIA_AGENT_EGRESS_ALLOWLIST`، منحة واحدة لكل جلب تُسحب في `finally`، وأداة `web.fetch` الوحيدة (قراءة، بلا موافقة كتابة) تمر دائمًا عبر وسيط C1 وتحمل سقوفًا وميزانية لكل تشغيل، وتنقّي الحقن قبل أن يرى المخطِّط أي نص، وتشهد على كل محاولة بصف أدلة (`web_source`) بـ`PASS`/`BLOCK`. اختبارات: 15/15 ([`test/agent-web-access.test.js`](../../test/agent-web-access.test.js)) وبوابة `npm run eval:web` 11/11. شبكة العزل ما زالت `deny` حرفيًا ولم تُفتح أي allowlist. سجل الجلسة: [2026-10-29-manus-c1b-c2a-web-access](sessions/2026-10-29-manus-c1b-c2a-web-access.md) · الدليل: [agent-egress.md](../agent-egress.md) · القرار: `DEC-060`.
+- **الجلسة النشطة:** MANUS-C1b-C2a — الوصول إلى الويب (S5/M-C) على `arena/df8cbebc-phone-google` من `main@97078dc`: بوابة إقلاع صريحة `CELIA_AGENT_EGRESS=off|proxy` + `CELIA_AGENT_EGRESS_ALLOWLIST`، منحة واحدة لكل جلب تُسحب في `finally`، وأداة `web.fetch` الوحيدة (قراءة، بلا موافقة كتابة) تمر دائمًا عبر وسيط C1 وتحمل سقوفًا وميزانية لكل تشغيل، وتنقّي الحقن قبل أن يرى المخطِّط أي نص، وتشهد على كل محاولة بصف أدلة (`web_source`) بـ`PASS`/`BLOCK`. وبعد مطابقة مخطط 2026 (DEC-061): قائمة بصيغة `https://host` تُطبَّع إلى `host:443`، وسقف تزامن عام في الوسيط (`maxConnections`، 429 مسجَّل)، والسياسة المنفَّذة تُعلن في `/api/agent/egress`. طبقة المحوّلات في المخطط غير موجودة ولم تُبنَ. اختبارات: 15/15 (+1 سقف تزامن في EP-14 → 14/14 للوسيط) ([`test/agent-web-access.test.js`](../../test/agent-web-access.test.js)) وبوابة `npm run eval:web` 11/11. شبكة العزل ما زالت `deny` حرفيًا ولم تُفتح أي allowlist. سجل الجلسة: [2026-10-29-manus-c1b-c2a-web-access](sessions/2026-10-29-manus-c1b-c2a-web-access.md) · الدليل: [agent-egress.md](../agent-egress.md) · القرار: `DEC-060`.
 - **آخر سجل جلسة مؤرَّخ:** [2026-10-29-manus-c1b-c2a-web-access](sessions/2026-10-29-manus-c1b-c2a-web-access.md)
-- **حجم [STATE.md](STATE.md) النشط:** 53 سطرًا (7931 بايت)
+- **حجم [STATE.md](STATE.md) النشط:** 54 سطرًا (8829 بايت)
 - **الأرشيف التاريخي المحفوظ بلا حذف:**
 - [STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md) — الأساس `9f6f8b2` · **983 سطرًا** محفوظًا حرفيًا (بصمة `f2674637e82e…`)
 
 ## 3. سجل القرارات المعمارية ([DECISIONS.md](DECISIONS.md))
 
-- **إجمالي القرارات المسجّلة:** 60 · **آخر قرار معتمد في السجل:** `DEC-060` · **المعرّف المتاح التالي (تحقّق قبل الحجز):** `DEC-061`
+- **إجمالي القرارات المسجّلة:** 61 · **آخر قرار معتمد في السجل:** `DEC-061` · **المعرّف المتاح التالي (تحقّق قبل الحجز):** `DEC-062`
 
 | المعرّف | العنوان المختصر |
 |---|---|
+| `DEC-061` | المخطط المعماري 2026 (`CELIA_AGENT_EGRESS`): اعتُمدت صيغ الإعداد والسقوف، ولم تُعتمد طبقة المحوّلات |
 | `DEC-060` | M-C/C1-b+C2-a: شبكة العزل تبقى `deny` دائمًا، والوصول إلى الويب أداة مضيف واحدة عبر الوسيط |
 | `DEC-059` | M-C/C1-a: وسيط خروج per-run كبابٍ واحد، قبل أي فتح للشبكة في العزل |
 | `DEC-058` | M-B/B4: رفع artifact مبصوم إلى Drive المالك بنفس بوابة الموافقة، وبلا نطاق OAuth جديد |
 | `DEC-057` | GOOG-005: حزمة Google read-only بعقود مستقلة وحدود 2026 بلا scopes جديدة |
-| `DEC-056` | GOOG-004: Gmail read-only داخل Runtime بعقد مستقل عن outbox وإعادة استخدام OAuth المشفر |
 
 ## 4. تقدّم الخطة التنفيذية 2026 ([agent-2026-execution-plan.md](../agent-2026-execution-plan.md))
 

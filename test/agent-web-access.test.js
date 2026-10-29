@@ -16,7 +16,7 @@ import { createEgressAllowlist, createEgressProxy } from '../src/agent/egress-pr
 import { createWebAccess, webToolDefinitions } from '../src/agent/web-tools.js';
 import { createWebFetcher, decodeEntities, extractReadableText, validateWebUrl } from '../src/agent/web-fetch.js';
 import { createToolRegistry, defaultToolDefinitions, RISK } from '../src/agent/tools.js';
-import { readAgentEgress } from '../src/agent/index.js';
+import { normalizeEgressEntry, readAgentEgress } from '../src/agent/index.js';
 import { canonicalRisk } from '../src/knowledge/tool-policy.js';
 import { createAgentRouter } from '../src/agent-routes.js';
 import { createTempStore } from './support/agent-fixtures.js';
@@ -335,14 +335,36 @@ test('WB-11: web.fetch exists only with a web service, is a settled read, and va
 // ─── 10. البوابة: الإقلاع لا يفتح شيئًا بلا إذن صريح ───────────────────────
 
 test('WB-12: CELIA_AGENT_EGRESS is off by default, demands an explicit allowlist in proxy mode, and refuses wildcards', () => {
-  assert.deepEqual(readAgentEgress({}), { mode: 'off', hosts: [], allowlist: null });
+  assert.deepEqual(readAgentEgress({}), { mode: 'off', hosts: [], allowlist: null, deny: ['*'] });
   assert.deepEqual(readAgentEgress({ CELIA_AGENT_EGRESS: 'off' }).hosts, []);
 
   const enabled = readAgentEgress({ CELIA_AGENT_EGRESS: 'proxy', CELIA_AGENT_EGRESS_ALLOWLIST: 'api.example.com, *.cdn.example.com:443' });
   assert.equal(enabled.mode, 'proxy');
   assert.deepEqual(enabled.hosts, ['api.example.com', '*.cdn.example.com:443']);
+  assert.deepEqual(enabled.deny, ['*']);
   assert.equal(enabled.allowlist.allows({ host: 'a.cdn.example.com', port: 443 }), true);
   assert.equal(enabled.allowlist.allows({ host: 'example.org', port: 443 }), false);
+
+  // صيغة المخطط (URL) تُقبل وتُضيق: مخطط معروف → منفذ صريح، ومسار/مخطط آخر مرفوض.
+  assert.equal(normalizeEgressEntry('https://api.example.com'), 'api.example.com:443');
+  assert.equal(normalizeEgressEntry('http://api.example.com'), 'api.example.com:80');
+  assert.equal(normalizeEgressEntry('https://api.example.com:8443'), 'api.example.com:8443');
+  assert.equal(normalizeEgressEntry('https://*.trusted.com'), '*.trusted.com:443');
+  assert.equal(normalizeEgressEntry('api.example.com'), 'api.example.com');
+  for (const bad of ['ftp://api.example.com', 'https://api.example.com/path', 'https://api.example.com/?q=1', 'https://']) {
+    assert.throws(() => normalizeEgressEntry(bad), (error) => error.code === 'agent_egress_allowlist_invalid', bad);
+  }
+  const fromUrls = readAgentEgress({
+    CELIA_AGENT_EGRESS: 'proxy',
+    CELIA_AGENT_EGRESS_ALLOWLIST: 'https://api.example.com, https://*.trusted.com'
+  });
+  assert.deepEqual(fromUrls.hosts, ['api.example.com:443', '*.trusted.com:443']);
+  assert.equal(fromUrls.allowlist.allows({ host: 'a.trusted.com', port: 443 }), true);
+  assert.equal(fromUrls.allowlist.allows({ host: 'a.trusted.com', port: 80 }), false, 'the scheme pinned the port');
+  assert.throws(
+    () => readAgentEgress({ CELIA_AGENT_EGRESS: 'proxy', CELIA_AGENT_EGRESS_ALLOWLIST: 'https://api.example.com/x' }),
+    (error) => error.code === 'agent_egress_allowlist_invalid'
+  );
 
   assert.throws(
     () => readAgentEgress({ CELIA_AGENT_EGRESS: 'proxy' }),
@@ -372,8 +394,21 @@ test('WB-13: /api/agent/egress is owner-only and never reports a grant token', a
       return { status: () => ({ enabled: true }) };
     },
     egress() {
-      // هذا هو شكل createAgentHost().egress() حرفيًا: وضع + قائمة + عنوان + أعداد.
-      return { mode: 'proxy', hosts: ['api.example.com'], url: 'http://127.0.0.1:1234', stats: { grants: 2, allowed: 1, blocked: 1 } };
+      // هذا هو شكل createAgentHost().egress() حرفيًا: سياسة + أعداد، بلا رموز.
+      return {
+        mode: 'proxy',
+        hosts: ['api.example.com:443'],
+        url: 'http://127.0.0.1:1234',
+        policy: {
+          mode: 'proxy',
+          allow: ['api.example.com:443'],
+          deny: ['*'],
+          upstreamProxy: null,
+          maxConnections: 16,
+          perRun: { maxFetchesPerRun: 6, maxTotalCharsPerRun: 80_000, grantTtlMs: 30_000 }
+        },
+        stats: { grants: 2, allowed: 1, blocked: 1 }
+      };
     }
   };
   app.use(
@@ -397,7 +432,10 @@ test('WB-13: /api/agent/egress is owner-only and never reports a grant token', a
   assert.equal(ok.headers.get('cache-control'), 'no-store');
   const body = await ok.json();
   assert.equal(body.mode, 'proxy');
-  assert.deepEqual(body.hosts, ['api.example.com']);
+  assert.deepEqual(body.hosts, ['api.example.com:443']);
+  assert.deepEqual(body.policy.deny, ['*'], 'deny is explicit: everything outside allow is refused');
+  assert.equal(body.policy.upstreamProxy, null, 'no upstream proxy chaining exists');
+  assert.equal(body.policy.maxConnections, 16);
 
   // لا رمز منحة (64 خانة hex) ولا ترويسة تفويض في أي حقل من الرد.
   assert.equal(/[a-f0-9]{64}/.test(JSON.stringify(body)), false, 'no grant token shape in the payload');

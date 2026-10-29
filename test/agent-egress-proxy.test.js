@@ -401,7 +401,7 @@ test('EP-10: a fresh proxy grants nothing, and revoking a run drops its tunnels 
 
 // ─── 11. لا يُفتح allowlist داخل العزل قبل أن يُركَّب الوسيط (C1-b) ──────────
 
-test('EP-11: the sandbox still refuses to open its own allowlist — C1-b has not happened yet', async () => {
+test('EP-11: the sandbox still refuses to open its own allowlist — permanently, by DEC-060', async () => {
   const { createSandboxPolicy } = await import('../src/agent/sandbox-policy.js');
   assert.throws(
     () => createSandboxPolicy({ network: { mode: 'deny', allowlist: ['api.example.com'] } }),
@@ -413,6 +413,47 @@ test('EP-11: the sandbox still refuses to open its own allowlist — C1-b has no
 });
 
 // ─── 12. الرفض الشكلي: طريقة أو هدف غير صالح ───────────────────────────────
+
+test('EP-14: a single global connection ceiling bounds in-flight requests, refuses the next one with 429 and audits it', async (t) => {
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  const upstream = await startUpstream(async (req, res) => {
+    await gate;
+    res.writeHead(200, { 'content-type': 'text/plain' });
+    res.end('slow-ok');
+  });
+  t.after(() => upstream.close());
+  const harness = await setupProxy(t, { limits: { maxConnections: 1 } });
+  const grant = harness.proxy.issueGrant({ runId: 'run-ep14', allowlist: [`127.0.0.1:${upstream.port}`] });
+
+  const first = proxiedGet({ proxyPort: harness.proxyPort, token: grant.token, target: `${upstream.url}/slow` });
+  const inFlight = await waitFor(() => harness.proxy.stats().activeConnections === 1);
+  assert.equal(inFlight, true, 'the first request is counted while it is open');
+
+  // الثانية تُرفض عند السقف قبل أي اتصال بالوجهة.
+  const before = upstream.calls.length;
+  const refused = await proxiedGet({ proxyPort: harness.proxyPort, token: grant.token, target: `${upstream.url}/second` });
+  assert.equal(refused.status, 429);
+  assert.equal(refused.body.includes('egress_connection_limit'), true);
+  assert.equal(upstream.calls.length, before, 'the refused request never reached the origin');
+  assert.equal(
+    await waitFor(() => harness.events.some((event) => event.reason === 'egress_connection_limit')),
+    true,
+    'the ceiling decision is audited like any other block'
+  );
+
+  release();
+  const done = await first;
+  assert.equal(done.status, 200);
+  assert.equal(done.body, 'slow-ok');
+  assert.equal(await waitFor(() => harness.proxy.stats().activeConnections === 0), true, 'the slot is released');
+
+  // بعد التحرير يعمل الطلب التالي عاديًا: السقف ليس قاطعًا دائمًا.
+  const after = await proxiedGet({ proxyPort: harness.proxyPort, token: grant.token, target: `${upstream.url}/after` });
+  assert.equal(after.status, 200);
+});
 
 test('EP-12: unsupported methods and malformed or non-CONNECT https targets are refused with explicit codes', async (t) => {
   const upstream = await startUpstream();
