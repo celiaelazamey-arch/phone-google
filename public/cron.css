@@ -2,7 +2,7 @@
 
 .brand .dot.cron {
   background: var(--warn);
-  box-shadow: 0 0 0 6px rgba(255, 203, 107, 0.14);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--warn) 14%, transparent);
 }
 
 .card.wide { grid-column: span 2; }
@@ -14,14 +14,14 @@ select {
   padding: 0.55rem 0.7rem;
   border-radius: 10px;
   border: 1px solid var(--line);
-  background: #0e1530;
+  background: var(--field);
   color: var(--text);
   font: inherit;
 }
 
 .table-wrap { overflow-x: auto; }
 .jobs { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-.jobs th, .jobs td { text-align: start; padding: 0.45rem 0.5rem; border-bottom: 1px dashed rgba(39, 49, 84, 0.7); vertical-align: top; }
+.jobs th, .jobs td { text-align: start; padding: 0.45rem 0.5rem; border-bottom: 1px dashed color-mix(in srgb, var(--line) 70%, transparent); vertical-align: top; }
 .jobs th { color: var(--muted); font-weight: 500; }
 .jobs td.url { direction: ltr; text-align: left; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.78rem; word-break: break-all; }
 .jobs td.empty { color: var(--muted); text-align: center; }
@@ -33,7 +33,7 @@ select {
 
 .history { margin-top: 0.8rem; font-size: 0.82rem; }
 .history table { width: 100%; border-collapse: collapse; }
-.history th, .history td { text-align: start; padding: 0.3rem 0.4rem; border-bottom: 1px dashed rgba(39, 49, 84, 0.7); }
+.history th, .history td { text-align: start; padding: 0.3rem 0.4rem; border-bottom: 1px dashed color-mix(in srgb, var(--line) 70%, transparent); }
 .history th { color: var(--muted); font-weight: 500; }
 
 .intents { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
@@ -41,22 +41,22 @@ select {
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 0.7rem 0.8rem;
-  background: rgba(14, 21, 48, 0.6);
+  background: color-mix(in srgb, var(--field) 60%, transparent);
   display: grid;
   gap: 0.4rem;
 }
 .intents .head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.4rem; }
 .intents .state { font-size: 0.75rem; padding: 0.15rem 0.55rem; border-radius: 999px; border: 1px solid var(--line); }
-.intents .state.pending_approval { color: var(--warn); border-color: rgba(255, 203, 107, 0.4); }
-.intents .state.applied { color: var(--ok); border-color: rgba(61, 220, 151, 0.4); }
-.intents .state.failed, .intents .state.rejected, .intents .state.not_applied { color: var(--bad); border-color: rgba(255, 107, 107, 0.4); }
-.intents .state.unknown, .intents .state.dispatching { color: var(--warn); border-color: rgba(255, 203, 107, 0.6); }
+.intents .state.pending_approval { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
+.intents .state.applied { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
+.intents .state.failed, .intents .state.rejected, .intents .state.not_applied { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, transparent); }
+.intents .state.unknown, .intents .state.dispatching { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 60%, transparent); }
 .intents pre {
   margin: 0;
   padding: 0.5rem 0.6rem;
   border-radius: 8px;
-  background: #0a1028;
-  color: #cbd5e1;
+  background: var(--field);
+  color: var(--text);
   font-size: 0.75rem;
   direction: ltr;
   text-align: left;

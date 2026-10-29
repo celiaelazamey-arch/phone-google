@@ -6,6 +6,8 @@
   <meta name="robots" content="noindex">
   <title>شبكة المعرفة — سيليا</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <script src="./theme.js"></script>
+  <link rel="stylesheet" href="./theme.css">
   <link rel="stylesheet" href="./fonts.css">
   <link rel="stylesheet" href="./agent.css">
   <link rel="stylesheet" href="./kb.css">
@@ -23,6 +25,14 @@
       <a href="./agent">مساحة الوكيل</a>
       <a href="./studio">الاستوديو</a>
       <a href="./system">حالة النظام</a>
+      <label class="theme-switch"><span>المظهر</span>
+        <select data-theme-switcher aria-label="المظهر">
+          <option value="system">يتبع النظام</option>
+          <option value="dark">داكن</option>
+          <option value="oled">OLED</option>
+          <option value="light">فاتح</option>
+        </select>
+      </label>
     </nav>
   </header>
 
