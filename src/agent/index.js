@@ -492,9 +492,16 @@ export function createAgentHost({
   }
   let lastBootRecovery = null;
   let egressInfo = { mode: 'off', hosts: [], stats: null };
+  let egressProxy = null;
+  let closed = false;
   let webAccess = null;
-  // البوابة تُقرأ عند إنشاء المضيف لا عند أول جلب: إعداد خاطئ يُفشل الإقلاع فورًا.
-  const egressConfig = readAgentEgress(env);
+  let egressConfig = { mode: 'off', hosts: [], allowlist: null, deny: ['*'] };
+  // البوابة تُقرأ عند إنشاء المضيف لا عند أول جلب: إعداد خاطئ يُفشل الإقلاع عبر `ready` دون إسقاط الخادم الرئيسي.
+  try {
+    egressConfig = readAgentEgress(env);
+  } catch (error) {
+    failure = failure || { code: error.code || 'agent_egress_misconfigured', message: error.message };
+  }
   const nodeEnv = config.nodeEnv || env.NODE_ENV || 'development';
 
   const ready = (async () => {
@@ -616,13 +623,18 @@ export function createAgentHost({
       : null;
     // M-C/C1-b: الوصول إلى الويب قرار نشر صريح. الوسيط يستمع على 127.0.0.1 فقط،
     // وكل جلب يأخذ منحة معتمة تُسحب بعد الاستخدام؛ بلا هذا العلم لا أداة web.fetch.
-    let egressProxy = null;
     if (egressConfig.mode === 'proxy') {
-      egressProxy = createEgressProxy({
+      const createdProxy = createEgressProxy({
         limits: { maxConnections: positiveInt(env.CELIA_AGENT_EGRESS_MAX_CONNECTIONS, 16) },
         onEvent: createEvidenceEgressSink({ store })
       });
-      const address = await egressProxy.listen({ port: 0 });
+      const address = await createdProxy.listen({ port: 0 });
+      if (closed) {
+        await createdProxy.close().catch(() => {});
+        await store.close?.().catch?.(() => {});
+        return null;
+      }
+      egressProxy = createdProxy;
       webAccess = createWebAccess({
         proxy: egressProxy,
         proxyUrl: address.url,
@@ -732,8 +744,28 @@ export function createAgentHost({
       limits: readAgentLimits(env),
       logger
     });
+    if (closed) {
+      await runtime.shutdown().catch(() => {});
+      if (egressProxy) {
+        const activeProxy = egressProxy;
+        egressProxy = null;
+        await activeProxy.close().catch(() => {});
+      }
+      return null;
+    }
     return runtime;
   })();
+
+  // Prevent V8 UnhandledPromiseRejection from crashing the process when nobody
+  // awaits `host.ready` on tick 0; `ready` itself still rejects for callers
+  // such as `await host.ready` (HOST-01/HOST-02) and `await host.status()`.
+  ready.catch(async () => {
+    if (egressProxy) {
+      const activeProxy = egressProxy;
+      egressProxy = null;
+      await activeProxy.close().catch(() => {});
+    }
+  });
 
   const bootRecoveryPolicy = () => ({
     policy: resumeOnBoot ? 'resume' : 'manual',
@@ -797,6 +829,18 @@ export function createAgentHost({
         return record({ performed: true, ...(await runtime.recoverOnBoot()) });
       } catch (error) {
         return record({ performed: false, reason: error.code || 'boot_recovery_failed' });
+      }
+    },
+    async close() {
+      closed = true;
+      const runtime = await ready.catch(() => null);
+      if (runtime?.shutdown) {
+        await runtime.shutdown().catch(() => {});
+      }
+      if (egressProxy) {
+        const activeProxy = egressProxy;
+        egressProxy = null;
+        await activeProxy.close().catch(() => {});
       }
     }
   };

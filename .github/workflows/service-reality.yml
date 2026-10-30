@@ -104,7 +104,18 @@ jobs:
           AGENTROUTER_MODEL: ${{ vars.AGENTROUTER_MODEL }}
           AI_GATEWAY_MODEL: ${{ vars.AI_GATEWAY_MODEL }}
           GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/service-reality.mjs --min-rate ${{ inputs.min_rate || '0.95' }} ${{ inputs.live_only && '--skip-offline' || '' }}
+          INPUT_MIN_RATE: ${{ inputs.min_rate || '0.95' }}
+          INPUT_LIVE_ONLY: ${{ inputs.live_only && 'true' || 'false' }}
+        run: |
+          if ! [[ "$INPUT_MIN_RATE" =~ ^(0(\.[0-9]+)?|1(\.0+)?)$ ]]; then
+            echo "::error::min_rate must be a decimal between 0 and 1 (e.g. 0.95)"
+            exit 1
+          fi
+          extra_args=()
+          if [ "$INPUT_LIVE_ONLY" = "true" ]; then
+            extra_args+=(--skip-offline)
+          fi
+          node scripts/service-reality.mjs --min-rate "$INPUT_MIN_RATE" "${extra_args[@]}"
       - name: Notify the owner through one tracking issue (main, scheduled/manual runs only)
         if: always() && github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && hashFiles('.validation-artifacts/service-reality.json') != ''
         env:

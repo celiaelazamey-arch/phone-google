@@ -320,12 +320,17 @@ test('ElevenLabs TTS with Idempotency-Key, Figma read-only client, Codata read-o
   }
 });
 
-test('MCP_TOOLS preserves strict N/N-1 backward compatibility with 0.2.0 baseline', async () => {
+test('MCP_TOOLS preserves strict N/N-1 backward compatibility with 0.2.0 baseline', async (t) => {
   const baseline = '2508893bd7e6d447b2e19374933556322cc9cdb7';
   const root = path.resolve(import.meta.dirname, '..');
-  let tmpDir = null;
   try {
     await exec('git', ['cat-file', '-e', `${baseline}^{commit}`], { cwd: root });
+  } catch {
+    t.skip(`shallow clone: baseline commit ${baseline.slice(0, 7)} is not present locally`);
+    return;
+  }
+  let tmpDir = null;
+  try {
     await mkdir(path.join(root, '.validation-artifacts'), { recursive: true });
     tmpDir = await mkdtemp(path.join(root, '.validation-artifacts', 'mcp-contract-'));
     const archive = await exec('git', ['archive', baseline], { cwd: root, encoding: 'buffer', maxBuffer: 8 * 1024 * 1024 });

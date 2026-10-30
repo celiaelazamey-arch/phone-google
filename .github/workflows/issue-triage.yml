@@ -55,11 +55,26 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_ISSUE_NUMBER: ${{ inputs.issue_number }}
+          INPUT_APPLY: ${{ inputs.apply && 'true' || 'false' }}
           TRIAGE_MODE: ${{ inputs.mode || 'cautious' }}
           TRIAGE_REVIEWER: triage-workflow
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            node scripts/issue-triage.mjs --issue "${{ inputs.issue_number }}" --mode "$TRIAGE_MODE" ${{ inputs.apply && '--apply' || '' }}
+          if ! [[ "$TRIAGE_MODE" =~ ^(cautious|propose)$ ]]; then
+            echo "::error::mode must be cautious or propose"
+            exit 1
+          fi
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            if ! [[ "$INPUT_ISSUE_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+              echo "::error::issue_number must be a positive integer"
+              exit 1
+            fi
+            extra_args=()
+            if [ "$INPUT_APPLY" = "true" ]; then
+              extra_args+=(--apply)
+            fi
+            node scripts/issue-triage.mjs --issue "$INPUT_ISSUE_NUMBER" --mode "$TRIAGE_MODE" "${extra_args[@]}"
           else
             node scripts/issue-triage.mjs --event "$GITHUB_EVENT_PATH" --mode "$TRIAGE_MODE" --apply
           fi

@@ -41,11 +41,21 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          INPUT_ISSUES: ${{ inputs.issues || '61' }}
           TRIAGE_MODE: ${{ inputs.mode || 'cautious' }}
           TRIAGE_REVIEWER: triage-selftest
         run: |
           set -euo pipefail
-          for n in $(echo "${{ inputs.issues || '61' }}" | tr ',' ' '); do
+          if ! [[ "$TRIAGE_MODE" =~ ^(cautious|propose)$ ]]; then
+            echo "::error::mode must be cautious or propose"
+            exit 1
+          fi
+          if ! [[ "$INPUT_ISSUES" =~ ^[1-9][0-9]*(,[1-9][0-9]*)*$ ]]; then
+            echo "::error::issues must be a comma-separated list of positive integers"
+            exit 1
+          fi
+          IFS=',' read -ra issue_list <<< "$INPUT_ISSUES"
+          for n in "${issue_list[@]}"; do
             echo "::group::issue #$n"
             node scripts/issue-triage.mjs --issue "$n" --mode "$TRIAGE_MODE" --apply
             echo "::endgroup::"

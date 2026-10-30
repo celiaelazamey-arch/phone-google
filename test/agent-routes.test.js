@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import express from 'express';
 import { createApp } from '../src/app.js';
+import { createAgentRouter } from '../src/agent-routes.js';
 import { createAgentHost } from '../src/agent/index.js';
 
 const TOKEN = 'test-token-with-at-least-32-characters';
@@ -57,6 +59,35 @@ test('agent routes: disabled by default and never silently enabled', async (t) =
   assert.equal(run.status, 503);
   assert.equal((await run.json()).error, 'agent_runtime_disabled');
   assert.equal((await fetch(`${app.baseUrl}/api/agent/status`)).status, 401);
+
+  const egressRes = await fetch(`${app.baseUrl}/api/agent/egress`, { headers: auth });
+  assert.equal(egressRes.status, 503);
+  assert.equal((await egressRes.json()).error, 'agent_runtime_disabled');
+
+  // Verify directly on createAgentRouter that GET /egress when disabled never forwards ERR_HTTP_HEADERS_SENT.
+  const forwardedErrors = [];
+  const probeApp = express();
+  probeApp.use(
+    '/api/agent',
+    createAgentRouter({
+      agent: app.agentHost,
+      authorize: (_req, _res, next) => next()
+    })
+  );
+  probeApp.use((err, _req, _res, _next) => {
+    forwardedErrors.push(err);
+  });
+  const probeServer = await new Promise((resolve) => {
+    const srv = probeApp.listen(0, '127.0.0.1', () => resolve(srv));
+  });
+  try {
+    const res = await fetch(`http://127.0.0.1:${probeServer.address().port}/api/agent/egress`);
+    assert.equal(res.status, 503);
+    assert.equal((await res.json()).error, 'agent_runtime_disabled');
+    assert.equal(forwardedErrors.length, 0, 'GET /api/agent/egress must not double-send headers when disabled');
+  } finally {
+    await new Promise((resolve) => probeServer.close(resolve));
+  }
 });
 
 test('agent routes: owner can create a thread, submit once, follow steps and read the delivery', async (t) => {
