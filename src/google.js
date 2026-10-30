@@ -20,7 +20,12 @@ const GOOGLE_SCOPES = [
 function readCookie(req, name) {
   const header = req.get('cookie') || '';
   const item = header.split(';').map((part) => part.trim()).find((part) => part.startsWith(`${name}=`));
-  return item ? decodeURIComponent(item.slice(name.length + 1)) : '';
+  if (!item) return '';
+  try {
+    return decodeURIComponent(item.slice(name.length + 1));
+  } catch {
+    return '';
+  }
 }
 
 function oauthClient(config) {
@@ -232,28 +237,46 @@ export function createGoogleRouter({ pool, config, services = createServiceRegis
     }));
   };
 
+  const issueBrowserOAuthState = async (userId) => {
+    const state = `browser:${crypto.randomBytes(32).toString('hex')}`;
+    const expiresUnix = Math.floor((Date.now() + consentTicketDefaults.ttlMs) / 1000);
+    await pool.execute(
+      'INSERT INTO oauth_states (state_hash, user_id, expires_at) VALUES (?, ?, FROM_UNIXTIME(?))',
+      [hashOAuthState(state), userId, expiresUnix]
+    );
+    return state;
+  };
+
   // Owner-token entry point (unchanged contract): mints a fresh state and redirects to Google.
   // A single-use signed ticket may be supplied instead, so a chat client can hand the owner a
-  // link without ever seeing APP_API_TOKEN. An invalid or already-used ticket is rejected.
+  // link without ever seeing APP_API_TOKEN. The ticket is consumed atomically on first use and
+  // exchanged for an independent `browser:` OAuth state so the ticket never leaves this server.
   router.get('/auth/google', async (req, res, next) => {
     try {
       const ticket = typeof req.query.ticket === 'string' ? req.query.ticket : '';
       if (ticket) {
         const verified = verifyConsentTicket(ticket, { encryptionKey: config.encryptionKey, userId: config.userId });
         if (!verified.ok) return res.status(400).send('This connection link is invalid or has expired. Request a new link from the assistant.');
+        const ticketHash = hashOAuthState(ticket);
         const [rows] = await pool.execute(
           'SELECT user_id FROM oauth_states WHERE state_hash = ? AND used_at IS NULL AND expires_at > UTC_TIMESTAMP()',
-          [hashOAuthState(ticket)]
+          [ticketHash]
         );
         if (!rows.length) return res.status(400).send('This connection link was already used or has expired. Request a new link from the assistant.');
-        return startAuthorization(res, ticket);
+        const [consume] = await pool.execute(
+          'UPDATE oauth_states SET used_at = UTC_TIMESTAMP() WHERE state_hash = ? AND used_at IS NULL AND expires_at > UTC_TIMESTAMP()',
+          [ticketHash]
+        );
+        if (consume.affectedRows !== 1) {
+          return res.status(400).send('This connection link was already used or has expired. Request a new link from the assistant.');
+        }
+        const oauthState = await issueBrowserOAuthState(rows[0].user_id);
+        return startAuthorization(res, oauthState);
       }
       return ownerOnly(req, res, () => {
-        const state = crypto.randomBytes(32).toString('hex');
-        pool.execute(
-          'INSERT INTO oauth_states (state_hash, user_id, expires_at) VALUES (?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 10 MINUTE))',
-          [hashOAuthState(state), config.userId]
-        ).then(() => startAuthorization(res, state)).catch(next);
+        issueBrowserOAuthState(config.userId)
+          .then((state) => startAuthorization(res, state))
+          .catch(next);
       });
     } catch (error) { return next(error); }
   });
@@ -263,7 +286,7 @@ export function createGoogleRouter({ pool, config, services = createServiceRegis
       const state = typeof req.query.state === 'string' ? req.query.state : '';
       const cookieState = readCookie(req, 'google_oauth_state');
       res.clearCookie('google_oauth_state', { path: '/auth/google/callback', sameSite: 'lax', secure: config.nodeEnv === 'production' });
-      if (!state || !safeEqual(state, cookieState) || typeof req.query.code !== 'string') {
+      if (!/^browser:[0-9a-f]{64}$/.test(state) || !safeEqual(state, cookieState) || typeof req.query.code !== 'string') {
         return res.status(400).send('OAuth verification failed. Return to the app and try again.');
       }
       const stateHash = hashOAuthState(state);
