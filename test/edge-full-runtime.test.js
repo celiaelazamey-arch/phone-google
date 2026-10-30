@@ -1070,4 +1070,72 @@ test('HIGH-07 (5/5): env.__NOW clock governs deterministic 10-minute expiry for 
   assert.equal((await expStateRes.json()).error, 'invalid_or_expired_oauth_state');
 });
 
+test('EDGE-PROD (1/2): GET /api/state/%E0%A4%A returns 400 invalid_key instead of throwing uncaught URIError', async () => {
+  const { env, authHeaders } = await createHigh07Harness();
+  const res = await worker.fetch(
+    new Request('https://celia.workers.dev/api/state/%E0%A4%A', { headers: authHeaders }),
+    env
+  );
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.equal(body.ok, false);
+  assert.equal(body.error, 'invalid_key');
+});
+
+test('EDGE-PROD (2/2): concurrent Promise.all writes to edge_state preserve an unbroken append-only edge_audit hash chain', async () => {
+  const { env, authHeaders } = await createHigh07Harness();
+  const origPrepare = env.DB.prepare.bind(env.DB);
+  env.DB.prepare = (sql) => {
+    const stmt = origPrepare(sql);
+    if (String(sql).includes('SELECT hash FROM edge_audit')) {
+      const origFirst = stmt.first.bind(stmt);
+      stmt.first = async (...args) => {
+        const row = await origFirst(...args);
+        await new Promise((r) => setTimeout(r, 8));
+        return row;
+      };
+    }
+    return stmt;
+  };
+
+  const [r1, r2, r3] = await Promise.all([
+    worker.fetch(
+      new Request('https://celia.workers.dev/api/state/prod.key.one', {
+        method: 'PUT',
+        headers: { ...authHeaders, 'content-type': 'application/json' },
+        body: JSON.stringify({ value: 'alpha' })
+      }),
+      env
+    ),
+    worker.fetch(
+      new Request('https://celia.workers.dev/api/state/prod.key.two', {
+        method: 'PUT',
+        headers: { ...authHeaders, 'content-type': 'application/json' },
+        body: JSON.stringify({ value: 'beta' })
+      }),
+      env
+    ),
+    worker.fetch(
+      new Request('https://celia.workers.dev/api/state/prod.key.three', {
+        method: 'PUT',
+        headers: { ...authHeaders, 'content-type': 'application/json' },
+        body: JSON.stringify({ value: 'gamma' })
+      }),
+      env
+    )
+  ]);
+
+  assert.deepEqual([r1.status, r2.status, r3.status], [200, 200, 200]);
+
+  const auditRes = await worker.fetch(
+    new Request('https://celia.workers.dev/api/audit?limit=50', { headers: authHeaders }),
+    env
+  );
+  assert.equal(auditRes.status, 200);
+  const auditBody = await auditRes.json();
+  assert.equal(auditBody.chain.ok, true, JSON.stringify(auditBody.chain));
+  assert.equal(auditBody.rows.length, 3);
+});
+
+
 

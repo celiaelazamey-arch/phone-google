@@ -208,42 +208,54 @@ export function createWhatsAppApiRouter({ pool, config, services = createService
     const headerKey = req.get('Idempotency-Key') || req.get('idempotency-key') || '';
     const bodyKey = typeof req.body?.idempotencyKey === 'string' ? req.body.idempotencyKey : (typeof req.body?.idempotency_key === 'string' ? req.body.idempotency_key : '');
     const idempotencyKey = isValidIdempotencyKey(headerKey) ? headerKey : (isValidIdempotencyKey(bodyKey) ? bodyKey : null);
+    const idemScope = 'whatsapp.send';
+    let claimToken;
     if (idempotencyKey) {
-      const cached = idempotencyStore.get(idempotencyKey);
+      const cached = idempotencyStore.get(idempotencyKey, idemScope);
       if (cached) {
         if (cached._idempotencyStatus === 'in_progress') return res.status(409).json({ error: 'idempotency_conflict_in_progress' });
         return res.status(200).json({ ...cached, _idempotencyReplay: true });
       }
-      if (!idempotencyStore.claim(idempotencyKey)) {
-        const again = idempotencyStore.get(idempotencyKey);
+      claimToken = idempotencyStore.claim(idempotencyKey, idemScope);
+      if (!claimToken) {
+        const again = idempotencyStore.get(idempotencyKey, idemScope);
         if (again?._idempotencyStatus === 'in_progress') return res.status(409).json({ error: 'idempotency_conflict_in_progress' });
         if (again) return res.status(200).json({ ...again, _idempotencyReplay: true });
+        return res.status(409).json({ error: 'idempotency_conflict_in_progress' });
       }
     }
     try {
       const [rows] = await pool.execute('SELECT opted_in, last_inbound_at FROM whatsapp_contacts WHERE phone_e164 = ?', [phone]);
       const contact = rows[0];
       if (!contact?.opted_in) {
-        if (idempotencyKey) idempotencyStore.fail(idempotencyKey);
+        if (idempotencyKey) idempotencyStore.fail(idempotencyKey, idemScope, claimToken);
         return res.status(403).json({ error: 'recipient_has_not_opted_in' });
       }
       if (!isWithinCustomerWindow(contact.last_inbound_at)) {
-        if (idempotencyKey) idempotencyStore.fail(idempotencyKey);
+        if (idempotencyKey) idempotencyStore.fail(idempotencyKey, idemScope, claimToken);
         return res.status(403).json({ error: 'outside_customer_service_window_use_approved_template' });
       }
+      let providerId;
       try {
-        const providerId = await services.run('whatsapp', (signal) => sendWhatsAppText({ config, phone, text, signal }), { sideEffect: true });
-        if (providerId) await pool.execute(
-          'INSERT IGNORE INTO whatsapp_messages (provider_message_id, phone_e164, direction, message_type, body, status) VALUES (?, ?, ?, ?, ?, ?)',
-          [providerId, phone, 'outbound', 'text', text.trim().slice(0, 4000), 'sent']
-        );
-        const result = { status: 'accepted', providerMessageId: providerId };
-        if (idempotencyKey) idempotencyStore.complete(idempotencyKey, result);
-        return res.status(idempotencyKey ? 200 : 202).json(result);
+        providerId = await services.run('whatsapp', (signal) => sendWhatsAppText({ config, phone, text, signal }), { sideEffect: true });
       } catch (inner) {
-        if (idempotencyKey) idempotencyStore.fail(idempotencyKey);
+        if (idempotencyKey) idempotencyStore.fail(idempotencyKey, idemScope, claimToken);
         throw inner;
       }
+      // Record completion IMMEDIATELY after upstream acceptance — before local DB logging — so a local DB failure never triggers a duplicate send on retry.
+      const result = { status: 'accepted', phone, providerMessageId: providerId };
+      if (idempotencyKey) idempotencyStore.complete(idempotencyKey, result, idemScope);
+      if (providerId) {
+        try {
+          await pool.execute(
+            'INSERT IGNORE INTO whatsapp_messages (provider_message_id, phone_e164, direction, message_type, body, status) VALUES (?, ?, ?, ?, ?, ?)',
+            [providerId, phone, 'outbound', 'text', text.trim().slice(0, 4000), 'sent']
+          );
+        } catch (dbErr) {
+          console.warn('WhatsApp outbound local log failed after upstream send:', dbErr?.code || 'storage_failed');
+        }
+      }
+      return res.status(idempotencyKey ? 200 : 202).json(result);
     } catch (error) {
       console.error('WhatsApp send failed:', error.code || 'upstream_failed');
       if (error instanceof ServiceUnavailableError) return res.status(503).json({ error: safeError(error), outcomeUnknown: error.outcomeUnknown });

@@ -6,6 +6,7 @@ import { createOperations, mountOperations } from './operations.js';
 import { createGoogleRouter } from './google.js';
 import { createSecretsHubRouter } from './secrets-hub.js';
 import { createWhatsAppApiRouter, createWhatsAppWebhookRouter } from './whatsapp.js';
+import { createIdempotencyStore } from './idempotency.js';
 import { createAgentHost } from './agent/index.js';
 import { createAgentRouter } from './agent-routes.js';
 import { createKnowledgeHost } from './knowledge/index.js';
@@ -37,12 +38,13 @@ export function createApp({ pool, config, services = createServiceRegistry(confi
   app.use('/api/kb', createKbRouter({ kb: knowledge, authorize }));
   app.use('/api/agent', createAgentRouter({ agent: agents, authorize }));
 
+  const idempotencyStore = createIdempotencyStore();
   // WhatsApp signature validation needs the exact raw request bytes.
   app.use('/webhooks/whatsapp', createWhatsAppWebhookRouter({ pool, config, services }));
   app.use(express.json({ limit: '256kb' }));
-  app.use(createSecretsHubRouter({ config, services, authorize }));
-  app.use(createGoogleRouter({ pool, config, services }));
-  app.use(createWhatsAppApiRouter({ pool, config, services }));
+  app.use(createSecretsHubRouter({ config, services, idempotencyStore, authorize }));
+  app.use(createGoogleRouter({ pool, config, services, idempotencyStore }));
+  app.use(createWhatsAppApiRouter({ pool, config, services, idempotencyStore }));
   app.use((_req, res) => res.status(404).json({ error: 'not_found' }));
   app.use((error, _req, res, _next) => {
     console.error('Unhandled request error:', error.code || 'request_failed');

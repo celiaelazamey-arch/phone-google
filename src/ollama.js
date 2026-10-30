@@ -1,6 +1,6 @@
 import { DEFAULT_POLICY, generateWhatsAppReplyDetailed } from './gemini.js';
 import { buildContext } from './context-policy.js';
-import { generateOpenAiCompatibleReply } from './ai-providers.js';
+import { generateOpenAiCompatibleReply, isMetadataOrLinkLocalHost } from './ai-providers.js';
 import { generateLocalPolicyReply } from './policy.js';
 import { createServiceRegistry, safeError, UpstreamError } from './resilience.js';
 
@@ -16,10 +16,15 @@ export function normalizeOllamaBaseUrl(rawUrl = 'http://127.0.0.1:11434', allowR
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     throw new Error('OLLAMA_BASE_URL must use http or https');
   }
-  if (!allowRemote && !LOOPBACK_HOSTS.has(parsed.hostname.toLowerCase())) {
-    throw new Error('OLLAMA_BASE_URL must point to localhost/127.0.0.1 unless OLLAMA_ALLOW_REMOTE=true');
-  }
   if (parsed.username || parsed.password) throw new Error('OLLAMA_BASE_URL must not contain credentials');
+  const hostLower = parsed.hostname.toLowerCase();
+  if (!allowRemote) {
+    if (!LOOPBACK_HOSTS.has(hostLower)) {
+      throw new Error('OLLAMA_BASE_URL must point to localhost/127.0.0.1 unless OLLAMA_ALLOW_REMOTE=true');
+    }
+  } else if (!LOOPBACK_HOSTS.has(hostLower) && isMetadataOrLinkLocalHost(hostLower)) {
+    throw new Error('OLLAMA_BASE_URL cannot target cloud metadata, link-local, or disallowed transitional hosts');
+  }
   return parsed.origin;
 }
 
