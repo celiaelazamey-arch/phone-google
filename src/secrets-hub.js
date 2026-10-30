@@ -558,9 +558,11 @@ export function createSecretsHubRouter({
         ? req.body.idempotency_key
         : '';
     const idempotencyKey = isValidIdempotencyKey(headerKey) ? headerKey : (isValidIdempotencyKey(bodyKey) ? bodyKey : null);
+    const idemScope = 'elevenlabs.tts';
+    let claimToken;
 
     if (idempotencyKey) {
-      const cached = idempotencyStore.get(idempotencyKey);
+      const cached = idempotencyStore.get(idempotencyKey, idemScope);
       if (cached) {
         if (cached._idempotencyStatus === 'in_progress') return res.status(409).json({ error: 'idempotency_conflict_in_progress' });
         if (req.body?.format === 'mp3' || req.accepts(['json', 'audio/mpeg']) === 'audio/mpeg') {
@@ -568,10 +570,12 @@ export function createSecretsHubRouter({
         }
         return res.status(200).json({ ...cached, _idempotencyReplay: true });
       }
-      if (!idempotencyStore.claim(idempotencyKey)) {
-        const again = idempotencyStore.get(idempotencyKey);
+      claimToken = idempotencyStore.claim(idempotencyKey, idemScope);
+      if (!claimToken) {
+        const again = idempotencyStore.get(idempotencyKey, idemScope);
         if (again?._idempotencyStatus === 'in_progress') return res.status(409).json({ error: 'idempotency_conflict_in_progress' });
         if (again) return res.status(200).json({ ...again, _idempotencyReplay: true });
+        return res.status(409).json({ error: 'idempotency_conflict_in_progress' });
       }
     }
 
@@ -589,13 +593,13 @@ export function createSecretsHubRouter({
           }),
         { sideEffect: true }
       );
-      if (idempotencyKey) idempotencyStore.complete(idempotencyKey, synthesized);
+      if (idempotencyKey) idempotencyStore.complete(idempotencyKey, synthesized, idemScope);
       if (req.body?.format === 'mp3' || req.accepts(['json', 'audio/mpeg']) === 'audio/mpeg') {
         return res.type('audio/mpeg').send(Buffer.from(synthesized.audioBase64, 'base64'));
       }
       return res.json(synthesized);
     } catch (error) {
-      if (idempotencyKey) idempotencyStore.fail(idempotencyKey);
+      if (idempotencyKey) idempotencyStore.fail(idempotencyKey, idemScope, claimToken);
       return sendHubError(res, error);
     }
   });

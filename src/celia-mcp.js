@@ -543,16 +543,20 @@ export function createCeliaMcpHandler({ pool, config, services = createServiceRe
           throw new Error('invalid_event_time_range');
         }
         const idempotencyKey = extractIdempotencyKey({ args });
+        const idemScope = 'calendar.create';
+        let claimToken;
         if (idempotencyKey) {
-          const cached = idempotencyStore.get(idempotencyKey);
+          const cached = idempotencyStore.get(idempotencyKey, idemScope);
           if (cached) {
             if (cached._idempotencyStatus === 'in_progress') throw Object.assign(new Error('idempotency_conflict_in_progress'), { status: 409 });
             return { ...cached, _idempotencyReplay: true };
           }
-          if (!idempotencyStore.claim(idempotencyKey)) {
-            const again = idempotencyStore.get(idempotencyKey);
+          claimToken = idempotencyStore.claim(idempotencyKey, idemScope);
+          if (!claimToken) {
+            const again = idempotencyStore.get(idempotencyKey, idemScope);
             if (again?._idempotencyStatus === 'in_progress') throw Object.assign(new Error('idempotency_conflict_in_progress'), { status: 409 });
             if (again) return { ...again, _idempotencyReplay: true };
+            throw Object.assign(new Error('idempotency_conflict_in_progress'), { status: 409 });
           }
         }
         try {
@@ -569,10 +573,10 @@ export function createCeliaMcpHandler({ pool, config, services = createServiceRe
             fields: 'id,summary,start,end,htmlLink,status'
           }, { signal, retry: false, timeout: config.resilience?.timeoutMs || 8000 });
           const result = { event: data };
-          if (idempotencyKey) idempotencyStore.complete(idempotencyKey, result);
+          if (idempotencyKey) idempotencyStore.complete(idempotencyKey, result, idemScope);
           return result;
         } catch (error) {
-          if (idempotencyKey) idempotencyStore.fail(idempotencyKey);
+          if (idempotencyKey) idempotencyStore.fail(idempotencyKey, idemScope, claimToken);
           throw error;
         }
       }
@@ -630,43 +634,59 @@ export function createCeliaMcpHandler({ pool, config, services = createServiceRe
         const text = typeof args?.text === 'string' ? args.text : '';
         if (!isValidE164(phone) || !text.trim()) throw new Error('valid_phone_and_text_required');
         const idempotencyKey = extractIdempotencyKey({ args });
+        const idemScope = 'whatsapp.send';
+        let claimToken;
         if (idempotencyKey) {
-          const cached = idempotencyStore.get(idempotencyKey);
+          const cached = idempotencyStore.get(idempotencyKey, idemScope);
           if (cached) {
             if (cached._idempotencyStatus === 'in_progress') throw Object.assign(new Error('idempotency_conflict_in_progress'), { status: 409 });
             return { ...cached, _idempotencyReplay: true };
           }
-          if (!idempotencyStore.claim(idempotencyKey)) {
-            const again = idempotencyStore.get(idempotencyKey);
+          claimToken = idempotencyStore.claim(idempotencyKey, idemScope);
+          if (!claimToken) {
+            const again = idempotencyStore.get(idempotencyKey, idemScope);
             if (again?._idempotencyStatus === 'in_progress') throw Object.assign(new Error('idempotency_conflict_in_progress'), { status: 409 });
             if (again) return { ...again, _idempotencyReplay: true };
+            throw Object.assign(new Error('idempotency_conflict_in_progress'), { status: 409 });
           }
         }
-        const [rows] = await pool.execute('SELECT opted_in, last_inbound_at FROM whatsapp_contacts WHERE phone_e164 = ?', [phone]);
-        const contact = rows[0];
+        let contact;
+        try {
+          const [rows] = await pool.execute('SELECT opted_in, last_inbound_at FROM whatsapp_contacts WHERE phone_e164 = ?', [phone]);
+          contact = rows[0];
+        } catch (dbReadErr) {
+          if (idempotencyKey) idempotencyStore.fail(idempotencyKey, idemScope, claimToken);
+          throw dbReadErr;
+        }
         if (!contact?.opted_in) {
-          if (idempotencyKey) idempotencyStore.fail(idempotencyKey);
+          if (idempotencyKey) idempotencyStore.fail(idempotencyKey, idemScope, claimToken);
           throw new Error('recipient_has_not_opted_in');
         }
         if (!isWithinCustomerWindow(contact.last_inbound_at)) {
-          if (idempotencyKey) idempotencyStore.fail(idempotencyKey);
+          if (idempotencyKey) idempotencyStore.fail(idempotencyKey, idemScope, claimToken);
           throw new Error('outside_customer_service_window_use_approved_template');
         }
+        let providerMessageId;
         try {
-          const providerMessageId = await sendWhatsAppText({ config, phone, text, signal });
-          if (providerMessageId) {
+          providerMessageId = await sendWhatsAppText({ config, phone, text, signal });
+        } catch (error) {
+          if (idempotencyKey) idempotencyStore.fail(idempotencyKey, idemScope, claimToken);
+          throw error;
+        }
+        // Complete idempotency IMMEDIATELY after Meta accepts the message — before local DB logging.
+        const result = { status: 'accepted', phone, providerMessageId };
+        if (idempotencyKey) idempotencyStore.complete(idempotencyKey, result, idemScope);
+        if (providerMessageId) {
+          try {
             await pool.execute(
               'INSERT IGNORE INTO whatsapp_messages (provider_message_id, phone_e164, direction, message_type, body, status) VALUES (?, ?, ?, ?, ?, ?)',
               [providerMessageId, phone, 'outbound', 'text', text.trim().slice(0, 4000), 'sent']
             );
+          } catch (dbErr) {
+            console.warn('WhatsApp MCP local log failed after upstream send:', dbErr?.code || 'storage_failed');
           }
-          const result = { status: 'accepted', phone, providerMessageId };
-          if (idempotencyKey) idempotencyStore.complete(idempotencyKey, result);
-          return result;
-        } catch (error) {
-          if (idempotencyKey) idempotencyStore.fail(idempotencyKey);
-          throw error;
         }
+        return result;
       }
       case 'find_skills': {
         const query = String(args?.query || '').trim().toLowerCase();
@@ -766,16 +786,20 @@ export function createCeliaMcpHandler({ pool, config, services = createServiceRe
       }
       case 'celia_voice_speak': {
         const idempotencyKey = extractIdempotencyKey({ args });
+        const idemScope = 'elevenlabs.tts';
+        let claimToken;
         if (idempotencyKey) {
-          const cached = idempotencyStore.get(idempotencyKey);
+          const cached = idempotencyStore.get(idempotencyKey, idemScope);
           if (cached) {
             if (cached._idempotencyStatus === 'in_progress') throw Object.assign(new Error('idempotency_conflict_in_progress'), { status: 409 });
             return { ...cached, _idempotencyReplay: true };
           }
-          if (!idempotencyStore.claim(idempotencyKey)) {
-            const again = idempotencyStore.get(idempotencyKey);
+          claimToken = idempotencyStore.claim(idempotencyKey, idemScope);
+          if (!claimToken) {
+            const again = idempotencyStore.get(idempotencyKey, idemScope);
             if (again?._idempotencyStatus === 'in_progress') throw Object.assign(new Error('idempotency_conflict_in_progress'), { status: 409 });
             if (again) return { ...again, _idempotencyReplay: true };
+            throw Object.assign(new Error('idempotency_conflict_in_progress'), { status: 409 });
           }
         }
         try {
@@ -787,10 +811,10 @@ export function createCeliaMcpHandler({ pool, config, services = createServiceRe
             similarityBoost: args?.similarityBoost,
             signal
           });
-          if (idempotencyKey) idempotencyStore.complete(idempotencyKey, synthesized);
+          if (idempotencyKey) idempotencyStore.complete(idempotencyKey, synthesized, idemScope);
           return synthesized;
         } catch (error) {
-          if (idempotencyKey) idempotencyStore.fail(idempotencyKey);
+          if (idempotencyKey) idempotencyStore.fail(idempotencyKey, idemScope, claimToken);
           throw error;
         }
       }
@@ -1060,7 +1084,7 @@ export function createCeliaMcpApp({ pool, config, services = createServiceRegist
   app.use('/api/kb', createKbRouter({ kb: knowledge, authorize }));
   app.use('/api/agent', createAgentRouter({ agent: agents, authorize }));
   if (config.hosting?.integrationsEnabled) {
-    app.use(createIntegratedApiRouter({ pool, config: config.hosting.integrationConfig, services }));
+    app.use(createIntegratedApiRouter({ pool, config: config.hosting.integrationConfig, services, idempotencyStore }));
   }
   app.get('/api/skills/find', async (req, res) => {
     const q = String(req.query.q || req.query.query || '').trim();

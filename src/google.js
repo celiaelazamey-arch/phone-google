@@ -383,16 +383,20 @@ export function createGoogleRouter({ pool, config, services = createServiceRegis
       const headerKey = req.get('Idempotency-Key') || req.get('idempotency-key') || '';
       const bodyKey = typeof req.body?.idempotencyKey === 'string' ? req.body.idempotencyKey : (typeof req.body?.idempotency_key === 'string' ? req.body.idempotency_key : '');
       const idempotencyKey = isValidIdempotencyKey(headerKey) ? headerKey : (isValidIdempotencyKey(bodyKey) ? bodyKey : null);
+      const idemScope = 'calendar.create';
+      let claimToken;
       if (idempotencyKey) {
-        const cached = idempotencyStore.get(idempotencyKey);
+        const cached = idempotencyStore.get(idempotencyKey, idemScope);
         if (cached) {
           if (cached._idempotencyStatus === 'in_progress') return res.status(409).json({ error: 'idempotency_conflict_in_progress' });
           return res.status(200).json({ ...cached, _idempotencyReplay: true });
         }
-        if (!idempotencyStore.claim(idempotencyKey)) {
-          const again = idempotencyStore.get(idempotencyKey);
+        claimToken = idempotencyStore.claim(idempotencyKey, idemScope);
+        if (!claimToken) {
+          const again = idempotencyStore.get(idempotencyKey, idemScope);
           if (again?._idempotencyStatus === 'in_progress') return res.status(409).json({ error: 'idempotency_conflict_in_progress' });
           if (again) return res.status(200).json({ ...again, _idempotencyReplay: true });
+          return res.status(409).json({ error: 'idempotency_conflict_in_progress' });
         }
       }
       try {
@@ -404,10 +408,10 @@ export function createGoogleRouter({ pool, config, services = createServiceRegis
           fields: 'id,summary,start,end,htmlLink,status'
         }, options), true);
         const result = { event: data };
-        if (idempotencyKey) idempotencyStore.complete(idempotencyKey, result);
+        if (idempotencyKey) idempotencyStore.complete(idempotencyKey, result, idemScope);
         return res.status(201).json(result);
       } catch (inner) {
-        if (idempotencyKey) idempotencyStore.fail(idempotencyKey);
+        if (idempotencyKey) idempotencyStore.fail(idempotencyKey, idemScope, claimToken);
         throw inner;
       }
     } catch (error) { return handleError(res, error); }
