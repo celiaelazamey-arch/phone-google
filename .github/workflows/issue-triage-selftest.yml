@@ -41,7 +41,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          INPUT_ISSUES: ${{ inputs.issues }}
+          INPUT_ISSUES: ${{ inputs.issues || '61' }}
           TRIAGE_MODE: ${{ inputs.mode || 'cautious' }}
           TRIAGE_REVIEWER: triage-selftest
         run: |
