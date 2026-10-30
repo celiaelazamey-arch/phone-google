@@ -891,4 +891,183 @@ test('HIGH-05 (5/5): inbound WhatsApp webhook deduplicates concurrent identical 
   assert.equal(state.metaCalls, 1, 'auto-reply outbound message is sent once, not twice');
 });
 
+async function createHigh07Harness() {
+  const DB = await createSqliteD1();
+  const state = {
+    nowMs: Date.now(),
+    tokenExchanges: 0
+  };
+
+  // Simulate real Cloudflare D1 async network boundary on SELECT .first() so TOCTOU races surface deterministically.
+  const origPrepare = DB.prepare.bind(DB);
+  DB.prepare = (query) => {
+    const stmt = origPrepare(query);
+    if (/^\s*SELECT\b/i.test(query)) {
+      const origFirst = stmt.first.bind(stmt);
+      stmt.first = async (...args) => {
+        const row = await origFirst(...args);
+        await new Promise((r) => setTimeout(r, 5));
+        return row;
+      };
+    }
+    return stmt;
+  };
+
+  const env = {
+    DB,
+    CELIA_MCP_API_TOKEN: OWNER_TOKEN,
+    GOOGLE_CLIENT_ID: 'cid.apps.googleusercontent.com',
+    GOOGLE_CLIENT_SECRET: 'GOCSPX-secret',
+    __NOW: () => new Date(state.nowMs),
+    __FETCH_IMPL: async (url) => {
+      const target = String(url);
+      if (target === 'https://oauth2.googleapis.com/token') {
+        state.tokenExchanges += 1;
+        await new Promise((r) => setTimeout(r, 15));
+        return new Response(
+          JSON.stringify({
+            access_token: `tok-${state.tokenExchanges}`,
+            refresh_token: `ref-${state.tokenExchanges}`,
+            expires_in: 3600,
+            scope: 'email calendar gmail'
+          }),
+          { status: 200 }
+        );
+      }
+      if (target === 'https://openidconnect.googleapis.com/v1/userinfo') {
+        return new Response(JSON.stringify({ email: 'owner@example.com', email_verified: true }), { status: 200 });
+      }
+      throw new Error(`unexpected url in HIGH-07 harness: ${target}`);
+    }
+  };
+
+  const authHeaders = { authorization: `Bearer ${OWNER_TOKEN}` };
+  return { DB, env, state, authHeaders };
+}
+
+test('HIGH-07 (1/5): concurrent Promise.all race on /auth/google/callback consumes oauth_states atomically ([200, 400]) and exchanges Google token once', async () => {
+  const { env, state, authHeaders } = await createHigh07Harness();
+
+  const linkRes = await worker.fetch(new Request('https://celia.workers.dev/auth/google/link', { method: 'POST', headers: authHeaders }), env);
+  assert.equal(linkRes.status, 200);
+  const oauthState = new URL((await linkRes.json()).url).searchParams.get('state');
+
+  const callCb = () =>
+    worker.fetch(new Request(`https://celia.workers.dev/auth/google/callback?code=race-code&state=${encodeURIComponent(oauthState)}`), env);
+
+  const [r1, r2] = await Promise.all([callCb(), callCb()]);
+  assert.deepEqual([r1.status, r2.status].sort((a, b) => a - b), [200, 400]);
+  assert.equal(state.tokenExchanges, 1, 'Google token endpoint must be called at most once');
+});
+
+test('HIGH-07 (2/5): GET /auth/google mints browser: state and enforces mandatory celia_oauth_state cookie before touching D1', async () => {
+  const { DB, env, state, authHeaders } = await createHigh07Harness();
+
+  const startRes = await worker.fetch(new Request('https://celia.workers.dev/auth/google', { headers: authHeaders }), env);
+  assert.equal(startRes.status, 302);
+  const oauthState = new URL(startRes.headers.get('location')).searchParams.get('state');
+  assert.match(oauthState, /^browser:[0-9a-f]{64}$/);
+
+  const noCookieRes = await worker.fetch(
+    new Request(`https://celia.workers.dev/auth/google/callback?code=c1&state=${encodeURIComponent(oauthState)}`),
+    env
+  );
+  assert.equal(noCookieRes.status, 400);
+  assert.equal((await noCookieRes.json()).error, 'oauth_state_cookie_mismatch');
+  assert.equal(state.tokenExchanges, 0);
+
+  const rowStillUnused = DB.sqlite.prepare('SELECT used_at FROM oauth_states').get();
+  assert.equal(rowStillUnused?.used_at, null, 'cookieless CSRF attempt must not burn pending browser oauth_state');
+
+  const withCookieRes = await worker.fetch(
+    new Request(`https://celia.workers.dev/auth/google/callback?code=c1&state=${encodeURIComponent(oauthState)}`, {
+      headers: { cookie: `celia_oauth_state=${encodeURIComponent(oauthState)}` }
+    }),
+    env
+  );
+  assert.equal(withCookieRes.status, 200);
+  assert.equal(state.tokenExchanges, 1);
+});
+
+test('HIGH-07 (3/5): POST /auth/google/link mints link: state (cookieless single-use) and rejects mismatched cookies or unprefixed states', async () => {
+  const { DB, env, state, authHeaders } = await createHigh07Harness();
+
+  const linkRes = await worker.fetch(new Request('https://celia.workers.dev/auth/google/link', { method: 'POST', headers: authHeaders }), env);
+  assert.equal(linkRes.status, 200);
+  const linkState = new URL((await linkRes.json()).url).searchParams.get('state');
+  assert.match(linkState, /^link:[0-9a-f]{64}$/);
+
+  const mismatchCookieRes = await worker.fetch(
+    new Request(`https://celia.workers.dev/auth/google/callback?code=c2&state=${encodeURIComponent(linkState)}`, {
+      headers: { cookie: `celia_oauth_state=${encodeURIComponent('browser:' + 'a'.repeat(64))}` }
+    }),
+    env
+  );
+  assert.equal(mismatchCookieRes.status, 400);
+  assert.equal((await mismatchCookieRes.json()).error, 'oauth_state_cookie_mismatch');
+
+  const okLinkRes = await worker.fetch(
+    new Request(`https://celia.workers.dev/auth/google/callback?code=c2&state=${encodeURIComponent(linkState)}`),
+    env
+  );
+  assert.equal(okLinkRes.status, 200);
+  assert.equal(state.tokenExchanges, 1);
+
+  const rawUnprefixed = 'b'.repeat(64);
+  const rawHash = crypto.createHash('sha256').update(rawUnprefixed).digest('hex');
+  const nowIso = new Date(state.nowMs).toISOString();
+  const expIso = new Date(state.nowMs + 600_000).toISOString();
+  DB.sqlite
+    .prepare('INSERT INTO oauth_states (state_hash, user_id, expires_at, used_at, created_at) VALUES (?, ?, ?, NULL, ?)')
+    .run(rawHash, 'owner', expIso, nowIso);
+  const unprefixedRes = await worker.fetch(
+    new Request(`https://celia.workers.dev/auth/google/callback?code=c3&state=${rawUnprefixed}`),
+    env
+  );
+  assert.equal(unprefixedRes.status, 400);
+  assert.equal((await unprefixedRes.json()).error, 'invalid_or_expired_oauth_state');
+});
+
+test('HIGH-07 (4/5): GET /auth/google?ticket=... consumes consent ticket atomically in Promise.all ([302, 401]) and blocks replay', async () => {
+  const { env, state } = await createHigh07Harness();
+
+  const ticket = await mintEdgeConsentTicket(env, { userId: 'owner', ttlSeconds: 600, nowMs: state.nowMs });
+  const ticketUrl = `https://celia.workers.dev/auth/google?ticket=${encodeURIComponent(ticket)}`;
+
+  const [t1, t2] = await Promise.all([worker.fetch(new Request(ticketUrl), env), worker.fetch(new Request(ticketUrl), env)]);
+  const statuses = [t1.status, t2.status].sort((a, b) => a - b);
+  assert.deepEqual(statuses, [302, 401]);
+
+  const loser = t1.status === 401 ? t1 : t2;
+  assert.equal((await loser.json()).error, 'ticket_already_used');
+
+  const replayTicket = await worker.fetch(new Request(ticketUrl), env);
+  assert.equal(replayTicket.status, 401);
+  assert.equal((await replayTicket.json()).error, 'ticket_already_used');
+});
+
+test('HIGH-07 (5/5): env.__NOW clock governs deterministic 10-minute expiry for both consent tickets and oauth_states', async () => {
+  const { env, state, authHeaders } = await createHigh07Harness();
+
+  const ticket = await mintEdgeConsentTicket(env, { userId: 'owner', ttlSeconds: 600, nowMs: state.nowMs });
+  const linkRes = await worker.fetch(new Request('https://celia.workers.dev/auth/google/link', { method: 'POST', headers: authHeaders }), env);
+  const linkState = new URL((await linkRes.json()).url).searchParams.get('state');
+
+  state.nowMs += 601_000;
+
+  const expTicketRes = await worker.fetch(
+    new Request(`https://celia.workers.dev/auth/google?ticket=${encodeURIComponent(ticket)}`),
+    env
+  );
+  assert.equal(expTicketRes.status, 401);
+  assert.equal((await expTicketRes.json()).error, 'expired_ticket');
+
+  const expStateRes = await worker.fetch(
+    new Request(`https://celia.workers.dev/auth/google/callback?code=c4&state=${encodeURIComponent(linkState)}`),
+    env
+  );
+  assert.equal(expStateRes.status, 400);
+  assert.equal((await expStateRes.json()).error, 'invalid_or_expired_oauth_state');
+});
+
 

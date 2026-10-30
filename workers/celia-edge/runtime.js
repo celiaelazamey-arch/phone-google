@@ -424,21 +424,68 @@ export async function getEdgeGoogleStatus(env, { userId = 'owner' } = {}) {
   }
 }
 
+const OAUTH_STATE_PATTERN = /^(browser|link):[0-9a-f]{64}$/;
+
+function decodeVerifiedTicketExpMs(ticket, fallbackMs) {
+  try {
+    const bodyPart = String(ticket || '').trim().split('.')[0] || '';
+    const base64 = bodyPart.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+    const payload = JSON.parse(atob(padded));
+    const expSec = Number(payload?.exp);
+    return Number.isFinite(expSec) && expSec > 0 ? expSec * 1000 : fallbackMs;
+  } catch {
+    return fallbackMs;
+  }
+}
+
+export async function consumeEdgeConsentTicket({
+  env = {},
+  ticket = '',
+  now = () => new Date()
+} = {}) {
+  const nowMs = now().getTime();
+  const verified = await verifyEdgeConsentTicket(env, ticket, { nowMs });
+  if (!verified.ok) {
+    return { ok: false, status: 401, error: verified.reason };
+  }
+  const db = requireD1(env);
+  const nowIso = new Date(nowMs).toISOString();
+  await db.prepare('DELETE FROM oauth_states WHERE expires_at <= ?').bind(nowIso).run();
+
+  const ticketKey = `ticket:${await sha256Hex(String(ticket).trim())}`;
+  const expiresIso = new Date(decodeVerifiedTicketExpMs(ticket, nowMs + 10 * 60 * 1000)).toISOString();
+  const claimRes = await db
+    .prepare('INSERT OR IGNORE INTO oauth_states (state_hash, user_id, expires_at, used_at, created_at) VALUES (?, ?, ?, ?, ?)')
+    .bind(ticketKey, verified.userId, expiresIso, nowIso, nowIso)
+    .run();
+  if ((claimRes?.meta?.changes ?? 0) !== 1) {
+    return { ok: false, status: 401, error: 'ticket_already_used' };
+  }
+  return { ok: true, userId: verified.userId };
+}
+
 export async function createEdgeGoogleAuthUrl({
   env = {},
   origin,
   userId = 'owner',
+  mode = 'link',
   now = () => new Date()
 } = {}) {
   if (!hasVal(env, 'GOOGLE_CLIENT_ID') || !hasVal(env, 'GOOGLE_CLIENT_SECRET')) {
     throw Object.assign(new Error('google_oauth_not_configured'), { status: 503 });
   }
+  if (mode !== 'browser' && mode !== 'link') {
+    throw Object.assign(new Error('invalid_oauth_state_mode'), { status: 400 });
+  }
   const db = requireD1(env);
-  const state = randomHex(32);
+  const state = `${mode}:${randomHex(32)}`;
   const stateHash = await sha256Hex(state);
   const createdAt = now().toISOString();
   const expiresAt = new Date(now().getTime() + 10 * 60 * 1000).toISOString();
   const redirectUri = resolveGoogleRedirectUri(env, origin);
+
+  await db.prepare('DELETE FROM oauth_states WHERE expires_at <= ?').bind(createdAt).run();
 
   await db
     .prepare('INSERT INTO app_users (id, email, phone_e164, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO NOTHING')
@@ -473,7 +520,11 @@ function parseCookieHeader(cookieHeader, name) {
   for (const part of raw.split(';')) {
     const trimmed = part.trim();
     if (trimmed.startsWith(`${name}=`)) {
-      return decodeURIComponent(trimmed.slice(name.length + 1));
+      try {
+        return decodeURIComponent(trimmed.slice(name.length + 1));
+      } catch {
+        return '';
+      }
     }
   }
   return '';
@@ -495,28 +546,38 @@ export async function handleGoogleOAuthCallback({
   if (!code || !state) {
     return { status: 400, body: { error: 'missing_oauth_code_or_state' } };
   }
+  if (!OAUTH_STATE_PATTERN.test(state)) {
+    return { status: 400, body: { error: 'invalid_or_expired_oauth_state' } };
+  }
 
   const cookieState = parseCookieHeader(request.headers.get('cookie'), 'celia_oauth_state');
-  if (cookieState && !(await constantTimeEqualAsync(cookieState, state))) {
+  if (state.startsWith('browser:')) {
+    if (!cookieState || !(await constantTimeEqualAsync(cookieState, state))) {
+      return { status: 400, body: { error: 'oauth_state_cookie_mismatch' } };
+    }
+  } else if (cookieState && !(await constantTimeEqualAsync(cookieState, state))) {
     return { status: 400, body: { error: 'oauth_state_cookie_mismatch' } };
   }
 
   const stateHash = await sha256Hex(state);
-  const row = await db
-    .prepare('SELECT state_hash, user_id, expires_at, used_at FROM oauth_states WHERE state_hash = ?')
-    .bind(stateHash)
-    .first();
-
   const nowIso = now().toISOString();
-  if (!row || row.used_at || Date.parse(row.expires_at) <= now().getTime()) {
+
+  // Atomically consume single-use state in D1 BEFORE external token exchange (prevents concurrent callback TOCTOU).
+  const consumeRes = await db
+    .prepare('UPDATE oauth_states SET used_at = ? WHERE state_hash = ? AND used_at IS NULL AND expires_at > ?')
+    .bind(nowIso, stateHash, nowIso)
+    .run();
+  if ((consumeRes?.meta?.changes ?? 0) !== 1) {
     return { status: 400, body: { error: 'invalid_or_expired_oauth_state' } };
   }
 
-  // Mark state consumed immediately before external token exchange (single-use enforcement).
-  await db
-    .prepare('UPDATE oauth_states SET used_at = ? WHERE state_hash = ? AND used_at IS NULL')
-    .bind(nowIso, stateHash)
-    .run();
+  const row = await db
+    .prepare('SELECT user_id FROM oauth_states WHERE state_hash = ?')
+    .bind(stateHash)
+    .first();
+  if (!row?.user_id) {
+    return { status: 400, body: { error: 'invalid_or_expired_oauth_state' } };
+  }
 
   const redirectUri = resolveGoogleRedirectUri(env, url.origin);
   const tokenRes = await fetchImpl('https://oauth2.googleapis.com/token', {
