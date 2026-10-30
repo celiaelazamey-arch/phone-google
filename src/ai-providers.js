@@ -24,25 +24,105 @@ function isDisallowedIpv4(octets) {
   return false;
 }
 
-function extractMappedIpv4Octets(ipv6Host) {
-  const lower = ipv6Host.toLowerCase();
-  const prefixMatch = lower.match(/^(?:::ffff:|0:0:0:0:0:ffff:)(.+)$/);
-  if (!prefixMatch) return null;
-  const tail = prefixMatch[1];
-  if (/^\d+\.\d+\.\d+\.\d+$/.test(tail)) {
-    return tail.split('.').map((n) => Number.parseInt(n, 10));
+function parseIpv6Words(input) {
+  let addr = input;
+  let tailWords = [];
+  const lastColon = addr.lastIndexOf(':');
+  if (lastColon !== -1 && addr.slice(lastColon + 1).includes('.')) {
+    const v4Part = addr.slice(lastColon + 1);
+    const v4Match = v4Part.match(/^(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})$/);
+    if (!v4Match) return null;
+    const octets = v4Match.slice(1).map(Number);
+    if (octets.some((n) => n < 0 || n > 255)) return null;
+    tailWords = [(octets[0] << 8) | octets[1], (octets[2] << 8) | octets[3]];
+    addr = addr.slice(0, lastColon);
+    if (addr.endsWith(':')) addr += '0';
   }
-  const hexMatch = tail.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
-  if (!hexMatch) return null;
-  const hi = Number.parseInt(hexMatch[1], 16);
-  const lo = Number.parseInt(hexMatch[2], 16);
-  return [(hi >> 8) & 0xff, hi & 0xff, (lo >> 8) & 0xff, lo & 0xff];
+
+  const dblParts = addr.split('::');
+  if (dblParts.length > 2) return null;
+  const parseSide = (side) => {
+    if (!side) return [];
+    const groups = side.split(':');
+    const out = [];
+    for (const g of groups) {
+      if (!/^[0-9a-f]{1,4}$/i.test(g)) return null;
+      out.push(Number.parseInt(g, 16));
+    }
+    return out;
+  };
+
+  const targetGroups = 8 - tailWords.length;
+  if (dblParts.length === 2) {
+    const left = parseSide(dblParts[0]);
+    const right = parseSide(dblParts[1]);
+    if (!left || !right || left.length + right.length >= targetGroups) return null;
+    const zeros = new Array(targetGroups - left.length - right.length).fill(0);
+    return [...left, ...zeros, ...right, ...tailWords];
+  }
+
+  const full = parseSide(addr);
+  if (!full || full.length !== targetGroups) return null;
+  return [...full, ...tailWords];
+}
+
+function isDisallowedIpv6(rawIpv6, { allowPrivateLan = false } = {}) {
+  if (rawIpv6.includes('%')) return true;
+  const words = parseIpv6Words(rawIpv6);
+  if (!words || words.length !== 8) return true;
+  const [w0, w1, w2, w3, w4, w5, w6, w7] = words;
+
+  // ::/128, ::1/128, and deprecated IPv4-compatible ::/96
+  if (w0 === 0 && w1 === 0 && w2 === 0 && w3 === 0 && w4 === 0 && w5 === 0) return true;
+  // IPv4-mapped ::ffff:0:0/96
+  if (w0 === 0 && w1 === 0 && w2 === 0 && w3 === 0 && w4 === 0 && w5 === 0xffff) {
+    const octets = [(w6 >> 8) & 0xff, w6 & 0xff, (w7 >> 8) & 0xff, w7 & 0xff];
+    if (allowPrivateLan) {
+      const [a, b] = octets;
+      return a === 0 || (a === 169 && b === 254) || a >= 224;
+    }
+    return isDisallowedIpv4(octets);
+  }
+  // SIIT IPv4-translated ::ffff:0:0:0/96
+  if (w0 === 0 && w1 === 0 && w2 === 0 && w3 === 0 && w4 === 0xffff && w5 === 0) return true;
+  // NAT64 well-known 64:ff9b::/96 and local-use 64:ff9b:1::/48
+  if (w0 === 0x0064 && w1 === 0xff9b && ((w2 === 0 && w3 === 0 && w4 === 0 && w5 === 0) || w2 === 0x0001)) {
+    return true;
+  }
+  // Discard-only 100::/64
+  if (w0 === 0x0100 && w1 === 0 && w2 === 0 && w3 === 0) return true;
+  // Special IETF 2001:: ranges (Teredo, Benchmarking, ORCHID/v2, Docs)
+  if (w0 === 0x2001) {
+    if (w1 === 0x0000 || w1 === 0x0db8) return true;
+    if (w1 === 0x0002 && w2 === 0x0000) return true;
+    if ((w1 & 0xfff0) === 0x0010 || (w1 & 0xfff0) === 0x0020) return true;
+  }
+  // 6to4 transitional 2002::/16
+  if (w0 === 0x2002) return true;
+  // ISATAP interface identifier
+  if ((w4 === 0x0000 || w4 === 0x0200) && w5 === 0x5efe) return true;
+  // Unique-local fc00::/7 (allowed only when allowPrivateLan === true)
+  if (!allowPrivateLan && (w0 & 0xfe00) === 0xfc00) return true;
+  // Link-local fe80::/10, deprecated site-local fec0::/10, multicast ff00::/8
+  if ((w0 & 0xffc0) === 0xfe80 || (w0 & 0xffc0) === 0xfec0) return true;
+  if ((w0 & 0xff00) === 0xff00) return true;
+
+  return false;
 }
 
 export function isDisallowedHost(hostname) {
   const raw = String(hostname || '').trim().toLowerCase();
   if (!raw) return true;
-  const host = raw.startsWith('[') && raw.endsWith(']') ? raw.slice(1, -1) : raw;
+  const unwrapped = raw.startsWith('[') && raw.endsWith(']') ? raw.slice(1, -1) : raw;
+  if (!unwrapped || unwrapped.includes('[') || unwrapped.includes(']')) return true;
+
+  if (unwrapped.includes(':')) {
+    return isDisallowedIpv6(unwrapped);
+  }
+
+  const hadTrailingDot = unwrapped.endsWith('.');
+  if (unwrapped.startsWith('.') || unwrapped.includes('..')) return true;
+  const host = unwrapped.replace(/\.+$/, '');
   if (!host) return true;
 
   if (
@@ -50,36 +130,45 @@ export function isDisallowedHost(hostname) {
     host.endsWith('.localhost') ||
     host.endsWith('.local') ||
     host.endsWith('.internal') ||
-    host === 'metadata.google.internal'
+    host === 'metadata.google.internal' ||
+    host === 'metadata'
   ) {
     return true;
   }
 
-  if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) {
+  const labels = host.split('.');
+  if (labels.every((label) => /^(?:\d+|0x[0-9a-f]+)$/i.test(label))) {
+    if (hadTrailingDot) return true;
+    if (!/^(?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}$/.test(host)) {
+      return true;
+    }
     return isDisallowedIpv4(host.split('.').map((n) => Number.parseInt(n, 10)));
   }
 
-  if (/^\d+$/.test(host) || /^0x[0-9a-f]+$/i.test(host)) {
+  return false;
+}
+
+export function isMetadataOrLinkLocalHost(hostname) {
+  const raw = String(hostname || '').trim().toLowerCase();
+  if (!raw) return true;
+  const unwrapped = raw.startsWith('[') && raw.endsWith(']') ? raw.slice(1, -1) : raw;
+  if (!unwrapped || unwrapped.includes('[') || unwrapped.includes(']')) return true;
+  if (unwrapped.includes(':')) {
+    return isDisallowedIpv6(unwrapped, { allowPrivateLan: true });
+  }
+  const hadTrailingDot = unwrapped.endsWith('.');
+  if (unwrapped.startsWith('.') || unwrapped.includes('..')) return true;
+  const host = unwrapped.replace(/\.+$/, '');
+  if (!host) return true;
+  if (host === 'metadata.google.internal' || host === 'metadata' || host.endsWith('.metadata.google.internal')) {
     return true;
   }
-
-  if (host.includes(':')) {
-    if (host === '::' || host === '::1' || host === '0:0:0:0:0:0:0:0' || host === '0:0:0:0:0:0:0:1') {
-      return true;
-    }
-    const mapped = extractMappedIpv4Octets(host);
-    if (mapped) return isDisallowedIpv4(mapped);
-    const firstHextet = host.split(':').find((part) => part.length > 0);
-    if (firstHextet) {
-      const value = Number.parseInt(firstHextet, 16);
-      if (Number.isFinite(value)) {
-        if ((value & 0xfe00) === 0xfc00) return true;
-        if ((value & 0xffc0) === 0xfe80) return true;
-        if ((value & 0xff00) === 0xff00) return true;
-      }
-    }
+  const labels = host.split('.');
+  if (labels.every((label) => /^(?:\d+|0x[0-9a-f]+)$/i.test(label))) {
+    if (hadTrailingDot || !/^(?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}$/.test(host)) return true;
+    const [a, b] = host.split('.').map((n) => Number.parseInt(n, 10));
+    if (a === 0 || (a === 169 && b === 254) || a >= 224) return true;
   }
-
   return false;
 }
 

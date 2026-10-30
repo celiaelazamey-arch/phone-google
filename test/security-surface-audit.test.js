@@ -9,6 +9,7 @@ import {
 } from '../src/security.js';
 import { loadConfig } from '../src/config.js';
 import { isDisallowedHost, normalizeHttpsApiUrl } from '../src/ai-providers.js';
+import { normalizeOllamaBaseUrl } from '../src/ollama.js';
 import { inspectUnwiredEnvironmentVariables } from '../src/secrets-hub.js';
 import { createApp } from '../src/app.js';
 import { connectPoolWithFallback, createCeliaMcpApp, loadCeliaMcpConfig } from '../src/celia-mcp.js';
@@ -274,4 +275,84 @@ test('SEC-001 & SEC-002: Express & MCP routers enforce bearer auth, HMAC signatu
     await new Promise((resolve) => restServer.close(resolve));
     await new Promise((resolve) => mcpServer.close(resolve));
   }
+});
+
+test('HIGH-02 Node (1/4): isDisallowedHost rejects trailing-dot FQDNs, trailing-dot IPv4s, and bare metadata hostnames', () => {
+  for (const host of [
+    'localhost.',
+    'api.localhost...',
+    'service.local.',
+    'db.internal.',
+    'metadata.google.internal.',
+    'metadata',
+    'metadata.',
+    '127.0.0.1.',
+    '169.254.169.254.',
+    '.localhost',
+    'api..example.com'
+  ]) {
+    assert.equal(isDisallowedHost(host), true, `Expected ${JSON.stringify(host)} to be blocked`);
+  }
+});
+
+test('HIGH-02 Node (2/4): isDisallowedHost parses canonical uint16[8] IPv6 to block NAT64, 6to4, Teredo, SIIT, IPv4-compatible, ISATAP, non-canonical loopback, and %zone', () => {
+  for (const v6 of [
+    '[::0:1]',
+    '[0:0:0:0:0:0:0:0001]',
+    '[64:ff9b::169.254.169.254]',
+    '[64:ff9b:1::1]',
+    '[2002:7f00:0001::1]',
+    '[2001:0::1]',
+    '[::ffff:0:127.0.0.1]',
+    '[::127.0.0.1]',
+    '[2001:db8::5efe:169.254.169.254]',
+    '[fe80::1%25eth0]',
+    'fe80::1%eth0'
+  ]) {
+    assert.equal(isDisallowedHost(v6), true, `Expected IPv6 ${JSON.stringify(v6)} to be blocked`);
+  }
+});
+
+test('HIGH-02 Node (3/4): isDisallowedHost rejects shorthand, octal, and hex IPv4 notations while keeping public hosts allowed', () => {
+  for (const badV4 of ['127.1', '10.1', '169.254.1', '0177.0.0.1', '0x7f.0.0.1', '93.184.216.34.']) {
+    assert.equal(isDisallowedHost(badV4), true, `Expected alternate IPv4 ${JSON.stringify(badV4)} to be blocked`);
+  }
+  for (const pub of [
+    'api.deepseek.com',
+    'api.deepseek.com.',
+    '93.184.216.34',
+    '172.32.0.1',
+    '100.128.0.1',
+    '[2606:4700:4700::1111]',
+    '[::ffff:93.184.216.34]'
+  ]) {
+    assert.equal(isDisallowedHost(pub), false, `Expected public target ${JSON.stringify(pub)} to remain allowed`);
+  }
+});
+
+test('HIGH-02 Node (4/4): normalizeHttpsApiUrl and normalizeOllamaBaseUrl block cloud metadata and link-local SSRF even when OLLAMA_ALLOW_REMOTE=true', () => {
+  assert.throws(
+    () => normalizeHttpsApiUrl('https://localhost./v1', 'https://api.deepseek.com'),
+    /public HTTPS host/
+  );
+  assert.throws(
+    () => normalizeHttpsApiUrl('https://[64:ff9b::169.254.169.254]/v1', 'https://api.deepseek.com'),
+    /public HTTPS host/
+  );
+  assert.throws(
+    () => normalizeOllamaBaseUrl('http://169.254.169.254/latest/meta-data', true),
+    /metadata|link-local|disallowed/i
+  );
+  assert.throws(
+    () => normalizeOllamaBaseUrl('https://metadata.google.internal.:11434', true),
+    /metadata|link-local|disallowed/i
+  );
+  assert.throws(
+    () => normalizeOllamaBaseUrl('http://[64:ff9b::169.254.169.254]:11434', true),
+    /metadata|link-local|disallowed/i
+  );
+  assert.equal(
+    normalizeOllamaBaseUrl('https://ollama.example.internal:11434', true),
+    'https://ollama.example.internal:11434'
+  );
 });
