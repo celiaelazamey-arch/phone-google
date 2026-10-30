@@ -11,10 +11,10 @@
 
 ## 2. التركيز النشط وسجل الحالة ([STATE.md](STATE.md))
 
-- **آخر مراجعة مسجّلة:** 29 أكتوبر 2026
-- **الجلسة النشطة:** RELEASE-SIGNAL — «هل `system.html#releases` تعكس التقدّم فعلًا؟» على `arena/afe3493a-phone-google` من `main@e99ebaf`. الجواب: نصفها حيّ ونصفها مجمّد — المكوّنات من `GET /api/system` الحقيقي، وسجل الإصدارات ثلاثة مداخل مكتوبة بيد في `releases/history.json` لا تتحرك إلا بترقية إصدار (`src/version.js` يرمي استثناءً عند المخالفة)، فلا شريحة من PR #93…#98 ظهرت، وGitHub يحمل إصدارًا منشورًا واحدًا (`v0.2.1`) بينما السجل يعرض ثلاثة. الإصلاح المقيس: [`src/progress.js`](../../src/progress.js) يقرأ قسم `Unreleased` من `CHANGELOG.md` بلا شبكة ولا نموذج، ويُضاف إلى `GET /api/releases` كحقل `unreleased`، وتعرضه الصفحة بطاقة متقطّعة `.progress-card` ليست بطاقة إصدار ولا تحمل تاريخًا أو وسمًا أو ادعاء نشر، وتصمت (`parsed:false`) إن غاب الملف. الاختبارات `PRG-01..07`. سجل الجلسة: [2026-10-29-release-signal](sessions/2026-10-29-release-signal.md) · الشرح التشغيلي: [§8 من دليل الإصدارات](../releases-and-recovery.md).
-- **آخر سجل جلسة مؤرَّخ:** [2026-10-29-release-signal](sessions/2026-10-29-release-signal.md)
-- **حجم [STATE.md](STATE.md) النشط:** 61 سطرًا (11155 بايت)
+- **آخر مراجعة مسجّلة:** 30 أكتوبر 2026
+- **الجلسة النشطة:** P0-SECURITY-HOTFIX — إصلاح حقن أوامر `workflow_dispatch` واستقرار خزنة MySQL وإقلاع الوكيل ووسيط الخروج (`CRIT-01..04`, `LOW-02`) على `arena/0a520cc0-phone-google` من `main@112fe71`. أُغلقت أربع ثغرات/أعطال P0 حرجة مع اختبارات فشل-قبل/نجاح-بعد (`test/workflows-static.test.js`، `test/db-pool-contract.test.js`، `test/agent-host-boot-safety.test.js`، `EP-15..17` في `test/agent-egress-proxy.test.js`، و`test/agent-routes.test.js`) وتخطي الفحص التاريخي في الاستنساخ السطحي (`test/secrets-hub.test.js`) حتى بلغ `npm run test:ci` 812 اختبارًا / 795 ناجحًا / 0 فشل / 17 skipped. `main` والإنتاج لم يُمسّا بعد (PR مفتوح للمراجعة؛ تدوير الـ28 سرًا في `service-reality.yml` واجب بعد الدمج إن استُدعي `workflow_dispatch` من غير المالك). سجل الجلسة: [2026-10-30-p0-security-and-stability-hotfix](sessions/2026-10-30-p0-security-and-stability-hotfix.md).
+- **آخر سجل جلسة مؤرَّخ:** [2026-10-30-p0-security-and-stability-hotfix](sessions/2026-10-30-p0-security-and-stability-hotfix.md)
+- **حجم [STATE.md](STATE.md) النشط:** 64 سطرًا (13319 بايت)
 - **الأرشيف التاريخي المحفوظ بلا حذف:**
 - [STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md) — الأساس `9f6f8b2` · **983 سطرًا** محفوظًا حرفيًا (بصمة `f2674637e82e…`)
 
