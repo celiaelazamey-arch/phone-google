@@ -60,10 +60,17 @@ jobs:
           CELIA_MCP_API_TOKEN: ${{ secrets.CELIA_MCP_API_TOKEN }}
           CELIAOS_CRONJOB_ORG_API_KEY: ${{ secrets.CELIAOS_CRONJOB_ORG_API_KEY }}
           CELIA_EXPECT_COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
-        run: >
-          node scripts/deploy-render.mjs
-          ${{ inputs.plan_only && '--plan' || '' }}
-          ${{ inputs.skip_keepalive && '--skip-keepalive' || '' }}
+          INPUT_PLAN_ONLY: ${{ inputs.plan_only && 'true' || 'false' }}
+          INPUT_SKIP_KEEPALIVE: ${{ inputs.skip_keepalive && 'true' || 'false' }}
+        run: |
+          extra_args=()
+          if [ "$INPUT_PLAN_ONLY" = "true" ]; then
+            extra_args+=(--plan)
+          fi
+          if [ "$INPUT_SKIP_KEEPALIVE" = "true" ]; then
+            extra_args+=(--skip-keepalive)
+          fi
+          node scripts/deploy-render.mjs "${extra_args[@]}"
       - name: Upload live acceptance report (token-free by construction)
         if: always() && hashFiles('.validation-artifacts/live-acceptance.json') != ''
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
