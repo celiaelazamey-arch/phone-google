@@ -110,12 +110,45 @@
   function renderReleases(data) {
     state.catalogue = data;
     $("catalog-notice").textContent = data.notice;
-    $("release-list").innerHTML = data.releases
+    const unreleased = data.unreleased?.parsed && data.unreleased.items > 0
+      ? renderUnreleased(data.unreleased, data.current)
+      : "";
+    $("release-list").innerHTML =
+      unreleased +
+      data.releases
       .map((release) => {
         const current = release.version === data.current.version;
         return `<article class="release-card ${current ? "current" : ""}"><div class="release-head"><strong class="mono">v${escape(release.version)}</strong><span class="release-badge ${current ? "" : "baseline"}">${current ? "نسخة التشغيل" : "خط أساس المصدر"}</span><time class="release-date">${escape(release.date)}</time></div><div class="release-name" dir="ltr">${escape(release.name)}</div><ul>${release.highlights.map((line) => `<li>${escape(line)}</li>`).join("")}</ul><div class="release-meta"><span aria-hidden="true">${release.managedDeployment ? "◇" : "ⓘ"}</span>${release.managedDeployment ? "يقبل النشر المُدار · يُفحص التوافق قبل التبديل" : "نسخة سابقة غير مُدارة؛ الاستعادة من المصدر فقط"}</div></article>`;
       })
       .join("");
+  }
+  // إشارة تقدّم من المصدر: بنود CHANGELOG.md التي لم تُنسب إلى إصدار بعد.
+  // ليست إصدارًا منشورًا، ولا تحمل تاريخًا أو وسمًا أو التزامًا بالنشر.
+  function renderUnreleased(progress, current) {
+    const parts = [
+      ["أُضيف", progress.sections.added],
+      ["تغيّر", progress.sections.changed],
+      ["أُصلح", progress.sections.fixed],
+      ["أُزيل", progress.sections.removed],
+      ["أمن", progress.sections.security],
+      ["حدود", progress.sections.limits || 0],
+    ]
+      .filter(([, count]) => count > 0)
+      .map(([label, count]) => `${label} ${count}`);
+    const loose = progress.items - partsCount(progress.sections);
+    if (loose > 0) parts.push(`بلا قسم ${loose}`);
+    return `<article class="progress-card"><div class="release-head"><strong class="mono">${escape(String(progress.items))}</strong><span class="progress-badge">بنود غير منسوبة</span><time class="release-date">مقروء من CHANGELOG.md</time></div><div class="release-name">ما جرى بعد v${escape(current?.version ?? "الحالي")}، قبل أن يصبح إصدارًا</div><ul><li>${escape(parts.join(" · "))}</li><li>لم يُوسم ولم يُنشر ولم يُؤرَّخ؛ قد يحتاج مراجعة قبل الإطلاق</li></ul><div class="release-meta"><span aria-hidden="true">ⓘ</span>تقدّم موثّق في المصدر، وليس إصدارًا منشورًا</div></article>`;
+  }
+  function partsCount(sections) {
+    return (
+      sections.added +
+      sections.changed +
+      sections.fixed +
+      sections.removed +
+      sections.security +
+      (sections.deprecated || 0) +
+      (sections.limits || 0)
+    );
   }
   async function refresh() {
     if (state.refreshing) return;

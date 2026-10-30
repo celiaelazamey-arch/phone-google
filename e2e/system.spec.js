@@ -17,6 +17,10 @@ test("server dashboard is real, responsive, navigable and exports a JSON report"
     await expect(page.locator("#metric-storage")).toHaveText("ذاكرة مؤقتة");
     await expect(page.locator("#notice")).toContainText("ليست نسخة احتياطية");
     await expect(page.locator("#release-list .release-card")).toHaveCount(RELEASE_HISTORY.length);
+    // بطاقة التقدّم ليست إصدارًا: لا تُحسب مع سجل الإصدارات، وإن ظهرت فلا بد أن تسمّي مصدرها.
+    const progress = page.locator("#release-list .progress-card");
+    expect(await progress.count()).toBeLessThanOrEqual(1);
+    if (await progress.count()) await expect(progress).toContainText("CHANGELOG.md");
     await page.locator(".hero-actions a").click();
     await expect(page).toHaveURL(/#releases$/);
     expect(

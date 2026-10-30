@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { resolveEffectiveAiProvider } from "./ollama.js";
 import { buildSecretsReadiness } from "./secrets-hub.js";
 import { releaseInfo, RELEASE_HISTORY, SERVER_INFO } from "./version.js";
+import { unreleasedProgress } from "./progress.js";
 import { isolatePool } from "./resilience.js";
 
 export function createOperations({
@@ -259,6 +260,9 @@ export function mountOperations(app, { operations, authorize }) {
       publication: "catalog-only",
       notice:
         "هذا سجل المصدر، وليس تأكيدًا على نشر كل إصدار. التبديل يتم من أدوات النشر بصلاحية المشغّل، وليس من المتصفح.",
+      // ما جرى بعد آخر إصدار: مقروء من CHANGELOG.md. لا رقم يُختلق إن تعذّرت القراءة.
+      unreleased: unreleasedProgress(),
+      unreleasedSource: "CHANGELOG.md#Unreleased",
     }),
   );
   app.get("/api/system/diagnostics", authorize, noCache, (_req, res) =>

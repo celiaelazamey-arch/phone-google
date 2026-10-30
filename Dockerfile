@@ -8,6 +8,7 @@ COPY src ./src
 COPY public ./public
 COPY sql ./sql
 COPY releases ./releases
+COPY CHANGELOG.md ./CHANGELOG.md
 EXPOSE 3000
 USER node
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
