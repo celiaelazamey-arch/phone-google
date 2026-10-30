@@ -32,6 +32,15 @@ export function createPool(config, { prepareOwner = true } = {}) {
     isMemory: false,
     execute: (sql, params) => invoke('execute', sql, params),
     query: (sql, params) => invoke('query', sql, params),
+    getConnection: async () => {
+      try {
+        if (prepareOwner) await prepare();
+        return await raw.getConnection();
+      } catch (error) {
+        prepared = null;
+        throw error;
+      }
+    },
     end: () => raw.end()
   };
 }
