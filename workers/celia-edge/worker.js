@@ -805,7 +805,12 @@ export default {
     }
 
     if (pathname.startsWith('/api/state/')) {
-      const key = decodeURIComponent(pathname.slice('/api/state/'.length));
+      let key;
+      try {
+        key = decodeURIComponent(pathname.slice('/api/state/'.length));
+      } catch {
+        return jsonResponse({ ok: false, error: 'invalid_key' }, 400, baseHeaders);
+      }
       const store = createStateStore(env);
       if (request.method === 'GET') {
         const { status, body } = await stateResult(() => store.get(key));

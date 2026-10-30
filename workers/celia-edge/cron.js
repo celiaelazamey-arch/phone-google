@@ -396,10 +396,17 @@ export async function createIntent(env, { action, jobId, job, note, idempotencyK
 
   const id = crypto.randomUUID();
   const at = now().toISOString();
-  await env.DB
-    .prepare('INSERT INTO edge_cron_outbox (id, idempotency_key, action, job_id, payload, payload_hash, note, status, attempts, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)')
+  const insertRes = await env.DB
+    .prepare('INSERT INTO edge_cron_outbox (id, idempotency_key, action, job_id, payload, payload_hash, note, status, attempts, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?) ON CONFLICT(idempotency_key) DO NOTHING')
     .bind(id, key, action, target, JSON.stringify(payload), payloadHash, noteText, INTENT_STATUS.pending, at, at)
     .run();
+  if (!changed(insertRes)) {
+    const raced = await getByIdempotencyKey(env, key);
+    if (raced && raced.payloadHash === payloadHash) {
+      return { status: 200, body: { intent: raced, replayed: true } };
+    }
+    return { status: 409, body: { error: 'idempotency_key_reused', intentId: raced?.id ?? null } };
+  }
   await audit(env, id, 'created', payloadHash, at);
   const intent = await getIntent(env, id);
   return { status: 202, body: { intent, approve: `/api/cron/intents/${id}/approve`, reject: `/api/cron/intents/${id}/reject` } };

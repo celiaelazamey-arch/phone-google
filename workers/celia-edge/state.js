@@ -142,17 +142,36 @@ export function createStateStore(env, { now = () => new Date() } = {}) {
   };
 }
 
-/** Appends one link to the audit chain. The hash covers the previous hash, the timestamp and the content. */
+const auditQueues = new WeakMap();
+
+/** Appends one link to the audit chain. Serialized per D1 binding + conditional CAS insert so concurrent writes never fork prev_hash. */
 export async function appendAudit(env, { key, action, valueHash, at }) {
   if (!isD1Bound(env)) return { ok: false, error: 'd1_not_bound' };
-  const previous = await env.DB.prepare('SELECT hash FROM edge_audit ORDER BY seq DESC LIMIT 1').first();
-  const prevHash = previous?.hash || AUDIT_ORIGIN;
-  const hash = await sha256Hex([prevHash, at, key, action, valueHash].join('|'));
-  await env.DB
-    .prepare('INSERT INTO edge_audit (at, key, action, value_hash, prev_hash, hash) VALUES (?, ?, ?, ?, ?, ?)')
-    .bind(at, key, action, valueHash, prevHash, hash)
-    .run();
-  return { ok: true, prevHash, hash };
+  const db = env.DB;
+  const runOnce = async () => {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const previous = await db.prepare('SELECT hash FROM edge_audit ORDER BY seq DESC LIMIT 1').first();
+      const prevHash = previous?.hash || AUDIT_ORIGIN;
+      const hash = await sha256Hex([prevHash, at, key, action, valueHash].join('|'));
+      const res = await db
+        .prepare(
+          'INSERT INTO edge_audit (at, key, action, value_hash, prev_hash, hash) ' +
+          'SELECT ?, ?, ?, ?, ?, ? ' +
+          'WHERE COALESCE((SELECT hash FROM edge_audit ORDER BY seq DESC LIMIT 1), ?) = ?'
+        )
+        .bind(at, key, action, valueHash, prevHash, hash, AUDIT_ORIGIN, prevHash)
+        .run();
+      if (typeof res?.meta?.changes !== 'number' || res.meta.changes > 0) {
+        return { ok: true, prevHash, hash };
+      }
+    }
+    throw Object.assign(new Error('audit_chain_conflict'), { code: 'audit_chain_conflict' });
+  };
+
+  const prior = auditQueues.get(db) || Promise.resolve();
+  const next = prior.catch(() => {}).then(runOnce);
+  auditQueues.set(db, next);
+  return next;
 }
 
 /** Recomputes the chain. Any edited or reordered row breaks it, and the first broken link is named. */

@@ -492,3 +492,70 @@ test('HIGH-02 (4/4): Edge /api/cron/intents and /api/cron/jobs reject trailing-d
   const stored = await call(env, 'GET', '/api/cron/intents');
   assert.equal(stored.json.intents.length, 0, 'no SSRF bypass URL may enter edge_cron_outbox');
 });
+
+test('EDGE-CRON (1/2): concurrent Promise.all createIntent with identical Idempotency-Key and payload returns [202, 200] without UNIQUE constraint crash', async () => {
+  const { env } = await makeEnv();
+  const origPrepare = env.DB.prepare.bind(env.DB);
+  env.DB.prepare = (sql) => {
+    const stmt = origPrepare(sql);
+    if (String(sql).includes('WHERE idempotency_key = ?')) {
+      const origFirst = stmt.first.bind(stmt);
+      stmt.first = async (...args) => {
+        const row = await origFirst(...args);
+        await new Promise((r) => setTimeout(r, 8));
+        return row;
+      };
+    }
+    return stmt;
+  };
+
+  const [first, second] = await Promise.all([
+    call(env, 'POST', '/api/cron/intents', {
+      body: { action: 'create', job: validJob },
+      headers: { 'idempotency-key': 'race-same-payload-0001' }
+    }),
+    call(env, 'POST', '/api/cron/intents', {
+      body: { action: 'create', job: validJob },
+      headers: { 'idempotency-key': 'race-same-payload-0001' }
+    })
+  ]);
+
+  assert.deepEqual([first.status, second.status].sort((a, b) => a - b), [200, 202]);
+  const replay = first.status === 200 ? first : second;
+  const created = first.status === 202 ? first : second;
+  assert.equal(replay.json.replayed, true);
+  assert.equal(replay.json.intent.id, created.json.intent.id);
+});
+
+test('EDGE-CRON (2/2): concurrent Promise.all createIntent with identical Idempotency-Key and divergent payload returns [202, 409] without UNIQUE constraint crash', async () => {
+  const { env } = await makeEnv();
+  const origPrepare = env.DB.prepare.bind(env.DB);
+  env.DB.prepare = (sql) => {
+    const stmt = origPrepare(sql);
+    if (String(sql).includes('WHERE idempotency_key = ?')) {
+      const origFirst = stmt.first.bind(stmt);
+      stmt.first = async (...args) => {
+        const row = await origFirst(...args);
+        await new Promise((r) => setTimeout(r, 8));
+        return row;
+      };
+    }
+    return stmt;
+  };
+
+  const [first, second] = await Promise.all([
+    call(env, 'POST', '/api/cron/intents', {
+      body: { action: 'create', job: validJob },
+      headers: { 'idempotency-key': 'race-diff-payload-0001' }
+    }),
+    call(env, 'POST', '/api/cron/intents', {
+      body: { action: 'create', job: { ...validJob, title: 'Different title' } },
+      headers: { 'idempotency-key': 'race-diff-payload-0001' }
+    })
+  ]);
+
+  assert.deepEqual([first.status, second.status].sort((a, b) => a - b), [202, 409]);
+  const conflict = first.status === 409 ? first : second;
+  assert.equal(conflict.json.error, 'idempotency_key_reused');
+});
+
