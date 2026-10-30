@@ -5,10 +5,30 @@ import test from 'node:test';
 import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
-import { collectWorkerModules, main, WORKER_ENTRY_MODULE } from '../scripts/deploy-cloudflare-edge.mjs';
+import { collectWorkerModules, main, splitSqlStatements, WORKER_ENTRY_MODULE } from '../scripts/deploy-cloudflare-edge.mjs';
 
 const workerDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'workers', 'celia-edge');
+const migrationsDir = path.join(workerDir, 'migrations');
+
+function createRealD1QueryHandler(sqlite, queriedStatements = []) {
+  return (_url, init = {}) => {
+    const { sql, params = [] } = JSON.parse(init.body);
+    queriedStatements.push(sql);
+    try {
+      const stmt = sqlite.prepare(sql);
+      if (/^\s*(?:SELECT|PRAGMA)\b/i.test(sql)) {
+        const results = stmt.all(...params);
+        return jsonResponse(200, { success: true, result: [{ success: true, results }] });
+      }
+      const info = stmt.run(...params);
+      return jsonResponse(200, { success: true, result: [{ success: true, meta: { changes: info.changes } }] });
+    } catch (err) {
+      return jsonResponse(400, { success: false, errors: [{ message: err.message }] });
+    }
+  };
+}
 
 const jsonResponse = (status, body) => ({
   ok: status >= 200 && status < 300,
@@ -50,6 +70,8 @@ test('edge deploy: a rejected upload reports the provider code, never the token'
   const summaryPath = path.join(directory, 'summary.md');
   const lines = [];
   const calls = [];
+  const sqlite = new DatabaseSync(':memory:');
+  const d1Handler = createRealD1QueryHandler(sqlite);
   const returned = await main({
     argv: [],
     env: {
@@ -59,6 +81,10 @@ test('edge deploy: a rejected upload reports the provider code, never the token'
     },
     fetchImpl: async (url, init = {}) => {
       calls.push({ url, method: init.method || 'GET' });
+      if (url.includes('/d1/database?')) {
+        return jsonResponse(200, { success: true, result: [{ uuid: 'db-1', name: 'celia-edge-state' }] });
+      }
+      if (url.includes('/d1/database/db-1/query')) return d1Handler(url, init);
       if (url.includes('/workers/scripts/') && init.method === 'PUT') {
         return jsonResponse(403, { success: false, errors: [{ code: 10000, message: 'Authentication error' }] });
       }
@@ -83,10 +109,16 @@ test('edge deploy: a rejected upload reports the provider code, never the token'
 test('edge deploy: a wrong account id is discovered and the upload retried once', async () => {
   const lines = [];
   let put = 0;
+  const sqlite = new DatabaseSync(':memory:');
+  const d1Handler = createRealD1QueryHandler(sqlite);
   await main({
     argv: [],
     env: { CLOUDFLARE_ACCOUNT_ID: 'stale-account', CLOUDFLARE_API_TOKEN: 'token-1' },
     fetchImpl: async (url, init = {}) => {
+      if (url.includes('/d1/database?')) {
+        return jsonResponse(200, { success: true, result: [{ uuid: 'db-1', name: 'celia-edge-state' }] });
+      }
+      if (url.includes('/d1/database/db-1/query')) return d1Handler(url, init);
       if (url.includes('/accounts?') || url.endsWith('/accounts')) {
         return jsonResponse(200, { result: [{ id: 'right-account' }] });
       }
@@ -111,10 +143,16 @@ test('edge deploy: a wrong account id is discovered and the upload retried once'
 
 test('edge deploy: a worker with no subdomain is deployed but claims no live URL', async () => {
   const lines = [];
+  const sqlite = new DatabaseSync(':memory:');
+  const d1Handler = createRealD1QueryHandler(sqlite);
   await main({
     argv: [],
     env: { CLOUDFLARE_ACCOUNT_ID: 'acc-1', CLOUDFLARE_API_TOKEN: 'token-1' },
     fetchImpl: async (url, init = {}) => {
+      if (url.includes('/d1/database?')) {
+        return jsonResponse(200, { success: true, result: [{ uuid: 'db-1', name: 'celia-edge-state' }] });
+      }
+      if (url.includes('/d1/database/db-1/query')) return d1Handler(url, init);
       if (init.method === 'PUT') return jsonResponse(200, { success: true });
       if (url.endsWith('/subdomain')) return jsonResponse(200, { result: {} });
       return jsonResponse(200, { result: {} });
@@ -129,10 +167,16 @@ test('edge deploy: a worker with no subdomain is deployed but claims no live URL
 
 test('edge deploy: a failing /readyz probe keeps liveReady false instead of throwing', async () => {
   const lines = [];
+  const sqlite = new DatabaseSync(':memory:');
+  const d1Handler = createRealD1QueryHandler(sqlite);
   await main({
     argv: [],
     env: { CLOUDFLARE_ACCOUNT_ID: 'acc-1', CLOUDFLARE_API_TOKEN: 'token-1' },
     fetchImpl: async (url, init = {}) => {
+      if (url.includes('/d1/database?')) {
+        return jsonResponse(200, { success: true, result: [{ uuid: 'db-1', name: 'celia-edge-state' }] });
+      }
+      if (url.includes('/d1/database/db-1/query')) return d1Handler(url, init);
       if (init.method === 'PUT') return jsonResponse(200, { success: true });
       if (url.endsWith('/subdomain')) return jsonResponse(200, { result: { subdomain: 'celia' } });
       if (url.endsWith('/readyz')) throw new Error('connection refused');
@@ -145,12 +189,14 @@ test('edge deploy: a failing /readyz probe keeps liveReady false instead of thro
   assert.equal(report.liveReady, false);
 });
 
-test('edge deploy: full D1 migration applies all 16 statements (0001_state + 0002_runtime + 0003_cron_outbox + 0004_reply_metrics) and records live /readyz storage durability', async () => {
+test('edge deploy: full D1 migration applies all 20 statements (0001..0005) on real SQLite D1 and records _migrations ledger', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'celia-edge-ok-'));
   const summaryPath = path.join(directory, 'summary.md');
   const lines = [];
   const queriedStatements = [];
   const uploadedParts = [];
+  const sqlite = new DatabaseSync(':memory:');
+  const d1Handler = createRealD1QueryHandler(sqlite, queriedStatements);
 
   await main({
     argv: [],
@@ -161,12 +207,13 @@ test('edge deploy: full D1 migration applies all 16 statements (0001_state + 000
     },
     fetchImpl: async (url, init = {}) => {
       if (url.includes('/d1/database?')) {
-        return jsonResponse(200, { success: true, result: [{ uuid: 'db-live-1', name: 'celia-edge-state' }] });
+        return jsonResponse(200, { success: true, result: [] });
+      }
+      if (url.endsWith('/d1/database') && init.method === 'POST') {
+        return jsonResponse(200, { success: true, result: { uuid: 'db-live-1', name: 'celia-edge-state' } });
       }
       if (url.includes('/d1/database/db-live-1/query')) {
-        const body = JSON.parse(init.body);
-        queriedStatements.push(body.sql);
-        return jsonResponse(200, { success: true, result: [{ success: true }] });
+        return d1Handler(url, init);
       }
       if (init.method === 'PUT') {
         uploadedParts.push([...init.body.keys()]);
@@ -189,10 +236,14 @@ test('edge deploy: full D1 migration applies all 16 statements (0001_state + 000
   assert.equal(report.status, 'deployed');
   assert.equal(report.d1.ok, true);
   assert.equal(report.d1.id, 'db-live-1');
-  assert.equal(report.d1.migrations.statements, 16);
-  assert.equal(queriedStatements.length, 16);
+  assert.equal(report.d1.migrations.statements, 20);
+  assert.equal(report.d1.migrations.appliedFiles, 5);
   assert.equal(queriedStatements.filter((stmt) => stmt.includes('edge_cron_outbox')).length, 2, 'the cron outbox table and its index ship with the deploy');
   assert.equal(queriedStatements.some((stmt) => stmt.includes('every statement is')), false);
+  const cols = sqlite.prepare('PRAGMA table_info(edge_idempotency)').all().map((c) => c.name);
+  assert.ok(cols.includes('status') && cols.includes('dispatched_at'), '0005 columns exist on real SQLite');
+  const recordedVersions = sqlite.prepare('SELECT version FROM _migrations ORDER BY version ASC').all().map((r) => r.version);
+  assert.equal(recordedVersions.length, 5);
   assert.equal(report.liveReady, true);
   assert.equal(report.storage?.durable, true);
   assert.equal(report.storage?.mode, 'd1');
@@ -255,9 +306,10 @@ test('edge deploy: a module imported but missing from the bundle fails the deplo
   await assert.rejects(collectWorkerModules({ dir: directory }), /worker_module_outside_bundle/);
 });
 
-test('edge deploy: when D1 exists but migration fails, warning honestly notes the binding was still applied', async () => {
+test('edge deploy: fail-closed when existing D1 database migration fails — Worker upload is aborted', async () => {
   const lines = [];
-  await main({
+  let putCalls = 0;
+  const returned = await main({
     argv: [],
     env: { CLOUDFLARE_ACCOUNT_ID: 'acc-1', CLOUDFLARE_API_TOKEN: 'token-1' },
     fetchImpl: async (url, init = {}) => {
@@ -267,10 +319,9 @@ test('edge deploy: when D1 exists but migration fails, warning honestly notes th
       if (url.includes('/d1/database/db-existing/query')) {
         return jsonResponse(400, { success: false, errors: [{ message: 'simulated_ddl_rejection' }] });
       }
-      if (init.method === 'PUT') return jsonResponse(200, { success: true });
-      if (url.endsWith('/subdomain')) return jsonResponse(200, { result: { subdomain: 'celia' } });
-      if (url.endsWith('/readyz')) {
-        return jsonResponse(200, { ready: true, storage: { mode: 'cloudflare-edge', durable: false, reason: 'd1_probe_failed:no such table: edge_heartbeat' } });
+      if (init.method === 'PUT') {
+        putCalls += 1;
+        return jsonResponse(200, { success: true });
       }
       return jsonResponse(200, { result: {} });
     },
@@ -279,10 +330,102 @@ test('edge deploy: when D1 exists but migration fails, warning honestly notes th
   });
 
   const report = JSON.parse(lines.at(-1));
+  assert.equal(returned?.status, 'migration-failed');
+  assert.equal(report.status, 'migration-failed');
   assert.equal(report.d1.ok, false);
-  assert.equal(report.d1.bindingApplied, true);
-  assert.equal(report.storage?.durable, false);
-  const warningLine = lines.find((line) => line.startsWith('::warning title=Celia D1::')) || '';
-  assert.match(warningLine, /binding applied/);
-  assert.doesNotMatch(warningLine, /deploying without the binding/);
+  assert.equal(report.d1.created, false);
+  assert.equal(putCalls, 0, 'Worker PUT upload must never run when migration fails on existing D1');
+  assert.ok(lines.some((line) => line.startsWith('::error title=Celia D1::')), 'migration failure emits an error annotation');
+});
+
+test('edge deploy: fail-closed when newly created D1 database migration fails — Worker upload is aborted', async () => {
+  const lines = [];
+  let putCalls = 0;
+  const returned = await main({
+    argv: [],
+    env: { CLOUDFLARE_ACCOUNT_ID: 'acc-1', CLOUDFLARE_API_TOKEN: 'token-1' },
+    fetchImpl: async (url, init = {}) => {
+      if (url.includes('/d1/database?')) {
+        return jsonResponse(200, { success: true, result: [] });
+      }
+      if (url.endsWith('/d1/database') && init.method === 'POST') {
+        return jsonResponse(200, { success: true, result: { uuid: 'db-brand-new', name: 'celia-edge-state' } });
+      }
+      if (url.includes('/d1/database/db-brand-new/query')) {
+        return jsonResponse(400, { success: false, errors: [{ message: 'simulated_new_db_ddl_rejection' }] });
+      }
+      if (init.method === 'PUT') {
+        putCalls += 1;
+        return jsonResponse(200, { success: true });
+      }
+      return jsonResponse(200, { result: {} });
+    },
+    retryDelayMs: 5,
+    log: (line) => lines.push(line)
+  });
+
+  const report = JSON.parse(lines.at(-1));
+  assert.equal(returned?.status, 'migration-failed');
+  assert.equal(report.status, 'migration-failed');
+  assert.equal(report.d1.ok, false);
+  assert.equal(report.d1.created, true);
+  assert.equal(putCalls, 0, 'Worker PUT upload must never run when migration fails on newly created D1');
+  assert.ok(lines.some((line) => line.startsWith('::error title=Celia D1::')));
+});
+
+test('edge deploy: running main() twice back-to-back on pre-0005 live D1 state marks 0001..0004 pre-applied, runs 0005 once, backfills legacy rows, and skips all on second deploy', async () => {
+  const sqlite = new DatabaseSync(':memory:');
+  const pre0005Names = (await readdir(migrationsDir)).filter((n) => n.endsWith('.sql') && n < '0005_').sort();
+  for (const name of pre0005Names) {
+    const raw = await readFile(path.join(migrationsDir, name), 'utf8');
+    for (const stmt of splitSqlStatements(raw)) sqlite.exec(stmt);
+  }
+  sqlite
+    .prepare('INSERT INTO edge_idempotency (scope_key, response_json, created_at) VALUES (?, ?, ?)')
+    .run('whatsapp.send:legacy-1', '{"ok":true,"providerMessageId":"wamid.old"}', '2026-10-30T17:15:00.000Z');
+
+  const queried = [];
+  const d1Handler = createRealD1QueryHandler(sqlite, queried);
+  const runDeploy = async () => {
+    const lines = [];
+    const res = await main({
+      argv: [],
+      env: { CLOUDFLARE_ACCOUNT_ID: 'acc-1', CLOUDFLARE_API_TOKEN: 'token-1' },
+      fetchImpl: async (url, init = {}) => {
+        if (url.includes('/d1/database?')) {
+          return jsonResponse(200, { success: true, result: [{ uuid: 'db-live-upgrade', name: 'celia-edge-state' }] });
+        }
+        if (url.includes('/d1/database/db-live-upgrade/query')) return d1Handler(url, init);
+        if (init.method === 'PUT') return jsonResponse(200, { success: true });
+        if (url.endsWith('/subdomain')) return jsonResponse(200, { result: { subdomain: 'celia' } });
+        if (url.endsWith('/readyz')) return jsonResponse(200, { ready: true, storage: { mode: 'd1', durable: true } });
+        return jsonResponse(200, { result: {} });
+      },
+      retryDelayMs: 5,
+      log: (line) => lines.push(line)
+    });
+    return res;
+  };
+
+  // Deploy #1: pre-marks 0001..0004 without re-executing them, applies 0005 (4 statements)
+  const first = await runDeploy();
+  assert.equal(first.status, 'deployed');
+  assert.equal(first.d1.ok, true);
+  assert.equal(first.d1.migrations.preAppliedFiles, 4);
+  assert.equal(first.d1.migrations.appliedFiles, 1);
+  assert.equal(first.d1.migrations.statements, 4);
+
+  const upgradedRow = sqlite
+    .prepare('SELECT status, dispatched_at, response_json FROM edge_idempotency WHERE scope_key = ?')
+    .get('whatsapp.send:legacy-1');
+  assert.equal(upgradedRow.status, 'completed');
+  assert.equal(upgradedRow.dispatched_at, Date.parse('2026-10-30T17:15:00.000Z'));
+
+  // Deploy #2 back-to-back: skips all 5 recorded migrations with zero ALTER TABLE re-runs
+  const second = await runDeploy();
+  assert.equal(second.status, 'deployed');
+  assert.equal(second.d1.ok, true);
+  assert.equal(second.d1.migrations.appliedFiles, 0);
+  assert.equal(second.d1.migrations.skippedFiles, 5);
+  assert.equal(second.d1.migrations.statements, 0);
 });

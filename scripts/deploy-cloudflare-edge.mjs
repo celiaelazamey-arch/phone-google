@@ -294,10 +294,133 @@ export async function collectWorkerModules({ dir = workerDir, entry = WORKER_ENT
   return ordered;
 }
 
-export async function loadAllMigrationsSql(dir = migrationsDir) {
+export async function loadMigrationFiles(dir = migrationsDir) {
   const entries = (await readdir(dir)).filter((name) => name.endsWith('.sql')).sort();
-  const chunks = await Promise.all(entries.map((name) => readFile(path.join(dir, name), 'utf8')));
-  return chunks.join('\n\n');
+  return Promise.all(
+    entries.map(async (version) => ({
+      version,
+      sql: await readFile(path.join(dir, version), 'utf8')
+    }))
+  );
+}
+
+export async function loadAllMigrationsSql(dir = migrationsDir) {
+  const files = await loadMigrationFiles(dir);
+  return files.map((file) => file.sql).join('\n\n');
+}
+
+/**
+ * Applies versioned `migrations/*.sql` files with a durable `_migrations (version, applied_at)` ledger.
+ *
+ * Pre-0005 live D1 databases already have `0001..0004` applied (`whatsapp_reply_metrics` exists) without a
+ * `_migrations` table: when `_migrations` is empty on an existing database (`!databaseCreated`) and that table
+ * is already present, `0001..0004` are recorded as pre-applied without re-executing their 16 statements.
+ */
+export async function applyVersionedMigrations({
+  accountId,
+  apiToken,
+  databaseId,
+  databaseCreated = false,
+  migrationFiles = null,
+  fetchImpl = fetch,
+  retryDelayMs = 400,
+  now = () => new Date(),
+  log = () => {}
+}) {
+  const baseUrl = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}`;
+  const headers = { authorization: `Bearer ${apiToken}`, 'content-type': 'application/json' };
+
+  const execD1 = async (statement, params = [], { allowAlreadyAppliedDdl = false } = {}) => {
+    let lastDetail = 'status_unknown';
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const response = await fetchImpl(`${baseUrl}/d1/database/${encodeURIComponent(databaseId)}/query`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ sql: statement, params })
+      });
+      const payload = await response.json().catch(() => ({}));
+      const firstResult = Array.isArray(payload?.result) ? payload.result[0] : null;
+      const itemError = Array.isArray(payload?.result)
+        ? payload.result.find((entry) => entry && (entry.success === false || entry.error))?.error
+        : null;
+      const resultFailed = Array.isArray(payload?.result) && payload.result.some((entry) => entry && entry.success === false);
+      const detail = payload?.errors?.[0]?.message || itemError || `status_${response.status}`;
+
+      if (allowAlreadyAppliedDdl && (/already exists/i.test(detail) || /duplicate column name/i.test(detail))) {
+        return { rows: [] };
+      }
+      if (response.ok && payload?.success !== false && !resultFailed) {
+        return { rows: Array.isArray(firstResult?.results) ? firstResult.results : [] };
+      }
+      lastDetail = detail;
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs * (attempt + 1)));
+    }
+    throw new Error(String(lastDetail).slice(0, 160));
+  };
+
+  await execD1('CREATE TABLE IF NOT EXISTS _migrations (version TEXT PRIMARY KEY, applied_at TEXT NOT NULL)');
+  const { rows: recorded } = await execD1('SELECT version FROM _migrations ORDER BY version ASC');
+  const appliedVersions = new Set(recorded.map((row) => String(row.version)));
+
+  const files = migrationFiles || (await loadMigrationFiles());
+  let preAppliedFiles = 0;
+
+  if (appliedVersions.size === 0 && !databaseCreated) {
+    const { rows: legacyProbe } = await execD1(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'whatsapp_reply_metrics'"
+    );
+    if (legacyProbe.length > 0) {
+      const atIso = now().toISOString();
+      for (const file of files) {
+        if (file.version < '0005_') {
+          await execD1(
+            'INSERT INTO _migrations (version, applied_at) VALUES (?, ?) ON CONFLICT(version) DO NOTHING',
+            [file.version, atIso]
+          );
+          appliedVersions.add(file.version);
+          preAppliedFiles += 1;
+        }
+      }
+    }
+  }
+
+  let appliedStatements = 0;
+  let newlyAppliedFiles = 0;
+  let skippedFiles = 0;
+
+  for (const file of files) {
+    if (appliedVersions.has(file.version)) {
+      if (preAppliedFiles === 0 || file.version >= '0005_') {
+        skippedFiles += 1;
+      }
+      continue;
+    }
+    const statements = splitSqlStatements(file.sql);
+    for (const [index, statement] of statements.entries()) {
+      const isAdditiveDdl = /^\s*(?:CREATE\s+(?:UNIQUE\s+)?INDEX|CREATE\s+TABLE|ALTER\s+TABLE\s+\S+\s+ADD\s+COLUMN)\b/i.test(statement);
+      try {
+        await execD1(statement, [], { allowAlreadyAppliedDdl: isAdditiveDdl });
+        appliedStatements += 1;
+      } catch (err) {
+        throw new Error(`d1_migration_failed:${file.version}:statement_${index + 1}:${err.message}`);
+      }
+    }
+    await execD1(
+      'INSERT INTO _migrations (version, applied_at) VALUES (?, ?) ON CONFLICT(version) DO NOTHING',
+      [file.version, now().toISOString()]
+    );
+    newlyAppliedFiles += 1;
+  }
+
+  log(
+    `D1 migrations applied: ${newlyAppliedFiles} file(s), ${appliedStatements} statement(s), ${preAppliedFiles} pre-applied, ${skippedFiles} skipped`
+  );
+  return {
+    statements: appliedStatements,
+    appliedFiles: newlyAppliedFiles,
+    preAppliedFiles,
+    skippedFiles
+  };
 }
 
 export async function main({ argv = process.argv.slice(2), env = process.env, fetchImpl = fetch, retryDelayMs = 400, log = console.log } = {}) {
@@ -308,32 +431,58 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
 
   const pkg = JSON.parse(await readFile(pkgPath, 'utf8'));
   // Every module reachable from `worker.js` (state.js, runtime.js, crypto.js, cron.js, …) ships in the same upload.
-  const [workerModules, migrationSql] = await Promise.all([collectWorkerModules(), loadAllMigrationsSql()]);
+  const [workerModules, migrationFiles] = await Promise.all([collectWorkerModules(), loadMigrationFiles()]);
   const commit = String(env.GITHUB_SHA || 'main').trim();
 
   let d1 = { ok: false, reason: 'dry_run' };
   let database = null;
-  // Bound even when the DDL fails: a bound-but-empty database makes /readyz say *why* (no such table) instead
-  // of "not bound", which is the difference between a diagnosis and a shrug.
+  // Fail-closed: if D1 provisioning or schema migration fails on either an existing or a newly created database,
+  // abort before uploading Worker code so the live Worker never queries unmigrated columns or tables.
   let d1BindingId = null;
   if (!dryRun) {
     try {
       database = await ensureD1Database({ accountId, apiToken, fetchImpl, log });
       d1BindingId = database.id;
-      const migrations = await applyMigrations({ accountId, apiToken, databaseId: database.id, sql: migrationSql, fetchImpl, retryDelayMs, log });
+      const migrations = await applyVersionedMigrations({
+        accountId,
+        apiToken,
+        databaseId: database.id,
+        databaseCreated: Boolean(database.created),
+        migrationFiles,
+        fetchImpl,
+        retryDelayMs,
+        log
+      });
       d1 = { ok: true, id: database.id, name: database.name, created: database.created, migrations };
     } catch (error) {
       d1 = {
         ok: false,
         reason: String(error?.message || error).slice(0, 240),
-        databaseId: database?.id || null,
-        databaseCreated: database?.created ?? null,
-        bindingApplied: Boolean(d1BindingId)
+        id: database?.id || null,
+        created: database?.created ?? null
       };
-      const bindingNote = d1BindingId
-        ? 'binding applied so /readyz reports the exact probe error'
-        : 'deploying without the binding; the worker will report storage.durable=false';
-      log(`::warning title=Celia D1::${d1.reason} — ${bindingNote}`);
+      const report = {
+        status: 'migration-failed',
+        scriptName,
+        version: pkg.version,
+        commit,
+        d1
+      };
+      if (env.GITHUB_STEP_SUMMARY) {
+        await appendFile(
+          env.GITHUB_STEP_SUMMARY,
+          [
+            '### Cloudflare Worker Edge Deployment',
+            '- Status: **migration-failed** (Worker upload aborted fail-closed)',
+            `- D1 Error: \`${d1.reason}\``,
+            ''
+          ].join('\n'),
+          'utf8'
+        );
+      }
+      log(`::error title=Celia D1::${d1.reason} — Worker upload aborted (fail-closed)`);
+      log(JSON.stringify(report, null, 2));
+      return report;
     }
   }
 
@@ -503,7 +652,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
         ...(liveStorage
           ? [`- Live \`/readyz\` storage: \`durable=${Boolean(liveStorage.durable)}\` (\`mode=${liveStorage.mode || 'unknown'}\`${liveStorage.reason ? `, \`reason=${liveStorage.reason}\`` : ''})`]
           : []),
-        `- Durable storage (D1 \`${D1_DATABASE_NAME}\`): **${d1.ok ? `${d1.id}${d1.created ? ' (created)' : ''}` : `degraded — ${d1.reason}${d1BindingId ? ' (binding applied, check /readyz)' : ' (no binding)'}`}**`,
+        `- Durable storage (D1 \`${D1_DATABASE_NAME}\`): **${d1.ok ? `${d1.id}${d1.created ? ' (created)' : ''}` : `failed — ${d1.reason}`}**`,
         ''
       ].join('\n'),
       'utf8'
@@ -518,5 +667,5 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMain) {
   const result = await main();
-  if (result?.status === 'api-rejected') process.exitCode = 1;
+  if (result?.status === 'api-rejected' || result?.status === 'migration-failed') process.exitCode = 1;
 }

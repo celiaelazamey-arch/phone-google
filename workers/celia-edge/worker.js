@@ -319,6 +319,7 @@ async function handleCronIntents({ request, env, pathname, baseHeaders, fetchImp
 export default {
   async fetch(request, env = {}) {
     const fetchImpl = typeof env?.__FETCH_IMPL === 'function' ? env.__FETCH_IMPL : globalThis.fetch;
+    const now = typeof env?.__NOW === 'function' ? env.__NOW : () => new Date();
     const baseHeaders = corsHeaders(request, env);
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: baseHeaders });
@@ -485,7 +486,7 @@ export default {
       }
       if (request.method === 'POST') {
         try {
-          const result = await handleWhatsAppWebhookPost({ request, env, origin: url.origin, fetchImpl });
+          const result = await handleWhatsAppWebhookPost({ request, env, origin: url.origin, fetchImpl, now });
           return jsonResponse(result.body, result.status, baseHeaders);
         } catch (err) {
           return runtimeErrorResponse(err, baseHeaders);
@@ -595,7 +596,8 @@ export default {
           env,
           origin: url.origin,
           release,
-          fetchImpl
+          fetchImpl,
+          now
         });
         if (rpc.status === 202 || rpc.payload === null) {
           return new Response(null, { status: 202, headers: baseHeaders });
@@ -683,7 +685,8 @@ export default {
               end: parsed.data?.end,
               timeZone: parsed.data?.timeZone,
               idempotencyKey: idem,
-              fetchImpl
+              fetchImpl,
+              now
             }),
             201,
             baseHeaders
@@ -746,7 +749,8 @@ export default {
             phone: parsed.data?.phone,
             text: parsed.data?.text,
             idempotencyKey: idem,
-            fetchImpl
+            fetchImpl,
+            now
           }),
           200,
           baseHeaders

@@ -695,3 +695,200 @@ test('card-free Edge full integration: Node v1 envelope compat + all 12 MCP tool
   assert.equal(fallbackAi.fallbackReason, 'gemini_http_502');
 });
 
+async function createHigh05Harness({ seedGoogle = false } = {}) {
+  const DB = await createSqliteD1();
+  const state = {
+    nowMs: Date.now(),
+    metaCalls: 0,
+    calCalls: 0,
+    failNextLocalMessageInsert: false
+  };
+
+  const origPrepare = DB.prepare.bind(DB);
+  DB.prepare = (query) => {
+    const stmt = origPrepare(query);
+    if (query.includes('INSERT OR IGNORE INTO whatsapp_messages') && query.includes('outbound')) {
+      const origRun = stmt.run.bind(stmt);
+      stmt.run = async () => {
+        if (state.failNextLocalMessageInsert) {
+          state.failNextLocalMessageInsert = false;
+          throw new Error('simulated_local_d1_whatsapp_messages_insert_failure');
+        }
+        return origRun();
+      };
+    }
+    return stmt;
+  };
+
+  const env = {
+    DB,
+    CELIA_MCP_API_TOKEN: OWNER_TOKEN,
+    GOOGLE_CLIENT_ID: 'cid.apps.googleusercontent.com',
+    GOOGLE_CLIENT_SECRET: 'GOCSPX-secret',
+    GEMINI_API_KEY: 'AIzaSyTest',
+    PHONE_NUMBER: '+201055566677',
+    WHATSAPP_VERIFY_TOKEN: WA_VERIFY,
+    WHATSAPP_APP_SECRET: WA_SECRET,
+    WHATSAPP_ACCESS_TOKEN: 'meta-tok',
+    WHATSAPP_PHONE_NUMBER_ID: '99887766',
+    WHATSAPP_AUTO_REPLY_ENABLED: 'true',
+    __NOW: () => new Date(state.nowMs),
+    __FETCH_IMPL: async (url, init = {}) => {
+      const target = String(url);
+      if (target === 'https://oauth2.googleapis.com/token') {
+        return new Response(
+          JSON.stringify({ access_token: 'tok-live', refresh_token: 'ref-live', expires_in: 3600, scope: 'email calendar gmail' }),
+          { status: 200 }
+        );
+      }
+      if (target === 'https://openidconnect.googleapis.com/v1/userinfo') {
+        return new Response(JSON.stringify({ email: 'owner@example.com', email_verified: true }), { status: 200 });
+      }
+      if (target.includes('graph.facebook.com')) {
+        state.metaCalls += 1;
+        await new Promise((r) => setTimeout(r, 15));
+        return new Response(JSON.stringify({ messages: [{ id: `wamid.race.${state.metaCalls}` }] }), { status: 200 });
+      }
+      if (target.startsWith('https://www.googleapis.com/calendar/v3/calendars/primary/events') && init.method === 'POST') {
+        state.calCalls += 1;
+        await new Promise((r) => setTimeout(r, 15));
+        return new Response(JSON.stringify({ id: `cal.${state.calCalls}`, summary: 'موعد', htmlLink: 'https://cal.example/1' }), { status: 200 });
+      }
+      if (target.includes('generativelanguage.googleapis.com')) {
+        await new Promise((r) => setTimeout(r, 15));
+        return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'رد واحد فقط' }] } }] }), { status: 200 });
+      }
+      throw new Error(`unexpected url: ${target}`);
+    }
+  };
+
+  const authHeaders = { authorization: `Bearer ${OWNER_TOKEN}`, 'content-type': 'application/json' };
+  const nowIso = new Date(state.nowMs).toISOString();
+  DB.sqlite
+    .prepare(
+      `INSERT INTO whatsapp_contacts (phone_e164, opted_in, ai_opted_in, last_inbound_at, created_at, updated_at)
+       VALUES ('+201099998888', 1, 1, ?, ?, ?)`
+    )
+    .run(nowIso, nowIso, nowIso);
+
+  if (seedGoogle) {
+    const linkResp = await worker.fetch(new Request('https://celia.workers.dev/auth/google/link', { method: 'POST', headers: authHeaders }), env);
+    const oauthState = new URL((await linkResp.json()).url).searchParams.get('state');
+    await worker.fetch(new Request(`https://celia.workers.dev/auth/google/callback?code=c1&state=${oauthState}`), env);
+  }
+
+  const sendWa = (idemKey, phone = '+201099998888') =>
+    worker.fetch(
+      new Request('https://celia.workers.dev/api/whatsapp/messages', {
+        method: 'POST',
+        headers: { ...authHeaders, 'idempotency-key': idemKey },
+        body: JSON.stringify({ phone, text: 'رسالة اختبار' })
+      }),
+      env
+    );
+
+  return { DB, env, state, authHeaders, nowIso, sendWa };
+}
+
+test('HIGH-05 (1/5): fresh concurrent Promise.all race returns [200, 409] and replays cached response without re-calling Meta', async () => {
+  const { state, sendWa } = await createHigh05Harness();
+
+  const [fresh1, fresh2] = await Promise.all([sendWa('fresh-race-key-01'), sendWa('fresh-race-key-01')]);
+  assert.deepEqual([fresh1.status, fresh2.status].sort((a, b) => a - b), [200, 409]);
+  assert.equal(state.metaCalls, 1, 'fresh race must invoke Meta exactly once');
+
+  const replayRes = await sendWa('fresh-race-key-01');
+  assert.equal(replayRes.status, 200);
+  const replayBody = await replayRes.json();
+  assert.equal(replayBody.deduplicated, true);
+  assert.equal(replayBody.providerMessageId, 'wamid.race.1');
+  assert.equal(state.metaCalls, 1);
+});
+
+test('HIGH-05 (2/5): stale pending CAS takeover holds 409 before 18s and elects a single winner at >= 18s', async () => {
+  const { DB, state, nowIso, sendWa } = await createHigh05Harness();
+
+  DB.sqlite
+    .prepare(
+      `INSERT INTO edge_idempotency (scope_key, response_json, created_at, status, dispatched_at)
+       VALUES ('whatsapp.send:stale-cas-key-02', '', ?, 'pending', ?)`
+    )
+    .run(nowIso, state.nowMs - 17_999);
+  const tooEarly = await sendWa('stale-cas-key-02');
+  assert.equal(tooEarly.status, 409, '17,999ms < 18,000ms must remain locked in-flight');
+  assert.equal(state.metaCalls, 0);
+
+  state.nowMs += 1;
+  const [cas1, cas2] = await Promise.all([sendWa('stale-cas-key-02'), sendWa('stale-cas-key-02')]);
+  assert.deepEqual([cas1.status, cas2.status].sort((a, b) => a - b), [200, 409], 'CAS takeover yields one 200 and one 409');
+  assert.equal(state.metaCalls, 1, 'only the single CAS winner invokes Meta');
+});
+
+test('HIGH-05 (3/5): post-upstream complete runs before local whatsapp_messages log failure and pre-upstream failure releases claim', async () => {
+  const { DB, state, sendWa } = await createHigh05Harness();
+
+  state.failNextLocalMessageInsert = true;
+  await sendWa('post-upstream-safe-03');
+  assert.equal(state.metaCalls, 1);
+  const storedAfterLogFail = DB.sqlite
+    .prepare('SELECT status, response_json FROM edge_idempotency WHERE scope_key = ?')
+    .get('whatsapp.send:post-upstream-safe-03');
+  assert.equal(storedAfterLogFail?.status, 'completed', 'idempotency must be completed before local log insert');
+
+  const retryAfterLogFail = await sendWa('post-upstream-safe-03');
+  assert.equal(retryAfterLogFail.status, 200);
+  const retryBody = await retryAfterLogFail.json();
+  assert.equal(retryBody.deduplicated, true);
+  assert.equal(retryBody.providerMessageId, 'wamid.race.1');
+  assert.equal(state.metaCalls, 1, 'retry after local log failure must NEVER send a duplicate WhatsApp message');
+
+  const rejectedPre = await sendWa('pre-fail-release-04', '+201011112222');
+  assert.equal(rejectedPre.status, 403);
+  const pendingLeft = DB.sqlite
+    .prepare('SELECT status FROM edge_idempotency WHERE scope_key = ?')
+    .get('whatsapp.send:pre-fail-release-04');
+  assert.equal(pendingLeft, undefined, 'pre-upstream failure must delete pending claim');
+});
+
+test('HIGH-05 (4/5): cross-scope isolation allows same Idempotency-Key across whatsapp.send and calendar.create', async () => {
+  const { env, state, authHeaders, sendWa } = await createHigh05Harness({ seedGoogle: true });
+
+  const waRes = await sendWa('shared-key-across-scopes');
+  assert.equal(waRes.status, 200);
+  assert.equal(state.metaCalls, 1);
+
+  const calRes = await worker.fetch(
+    new Request('https://celia.workers.dev/api/google/calendar/events', {
+      method: 'POST',
+      headers: { ...authHeaders, 'idempotency-key': 'shared-key-across-scopes' },
+      body: JSON.stringify({ summary: 'موعد مستقل', start: '2026-10-31T10:00:00Z', end: '2026-10-31T10:30:00Z' })
+    }),
+    env
+  );
+  assert.equal(calRes.status, 201);
+  assert.equal(state.calCalls, 1);
+});
+
+test('HIGH-05 (5/5): inbound WhatsApp webhook deduplicates concurrent identical wamid atomically via INSERT OR IGNORE', async () => {
+  const { env, state } = await createHigh05Harness();
+
+  const rawWh = JSON.stringify({
+    entry: [{ changes: [{ value: { messages: [{ id: 'wamid.concurrent.in.1', from: '201099998888', type: 'text', text: { body: 'سؤال متزامن' } }] } }] }]
+  });
+  const makeWh = () =>
+    worker.fetch(
+      new Request('https://celia.workers.dev/webhooks/whatsapp', {
+        method: 'POST',
+        headers: { 'x-hub-signature-256': signMetaBody(rawWh) },
+        body: rawWh
+      }),
+      env
+    );
+  const [wh1, wh2] = await Promise.all([makeWh(), makeWh()]);
+  const [b1, b2] = await Promise.all([wh1.json(), wh2.json()]);
+  assert.equal(b1.processed + b2.processed, 1, 'atomic INSERT OR IGNORE processes inbound message once');
+  assert.equal(b1.duplicates + b2.duplicates, 1, 'concurrent duplicate delivery is counted as duplicate');
+  assert.equal(state.metaCalls, 1, 'auto-reply outbound message is sent once, not twice');
+});
+
+
