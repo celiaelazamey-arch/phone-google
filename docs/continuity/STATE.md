@@ -4,7 +4,9 @@
 
 **آخر مراجعة:** 29 أكتوبر 2026 · **نوع الجلسة الحالية:** **RELEASE-SIGNAL — «هل `system.html#releases` تعكس التقدّم فعلًا؟»** على `arena/afe3493a-phone-google` من `main@e99ebaf`. **الجواب:** نصفها حيّ ونصفها مجمّد — المكوّنات من `GET /api/system` الحقيقي، وسجل الإصدارات ثلاثة مداخل مكتوبة بيد في `releases/history.json` لا تتحرك إلا بترقية إصدار (`src/version.js` يرمي استثناءً عند المخالفة)، فلا شريحة من PR #93…#98 ظهرت، وGitHub يحمل إصدارًا منشورًا واحدًا (`v0.2.1`) بينما السجل يعرض ثلاثة. **الإصلاح المقيس:** [`src/progress.js`](../../src/progress.js) يقرأ قسم `Unreleased` من `CHANGELOG.md` بلا شبكة ولا نموذج، ويُضاف إلى `GET /api/releases` كحقل `unreleased`، وتعرضه الصفحة بطاقة متقطّعة `.progress-card` **ليست** بطاقة إصدار ولا تحمل تاريخًا أو وسمًا أو ادعاء نشر، وتصمت (`parsed:false`) إن غاب الملف. الاختبارات `PRG-01..07`. سجل الجلسة: [2026-10-29-release-signal](sessions/2026-10-29-release-signal.md) · الشرح التشغيلي: [§8 من دليل الإصدارات](../releases-and-recovery.md).
 
-**الجلسة السابقة:** **MANUS-GAP-PLAN — خطة إغلاق الفجوات** (PR [#99](https://github.com/celiaelazamey-arch/phone-google/pull/99) مفتوح، توثيق فقط، صفر كود): جرد 19 فجوة (G1..G19) ونقد بناء وخطة ثماني شرائح S1..S8 وستة قرارات مالك D1..D6 في [agent-web-gaps.md](../agent-web-gaps.md).
+**ملحق نفس الجلسة — مراجعة فيديو أدوات الاستطلاع (بلا كود تشغيلي):** الفيديو عرض 14 أداة OSINT؛ الناتج **§8** في [خطة الفجوات](../agent-web-gaps.md) (تصنيف كل أداة بقرار وحدّ) + **فجوة G20** (لا سياسة لمزوّدي الفهارس الخارجيين) + سجل آلي `docs/source-providers.json` و`src/source-providers.js` و`SRC-01..06`. **قرارات جوهرية:** `urlscan.io` مرشّح مشروط فقط (يزور الرابط من عنده ⇒ لا عنوان داخلي ولا رابط برمز، ورؤية `private`) ونمطه هو مواصفة الـ`sandbox` في S3؛ **`IPinfo` مرفوض في مسار الحماية** لأن تصنيف العنوان عبر طرف ثالث يسرّب كل وجهة (يعزّز G10)؛ `Grabify` مرفوض قطعًا، و`Data Dumpster` مرفوض حتى التحقق. لا مزوّد مفعّل ولا استدعاء واحد، والترتيب لم يتغيّر: **S1 أولًا**.
+
+**الجلسة السابقة:** **MANUS-GAP-PLAN — خطة إغلاق الفجوات** (PR [#99](https://github.com/celiaelazamey-arch/phone-google/pull/99) مفتوح، توثيق فقط، صفر كود): جرد 19 فجوة (G1..G19، **وG20 أُضيفت في §8**) ونقد بناء وخطة ثماني شرائح S1..S8 وستة قرارات مالك D1..D6 في [agent-web-gaps.md](../agent-web-gaps.md).
 **قبلها:** MANUS-C2aL («اجلب ولخّص من ٣ مصادر» → `main@e99ebaf`، PR #98، `DEC-062`) · C1-b/C2-a (PR #96 → `main@00a2386`) · C1-a (PR #95 → `main@97078dc`) · B4 (PR #93 → `main@acafa13`) · B3 + إنقاذ A4 + قارئ العنكبوت (PR #92 → `main@bdfbb6b`) · وما قبلها في `docs/continuity/sessions/` وروابطها في [NOW.md](NOW.md).
 **ملاحظة استمرارية:** **PR #99 مفتوح بانتظار كلمة المالك — لا دمج تلقائي** (`DEC-015`/`DEC-016`). **#97 و#94 أُغلقا كمُستبدَلين** بعد نقل كل نص فريد منهما (لا شيء ضاع).
 
@@ -14,7 +16,7 @@
 - **الإصدار:** `v0.2.1` · `schema=1` · Node `>=22`. **لا ترقية إصدار في هذه الشريحة** (ولا ترحيل، ولا جدول، ولا نوع أدلة).
 - **السلّم:** S1/A4 ✅ · S5 (M-C): C1-a ✅ · C1-b ✅ · C2-a ✅ أداةً وحلقةً · **C2-b (`web.search`) مؤجّلة** بقرار المالك · C3/C4 موقوفة على بيئة بلا Chromium هنا.
 - **التالي المقترح (لا يحتاج قرارًا):** `S1` عقد الادعاء (`claims.js` + `claim_attribution` + CL-01…CL-05) → `S2` كشف التعارض بين المصادر → `S3` تقوية الجلب (منع العناوين الداخلية **قبل** أي تفعيل حقيقي).
-- **الجودة:** **796 اختبارًا / 779 ناجحًا / 1 فشل بيئي (`MCP_TOOLS` N/N−1: كائن Git `2508893…` غير موجود في هذا الاستنساخ) / 16 skipped** وتغطية **90.88 / 76.21 / 86.92** (قبل الشريحة: 789 / 772 / 1 / 16 و90.86 / 76.15 / 86.90). الشريحة تضيف **7** اختبارات (`PRG-01..07`) و`src/progress.js` بتغطية 100/100/100. **CI على `5bad1fb`:** Node 22/24 + MySQL 8.4 + Python + RTL dashboard + container smoke = نجاح، ودعمان متخطّيان.
+- **الجودة:** **802 اختبارًا / 785 ناجحًا / 1 فشل بيئي (`MCP_TOOLS` N/N−1: كائن Git `2508893…` غير موجود في هذا الاستنساخ) / 16 skipped** وتغطية **90.90 / 76.29 / 87.01** (بداية الجلسة: 789 / 772 / 1 / 16 و90.86 / 76.15 / 86.90). الشريحة تضيف **13** اختبارًا: `PRG-01..07` (إشارة التقدّم) و`SRC-01..06` (سياسة المزوّدين)؛ `src/progress.js` 100/100/100 و`src/source-providers.js` 97.56/95/100. **CI على `5bad1fb`:** Node 22/24 + MySQL 8.4 + Python + RTL dashboard + container smoke = نجاح، ودعمان متخطّيان.
 
 ## 1. مخرَج هذه الجلسة (إشارة تقدّم حقيقية، بلا ادعاء إصدار)
 
@@ -23,6 +25,12 @@
 - **الواجهة:** `GET /api/releases` + `unreleasedSource`، وبطاقة `.progress-card` متقطّعة منفصلة عن `.release-card`؛ `RELEASE_HISTORY.length` يبقى مرجع عدد الإصدارات في الاختبارات.
 - **الصورة:** `Dockerfile` و`Dockerfile.mcp` تنسخان `CHANGELOG.md`، والغياب مُعالج.
 - **القياس اليوم:** 73 بندًا في `Unreleased` (أُضيف 63 · أُصلح 7 · حدود 3) — التقدّم كان في المصدر ولم يكن مرئيًا.
+
+## 1.b ملحق سياسة المزوّدين (فيديو الاستطلاع)
+
+- **§8** يصنّف 14 أداة: مرفوض / مؤجّل / مرشّح مشروط / مصدر بيانات / مرجع — كل واحدة بحدّها المعلن.
+- **`src/source-providers.js` + `docs/source-providers.json`:** قرارات مغلقة، كل مدخل `enabled:false`، ورفض شكلي لأي تفعيل افتراضي أو استعلام غير مالكي أو سبب فارغ أو تكرار. **حارس انحراف `SRC-06`** يفحص كود التشغيل وسير العمل وملف النشر (لا الوثائق) ويفشل إن ظهر اسم أداة مرفوضة — تحقّقتُ منه بحقن مؤقت في `src/` ثم حذفه.
+- **مستهلكه اليوم: الاختبارات فقط** — لا مزوّد يُستدعى ولا مفتاح يُقرأ؛ أول مستهلك تشغيلي S3/S4 بعد D1.
 
 ## 2. الحدود والعوائق
 
@@ -33,18 +41,20 @@
 5. **لا إنترنت حقيقي:** كل مشاهد الويب على `127.0.0.1`؛ `proxy` غير مُفعَّل في أي بيئة؛ `web.search` مؤجّلة.
 6. **العزل بلا شبكة (`DEC-060`):** `sandbox-policy.js` يرفض `network.allowlist`، وEP-11 يحرس ذلك. طبقة المحوّلات لم تُبنَ (`DEC-061`).
 7. **لا MySQL/Chromium في هذا الصندوق:** `test:mysql`/`test:browser` لم تُشغَّل.
+8. **لا مزوّد فهارس خارجي:** القائمة كلها معطّلة؛ ولا استدعاء واحد لأي مزوّد في الاختبارات ولا في التشغيل، والترتيب يبقى S1 أولًا.
 
 ## 3. الاستئناف والفحوص
 
 1. ابقَ على `arena/afe3493a-phone-google`؛ اقرأ [سجل هذه الجلسة](sessions/2026-10-29-release-signal.md) و[§8 من دليل الإصدارات](../releases-and-recovery.md) قبل تعديل `/api/releases` أو `public/system.js`.
 2. لا ترفع الإصدار في `package.json` وحدها؛ الترقية تحتاج `releases/current.json` و`history.json` و`CHANGELOG.md` معًا وإلا رمى `src/version.js`.
 3. لا تُضف بطاقة تقدّم ثانية أو قائمة إصدارات مكتوبة يدويًا في HTML؛ مصدرا الصفحة هما `/api/system` و`/api/releases`.
-4. أول فحص آمن: `node --test test/releases-progress.test.js test/operations.test.js` ثم `npm run check:continuity`.
+4. أول فحص آمن: `node --test test/releases-progress.test.js test/source-providers.test.js test/operations.test.js` ثم `npm run check:continuity`.
+4.b لا تُضف مزوّدًا إلى قائمة سماح أو تهيئة قبل تعديل `docs/source-providers.json` بقرار مكتوب (`SRC-06` سيفشل).
 5. دمج PR #99 ليس تلقائيًا؛ ينتظر كلمة المالك.
 
 ```sh
 git branch --show-current && git status --short && git log -3 --oneline
-node --test test/releases-progress.test.js test/operations.test.js test/r0-continuity-2026.test.js
+node --test test/releases-progress.test.js test/source-providers.test.js test/operations.test.js test/r0-continuity-2026.test.js
 npm run check && npm run now && npm run now:check && npm run check:continuity && npm run check:secrets
 npm run test:coverage
 ```
