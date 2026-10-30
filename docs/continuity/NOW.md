@@ -12,23 +12,23 @@
 ## 2. التركيز النشط وسجل الحالة ([STATE.md](STATE.md))
 
 - **آخر مراجعة مسجّلة:** 30 أكتوبر 2026
-- **الجلسة النشطة:** P0-SECURITY-HOTFIX — إصلاح حقن أوامر `workflow_dispatch` واستقرار خزنة MySQL وإقلاع الوكيل ووسيط الخروج (`CRIT-01..04`, `LOW-02`) على `arena/0a520cc0-phone-google` من `main@112fe71`. أُغلقت أربع ثغرات/أعطال P0 حرجة مع اختبارات فشل-قبل/نجاح-بعد (`test/workflows-static.test.js`، `test/db-pool-contract.test.js`، `test/agent-host-boot-safety.test.js`، `EP-15..17` في `test/agent-egress-proxy.test.js`، و`test/agent-routes.test.js`) وتخطي الفحص التاريخي في الاستنساخ السطحي (`test/secrets-hub.test.js`) حتى بلغ `npm run test:ci` 812 اختبارًا / 795 ناجحًا / 0 فشل / 17 skipped. `main` والإنتاج لم يُمسّا بعد (PR مفتوح للمراجعة؛ تدوير الـ28 سرًا في `service-reality.yml` واجب بعد الدمج إن استُدعي `workflow_dispatch` من غير المالك). سجل الجلسة: [2026-10-30-p0-security-and-stability-hotfix](sessions/2026-10-30-p0-security-and-stability-hotfix.md).
-- **آخر سجل جلسة مؤرَّخ:** [2026-10-30-p0-security-and-stability-hotfix](sessions/2026-10-30-p0-security-and-stability-hotfix.md)
-- **حجم [STATE.md](STATE.md) النشط:** 64 سطرًا (13319 بايت)
+- **الجلسة النشطة:** PR-2A-EDGE-SECURITY — تحصين طبقة الحافة Cloudflare Edge + D1 (`HIGH-05`, `HIGH-07`, `HIGH-02`, `DEC-063`) على `arena/e83ae32c-phone-google` متفرعًا من `main@87a357d` (عزل تام بدون أي تعديل في `src/`). أُنجزت الترحيلات المتتبَّعة عبر `_migrations` وسياسة `fail-closed` الإلزامية قبل رفع الـWorker مع ترحيل `0005_edge_idempotency_state.sql` والحجز الذري بـCAS لـ`edge_idempotency` (`HIGH-05`)، والاستهلاك الذري أحادي الاستخدام لـ`oauth_states` وتذاكر `ticket` ببادئتَي `browser:`/`link:` (`HIGH-07`)، وحظر تجاوزات SSRF للنقاط اللاحقة وصيغ IPv6 الانتقالية (`HIGH-02`)، وتوثيق `DEC-063`، حتى بلغ `npm run test:ci` 828 اختبارًا / 811 ناجحًا / 0 فشل / 17 skipped. `main` والإنتاج لم يُمسّا بعد (PR مفتوح للمراجعة دون دمج تلقائي). سجل الجلسة: [2026-10-30-pr2a-edge-security-hardening](sessions/2026-10-30-pr2a-edge-security-hardening.md) · الجلسة السابقة في نفس اليوم (دمج PR #101 → `main@87a357d`): [2026-10-30-p0-security-and-stability-hotfix](sessions/2026-10-30-p0-security-and-stability-hotfix.md).
+- **آخر سجل جلسة مؤرَّخ:** [2026-10-30-pr2a-edge-security-hardening](sessions/2026-10-30-pr2a-edge-security-hardening.md)
+- **حجم [STATE.md](STATE.md) النشط:** 64 سطرًا (13537 بايت)
 - **الأرشيف التاريخي المحفوظ بلا حذف:**
 - [STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md) — الأساس `9f6f8b2` · **983 سطرًا** محفوظًا حرفيًا (بصمة `f2674637e82e…`)
 
 ## 3. سجل القرارات المعمارية ([DECISIONS.md](DECISIONS.md))
 
-- **إجمالي القرارات المسجّلة:** 62 · **آخر قرار معتمد في السجل:** `DEC-062` · **المعرّف المتاح التالي (تحقّق قبل الحجز):** `DEC-063`
+- **إجمالي القرارات المسجّلة:** 63 · **آخر قرار معتمد في السجل:** `DEC-063` · **المعرّف المتاح التالي (تحقّق قبل الحجز):** `DEC-064`
 
 | المعرّف | العنوان المختصر |
 |---|---|
+| `DEC-063` | استبدال `fail-open` في نشر D1 بـ`fail-closed` إلزامي وجدول تتبع الترحيلات `_migrations` (`HIGH-05`) |
 | `DEC-062` | M-C/C2-a (الحلقة): «اجلب ولخّص من ٣ مصادر» تمر بالحلقة، والإسناد صار مُقاسًا لا مُعلنًا |
 | `DEC-061` | المخطط المعماري 2026 (`CELIA_AGENT_EGRESS`): اعتُمدت صيغ الإعداد والسقوف، ولم تُعتمد طبقة المحوّلات |
 | `DEC-060` | M-C/C1-b+C2-a: شبكة العزل تبقى `deny` دائمًا، والوصول إلى الويب أداة مضيف واحدة عبر الوسيط |
 | `DEC-059` | M-C/C1-a: وسيط خروج per-run كبابٍ واحد، قبل أي فتح للشبكة في العزل |
-| `DEC-058` | M-B/B4: رفع artifact مبصوم إلى Drive المالك بنفس بوابة الموافقة، وبلا نطاق OAuth جديد |
 
 ## 4. تقدّم الخطة التنفيذية 2026 ([agent-2026-execution-plan.md](../agent-2026-execution-plan.md))
 

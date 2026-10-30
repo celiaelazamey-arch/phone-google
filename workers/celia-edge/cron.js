@@ -51,11 +51,102 @@ function isDisallowedIpv4(host) {
   return false;
 }
 
+function parseIpv6Words(input) {
+  let addr = input;
+  let tailWords = [];
+  const lastColon = addr.lastIndexOf(':');
+  if (lastColon !== -1 && addr.slice(lastColon + 1).includes('.')) {
+    const v4Part = addr.slice(lastColon + 1);
+    const v4Match = v4Part.match(/^(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})$/);
+    if (!v4Match) return null;
+    const octets = v4Match.slice(1).map(Number);
+    if (octets.some((n) => n < 0 || n > 255)) return null;
+    tailWords = [(octets[0] << 8) | octets[1], (octets[2] << 8) | octets[3]];
+    addr = addr.slice(0, lastColon);
+    if (addr.endsWith(':')) addr += '0';
+  }
+
+  const dblParts = addr.split('::');
+  if (dblParts.length > 2) return null;
+  const parseSide = (side) => {
+    if (!side) return [];
+    const groups = side.split(':');
+    const out = [];
+    for (const g of groups) {
+      if (!/^[0-9a-f]{1,4}$/i.test(g)) return null;
+      out.push(parseInt(g, 16));
+    }
+    return out;
+  };
+
+  const targetGroups = 8 - tailWords.length;
+  if (dblParts.length === 2) {
+    const left = parseSide(dblParts[0]);
+    const right = parseSide(dblParts[1]);
+    if (!left || !right || left.length + right.length >= targetGroups) return null;
+    const zeros = new Array(targetGroups - left.length - right.length).fill(0);
+    return [...left, ...zeros, ...right, ...tailWords];
+  }
+
+  const full = parseSide(addr);
+  if (!full || full.length !== targetGroups) return null;
+  return [...full, ...tailWords];
+}
+
+function isDisallowedIpv6(rawIpv6) {
+  if (rawIpv6.includes('%')) return true;
+  const words = parseIpv6Words(rawIpv6);
+  if (!words || words.length !== 8) return true;
+  const [w0, w1, w2, w3, w4, w5, w6, w7] = words;
+
+  // ::/128, ::1/128, and deprecated IPv4-compatible ::/96
+  if (w0 === 0 && w1 === 0 && w2 === 0 && w3 === 0 && w4 === 0 && w5 === 0) return true;
+  // IPv4-mapped ::ffff:0:0/96
+  if (w0 === 0 && w1 === 0 && w2 === 0 && w3 === 0 && w4 === 0 && w5 === 0xffff) {
+    const dotted = `${(w6 >> 8) & 0xff}.${w6 & 0xff}.${(w7 >> 8) & 0xff}.${w7 & 0xff}`;
+    return isDisallowedIpv4(dotted);
+  }
+  // SIIT IPv4-translated ::ffff:0:0:0/96
+  if (w0 === 0 && w1 === 0 && w2 === 0 && w3 === 0 && w4 === 0xffff && w5 === 0) return true;
+  // NAT64 well-known 64:ff9b::/96 and local-use 64:ff9b:1::/48
+  if (w0 === 0x0064 && w1 === 0xff9b && ((w2 === 0 && w3 === 0 && w4 === 0 && w5 === 0) || w2 === 0x0001)) {
+    return true;
+  }
+  // Discard-only 100::/64
+  if (w0 === 0x0100 && w1 === 0 && w2 === 0 && w3 === 0) return true;
+  // Special IETF 2001:: ranges: Teredo (2001:0::/32), Benchmarking (2001:2::/48), ORCHID/v2 (2001:10::/28, 2001:20::/28), Docs (2001:db8::/32)
+  if (w0 === 0x2001) {
+    if (w1 === 0x0000 || w1 === 0x0db8) return true;
+    if (w1 === 0x0002 && w2 === 0x0000) return true;
+    if ((w1 & 0xfff0) === 0x0010 || (w1 & 0xfff0) === 0x0020) return true;
+  }
+  // 6to4 transitional 2002::/16
+  if (w0 === 0x2002) return true;
+  // ISATAP interface identifier (*:0000:5efe:w6:w7 or *:0200:5efe:w6:w7)
+  if ((w4 === 0x0000 || w4 === 0x0200) && w5 === 0x5efe) return true;
+  // Unique-local fc00::/7, link-local fe80::/10, deprecated site-local fec0::/10, multicast ff00::/8
+  if ((w0 & 0xfe00) === 0xfc00) return true;
+  if ((w0 & 0xffc0) === 0xfe80 || (w0 & 0xffc0) === 0xfec0) return true;
+  if ((w0 & 0xff00) === 0xff00) return true;
+
+  return false;
+}
+
 export function isDisallowedTargetHost(rawHostname) {
   const raw = String(rawHostname || '').trim().toLowerCase();
   if (!raw) return true;
-  const host = raw.startsWith('[') && raw.endsWith(']') ? raw.slice(1, -1) : raw;
+  const unwrapped = raw.startsWith('[') && raw.endsWith(']') ? raw.slice(1, -1) : raw;
+  if (!unwrapped || unwrapped.includes('[') || unwrapped.includes(']')) return true;
+
+  if (unwrapped.includes(':')) {
+    return isDisallowedIpv6(unwrapped);
+  }
+
+  const hadTrailingDot = unwrapped.endsWith('.');
+  if (unwrapped.startsWith('.') || unwrapped.includes('..')) return true;
+  const host = unwrapped.replace(/\.+$/, '');
   if (!host) return true;
+
   if (
     host === 'localhost' ||
     host.endsWith('.localhost') ||
@@ -66,37 +157,16 @@ export function isDisallowedTargetHost(rawHostname) {
   ) {
     return true;
   }
-  if (/^\d+$/.test(host) || /^0x[0-9a-f]+$/i.test(host)) {
-    return true;
-  }
-  if (isDisallowedIpv4(host)) return true;
 
-  if (host.includes(':')) {
-    const normalized = host.split('%')[0];
-    if (normalized === '::' || normalized === '::1' || normalized === '0:0:0:0:0:0:0:1' || normalized === '0:0:0:0:0:0:0:0') {
+  const labels = host.split('.');
+  if (labels.every((label) => /^(?:\d+|0x[0-9a-f]+)$/i.test(label))) {
+    if (hadTrailingDot) return true;
+    if (!/^(?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}$/.test(host)) {
       return true;
     }
-    if (/^f[cd][0-9a-f]{2}:/i.test(normalized) || /^f[cd][0-9a-f]{0,2}$/i.test(normalized.split(':')[0])) {
-      return true;
-    }
-    if (/^fe[89ab][0-9a-f]:/i.test(normalized)) {
-      return true;
-    }
-    if (/^ff[0-9a-f]{2}:/i.test(normalized)) {
-      return true;
-    }
-    const v4MappedDotted = normalized.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i);
-    if (v4MappedDotted) {
-      return isDisallowedIpv4(v4MappedDotted[1]);
-    }
-    const v4MappedHex = normalized.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i);
-    if (v4MappedHex) {
-      const hi = parseInt(v4MappedHex[1], 16);
-      const lo = parseInt(v4MappedHex[2], 16);
-      const dotted = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
-      return isDisallowedIpv4(dotted);
-    }
+    return isDisallowedIpv4(host);
   }
+
   return false;
 }
 

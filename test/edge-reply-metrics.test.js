@@ -19,7 +19,7 @@ import { EDGE_MAX_OUTPUT_TOKENS, generateEdgeAiReply } from '../workers/celia-ed
 import * as edgeMetrics from '../workers/celia-edge/reply-metrics.js';
 import * as expressMetrics from '../src/reply-metrics.js';
 import { generateWhatsAppReplyDetailed, GEMINI_MAX_OUTPUT_TOKENS } from '../src/gemini.js';
-import { collectWorkerModules, loadAllMigrationsSql, splitSqlStatements } from '../scripts/deploy-cloudflare-edge.mjs';
+import { applyVersionedMigrations, collectWorkerModules, loadAllMigrationsSql, splitSqlStatements } from '../scripts/deploy-cloudflare-edge.mjs';
 
 const OWNER_TOKEN = 'edge-owner-token-'.padEnd(48, 'm');
 const WA_SECRET = 'meta-webhook-secret-metrics';
@@ -314,17 +314,29 @@ test('RM-05 metrics never break the reply path: broken DB → ok:false, duplicat
   assert.deepEqual(await edgeMetrics.recordReplyMetric({}, base), { ok: false, reason: 'd1_not_bound' });
 });
 
-test('RM-06 the Worker upload carries reply-metrics.js (import graph) and the migrations now total 16 idempotent statements', async () => {
+test('RM-06 the Worker upload carries reply-metrics.js (import graph) and versioned migrations (20 statements across 0001..0005) re-apply cleanly via _migrations', async () => {
   const modules = await collectWorkerModules();
   const names = modules.map((m) => m.name ?? m.fileName ?? m.path ?? m).map(String);
   assert.ok(names.some((n) => n.endsWith('reply-metrics.js')), `reply-metrics.js is in the bundle: ${names.join(', ')}`);
   const statements = splitSqlStatements(await loadAllMigrationsSql());
-  assert.equal(statements.length, 16);
+  assert.equal(statements.length, 20);
   assert.ok(statements.some((s) => /CREATE TABLE IF NOT EXISTS whatsapp_reply_metrics/.test(s)));
-  assert.ok(statements.every((s) => !/^ALTER TABLE/i.test(s.trim())), 'no non-idempotent ALTER in a migration that is re-applied on every deploy');
-  // Re-applying everything twice must be a no-op (the deploy does exactly that).
+
+  // Re-applying everything twice via applyVersionedMigrations must succeed with _migrations skipping already-applied files.
   const sqlite = new DatabaseSync(':memory:');
-  for (const statement of statements) sqlite.exec(statement);
-  for (const statement of statements) sqlite.exec(statement);
+  const d1Fetch = async (_url, init = {}) => {
+    const { sql, params = [] } = JSON.parse(init.body);
+    const stmt = sqlite.prepare(sql);
+    if (/^\s*(?:SELECT|PRAGMA)\b/i.test(sql)) {
+      return new Response(JSON.stringify({ success: true, result: [{ success: true, results: stmt.all(...params) }] }), { status: 200 });
+    }
+    const info = stmt.run(...params);
+    return new Response(JSON.stringify({ success: true, result: [{ success: true, meta: { changes: info.changes } }] }), { status: 200 });
+  };
+  const first = await applyVersionedMigrations({ accountId: 'acc', apiToken: 'tok', databaseId: 'db', databaseCreated: true, fetchImpl: d1Fetch, retryDelayMs: 1 });
+  const second = await applyVersionedMigrations({ accountId: 'acc', apiToken: 'tok', databaseId: 'db', databaseCreated: false, fetchImpl: d1Fetch, retryDelayMs: 1 });
+  assert.equal(first.statements, 20);
+  assert.equal(second.statements, 0);
+  assert.equal(second.skippedFiles, 5);
   assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name = 'whatsapp_reply_metrics'").get().n, 1);
 });

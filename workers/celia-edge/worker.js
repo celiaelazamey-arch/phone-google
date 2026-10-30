@@ -2,6 +2,7 @@ import { createStateStore, isD1Bound, probeDurability } from './state.js';
 import {
   EDGE_MCP_TOOLS,
   buildEdgeLiveStatus,
+  consumeEdgeConsentTicket,
   createEdgeGoogleAuthUrl,
   disconnectEdgeGoogle,
   edgeCalendarCreate,
@@ -19,7 +20,6 @@ import {
   handleWhatsAppWebhookGet,
   handleWhatsAppWebhookPost,
   searchEdgeSkills,
-  verifyEdgeConsentTicket,
   recordEdgeReplyMetric,
   EDGE_MAX_OUTPUT_TOKENS
 } from './runtime.js';
@@ -319,6 +319,7 @@ async function handleCronIntents({ request, env, pathname, baseHeaders, fetchImp
 export default {
   async fetch(request, env = {}) {
     const fetchImpl = typeof env?.__FETCH_IMPL === 'function' ? env.__FETCH_IMPL : globalThis.fetch;
+    const now = typeof env?.__NOW === 'function' ? env.__NOW : () => new Date();
     const baseHeaders = corsHeaders(request, env);
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: baseHeaders });
@@ -485,7 +486,7 @@ export default {
       }
       if (request.method === 'POST') {
         try {
-          const result = await handleWhatsAppWebhookPost({ request, env, origin: url.origin, fetchImpl });
+          const result = await handleWhatsAppWebhookPost({ request, env, origin: url.origin, fetchImpl, now });
           return jsonResponse(result.body, result.status, baseHeaders);
         } catch (err) {
           return runtimeErrorResponse(err, baseHeaders);
@@ -500,7 +501,7 @@ export default {
         return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
       }
       try {
-        const result = await handleGoogleOAuthCallback({ request, url, env, fetchImpl });
+        const result = await handleGoogleOAuthCallback({ request, url, env, fetchImpl, now });
         if (result.html) {
           return new Response(result.html, {
             status: result.status,
@@ -517,27 +518,27 @@ export default {
       }
     }
 
-    // Google OAuth2 browser start: accepts either Bearer owner token OR a short-lived signed `ticket` query param.
+    // Google OAuth2 browser start: accepts either Bearer owner token OR a short-lived single-use signed `ticket`.
     if (pathname === '/auth/google') {
       if (request.method !== 'GET') {
         return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
       }
       const ticket = url.searchParams.get('ticket') || '';
       let authorizedUserId = 'owner';
-      if (ticket) {
-        const verified = await verifyEdgeConsentTicket(env, ticket);
-        if (!verified.ok) {
-          return jsonResponse({ error: verified.reason }, 401, baseHeaders);
-        }
-        authorizedUserId = verified.userId;
-      } else {
-        const auth = await verifyBearer(request, env);
-        if (!auth.ok) {
-          return jsonResponse({ error: auth.error }, auth.status, baseHeaders);
-        }
-      }
       try {
-        const consent = await createEdgeGoogleAuthUrl({ env, origin: url.origin, userId: authorizedUserId });
+        if (ticket) {
+          const consumed = await consumeEdgeConsentTicket({ env, ticket, now });
+          if (!consumed.ok) {
+            return jsonResponse({ error: consumed.error }, consumed.status, baseHeaders);
+          }
+          authorizedUserId = consumed.userId;
+        } else {
+          const auth = await verifyBearer(request, env);
+          if (!auth.ok) {
+            return jsonResponse({ error: auth.error }, auth.status, baseHeaders);
+          }
+        }
+        const consent = await createEdgeGoogleAuthUrl({ env, origin: url.origin, userId: authorizedUserId, mode: 'browser', now });
         return new Response(null, {
           status: 302,
           headers: {
@@ -595,7 +596,8 @@ export default {
           env,
           origin: url.origin,
           release,
-          fetchImpl
+          fetchImpl,
+          now
         });
         if (rpc.status === 202 || rpc.payload === null) {
           return new Response(null, { status: 202, headers: baseHeaders });
@@ -610,7 +612,7 @@ export default {
         return methodNotAllowedResponse(['GET', 'POST', 'OPTIONS'], baseHeaders);
       }
       try {
-        const consent = await createEdgeGoogleAuthUrl({ env, origin: url.origin, userId: 'owner' });
+        const consent = await createEdgeGoogleAuthUrl({ env, origin: url.origin, userId: 'owner', mode: 'link', now });
         return jsonResponse(
           {
             ok: true,
@@ -683,7 +685,8 @@ export default {
               end: parsed.data?.end,
               timeZone: parsed.data?.timeZone,
               idempotencyKey: idem,
-              fetchImpl
+              fetchImpl,
+              now
             }),
             201,
             baseHeaders
@@ -746,7 +749,8 @@ export default {
             phone: parsed.data?.phone,
             text: parsed.data?.text,
             idempotencyKey: idem,
-            fetchImpl
+            fetchImpl,
+            now
           }),
           200,
           baseHeaders

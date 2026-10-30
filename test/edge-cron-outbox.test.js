@@ -10,7 +10,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import worker from '../workers/celia-edge/worker.js';
-import { canonicalJson, hashPayload, sanitizeJobDetails } from '../workers/celia-edge/cron.js';
+import { canonicalJson, hashPayload, isDisallowedTargetHost, sanitizeJobDetails } from '../workers/celia-edge/cron.js';
 import { createStateStore } from '../workers/celia-edge/state.js';
 import { loadAllMigrationsSql, splitSqlStatements } from '../scripts/deploy-cloudflare-edge.mjs';
 
@@ -401,4 +401,94 @@ test('a row edited behind the owner\'s back is refused as tampered before any di
   assert.equal(approve.json.error, 'post_approval_payload_tampered');
   assert.equal(upstream.calls.length, 0);
   assert.equal(canonicalJson({ b: 1, a: [2, { d: null, c: 'x' }] }), '{"a":[2,{"c":"x","d":null}],"b":1}');
+});
+
+test('HIGH-02 (1/4): trailing-dot FQDN and trailing-dot IPv4 SSRF bypasses are refused', () => {
+  const trailingDotBlocked = [
+    'localhost.',
+    'localhost..',
+    'api.localhost.',
+    'metadata.google.internal.',
+    'metadata.',
+    'service.internal.',
+    'printer.local.',
+    '127.0.0.1.',
+    '169.254.169.254.',
+    '10.0.0.8.',
+    '.',
+    '..'
+  ];
+  for (const host of trailingDotBlocked) {
+    assert.equal(isDisallowedTargetHost(host), true, `trailing-dot host ${JSON.stringify(host)} must be blocked`);
+  }
+});
+
+test('HIGH-02 (2/4): transitional, non-canonical, and reserved IPv6 SSRF forms (NAT64, 6to4, Teredo, SIIT, IPv4-compatible, zone IDs) are refused', () => {
+  const ipv6Blocked = [
+    '[::0:1]',
+    '0:0:0:0:0:0:0000:1',
+    '::127.0.0.1',
+    '::7f00:1',
+    '::a9fe:a9fe',
+    '::ffff:0:127.0.0.1',
+    '::ffff:0:7f00:1',
+    '64:ff9b::169.254.169.254',
+    '64:ff9b::7f00:1',
+    '64:ff9b:1::1',
+    '2002:7f00:0001::1',
+    '2002:a9fe:a9fe::1',
+    '2001:0000:4136:e378:8000:63bf:3fff:fdd2',
+    '2001:0::1',
+    '2001:db8::1',
+    '2001:2::1',
+    '2001:10::1',
+    '2001:20::1',
+    '100::1',
+    '2001:470::0:5efe:127.0.0.1',
+    '[2606:4700::1%25eth0]',
+    '2606:4700::1%eth0',
+    'invalid:ipv6:::1'
+  ];
+  for (const host of ipv6Blocked) {
+    assert.equal(isDisallowedTargetHost(host), true, `transitional/reserved IPv6 ${JSON.stringify(host)} must be blocked`);
+  }
+});
+
+test('HIGH-02 (3/4): shorthand, octal, and hex IPv4 SSRF notations are refused while public targets remain allowed', () => {
+  for (const badV4 of ['127.1', '10.1', '169.254.1', '0177.0.0.1', '0x7f.0.0.1', '93.184.216.34.']) {
+    assert.equal(isDisallowedTargetHost(badV4), true, `alternate IPv4 ${JSON.stringify(badV4)} must be blocked`);
+  }
+  for (const pub of ['api.cron-job.org', 'example.com', 'example.com.', '93.184.216.34', '2606:4700:4700::1111', '[2606:4700:4700::1111]']) {
+    assert.equal(isDisallowedTargetHost(pub), false, `public target ${JSON.stringify(pub)} must remain allowed`);
+  }
+});
+
+test('HIGH-02 (4/4): Edge /api/cron/intents and /api/cron/jobs reject trailing-dot FQDN and transitional IPv6 URLs with 422 before D1 storage', async () => {
+  const { env } = await makeEnv();
+  const bypassUrls = [
+    'https://localhost./hook',
+    'https://metadata.google.internal./computeMetadata/v1/',
+    'https://[64:ff9b::169.254.169.254]/latest/meta-data/',
+    'https://[2002:7f00:0001::1]/admin',
+    'https://[::0:1]/internal'
+  ];
+
+  for (let i = 0; i < bypassUrls.length; i += 1) {
+    const intentRes = await call(env, 'POST', '/api/cron/intents', {
+      body: { action: 'create', job: { ...validJob, url: bypassUrls[i] } },
+      headers: { 'idempotency-key': `high02-intent-${i}-0001` }
+    });
+    assert.equal(intentRes.status, 422, `intent must reject ${bypassUrls[i]}`);
+    assert.equal(intentRes.json.error, 'disallowed_job_url_host');
+
+    const jobRes = await call(env, 'POST', '/api/cron/jobs', {
+      body: { job: { ...validJob, url: bypassUrls[i] } },
+      headers: { 'idempotency-key': `high02-job-${i}-0001` }
+    });
+    assert.equal(jobRes.status, 422, `job must reject ${bypassUrls[i]}`);
+    assert.equal(jobRes.json.error, 'disallowed_job_url_host');
+  }
+
+  const stored = await call(env, 'GET', '/api/cron/intents');
+  assert.equal(stored.json.intents.length, 0, 'no SSRF bypass URL may enter edge_cron_outbox');
 });

@@ -29,6 +29,11 @@ export const SUPPORTED_MCP_VERSIONS = Object.freeze(['2024-11-05', '2025-03-26']
 export const CUSTOMER_WINDOW_MS = 24 * 60 * 60 * 1000;
 /** Gemini output budget for customer replies — measured by WP-1.4 (`whatsapp_reply_metrics`) before it is ever changed. */
 export const EDGE_MAX_OUTPUT_TOKENS = 220;
+export const EDGE_META_SEND_TIMEOUT_MS = 8_000;
+export const EDGE_GOOGLE_API_TIMEOUT_MS = 12_000;
+export const EDGE_IDEMPOTENCY_MARGIN_MS = 10_000;
+export const EDGE_WHATSAPP_DISPATCH_TIMEOUT_MS = EDGE_META_SEND_TIMEOUT_MS + EDGE_IDEMPOTENCY_MARGIN_MS;
+export const EDGE_CALENDAR_DISPATCH_TIMEOUT_MS = EDGE_GOOGLE_API_TIMEOUT_MS + EDGE_IDEMPOTENCY_MARGIN_MS;
 const E164_PATTERN = /^\+[1-9]\d{7,14}$/;
 const IDEMPOTENCY_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 
@@ -419,21 +424,68 @@ export async function getEdgeGoogleStatus(env, { userId = 'owner' } = {}) {
   }
 }
 
+const OAUTH_STATE_PATTERN = /^(browser|link):[0-9a-f]{64}$/;
+
+function decodeVerifiedTicketExpMs(ticket, fallbackMs) {
+  try {
+    const bodyPart = String(ticket || '').trim().split('.')[0] || '';
+    const base64 = bodyPart.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+    const payload = JSON.parse(atob(padded));
+    const expSec = Number(payload?.exp);
+    return Number.isFinite(expSec) && expSec > 0 ? expSec * 1000 : fallbackMs;
+  } catch {
+    return fallbackMs;
+  }
+}
+
+export async function consumeEdgeConsentTicket({
+  env = {},
+  ticket = '',
+  now = () => new Date()
+} = {}) {
+  const nowMs = now().getTime();
+  const verified = await verifyEdgeConsentTicket(env, ticket, { nowMs });
+  if (!verified.ok) {
+    return { ok: false, status: 401, error: verified.reason };
+  }
+  const db = requireD1(env);
+  const nowIso = new Date(nowMs).toISOString();
+  await db.prepare('DELETE FROM oauth_states WHERE expires_at <= ?').bind(nowIso).run();
+
+  const ticketKey = `ticket:${await sha256Hex(String(ticket).trim())}`;
+  const expiresIso = new Date(decodeVerifiedTicketExpMs(ticket, nowMs + 10 * 60 * 1000)).toISOString();
+  const claimRes = await db
+    .prepare('INSERT OR IGNORE INTO oauth_states (state_hash, user_id, expires_at, used_at, created_at) VALUES (?, ?, ?, ?, ?)')
+    .bind(ticketKey, verified.userId, expiresIso, nowIso, nowIso)
+    .run();
+  if ((claimRes?.meta?.changes ?? 0) !== 1) {
+    return { ok: false, status: 401, error: 'ticket_already_used' };
+  }
+  return { ok: true, userId: verified.userId };
+}
+
 export async function createEdgeGoogleAuthUrl({
   env = {},
   origin,
   userId = 'owner',
+  mode = 'link',
   now = () => new Date()
 } = {}) {
   if (!hasVal(env, 'GOOGLE_CLIENT_ID') || !hasVal(env, 'GOOGLE_CLIENT_SECRET')) {
     throw Object.assign(new Error('google_oauth_not_configured'), { status: 503 });
   }
+  if (mode !== 'browser' && mode !== 'link') {
+    throw Object.assign(new Error('invalid_oauth_state_mode'), { status: 400 });
+  }
   const db = requireD1(env);
-  const state = randomHex(32);
+  const state = `${mode}:${randomHex(32)}`;
   const stateHash = await sha256Hex(state);
   const createdAt = now().toISOString();
   const expiresAt = new Date(now().getTime() + 10 * 60 * 1000).toISOString();
   const redirectUri = resolveGoogleRedirectUri(env, origin);
+
+  await db.prepare('DELETE FROM oauth_states WHERE expires_at <= ?').bind(createdAt).run();
 
   await db
     .prepare('INSERT INTO app_users (id, email, phone_e164, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO NOTHING')
@@ -468,7 +520,11 @@ function parseCookieHeader(cookieHeader, name) {
   for (const part of raw.split(';')) {
     const trimmed = part.trim();
     if (trimmed.startsWith(`${name}=`)) {
-      return decodeURIComponent(trimmed.slice(name.length + 1));
+      try {
+        return decodeURIComponent(trimmed.slice(name.length + 1));
+      } catch {
+        return '';
+      }
     }
   }
   return '';
@@ -490,28 +546,38 @@ export async function handleGoogleOAuthCallback({
   if (!code || !state) {
     return { status: 400, body: { error: 'missing_oauth_code_or_state' } };
   }
+  if (!OAUTH_STATE_PATTERN.test(state)) {
+    return { status: 400, body: { error: 'invalid_or_expired_oauth_state' } };
+  }
 
   const cookieState = parseCookieHeader(request.headers.get('cookie'), 'celia_oauth_state');
-  if (cookieState && !(await constantTimeEqualAsync(cookieState, state))) {
+  if (state.startsWith('browser:')) {
+    if (!cookieState || !(await constantTimeEqualAsync(cookieState, state))) {
+      return { status: 400, body: { error: 'oauth_state_cookie_mismatch' } };
+    }
+  } else if (cookieState && !(await constantTimeEqualAsync(cookieState, state))) {
     return { status: 400, body: { error: 'oauth_state_cookie_mismatch' } };
   }
 
   const stateHash = await sha256Hex(state);
-  const row = await db
-    .prepare('SELECT state_hash, user_id, expires_at, used_at FROM oauth_states WHERE state_hash = ?')
-    .bind(stateHash)
-    .first();
-
   const nowIso = now().toISOString();
-  if (!row || row.used_at || Date.parse(row.expires_at) <= now().getTime()) {
+
+  // Atomically consume single-use state in D1 BEFORE external token exchange (prevents concurrent callback TOCTOU).
+  const consumeRes = await db
+    .prepare('UPDATE oauth_states SET used_at = ? WHERE state_hash = ? AND used_at IS NULL AND expires_at > ?')
+    .bind(nowIso, stateHash, nowIso)
+    .run();
+  if ((consumeRes?.meta?.changes ?? 0) !== 1) {
     return { status: 400, body: { error: 'invalid_or_expired_oauth_state' } };
   }
 
-  // Mark state consumed immediately before external token exchange (single-use enforcement).
-  await db
-    .prepare('UPDATE oauth_states SET used_at = ? WHERE state_hash = ? AND used_at IS NULL')
-    .bind(nowIso, stateHash)
-    .run();
+  const row = await db
+    .prepare('SELECT user_id FROM oauth_states WHERE state_hash = ?')
+    .bind(stateHash)
+    .first();
+  if (!row?.user_id) {
+    return { status: 400, body: { error: 'invalid_or_expired_oauth_state' } };
+  }
 
   const redirectUri = resolveGoogleRedirectUri(env, url.origin);
   const tokenRes = await fetchImpl('https://oauth2.googleapis.com/token', {
@@ -774,25 +840,77 @@ export async function edgeCalendarList({ env, days = 7, timeMin = null, timeMax 
   return { events };
 }
 
-async function withEdgeIdempotency(env, scope, idempotencyKey, compute, now = () => new Date()) {
+async function withEdgeIdempotency(env, scope, idempotencyKey, compute, optionsOrNow = {}) {
   if (!idempotencyKey) return compute();
   const cleanKey = String(idempotencyKey).trim();
   if (!IDEMPOTENCY_PATTERN.test(cleanKey)) {
     throw Object.assign(new Error('invalid_idempotency_key'), { status: 400 });
   }
+  const now = typeof optionsOrNow === 'function' ? optionsOrNow : optionsOrNow?.now || (() => new Date());
+  const dispatchTimeoutMs =
+    typeof optionsOrNow === 'object' && optionsOrNow !== null && Number.isFinite(optionsOrNow.dispatchTimeoutMs)
+      ? optionsOrNow.dispatchTimeoutMs
+      : EDGE_WHATSAPP_DISPATCH_TIMEOUT_MS;
+
   const db = requireD1(env);
   const scopeKey = `${scope}:${cleanKey}`;
-  const cached = await db
-    .prepare('SELECT response_json FROM edge_idempotency WHERE scope_key = ?')
-    .bind(scopeKey)
-    .first();
-  if (cached?.response_json) {
-    return { ...JSON.parse(cached.response_json), deduplicated: true };
+  const nowDate = now();
+  const nowIso = nowDate.toISOString();
+  const nowMs = nowDate.getTime();
+  let claimDispatchedAt = nowMs;
+
+  const insertRes = await db
+    .prepare(
+      'INSERT INTO edge_idempotency (scope_key, response_json, created_at, status, dispatched_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(scope_key) DO NOTHING'
+    )
+    .bind(scopeKey, '', nowIso, 'pending', claimDispatchedAt)
+    .run();
+
+  if ((insertRes?.meta?.changes ?? 0) === 0) {
+    const row = await db
+      .prepare('SELECT status, response_json, dispatched_at FROM edge_idempotency WHERE scope_key = ?')
+      .bind(scopeKey)
+      .first();
+
+    // Always inspect row.status BEFORE calling JSON.parse(row.response_json) — pending rows store ''
+    if (row?.status === 'completed') {
+      return { ...JSON.parse(row.response_json), deduplicated: true };
+    }
+    if (row?.status === 'pending') {
+      const prevDispatchedAt = Number(row.dispatched_at ?? 0);
+      if (nowMs - prevDispatchedAt < dispatchTimeoutMs) {
+        throw Object.assign(new Error('idempotency_conflict_in_progress'), { status: 409 });
+      }
+      claimDispatchedAt = Math.max(nowMs, prevDispatchedAt + 1);
+      const casRes = await db
+        .prepare(
+          'UPDATE edge_idempotency SET dispatched_at = ?, created_at = ? WHERE scope_key = ? AND status = ? AND dispatched_at = ?'
+        )
+        .bind(claimDispatchedAt, nowIso, scopeKey, 'pending', prevDispatchedAt)
+        .run();
+      if ((casRes?.meta?.changes ?? 0) !== 1) {
+        throw Object.assign(new Error('idempotency_conflict_in_progress'), { status: 409 });
+      }
+      console.warn('edge_idempotency_stale_takeover', scopeKey);
+    } else {
+      throw Object.assign(new Error('idempotency_conflict_in_progress'), { status: 409 });
+    }
   }
-  const fresh = await compute();
+
+  let fresh;
+  try {
+    fresh = await compute();
+  } catch (err) {
+    await db
+      .prepare('DELETE FROM edge_idempotency WHERE scope_key = ? AND status = ? AND dispatched_at = ?')
+      .bind(scopeKey, 'pending', claimDispatchedAt)
+      .run();
+    throw err;
+  }
+
   await db
-    .prepare('INSERT OR IGNORE INTO edge_idempotency (scope_key, response_json, created_at) VALUES (?, ?, ?)')
-    .bind(scopeKey, JSON.stringify(fresh), now().toISOString())
+    .prepare('UPDATE edge_idempotency SET status = ?, response_json = ? WHERE scope_key = ?')
+    .bind('completed', JSON.stringify(fresh), scopeKey)
     .run();
   return fresh;
 }
@@ -834,7 +952,8 @@ export async function edgeCalendarCreate({
             start: { dateTime: new Date(startMs).toISOString(), timeZone: tz },
             end: { dateTime: new Date(endMs).toISOString(), timeZone: tz }
           },
-          fetchImpl
+          fetchImpl,
+          timeoutMs: EDGE_GOOGLE_API_TIMEOUT_MS
         }
       );
       return {
@@ -845,7 +964,7 @@ export async function edgeCalendarCreate({
         htmlLink: created.htmlLink || null
       };
     },
-    now
+    { now, dispatchTimeoutMs: EDGE_CALENDAR_DISPATCH_TIMEOUT_MS }
   );
 }
 
@@ -989,7 +1108,7 @@ async function callMetaSendText({ env, phone, text, fetchImpl = globalThis.fetch
         type: 'text',
         text: { preview_url: false, body: String(text).trim() }
       }),
-      signal: AbortSignal.timeout(10_000)
+      signal: AbortSignal.timeout(EDGE_META_SEND_TIMEOUT_MS)
     }
   );
   const data = await res.json().catch(() => ({}));
@@ -1019,12 +1138,12 @@ export async function edgeWhatsAppSendText({
     throw Object.assign(new Error('whatsapp_disabled'), { status: 503 });
   }
 
-  return withEdgeIdempotency(
+  const db = requireD1(env);
+  const outcome = await withEdgeIdempotency(
     env,
     'whatsapp.send',
     idempotencyKey,
     async () => {
-      const db = requireD1(env);
       const contact = await db
         .prepare('SELECT opted_in, last_inbound_at FROM whatsapp_contacts WHERE phone_e164 = ?')
         .bind(normalized)
@@ -1037,17 +1156,27 @@ export async function edgeWhatsAppSendText({
       }
       const providerMessageId = await callMetaSendText({ env, phone: normalized, text: cleanText, fetchImpl });
       const at = now().toISOString();
+      return { ok: true, phone: normalized, providerMessageId, sentAt: at };
+    },
+    { now, dispatchTimeoutMs: EDGE_WHATSAPP_DISPATCH_TIMEOUT_MS }
+  );
+
+  // HIGH-05 invariant: idempotency is already committed `completed` BEFORE local DB logging.
+  // A local whatsapp_messages INSERT failure must never revert idempotency or cause a duplicate send.
+  if (!outcome.deduplicated) {
+    try {
       await db
         .prepare(
           'INSERT OR IGNORE INTO whatsapp_messages (provider_message_id, phone_e164, direction, message_type, body, status, created_at) ' +
           'VALUES (?, ?, ?, ?, ?, ?, ?)'
         )
-        .bind(providerMessageId, normalized, 'outbound', 'text', cleanText, 'sent', at)
+        .bind(outcome.providerMessageId, normalized, 'outbound', 'text', cleanText, 'sent', outcome.sentAt)
         .run();
-      return { ok: true, phone: normalized, providerMessageId, sentAt: at };
-    },
-    now
-  );
+    } catch (logErr) {
+      console.warn('edge_whatsapp_local_log_failed', logErr?.message || 'd1_error');
+    }
+  }
+  return outcome;
 }
 
 function extractWhatsAppInboundMessages(payload) {
@@ -1116,22 +1245,17 @@ export async function handleWhatsAppWebhookPost({
   let duplicates = 0;
 
   for (const msg of extractWhatsAppInboundMessages(payload)) {
-    const existing = await db
-      .prepare('SELECT id FROM whatsapp_messages WHERE provider_message_id = ?')
-      .bind(msg.id)
-      .first();
-    if (existing) {
-      duplicates += 1;
-      continue;
-    }
-
-    await db
+    const insertRes = await db
       .prepare(
         'INSERT OR IGNORE INTO whatsapp_messages (provider_message_id, phone_e164, direction, message_type, body, status, created_at) ' +
         'VALUES (?, ?, ?, ?, ?, ?, ?)'
       )
       .bind(msg.id, msg.from, 'inbound', msg.type, msg.body, 'received', at)
       .run();
+    if ((insertRes?.meta?.changes ?? 0) === 0) {
+      duplicates += 1;
+      continue;
+    }
 
     await db
       .prepare(
