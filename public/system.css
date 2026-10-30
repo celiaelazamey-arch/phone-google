@@ -656,6 +656,44 @@ h1 > span {
   border-color: #3c6b56;
   background: linear-gradient(125deg, #101b21, #13272066);
 }
+/* بطاقة التقدّم ليست إصدارًا: ليست في releases/history.json ولا تحمل تاريخًا أو وسمًا. */
+.progress-card {
+  border: 1px dashed #3d4d59;
+  border-radius: 10px;
+  padding: 24px;
+  background: #0e161c;
+  position: relative;
+}
+.progress-badge {
+  font-size: 9px;
+  padding: 2px 8px;
+  border: 1px solid #6d5a3a;
+  border-radius: 4px;
+  color: #d9b978;
+  background: #2a211566;
+}
+.progress-card ul {
+  padding: 0;
+  list-style: none;
+  margin: 16px 0;
+}
+.progress-card li {
+  font-size: 11px;
+  color: #849fa9;
+  display: flex;
+  gap: 9px;
+  margin: 6px 0;
+}
+.progress-card li::before {
+  content: "…";
+  color: #d9b978;
+}
+.progress-card .release-name {
+  color: #a8bcc4;
+}
+.progress-card .release-meta {
+  color: #8ba4ac;
+}
 .release-head {
   display: flex;
   align-items: center;

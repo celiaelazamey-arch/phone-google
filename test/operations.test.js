@@ -180,6 +180,11 @@ test("public sandbox cannot spend owner provider keys; owner diagnostics require
       r.json(),
     );
     assert.equal(catalogue.publication, "catalog-only");
+    // التقدّم بعد آخر إصدار يُقرأ من CHANGELOG.md، لا من قائمة مكتوبة بيد.
+    assert.equal(catalogue.unreleasedSource, "CHANGELOG.md#Unreleased");
+    assert.equal(catalogue.unreleased.parsed, true);
+    assert.ok(Number.isInteger(catalogue.unreleased.items));
+    assert.ok(Object.hasOwn(catalogue.unreleased.sections, "added"));
   } finally {
     globalThis.fetch = native;
     await server.close();
