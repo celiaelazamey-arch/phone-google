@@ -1,0 +1,164 @@
+{
+  "version": 1,
+  "updated": "2026-10-29",
+  "notice": "No external index or reconnaissance provider is enabled in this release. Every entry is data: a decision with a reason, not a capability. Enabling one needs the owner's explicit approval plus a key in the environment/keyvault.",
+  "decisions": ["candidate", "deferred", "refused", "data-source", "reference"],
+  "providers": [
+    {
+      "id": "shodan",
+      "label": "Shodan",
+      "decision": "refused",
+      "capability": "device-index",
+      "requiresKey": true,
+      "sendsQueryUpstream": true,
+      "ownerScopedOnly": true,
+      "enabled": false,
+      "reason": "Indexes other parties' exposed assets, and every query declares our own assets to a third party. It produces no citable claim, so it does not serve chat-01 (fetch + attributed snippet)."
+    },
+    {
+      "id": "leakix",
+      "label": "LeakIX",
+      "decision": "refused",
+      "capability": "exposure-index",
+      "requiresKey": true,
+      "sendsQueryUpstream": true,
+      "ownerScopedOnly": true,
+      "enabled": false,
+      "reason": "May surface other people's data; consuming, storing or summarizing it is outside the product's purpose."
+    },
+    {
+      "id": "greynoise",
+      "label": "GreyNoise",
+      "decision": "refused",
+      "capability": "scan-noise-intel",
+      "requiresKey": true,
+      "sendsQueryUpstream": true,
+      "ownerScopedOnly": true,
+      "enabled": false,
+      "reason": "A SIEM enrichment, not an agent tool. Revisit only under decision D6 (evidence sink) with a data classification."
+    },
+    {
+      "id": "publicwww",
+      "label": "PublicWWW",
+      "decision": "deferred",
+      "capability": "source-code-search",
+      "requiresKey": true,
+      "sendsQueryUpstream": true,
+      "ownerScopedOnly": true,
+      "enabled": false,
+      "reason": "Paid API. The only legitimate use is a technical fingerprint of a site the owner controls; it is not a general web search."
+    },
+    {
+      "id": "urlscan",
+      "label": "urlscan.io",
+      "decision": "candidate",
+      "capability": "isolated-url-scan",
+      "requiresKey": true,
+      "sendsQueryUpstream": true,
+      "ownerScopedOnly": true,
+      "enabled": false,
+      "opens": "S3",
+      "reason": "Its pattern (scan before you open, return screenshot and requests) is the specification for our own sandbox fetch. It visits the URL from urlscan's infrastructure, so private addresses, internal hostnames and URLs carrying tokens are refused, visibility must be private, and every scan is one evidence row."
+    },
+    {
+      "id": "criminalip",
+      "label": "Criminal IP",
+      "decision": "refused",
+      "capability": "asset-search-intel",
+      "requiresKey": true,
+      "sendsQueryUpstream": true,
+      "ownerScopedOnly": true,
+      "enabled": false,
+      "reason": "Same objection as Shodan, plus a paid risk score that invites treating a vendor's grade as evidence."
+    },
+    {
+      "id": "osint-framework",
+      "label": "OSINT Framework",
+      "decision": "reference",
+      "capability": "tool-directory",
+      "requiresKey": false,
+      "sendsQueryUpstream": false,
+      "ownerScopedOnly": true,
+      "enabled": false,
+      "reason": "A directory of links, not a provider. Useful for reading, never for calling."
+    },
+    {
+      "id": "securitytrails",
+      "label": "SecurityTrails",
+      "decision": "refused",
+      "capability": "dns-history",
+      "requiresKey": true,
+      "sendsQueryUpstream": true,
+      "ownerScopedOnly": true,
+      "enabled": false,
+      "reason": "Historical DNS of third parties. Allowed only for a domain the owner owns, during incident work, and never as an agent capability."
+    },
+    {
+      "id": "hibp",
+      "label": "Have I Been Pwned",
+      "decision": "candidate",
+      "capability": "breach-and-password-check",
+      "requiresKey": true,
+      "sendsQueryUpstream": true,
+      "ownerScopedOnly": true,
+      "enabled": false,
+      "opens": "owner-account-hygiene",
+      "reason": "Breach lookup for the owner's own address, with consent, on a paid API; Pwned Passwords range lookup is free and k-anonymous so a password never leaves the process. Checking someone else's address is refused."
+    },
+    {
+      "id": "ipinfo",
+      "label": "IPinfo",
+      "decision": "refused",
+      "capability": "ip-classification",
+      "requiresKey": false,
+      "sendsQueryUpstream": true,
+      "ownerScopedOnly": true,
+      "enabled": false,
+      "reason": "Refused inside any fetch path: deciding 'is this address private?' through a third party would disclose every destination we visit. Address classification stays local (gap G10). Manual lookup of one suspicious address, with consent, is the only permitted use."
+    },
+    {
+      "id": "grabify",
+      "label": "Grabify",
+      "decision": "refused",
+      "capability": "ip-logging-link",
+      "requiresKey": false,
+      "sendsQueryUpstream": false,
+      "ownerScopedOnly": false,
+      "enabled": false,
+      "reason": "A link that logs whoever opens it. It targets people, not the owner's own accounts, so it never enters the product."
+    },
+    {
+      "id": "nasa-worldview",
+      "label": "NASA Worldview",
+      "decision": "data-source",
+      "capability": "satellite-imagery",
+      "requiresKey": false,
+      "sendsQueryUpstream": true,
+      "ownerScopedOnly": true,
+      "enabled": false,
+      "reason": "Public imagery, not search or reconnaissance. Possible content later; it opens no slice today."
+    },
+    {
+      "id": "copernicus-browser",
+      "label": "Copernicus Browser",
+      "decision": "data-source",
+      "capability": "satellite-imagery",
+      "requiresKey": false,
+      "sendsQueryUpstream": true,
+      "ownerScopedOnly": true,
+      "enabled": false,
+      "reason": "As above: public Earth-observation data, no agent capability."
+    },
+    {
+      "id": "data-dumpster",
+      "label": "Data Dumpster",
+      "decision": "refused",
+      "capability": "unknown",
+      "requiresKey": true,
+      "sendsQueryUpstream": true,
+      "ownerScopedOnly": true,
+      "enabled": false,
+      "reason": "Unverified vendor, known only from a video list. No architecture decision rests on an unverified source; revisit only after its terms and data handling are checked."
+    }
+  ]
+}
