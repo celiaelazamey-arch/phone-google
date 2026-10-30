@@ -9,6 +9,7 @@ import { runDocumentAutomationBenchmark } from './agent/automation/index.js';
 const CLIENT_ID = /^[A-Za-z0-9_-]{8,64}$/;
 
 function fail(res, error) {
+  if (res.headersSent) return undefined;
   const status = Number.isInteger(error?.status) && error.status >= 400 && error.status <= 599 ? error.status : 500;
   return res.status(status).json({ error: error?.code || 'agent_request_failed' });
 }
@@ -67,7 +68,8 @@ export function createAgentRouter({ agent, authorize, logger = console }) {
   // لا رمز منحة ولا ترويسة ولا URL لمضيف غير مسموح في أي رد هنا.
   router.get('/egress', async (_req, res) => {
     if (typeof agent.egress !== 'function') return res.status(404).json({ error: 'agent_egress_unavailable' });
-    await runtime(res); // يبقى العقد: 503 حين لا يكون الوكيل ممكنًا أصلًا.
+    const current = await runtime(res); // يبقى العقد: 503 حين لا يكون الوكيل ممكنًا أصلًا.
+    if (!current) return undefined;
     return res.set('Cache-Control', 'no-store').json(agent.egress());
   });
 
@@ -426,9 +428,10 @@ export function createAgentRouter({ agent, authorize, logger = console }) {
     }
   });
 
-  router.use((error, _req, res, _next) => {
+  router.use((error, _req, res, next) => {
+    if (res.headersSent) return next(error);
     const status = Number.isInteger(error?.status) ? error.status : 400;
-    res.status(status).json({ error: status === 400 ? 'invalid_agent_request' : 'agent_request_failed' });
+    return res.status(status).json({ error: status === 400 ? 'invalid_agent_request' : 'agent_request_failed' });
   });
 
   return router;

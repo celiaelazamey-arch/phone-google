@@ -510,3 +510,98 @@ test('EP-13: a silent upstream times out as 504 and a closed port settles as 502
   assert.ok(reasons.includes('egress_upstream_unreachable'));
   assert.ok(harness.events.every((event) => event.status === 504 || event.status === 502));
 });
+
+test('EP-15 (CRIT-03): mid-stream upstream timeout after response headers are flushed aborts without ERR_HTTP_HEADERS_SENT', async (t) => {
+  const halfStream = await startUpstream((_req, res) => {
+    res.writeHead(200, { 'content-type': 'text/plain' });
+    res.write('partial-chunk');
+    // Intentionally never call res.end() so proxy hits upstream timeout after headersSent=true.
+  });
+  t.after(() => halfStream.close());
+
+  const harness = await setupProxy(t, { limits: { timeoutMs: 150 } });
+  const grant = harness.proxy.issueGrant({ runId: 'run-ep14', allowlist: [`127.0.0.1:${halfStream.port}`] });
+
+  const uncaught = [];
+  const onUncaught = (err) => uncaught.push(err);
+  process.on('uncaughtException', onUncaught);
+  t.after(() => process.off('uncaughtException', onUncaught));
+
+  const res = await Promise.race([
+    proxiedGet({
+      proxyPort: harness.proxyPort,
+      token: grant.token,
+      target: `${halfStream.url}/stall-mid-stream`
+    }),
+    new Promise((resolve) => setTimeout(() => resolve({ status: -1, body: 'hung' }), 800))
+  ]);
+
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(uncaught.length, 0, `expected zero uncaught exceptions, got: ${uncaught.map((e) => e.code || e.message).join(', ')}`);
+  assert.equal(res.status, 200);
+  assert.equal(res.body, 'partial-chunk');
+  assert.ok(harness.events.some((event) => event.reason === 'egress_upstream_timeout' && event.decision === EGRESS_DECISION.block));
+});
+
+test('EP-16 (CRIT-03): in-memory proxy events() log is bounded by limits.maxEvents while stats stay exact', async (t) => {
+  const upstream = await startUpstream();
+  t.after(() => upstream.close());
+
+  const harness = await setupProxy(t, { limits: { maxEvents: 5 } });
+  const grant = harness.proxy.issueGrant({ runId: 'run-ep15', allowlist: [`127.0.0.1:${upstream.port}`] });
+
+  for (let i = 0; i < 12; i += 1) {
+    const ok = await proxiedGet({ proxyPort: harness.proxyPort, token: grant.token, target: `${upstream.url}/item-${i}` });
+    assert.equal(ok.status, 200);
+  }
+
+  const retained = harness.proxy.events();
+  assert.equal(retained.length, 5, 'in-memory audit log stays capped at maxEvents');
+  assert.equal(retained[0].path, '/item-7');
+  assert.equal(retained[4].path, '/item-11');
+  assert.equal(harness.proxy.stats().allowed, 12, 'cumulative counters remain exact');
+});
+
+test('EP-17 (CRIT-03): CONNECT pipelined head bytes are counted in bytesOut and enforced against maxRequestBytes', async (t) => {
+  const received = [];
+  const tcpUpstream = net.createServer((sock) => {
+    sock.on('data', (chunk) => received.push(chunk));
+  });
+  await new Promise((resolve) => tcpUpstream.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => tcpUpstream.close(() => resolve())));
+  const targetPort = tcpUpstream.address().port;
+
+  const harness = await setupProxy(t, { limits: { maxRequestBytes: 1_024 } });
+  const grant = harness.proxy.issueGrant({ runId: 'run-ep16', allowlist: [`127.0.0.1:${targetPort}`] });
+
+  // Send a CONNECT request with a 1,200-byte pipelined head in the same TCP write so `head` is non-empty.
+  const oversizedHead = Buffer.alloc(1_200, 0x61);
+  await new Promise((resolve) => {
+    const client = net.connect({ host: '127.0.0.1', port: harness.proxyPort }, () => {
+      const reqHead = Buffer.from(
+        `CONNECT 127.0.0.1:${targetPort} HTTP/1.1\r\nHost: 127.0.0.1:${targetPort}\r\nProxy-Authorization: Bearer ${grant.token}\r\n\r\n`,
+        'ascii'
+      );
+      client.write(Buffer.concat([reqHead, oversizedHead]));
+    });
+    const timer = setTimeout(() => {
+      client.destroy();
+      resolve();
+    }, 500);
+    client.on('close', () => {
+      clearTimeout(timer);
+      resolve();
+    });
+    client.on('error', () => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
+
+  await new Promise((r) => setTimeout(r, 40));
+  assert.equal(received.length, 0, 'oversized pipelined CONNECT head must not be forwarded');
+  const blocked = harness.events.find((e) => e.reason === 'egress_request_too_large');
+  assert.ok(blocked, 'expected egress_request_too_large audit event');
+  assert.equal(blocked.bytesOut, 1_200);
+});
+

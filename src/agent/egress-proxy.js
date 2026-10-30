@@ -51,7 +51,9 @@ const DEFAULT_LIMITS = Object.freeze({
   timeoutMs: 15_000,
   maxTunnelsPerGrant: 8,
   // سقف الطلبات المتزامنة في الوسيط نفسه: تشغيل واحد لا يستطيع احتكار المقابس.
-  maxConnections: 16
+  maxConnections: 16,
+  // سقف حلقة سجل القرارات في الذاكرة حتى لا ينمو بلا حد في العمليات طويلة العمر.
+  maxEvents: 1_000
 });
 const MIN_TTL_MS = 1_000;
 const MAX_TTL_MS = 3_600_000;
@@ -211,6 +213,7 @@ export function createEgressProxy({ clock = Date.now, limits = {}, agent = 'celi
   boundedInteger(config.timeoutMs, 'egress_timeout_ms', 100, 120_000);
   boundedInteger(config.maxTunnelsPerGrant, 'egress_max_tunnels', 1, 64);
   boundedInteger(config.maxConnections, 'egress_max_connections', 1, 256);
+  boundedInteger(config.maxEvents, 'egress_max_events', 1, 100_000);
 
   const grants = new Map();
   const events = [];
@@ -232,6 +235,9 @@ export function createEgressProxy({ clock = Date.now, limits = {}, agent = 'celi
       path: event.path ? safeName(event.path) : null,
       reason: event.reason ? safeName(event.reason) : null
     });
+    if (events.length >= config.maxEvents) {
+      events.splice(0, events.length - config.maxEvents + 1);
+    }
     events.push(record);
     if (record.decision === EGRESS_DECISION.allow) {
       stats.allowed += 1;
@@ -265,6 +271,10 @@ export function createEgressProxy({ clock = Date.now, limits = {}, agent = 'celi
   }
 
   function reply(res, status, code) {
+    if (res.headersSent || res.writableEnded || res.destroyed) {
+      if (!res.destroyed) res.destroy();
+      return;
+    }
     const body = JSON.stringify({ error: code, code });
     res.writeHead(status, {
       'content-type': 'application/json; charset=utf-8',
@@ -503,7 +513,16 @@ export function createEgressProxy({ clock = Date.now, limits = {}, agent = 'celi
 
     upstream.once('connect', () => {
       socket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
-      if (head && head.length) upstream.write(head);
+      if (head && head.length) {
+        bytesOut += head.length;
+        if (bytesOut > config.maxRequestBytes) {
+          upstream.destroy();
+          socket.destroy();
+          settle(EGRESS_DECISION.block, 'egress_request_too_large', 413, { truncated: true });
+          return;
+        }
+        upstream.write(head);
+      }
       upstream.on('data', (chunk) => {
         bytesIn += chunk.length;
         if (bytesIn > config.maxResponseBytes) {
