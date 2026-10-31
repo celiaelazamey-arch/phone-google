@@ -1,0 +1,279 @@
+{
+  "capabilities": [
+    {
+      "anyOf": [],
+      "id": "mcp",
+      "label": "MCP",
+      "requires": [],
+      "settingLabels": {}
+    },
+    {
+      "anyOf": [],
+      "id": "stateStore",
+      "label": "Durable state (D1)",
+      "requires": [
+        "DB"
+      ],
+      "settingLabels": {
+        "DB": "D1"
+      }
+    },
+    {
+      "anyOf": [],
+      "id": "googleOAuth",
+      "label": "Google account linking",
+      "requires": [
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "DB"
+      ],
+      "settingLabels": {
+        "DB": "D1",
+        "GOOGLE_CLIENT_ID": "Google OAuth client id",
+        "GOOGLE_CLIENT_SECRET": "Google OAuth client secret"
+      }
+    },
+    {
+      "anyOf": [],
+      "id": "whatsappWebhook",
+      "label": "WhatsApp inbound webhook",
+      "requires": [
+        "WHATSAPP_APP_SECRET",
+        "DB"
+      ],
+      "settingLabels": {
+        "DB": "D1",
+        "WHATSAPP_APP_SECRET": "Meta app secret"
+      }
+    },
+    {
+      "anyOf": [],
+      "id": "whatsappOnboarding",
+      "label": "WhatsApp self-service linking",
+      "requires": [
+        "WHATSAPP_APP_ID",
+        "WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID",
+        "WHATSAPP_APP_SECRET",
+        "TOKEN_ENCRYPTION_KEY",
+        "DB"
+      ],
+      "settingLabels": {
+        "DB": "D1",
+        "TOKEN_ENCRYPTION_KEY": "encryption key",
+        "WHATSAPP_APP_ID": "Meta app",
+        "WHATSAPP_APP_SECRET": "Meta app secret",
+        "WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID": "Embedded Signup configuration"
+      }
+    },
+    {
+      "anyOf": [
+        "GEMINI_API_KEY",
+        "AI_GATEWAY_API_KEY",
+        "DEEPSEEK_API_KEY",
+        "AGENETROUTERAPI_KEY"
+      ],
+      "id": "aiReply",
+      "label": "Cloud AI reply",
+      "requires": [],
+      "settingLabels": {
+        "GEMINI_API_KEY": "a cloud AI provider key (Gemini / AI Gateway / DeepSeek / AgentRouter)"
+      }
+    },
+    {
+      "anyOf": [],
+      "id": "cronScheduler",
+      "label": "Governed cron scheduler",
+      "requires": [
+        "CELIAOS_CRONJOB_ORG_API_KEY"
+      ],
+      "settingLabels": {
+        "CELIAOS_CRONJOB_ORG_API_KEY": "cron-job.org API key"
+      }
+    }
+  ],
+  "generator": "scripts/build-manifest.mjs",
+  "manifestVersion": 1,
+  "name": "celia",
+  "provenance": {
+    "attestationWorkflow": ".github/workflows/release.yml",
+    "sbom": "sbom.cdx.json",
+    "sums": "SHA256SUMS"
+  },
+  "requiredSettings": [
+    "AGENETROUTERAPI_KEY",
+    "AI_GATEWAY_API_KEY",
+    "CELIAOS_CRONJOB_ORG_API_KEY",
+    "DEEPSEEK_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET",
+    "TOKEN_ENCRYPTION_KEY",
+    "WHATSAPP_APP_ID",
+    "WHATSAPP_APP_SECRET",
+    "WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID"
+  ],
+  "schema": {
+    "migrations": [
+      {
+        "digest": "sha256:b2257fff4dca768759b1f86074b8f1c48156683d34f10260e0a9141d57614897",
+        "version": "0001_state.sql"
+      },
+      {
+        "digest": "sha256:1199abea01c82ae05fbd09a8b25b4201d474cd9669045e2513453cb2441a9014",
+        "version": "0002_runtime.sql"
+      },
+      {
+        "digest": "sha256:530e50f1b8f43826ff6b4bcdca3f6c7a4b0215ebae8959f0a66cbc230df98ddc",
+        "version": "0003_cron_outbox.sql"
+      },
+      {
+        "digest": "sha256:8b499c744e1cc9b655d4f31602c5347c91afcdc82a4b1353c8e35ca6347777ec",
+        "version": "0004_reply_metrics.sql"
+      },
+      {
+        "digest": "sha256:fb658842bbf63768de901dc532839a1fab5bc4b878424bbe53dcabee99befbab",
+        "version": "0005_edge_idempotency_state.sql"
+      },
+      {
+        "digest": "sha256:5d50aae84527ebfca79eac20f940f75871f6ecca179b568555f9086ecc2340e2",
+        "version": "0006_whatsapp_onboarding.sql"
+      },
+      {
+        "digest": "sha256:f5129c09226e466a4b3ec98498b0fbd976f5c81e41c9b67e1a256db9b9aca39f",
+        "version": "0007_accounts_tenant_isolation.sql"
+      },
+      {
+        "digest": "sha256:89ab07c79d180eb5947320f33bddb06f0921304e2caa23a42d63586e517fd7c0",
+        "version": "0008_deployment_slices.sql"
+      }
+    ],
+    "policy": "additive-expand-contract",
+    "store": "cloudflare-d1"
+  },
+  "targets": {
+    "edge": {
+      "bundleDigest": "sha256:31d56eebbdb528c55c84edc5c3017a024ce6cf37b87164bf7314bf275f6e73ec",
+      "compatibilityDate": "2025-01-01",
+      "entry": "worker.js",
+      "modules": [
+        "state.js",
+        "whatsapp-ui.generated.js",
+        "reply-metrics.js",
+        "crypto.js",
+        "whatsapp-store.js",
+        "runtime.js",
+        "whatsapp-onboarding.js",
+        "capabilities.js",
+        "accounts.js",
+        "cron.js",
+        "worker.js"
+      ],
+      "runtime": "cloudflare-workers",
+      "script": "celia-phone-google"
+    },
+    "node": {
+      "engines": ">=22",
+      "entry": "src/server.js",
+      "runtime": "node-express-esm"
+    }
+  },
+  "tools": [
+    {
+      "contractDigest": "sha256:3a24d009ae496525cfdcb268a7d7d850547f0c346b647b11897a962e7bc21930",
+      "name": "celia_ai_reply",
+      "surfaces": [
+        "edge",
+        "node"
+      ]
+    },
+    {
+      "contractDigest": "sha256:8073e7a2a7adf30640888d3aec97b5ea8a553f29a6b558b181bffe143540671b",
+      "name": "celia_status",
+      "surfaces": [
+        "edge",
+        "node"
+      ]
+    },
+    {
+      "contractDigest": "sha256:a203170712f3a69c5db4e74852b1d9468035c20b213193c4d4a58e37c0a25be8",
+      "name": "find_skills",
+      "surfaces": [
+        "edge",
+        "node"
+      ]
+    },
+    {
+      "contractDigest": "sha256:0ee1b88c312088b4fc7cd54f1f5eb990bd064eb2378e20aa60cebfb8fca6e727",
+      "name": "google_calendar_events_create",
+      "surfaces": [
+        "edge",
+        "node"
+      ]
+    },
+    {
+      "contractDigest": "sha256:5b40398cded3475bcdd7759a977ce53e62e2b1bf336e8eb5908a6ba49285403e",
+      "name": "google_calendar_events_list",
+      "surfaces": [
+        "edge",
+        "node"
+      ]
+    },
+    {
+      "contractDigest": "sha256:7e059839424aeb2acd462b8aa2497b9825499e10fcfaa8676ebec335947cb15e",
+      "name": "google_contacts_search",
+      "surfaces": [
+        "edge",
+        "node"
+      ]
+    },
+    {
+      "contractDigest": "sha256:49f738e294cf4d9b850c3e2e076c8b86d2e392398ed29f18d55ea71490f8f18a",
+      "name": "google_drive_search",
+      "surfaces": [
+        "edge",
+        "node"
+      ]
+    },
+    {
+      "contractDigest": "sha256:93ed1fef36da414919938fec0e00d23cbb1113f0d1789a1355fdf67fb0a81277",
+      "name": "google_gmail_search",
+      "surfaces": [
+        "edge",
+        "node"
+      ]
+    },
+    {
+      "contractDigest": "sha256:f153d0333e4f9949c00b062cb962882e02f5714d830cee7311e74e42214f1ed2",
+      "name": "system_live_view",
+      "surfaces": [
+        "edge",
+        "node"
+      ]
+    },
+    {
+      "contractDigest": "sha256:f9fd25e5c58e6c8da2d6059cb8f2ca868436167bd01047b4a4597dddfc3ff771",
+      "name": "whatsapp_consent_upsert",
+      "surfaces": [
+        "edge",
+        "node"
+      ]
+    },
+    {
+      "contractDigest": "sha256:f1b0fcc92679870d3ece481e62e0ce4322d2a267784f74a24ab8677f1f80429a",
+      "name": "whatsapp_contacts_list",
+      "surfaces": [
+        "edge",
+        "node"
+      ]
+    },
+    {
+      "contractDigest": "sha256:e02713dee378305c6a2d5e07cc9f73daaa10769754bc4d9fae9d5a9034211395",
+      "name": "whatsapp_send_text",
+      "surfaces": [
+        "edge",
+        "node"
+      ]
+    }
+  ],
+  "version": "0.2.1"
+}

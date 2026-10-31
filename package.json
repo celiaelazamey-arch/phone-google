@@ -55,7 +55,9 @@
     "verify:edge": "node scripts/verify-live.mjs --mode edge --url https://celia-phone-google.celiaelazamey.workers.dev",
     "test:full": "CELIA_SANDBOX_INTEGRATION=1 node --test",
     "build:edge-ui": "node scripts/build-edge-ui.mjs",
-    "build:edge-ui:check": "node scripts/build-edge-ui.mjs --check"
+    "build:edge-ui:check": "node scripts/build-edge-ui.mjs --check",
+    "build:manifest": "node scripts/build-manifest.mjs",
+    "build:manifest:check": "node scripts/build-manifest.mjs --check"
   },
   "dependencies": {
     "dotenv": "^18.0.9",

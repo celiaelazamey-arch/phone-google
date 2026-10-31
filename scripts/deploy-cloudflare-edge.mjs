@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { appendFile, readdir, readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { buildSliceRecord, recordSlice, schemaVersionFrom } from './deployment-slices.mjs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { applyRetirementsToEnv, flagNameFor, loadServiceRetirements, RETIRABLE_FEATURES } from '../src/service-retirements.js';
@@ -642,6 +644,52 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
     }
   }
 
+  // MAN-007: write down the slice we just uploaded, with acceptance still pending. A green
+  // upload is not health (DEC-073); `known_good` is granted later, only by a passing live
+  // acceptance run for this exact commit. Recording never blocks or fails a deploy.
+  let slice = null;
+  if (d1.ok && d1BindingId) {
+    try {
+      const sha256 = (text) => createHash('sha256').update(text).digest('hex');
+      const manifestText = await readFile(new URL('../system.manifest.json', import.meta.url), 'utf8').catch(() => '');
+      slice = buildSliceRecord({
+        commit,
+        version: pkg.version,
+        manifestDigest: manifestText ? `sha256:${sha256(manifestText)}` : 'sha256:absent',
+        bundleDigest: `sha256:${sha256(workerModules.map((m) => `${m.name}\n${m.source}`).join('\n'))}`,
+        schemaVersion: schemaVersionFrom(migrationFiles),
+        workerVersionId: uploadJson?.result?.id ?? null,
+        deployedAt: new Date().toISOString()
+      });
+      const sliceHeaders = { ...authHeaders, 'content-type': 'application/json' };
+      const execSliceD1 = async (sql, params = []) => {
+        const res = await fetchImpl(`${baseUrl}/d1/database/${encodeURIComponent(d1BindingId)}/query`, {
+          method: 'POST',
+          headers: sliceHeaders,
+          body: JSON.stringify({ sql, params })
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok || payload?.success === false) throw new Error('slice_write_rejected');
+        const first = Array.isArray(payload?.result) ? payload.result[0] : null;
+        return { rows: Array.isArray(first?.results) ? first.results : [] };
+      };
+      await recordSlice(execSliceD1, slice);
+      // Hand the promotion step exactly what it needs, so no operator has to create a new
+      // GitHub variable for the database id (the deploy already discovered/created it).
+      const { mkdir, writeFile } = await import('node:fs/promises');
+      await mkdir(new URL('../.validation-artifacts/', import.meta.url), { recursive: true });
+      await writeFile(
+        new URL('../.validation-artifacts/deployment-slice.json', import.meta.url),
+        `${JSON.stringify({ commit: slice.commit_sha, manifestDigest: slice.manifest_digest, databaseId: d1BindingId, schemaVersion: slice.schema_version }, null, 2)}\n`,
+        'utf8'
+      );
+    } catch (error) {
+      // Observability must never take the deploy down with it.
+      slice = null;
+      log(`::warning title=Deployment Slice::not recorded (${String(error?.message || 'unknown').slice(0, 80)})`);
+    }
+  }
+
   const report = {
     status: 'deployed',
     scriptName,
@@ -653,6 +701,8 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
     modules: workerModules.map((module) => module.name),
     secretBindingsInjected: secretBindingsCount,
     totalSecretsTracked: SECRET_KEYS.length,
+    // MAN-007: recorded slice, acceptance pending until live verification proves it.
+    slice: slice ? { commit: slice.commit_sha, manifestDigest: slice.manifest_digest, schemaVersion: slice.schema_version, acceptance: slice.acceptance, knownGood: false } : null,
     d1
   };
 
