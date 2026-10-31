@@ -401,3 +401,28 @@ test('VER-09 unconfigured Meta onboarding is reported as skipped with setting na
   assert.notEqual(check.status, 'fail', 'missing operator config must not fail the deploy');
   void t;
 });
+
+test('VER-10 the run summary itself says whether a user can link, without exposing config values', async (t) => {
+  const { mkdtemp, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const dir = await mkdtemp(path.join(tmpdir(), 'celia-annot-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const server = http.createServer((req, res) => {
+    const send = (status, body) => { res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); };
+    if (req.url === '/healthz') return send(200, { status: 'ok' });
+    if (req.url === '/version') return send(200, { version: '0.2.1' });
+    if (req.url === '/readyz') return send(200, { ready: true, storage: { mode: 'd1', durable: true, latencyMs: 5 }, capabilities: { mcp: true, googleOAuth: true, whatsappWebhook: true }, whatsappOnboarding: { configured: false, missing: ['Meta app'] } });
+    return send(401, { error: 'unauthorized' });
+  });
+  const baseUrl = await listen(server);
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+
+  const out = { stdout: '', stderr: '' };
+  await runCli(['--url', baseUrl, '--mode', 'edge', '--allow-http', '--out', path.join(dir, 'r.json'), '--samples', '1', '--d1-samples', '2'], {
+    env: { GITHUB_ACTIONS: 'true', CELIA_MCP_API_TOKEN: TOKEN },
+    stdout: { write: (text) => (out.stdout += text) },
+    stderr: { write: (text) => (out.stderr += text) },
+  });
+  assert.match(out.stdout, /::warning title=whatsapp-onboarding::configured=false — missing: Meta app/);
+  assert.equal(out.stdout.includes(TOKEN), false, 'the annotation must never carry the token');
+});

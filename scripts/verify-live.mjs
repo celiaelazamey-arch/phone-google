@@ -534,6 +534,16 @@ export async function runCli(argv = process.argv.slice(2), { env = process.env, 
   // On GitHub Actions every failed check becomes an annotation that names the check id and its reason, so a red
   // deploy run says *which* gate failed on the run summary itself (the logs/artifacts are not always reachable).
   if (env.GITHUB_ACTIONS === 'true') {
+    // VER-10: logs and artifacts are not always reachable. Publish the operator-facing
+    // readiness as a notice so the run summary itself answers "can a user link yet?".
+    const onboarding = report.checks.find((entry) => entry.id === 'whatsapp_onboarding_config');
+    if (onboarding) {
+      const missing = Array.isArray(onboarding.detail?.missing) && onboarding.detail.missing.length
+        ? ` — missing: ${onboarding.detail.missing.join(', ')}`
+        : '';
+      const level = onboarding.status === 'pass' ? 'notice' : 'warning';
+      stdout.write(`::${level} title=whatsapp-onboarding::configured=${onboarding.detail?.configured === true}${missing}\n`);
+    }
     for (const check of report.checks.filter((entry) => entry.status === 'fail')) {
       const reason = check.detail?.reason ?? check.detail?.httpStatus ?? '';
       stdout.write(`::error title=verify-live ${check.id}::${check.id}${reason === '' ? '' : ` (${reason})`} — ${check.title}\n`);
