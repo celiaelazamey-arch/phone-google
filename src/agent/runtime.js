@@ -8,6 +8,7 @@ import {
 } from './store.js';
 import { RISK } from './tools.js';
 import { CALL_MANY_LIMITS } from './planner-provider.js';
+import { createNoProgressPolicy, NO_PROGRESS_CODE } from './no-progress.js';
 import { buildGoalContract } from './goal-contract.js';
 import { EVIDENCE_KIND, hashOf } from './evidence.js';
 import { createVerifier, VERDICT } from './verifier.js';
@@ -108,6 +109,9 @@ export function createAgentRuntime({
   const plannerToolSet = effectivePlannerAllowlist === null ? null : new Set(effectivePlannerAllowlist);
   const config = Object.freeze({ ...DEFAULT_LIMITS, ...limits });
   const verifier = createVerifier({ tools, clock });
+  // ASSUR-002: يقيّم فقط. العدّ من صفوف المخزن لا من عدّاد في الذاكرة، فالاستئناف
+  // بعد انقطاع يرى الحساب نفسه ولا يمنح نافذة محاولات جديدة.
+  const noProgress = createNoProgressPolicy();
   const outbox = createOutbox({ store, connectors, clock, workerId: `${workerId}-outbox` });
   const listeners = new Map();
   const controllers = new Map();
@@ -282,7 +286,9 @@ export function createAgentRuntime({
       stepId: entry.stepId,
       toolName: tool.name,
       risk: tool.risk,
-      idempotencyKey: entry.idempotencyKey
+      idempotencyKey: entry.idempotencyKey,
+      // ASSUR-002: نفس مُقنِّن الحمولة الذي يربط الموافقة بالأثر الخارجي نفسه.
+      argumentsDigest: hashOf(entry.payload ?? null)
     });
     if (!started.created) {
       if (started.toolRun.status === TOOL_RUN_STATUS.succeeded) {
@@ -740,6 +746,23 @@ export function createAgentRuntime({
               );
             }
           }
+          // ASSUR-002: الدفعة تُفحص كاملة قبل بدء أي عنصر — نفس قاعدة «الرفض قبل
+          // الأثر» أعلاه. تكرار متطابق فشل مرارًا لا يمرّ بحجم دفعة أكبر.
+          const batchProgressRuns = await store.listToolRuns(runId);
+          for (const entry of calls) {
+            const progress = noProgress.evaluate({
+              toolName: entry.tool,
+              argumentsDigest: hashOf(entry.args ?? null),
+              toolRuns: batchProgressRuns
+            });
+            if (progress.blocked) {
+              return rejectBatch(
+                'تقدّم صفري في الدفعة',
+                `رفض call_many: ${entry.tool} فشلت ${progress.priorFailures} مرات بالمعطيات نفسها؛ لم يبدأ أي عنصر من الدفعة.`,
+                NO_PROGRESS_CODE
+              );
+            }
+          }
           if (steps.length + 2 * calls.length > config.maxSteps) {
             return rejectBatch(
               'ميزانية الخطوات لا تتسع للدفعة',
@@ -781,7 +804,8 @@ export function createAgentRuntime({
               stepId: actStep.id,
               toolName: batchTool.name,
               risk: batchTool.risk,
-              idempotencyKey: `${runId}:${actStep.index}:${batchTool.name}`
+              idempotencyKey: `${runId}:${actStep.index}:${batchTool.name}`,
+              argumentsDigest: hashOf(entry.args ?? null)
             });
             if (!created) {
               if (toolRun.status === TOOL_RUN_STATUS.succeeded) {
@@ -957,6 +981,41 @@ export function createAgentRuntime({
           }
           return { run: await finish(runId, RUN_STATUS.failed, { error: inputValidation.code }), claimed: true };
         }
+        // ASSUR-002: بصمة المعطيات القانونية — نفس المُقنِّن الذي يربط الموافقة
+        // بالحمولة (`hashOf`)، فلا يختلف تعريف «نفس المعطيات» بين البوابتين.
+        const argumentsDigest = hashOf(decision.args ?? null);
+        const progress = noProgress.evaluate({
+          toolName: tool.name,
+          argumentsDigest,
+          toolRuns: await store.listToolRuns(runId)
+        });
+        if (progress.blocked) {
+          // قبل بوابة الموافقة وقبل outbox وقبل التنفيذ: لا أثر خارجي ولا إنفاق.
+          const stalledStep = await addStep(runId, {
+            kind: 'decide',
+            title: 'تقدّم صفري',
+            summary: `الأداة ${tool.name} فشلت ${progress.priorFailures} مرات بالمعطيات نفسها؛ رُفض التكرار قبل أي أثر خارجي أو إنفاق.`,
+            toolName: tool.name
+          });
+          if (decision.providerTrace) {
+            await recordProviderEvent({
+              runId,
+              stepId: stalledStep.id,
+              kind: EVIDENCE_KIND.toolSelected,
+              input: decision.providerTrace.plan,
+              output: {
+                allowed: false,
+                tool: tool.name,
+                reason: NO_PROGRESS_CODE,
+                priorFailures: progress.priorFailures,
+                maxIdenticalFailures: noProgress.maxIdenticalFailures
+              },
+              sourceIds: planEvidence ? [planEvidence.id] : [],
+              verdict: VERDICT.block
+            });
+          }
+          return { run: await finish(runId, RUN_STATUS.failed, { error: NO_PROGRESS_CODE }), claimed: true };
+        }
         if (!tools.executable(tool.name)) {
           const gateStep = await addStep(runId, {
             kind: 'decide',
@@ -1068,7 +1127,8 @@ export function createAgentRuntime({
           stepId: step.id,
           toolName: tool.name,
           risk: tool.risk,
-          idempotencyKey
+          idempotencyKey,
+          argumentsDigest
         });
         if (!created) {
           if (toolRun.status === TOOL_RUN_STATUS.succeeded) {
