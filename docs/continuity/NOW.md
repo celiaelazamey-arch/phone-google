@@ -14,7 +14,7 @@
 - **آخر مراجعة مسجّلة:** 31 أكتوبر 2026
 - **الجلسة النشطة:** PR-2B-PROD-INTEGRITY — تحصين سلامة الحافة الحية وتكافؤ أمان Node/MCP (`HIGH-05`, `HIGH-07`, `HIGH-02`) على `arena/ccf29ee7-phone-google` متفرعًا من `main@689bb8e` (بعد دمج PR #102 ونشره الحي الناجح في `Deploy (Cloudflare Edge)` رقم `41124514361`: تطبيق `0005` وتمهيد `0001..0004` في `_migrations` على `celia-edge-state` مع `storage.durable: true`). أُنجز تسلسل سلسلة التدقيق `edge_audit` ومنع `URIError` في `/api/state/:key` ومنع تصادم `UNIQUE` المتزامن في `edge_cron_outbox` (`59b2c17`)، وتكافؤ `HIGH-05` في Node/MCP بتسجيل الاكتمال قبل `INSERT` المحلي وعزل النطاق وحماية الحجوزات الجارية (`ba105f6`)، والاستهلاك الذري لتذاكر OAuth وفصل بادئة `browser:` في `src/google.js` (`898765c`)، وتكافؤ حارس SSRF في `src/{ai-providers,ollama}.js` (`77e7e35`)، حتى بلغ `npm run test:ci` 846 اختبارًا / 829 ناجحًا / 0 فشل / 17 skipped وتغطية 91.28 / 76.77 / 86.69. الـPR الجديد ينتظر مراجعة المالك دون دمج تلقائي. سجل الجلسة: [2026-10-31-pr2b-production-integrity-hardening](sessions/2026-10-31-pr2b-production-integrity-hardening.md) · الجلسة السابقة (PR #102 → `main@689bb8e`): [2026-10-30-pr2a-edge-security-hardening](sessions/2026-10-30-pr2a-edge-security-hardening.md).
 - **آخر سجل جلسة مؤرَّخ:** [2026-10-31-pr2b-production-integrity-hardening](sessions/2026-10-31-pr2b-production-integrity-hardening.md)
-- **حجم [STATE.md](STATE.md) النشط:** 78 سطرًا (16819 بايت)
+- **حجم [STATE.md](STATE.md) النشط:** 79 سطرًا (17122 بايت)
 - **الأرشيف التاريخي المحفوظ بلا حذف:**
 - [STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md) — الأساس `9f6f8b2` · **983 سطرًا** محفوظًا حرفيًا (بصمة `f2674637e82e…`)
 
