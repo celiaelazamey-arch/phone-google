@@ -101,3 +101,22 @@
 - **`MAN-002`** تحقق المنشأ قبل نشر الحافة، **`MAN-004`** النشر الذرّي بالتراجع، **`MAN-006`** فهرس ARD.
 - **لا دمج، لا دفع، لا نشر.** كل أثر إنتاجي غير مُثبت؛ سجل الشرائح سيبقى فارغًا حتى أول نشر حقيقي.
 - ربط واتساب ما زال `configured=false` بانتظار إعدادات المالك (`DEC-073`)؛ لا شيء هنا يغيّره.
+
+### الدليل الحيّ بعد الدمج (لم يكن متوقعًا في خطة الجلسة)
+
+المالك اشترط «انتاجي لا تجريبي»، فبعد خضوع كل الفحوص دُمج **PR #110** في `main@d0c56bb`:
+
+| الدليل | القيمة الفعلية من GitHub |
+|---|---|
+| تشغيلة النشر | `Deploy (Cloudflare Edge)` **41184103419** → `success` |
+| خطوة الترقية | `Promote deployment slice to known_good` → `success` |
+| التنبيه | `known_good granted to d0c56bb after passing live acceptance` |
+| الحزمة | تضمّ **`capabilities.js`** ضمن 11 وحدة |
+| الترحيل | `0008_deployment_slices.sql` طُبّق: `appliedFiles:1` · `skippedFiles:7` · `statements:3` |
+| الشريحة | `schemaVersion: 0008_deployment_slices.sql`، وبصمة manifest مسجّلة |
+| الجاهزية | `liveReady:true` · `storage.mode:d1` · `durable:true` · 18/18 أسرار |
+| بقية main | الجودة · Pages · Render · نشر الإصدار · إشعار الفشل → كلها `success` |
+
+**إذن سجل الشرائح لم يبقَ نظريًا:** أول شريحة حقيقية كُتبت ووُسمت `known_good` بالإثبات.
+
+**وما زال ناقصًا بصراحة:** `MAN-002` و`MAN-004` و`MAN-006` لم تُنفَّذ؛ وربط واتساب `configured=false` — التنبيه الحيّ ما زال يسمّي الناقص: Meta app، Embedded Signup configuration، Meta app secret، encryption key. **لا يُقرأ نجاح النشر كإثبات للربط.**
