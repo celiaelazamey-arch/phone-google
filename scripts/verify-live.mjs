@@ -180,12 +180,14 @@ export async function verifyLive({
     add('version', '/version يطابق الإصدار والـcommit المقصودين', 'fail', { reason: error?.code || error?.name || 'request_failed' });
   }
 
+  let onboardingReadiness = null;
   if (mode === 'edge') {
     // 3e. Readiness with durable Cloudflare D1 + full edge runtime capabilities (card-free path, DEC-037).
     try {
       const ready = await get('/readyz');
       const storage = ready.body?.storage || {};
       const caps = ready.body?.capabilities || {};
+      onboardingReadiness = ready.body?.whatsappOnboarding ?? null;
       const ok =
         ready.status === 200 &&
         ready.body?.ready === true &&
@@ -372,6 +374,22 @@ export async function verifyLive({
       });
     } catch (error) {
       add('whatsapp_auth_gate', 'واجهات الحساب والربط ترفض الزائر بلا جلسة (401) ولا تمنح جلسة مالك', 'fail', { reason: error?.code || error?.name || 'request_failed' });
+    }
+
+    // VER-09: report whether the ordinary-user linking flow can actually start. This is
+    // an operator setting, not a code defect, so it is reported as `skipped` with the
+    // missing setting names (never values) instead of failing the deploy or hiding it.
+    try {
+      // Reuse the ready_durable probe: an extra /readyz would pollute the D1 latency series.
+      const onboarding = onboardingReadiness;
+      const configured = onboarding?.configured === true;
+      add('whatsapp_onboarding_config', 'تهيئة Meta جاهزة لبدء ربط المستخدم العادي (أسماء الإعدادات الناقصة فقط، بلا قيم)', configured ? 'pass' : 'skipped', {
+        configured,
+        missing: Array.isArray(onboarding?.missing) ? onboarding.missing : null,
+        reason: configured ? null : 'operator_settings_missing'
+      });
+    } catch (error) {
+      add('whatsapp_onboarding_config', 'تهيئة Meta جاهزة لبدء ربط المستخدم العادي (أسماء الإعدادات الناقصة فقط، بلا قيم)', 'skipped', { reason: error?.code || error?.name || 'request_failed' });
     }
 
     // VER-08: prove the account tables really exist in D1. A 401 from /api/account/me

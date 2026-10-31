@@ -376,3 +376,28 @@ test('VER-05 live acceptance refuses a WhatsApp surface that is missing or hands
   assert.equal(byId.whatsapp_accounts_schema.status, 'fail', 'a missing accounts table must fail the deploy, not hide behind a 401 guard');
   assert.equal(report.verdict, 'fail');
 });
+
+test('VER-09 unconfigured Meta onboarding is reported as skipped with setting names, never values or a false pass', async (t) => {
+  const { verifyLive: run } = await import('../scripts/verify-live.mjs');
+  const fetchImpl = async (url) => {
+    const path = new URL(url).pathname;
+    const json = (body) => new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
+    if (path === '/whatsapp') return new Response('<html dir="rtl"><button id="connect"></button></html>', { headers: { 'content-type': 'text/html' } });
+    if (path === '/readyz') return json({ ready: true, storage: { mode: 'd1', durable: true, latencyMs: 5 }, capabilities: { mcp: true, googleOAuth: true, whatsappWebhook: true }, whatsappOnboarding: { configured: false, missing: ['Meta app', 'Embedded Signup configuration'] } });
+    if (path === '/version') return json({ version: '0.2.1' });
+    if (path === '/mcp') return json({ result: { tools: Array.from({ length: 12 }, (_, i) => ({ name: `t${i}` })) } });
+    if (path === '/api/cron/status') return json({ ok: true, mode: 'governed-scheduler', writes: 'outbox-approval-only', durable: true, decision: 'DEC-042', outbox: { pending: 0 } });
+    if (path.startsWith('/api/whatsapp/reply-metrics')) return json({ ok: true, replies: 0, truncated: 0, maxOutputTokens: 220, decision: 'DEC-050' });
+    if (path === '/api/account/login') return json({ error: 'invalid_email_or_password' });
+    return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: { 'content-type': 'application/json' } });
+  };
+  const report = await run({ url: 'https://example.workers.dev', mode: 'edge', token: TOKEN, samples: 1, d1Samples: 2, fetchImpl });
+  const check = report.checks.find((c) => c.id === 'whatsapp_onboarding_config');
+  assert.equal(check.status, 'skipped', 'an operator setting is not a code failure, but must never read as a pass');
+  assert.deepEqual(check.detail.missing, ['Meta app', 'Embedded Signup configuration']);
+  assert.ok(!JSON.stringify(report).includes(TOKEN), 'no token in the report');
+  // Only the onboarding check is asserted here; other checks fail because this stub is
+  // deliberately minimal. What matters: a missing operator setting is not a code failure.
+  assert.notEqual(check.status, 'fail', 'missing operator config must not fail the deploy');
+  void t;
+});
