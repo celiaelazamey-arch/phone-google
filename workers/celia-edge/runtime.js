@@ -13,6 +13,7 @@
 
 import { appendAudit, isD1Bound } from './state.js';
 import { classifyReplyTruncation, recordReplyMetric, REPLY_CHAR_CAP } from './reply-metrics.js';
+import { findWhatsAppVerifyToken, resolveEdgeWhatsAppCredentials } from './whatsapp-store.js';
 import {
   constantTimeEqualAsync,
   decryptEdgeJson,
@@ -1023,6 +1024,7 @@ export function parseEdgeOwnerCommand(body) {
 
 export async function edgeWhatsAppConsentUpsert({
   env = {},
+  userId = 'owner',
   phone,
   optedIn,
   aiOptedIn = false,
@@ -1041,18 +1043,18 @@ export async function edgeWhatsAppConsentUpsert({
     throw Object.assign(new Error('consent_source_required'), { status: 400 });
   }
   const db = requireD1(env);
+  const tenant = userId !== 'owner';
+  const table = tenant ? 'whatsapp_user_contacts' : 'whatsapp_contacts';
   const at = now().toISOString();
   const consentedAt = optedIn ? at : null;
 
-  await db
-    .prepare(
-      'INSERT INTO whatsapp_contacts (phone_e164, opted_in, ai_opted_in, consent_source, consented_at, last_inbound_at, created_at, updated_at) ' +
-      'VALUES (?, ?, ?, ?, ?, NULL, ?, ?) ' +
-      'ON CONFLICT(phone_e164) DO UPDATE SET opted_in = excluded.opted_in, ai_opted_in = excluded.ai_opted_in, ' +
-      'consent_source = excluded.consent_source, consented_at = COALESCE(excluded.consented_at, whatsapp_contacts.consented_at), updated_at = excluded.updated_at'
-    )
-    .bind(normalized, optedIn ? 1 : 0, optedIn && aiOptedIn ? 1 : 0, cleanSource, consentedAt, at, at)
-    .run();
+  if (tenant) {
+    await db.prepare('INSERT INTO whatsapp_user_contacts (user_id, phone_e164, opted_in, ai_opted_in, consent_source, consented_at, last_inbound_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?) ON CONFLICT(user_id, phone_e164) DO UPDATE SET opted_in = excluded.opted_in, ai_opted_in = excluded.ai_opted_in, consent_source = excluded.consent_source, consented_at = COALESCE(excluded.consented_at, whatsapp_user_contacts.consented_at), updated_at = excluded.updated_at')
+      .bind(userId, normalized, optedIn ? 1 : 0, optedIn && aiOptedIn ? 1 : 0, cleanSource, consentedAt, at, at).run();
+  } else {
+    await db.prepare('INSERT INTO whatsapp_contacts (phone_e164, opted_in, ai_opted_in, consent_source, consented_at, last_inbound_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NULL, ?, ?) ON CONFLICT(phone_e164) DO UPDATE SET opted_in = excluded.opted_in, ai_opted_in = excluded.ai_opted_in, consent_source = excluded.consent_source, consented_at = COALESCE(excluded.consented_at, whatsapp_contacts.consented_at), updated_at = excluded.updated_at')
+      .bind(normalized, optedIn ? 1 : 0, optedIn && aiOptedIn ? 1 : 0, cleanSource, consentedAt, at, at).run();
+  }
 
   return {
     phone: normalized,
@@ -1086,13 +1088,12 @@ export async function edgeWhatsAppContactsList({ env = {}, now = () => new Date(
   };
 }
 
-async function callMetaSendText({ env, phone, text, fetchImpl = globalThis.fetch }) {
-  const accessToken = String(env.WHATSAPP_ACCESS_TOKEN || '').trim();
-  const phoneNumberId = String(env.WHATSAPP_PHONE_NUMBER_ID || '').trim();
-  const apiVersion = String(env.WHATSAPP_API_VERSION || 'v26.0').trim();
-  if (!accessToken || !phoneNumberId) {
+async function callMetaSendText({ env, userId = 'owner', phone, text, fetchImpl = globalThis.fetch }) {
+  const credentials = await resolveEdgeWhatsAppCredentials(env, userId);
+  if (!credentials) {
     throw Object.assign(new Error('whatsapp_not_configured'), { status: 503 });
   }
+  const { accessToken, phoneNumberId, apiVersion } = credentials;
   const res = await fetchImpl(
     `https://graph.facebook.com/${encodeURIComponent(apiVersion)}/${encodeURIComponent(phoneNumberId)}/messages`,
     {
@@ -1120,6 +1121,7 @@ async function callMetaSendText({ env, phone, text, fetchImpl = globalThis.fetch
 
 export async function edgeWhatsAppSendText({
   env = {},
+  userId = 'owner',
   phone,
   text,
   idempotencyKey = null,
@@ -1139,14 +1141,15 @@ export async function edgeWhatsAppSendText({
   }
 
   const db = requireD1(env);
+  const tenant = userId !== 'owner';
   const outcome = await withEdgeIdempotency(
     env,
-    'whatsapp.send',
+    tenant ? `whatsapp.send.user:${userId}` : 'whatsapp.send',
     idempotencyKey,
     async () => {
       const contact = await db
-        .prepare('SELECT opted_in, last_inbound_at FROM whatsapp_contacts WHERE phone_e164 = ?')
-        .bind(normalized)
+        .prepare(tenant ? 'SELECT opted_in, last_inbound_at FROM whatsapp_user_contacts WHERE user_id = ? AND phone_e164 = ?' : 'SELECT opted_in, last_inbound_at FROM whatsapp_contacts WHERE phone_e164 = ?')
+        .bind(...(tenant ? [userId, normalized] : [normalized]))
         .first();
       if (!contact || !contact.opted_in) {
         throw Object.assign(new Error('recipient_not_opted_in'), { status: 403 });
@@ -1154,7 +1157,7 @@ export async function edgeWhatsAppSendText({
       if (!isWithin24Hours(contact.last_inbound_at, now().getTime())) {
         throw Object.assign(new Error('outside_24h_customer_window'), { status: 403 });
       }
-      const providerMessageId = await callMetaSendText({ env, phone: normalized, text: cleanText, fetchImpl });
+      const providerMessageId = await callMetaSendText({ env, userId, phone: normalized, text: cleanText, fetchImpl });
       const at = now().toISOString();
       return { ok: true, phone: normalized, providerMessageId, sentAt: at };
     },
@@ -1166,11 +1169,10 @@ export async function edgeWhatsAppSendText({
   if (!outcome.deduplicated) {
     try {
       await db
-        .prepare(
-          'INSERT OR IGNORE INTO whatsapp_messages (provider_message_id, phone_e164, direction, message_type, body, status, created_at) ' +
-          'VALUES (?, ?, ?, ?, ?, ?, ?)'
-        )
-        .bind(outcome.providerMessageId, normalized, 'outbound', 'text', cleanText, 'sent', outcome.sentAt)
+        .prepare(tenant
+          ? 'INSERT OR IGNORE INTO whatsapp_user_messages (user_id, provider_message_id, phone_e164, direction, message_type, body, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+          : 'INSERT OR IGNORE INTO whatsapp_messages (provider_message_id, phone_e164, direction, message_type, body, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .bind(...(tenant ? [userId, outcome.providerMessageId, normalized, 'outbound', 'text', cleanText, 'sent', outcome.sentAt] : [outcome.providerMessageId, normalized, 'outbound', 'text', cleanText, 'sent', outcome.sentAt]))
         .run();
     } catch (logErr) {
       console.warn('edge_whatsapp_local_log_failed', logErr?.message || 'd1_error');
@@ -1183,12 +1185,14 @@ function extractWhatsAppInboundMessages(payload) {
   const list = [];
   for (const entry of payload?.entry || []) {
     for (const change of entry?.changes || []) {
+      const phoneNumberId = String(change?.value?.metadata?.phone_number_id || '');
       for (const msg of change?.value?.messages || []) {
         const from = normalizeE164(msg?.from || '');
         const id = String(msg?.id || '').trim();
         if (id && isValidE164(from)) {
           list.push({
             id,
+            phoneNumberId,
             from,
             type: String(msg?.type || 'unknown').slice(0, 32),
             body: msg?.text?.body ? String(msg.text.body).slice(0, 4000) : null
@@ -1204,8 +1208,7 @@ export async function handleWhatsAppWebhookGet({ url, env = {} }) {
   const mode = url.searchParams.get('hub.mode');
   const token = url.searchParams.get('hub.verify_token') || '';
   const challenge = url.searchParams.get('hub.challenge') || '';
-  const expected = String(env.WHATSAPP_VERIFY_TOKEN || '').trim();
-  if (mode === 'subscribe' && expected && (await constantTimeEqualAsync(token, expected))) {
+  if (mode === 'subscribe' && (await findWhatsAppVerifyToken(env, token))) {
     return new Response(String(challenge), {
       status: 200,
       headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' }
@@ -1243,8 +1246,41 @@ export async function handleWhatsAppWebhookPost({
   const at = now().toISOString();
   let processed = 0;
   let duplicates = 0;
+  const credentials = await resolveEdgeWhatsAppCredentials(env).catch(() => null);
+
+  // Delivery receipts are provider facts, not a local claim that a test message reached a handset.
+  for (const entry of payload?.entry || []) for (const change of entry?.changes || []) {
+    const receiptPhoneId = String(change?.value?.metadata?.phone_number_id || '');
+    const receiptTenant = receiptPhoneId ? await db.prepare('SELECT user_id FROM whatsapp_connections WHERE phone_number_id = ?').bind(receiptPhoneId).first() : null;
+    for (const status of change?.value?.statuses || []) {
+      const id = String(status?.id || '');
+      const next = String(status?.status || '');
+      if (id && ['sent', 'delivered', 'read', 'failed'].includes(next)) {
+        if (receiptTenant && receiptTenant.user_id !== 'owner') {
+          await db.prepare("UPDATE whatsapp_user_messages SET status = ? WHERE user_id = ? AND provider_message_id = ? AND direction = 'outbound' AND CASE status WHEN 'read' THEN 4 WHEN 'delivered' THEN 3 WHEN 'sent' THEN 2 WHEN 'failed' THEN 1 ELSE 0 END < CASE ? WHEN 'read' THEN 4 WHEN 'delivered' THEN 3 WHEN 'sent' THEN 2 WHEN 'failed' THEN 1 ELSE 0 END").bind(next, receiptTenant.user_id, id, next).run();
+          continue;
+        }
+        await db.prepare("UPDATE whatsapp_messages SET status = ? WHERE provider_message_id = ? AND direction = 'outbound' AND CASE status WHEN 'read' THEN 4 WHEN 'delivered' THEN 3 WHEN 'sent' THEN 2 WHEN 'failed' THEN 1 ELSE 0 END < CASE ? WHEN 'read' THEN 4 WHEN 'delivered' THEN 3 WHEN 'sent' THEN 2 WHEN 'failed' THEN 1 ELSE 0 END").bind(next, id, next).run();
+      }
+    }
+  }
 
   for (const msg of extractWhatsAppInboundMessages(payload)) {
+    const tenantConnection = msg.phoneNumberId
+      ? await db.prepare('SELECT user_id FROM whatsapp_connections WHERE phone_number_id = ?').bind(msg.phoneNumberId).first()
+      : null;
+    if (tenantConnection && tenantConnection.user_id !== 'owner') {
+      const tenantId = tenantConnection.user_id;
+      const inserted = await db.prepare('INSERT OR IGNORE INTO whatsapp_user_messages (user_id, provider_message_id, phone_e164, direction, message_type, body, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .bind(tenantId, msg.id, msg.from, 'inbound', msg.type, msg.body, 'received', at).run();
+      if ((inserted?.meta?.changes ?? 0) === 0) { duplicates += 1; continue; }
+      await db.prepare('INSERT INTO whatsapp_user_contacts (user_id, phone_e164, opted_in, ai_opted_in, last_inbound_at, created_at, updated_at) VALUES (?, ?, 0, 0, ?, ?, ?) ON CONFLICT(user_id, phone_e164) DO UPDATE SET last_inbound_at = excluded.last_inbound_at, updated_at = excluded.updated_at')
+        .bind(tenantId, msg.from, at, at, at).run();
+      await db.prepare('UPDATE whatsapp_connections SET last_inbound_at = ?, updated_at = ? WHERE user_id = ?').bind(at, at, tenantId).run();
+      processed += 1;
+      continue; // Tenant messages never enter owner commands or the owner's auto-reply/consent ledger.
+    }
+    if (credentials?.phoneNumberId && msg.phoneNumberId && msg.phoneNumberId !== credentials.phoneNumberId) continue;
     const insertRes = await db
       .prepare(
         'INSERT OR IGNORE INTO whatsapp_messages (provider_message_id, phone_e164, direction, message_type, body, status, created_at) ' +
@@ -1267,6 +1303,9 @@ export async function handleWhatsAppWebhookPost({
       .run();
 
     processed += 1;
+    if (credentials?.connection) {
+      await db.prepare('UPDATE whatsapp_connections SET last_inbound_at = ?, updated_at = ? WHERE phone_number_id = ?').bind(at, at, credentials.phoneNumberId).run();
+    }
 
     // Owner-only commands on WhatsApp («اربط جوجل», «لخص آخر إيميل», «هات جدولي»).
     if (msg.body && ownerPhone && msg.from === ownerPhone) {
@@ -1323,7 +1362,7 @@ export async function handleWhatsAppWebhookPost({
             ? 'حساب Google غير مربوط بعد. أرسل «اربط جوجل» للحصول على رابط الربط الآمن.'
             : 'تعذر قراءة بيانات Google الآن؛ يرجى المحاولة لاحقًا.';
         }
-        if (replyText && hasVal(env, 'WHATSAPP_ACCESS_TOKEN') && hasVal(env, 'WHATSAPP_PHONE_NUMBER_ID')) {
+        if (replyText && credentials) {
           const outId = await callMetaSendText({ env, phone: msg.from, text: replyText, fetchImpl }).catch(() => null);
           if (outId) {
             await db
@@ -1385,7 +1424,8 @@ const TOOL_CATEGORY = Object.freeze({
 
 export async function buildEdgeLiveStatus({ env = {}, origin = '', release = {} } = {}) {
   const google = await getEdgeGoogleStatus(env);
-  const whatsappConfigured = hasVal(env, 'WHATSAPP_ACCESS_TOKEN') && hasVal(env, 'WHATSAPP_PHONE_NUMBER_ID');
+  const whatsappCredentials = await resolveEdgeWhatsAppCredentials(env).catch(() => null);
+  const whatsappConfigured = Boolean(whatsappCredentials);
   const geminiConfigured = hasVal(env, 'GEMINI_API_KEY') && String(env.CELIA_DISABLE_GEMINI || '').trim() !== 'true';
   return {
     ok: true,
@@ -1403,7 +1443,9 @@ export async function buildEdgeLiveStatus({ env = {}, origin = '', release = {} 
     google,
     whatsapp: {
       configured: whatsappConfigured,
-      webhookVerifyConfigured: hasVal(env, 'WHATSAPP_VERIFY_TOKEN') && hasVal(env, 'WHATSAPP_APP_SECRET'),
+      webhookVerifyConfigured: (hasVal(env, 'WHATSAPP_VERIFY_TOKEN') || whatsappCredentials?.source === 'embedded_signup') && hasVal(env, 'WHATSAPP_APP_SECRET'),
+      credentialSource: whatsappCredentials?.source || null,
+      onboardingConfigured: (await import('./whatsapp-store.js')).whatsappOnboardingConfig(env).configured,
       autoReplyEnabled: String(env.WHATSAPP_AUTO_REPLY_ENABLED || 'false').trim() === 'true',
       webhookUrl: origin ? `${String(origin).replace(/\/+$/, '')}/webhooks/whatsapp` : null
     },

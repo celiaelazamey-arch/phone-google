@@ -493,6 +493,35 @@ test.describe('سمات الواجهة (WP-1.3، UX-003): تتبع النظام 
     }
   });
 
+  // WA-005 انحدار حقيقي: إضافة رابط «ربط واتساب» جعلت الشريط يتجاوز العرض عند 412px
+  // (Pixel 7) فيُدفَع زر الاتصال خارج الشاشة. فحص 320px وحده لم يكن كافيًا لأن الالتفاف
+  // كان مقيّدًا بـ max-width:360px. نثبّت العرض الذي انكسر فعليًا ونقيس الإصابة لا العرض فقط.
+  test('شريط التنقل لا يدفع أدوات التحكم خارج الشاشة عند 361–530px (انحدار رابط واتساب)', async ({ page }, testInfo) => {
+    const { diagnostics, flush } = attachChromiumDiagnostics(page);
+    try {
+      for (const width of [361, 412, 480, 530]) {
+        await page.setViewportSize({ width, height: 800 });
+        await page.goto(`${LIVE}/agent`, { waitUntil: 'networkidle' });
+        const measured = await page.evaluate(() => {
+          const button = document.querySelector('#connect');
+          const box = button.getBoundingClientRect();
+          const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+          return {
+            overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+            insideViewport: box.x >= 0 && box.right <= window.innerWidth,
+            clickable: hit === button || button.contains(hit)
+          };
+        });
+        expect(measured.overflow, `عرض ${width}px`).toBeLessThanOrEqual(1);
+        expect(measured.insideViewport, `زر الاتصال داخل العرض ${width}px`).toBe(true);
+        expect(measured.clickable, `زر الاتصال قابل للنقر عند ${width}px`).toBe(true);
+      }
+      expect(diagnostics, diagnostics.join('\n')).toEqual([]);
+    } finally {
+      await flush(testInfo);
+    }
+  });
+
   test('prefers-reduced-motion: reduce يلغي الانتقالات (مقاسة من الأنماط المحسوبة، قبل وبعد)', async ({ page }, testInfo) => {
     const { diagnostics, flush } = attachChromiumDiagnostics(page);
     try {

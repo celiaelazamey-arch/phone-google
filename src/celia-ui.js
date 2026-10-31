@@ -135,6 +135,10 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, oper
     res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
   });
 
+  router.get(['/whatsapp', '/whatsapp.html'], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'whatsapp.html')));
+  router.get('/whatsapp.js', (_req, res) => res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'whatsapp.js')));
+  router.get('/whatsapp.css', (_req, res) => res.type('text/css').sendFile(path.join(PUBLIC_DIR, 'whatsapp.css')));
+
   router.get('/styles.css', (_req, res) => {
     res.type('text/css').sendFile(path.join(PUBLIC_DIR, 'styles.css'));
   });

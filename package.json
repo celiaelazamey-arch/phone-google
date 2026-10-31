@@ -36,7 +36,7 @@
     "release:bundle": "node scripts/release.mjs bundle",
     "release:verify": "node scripts/release.mjs verify",
     "test:resilience": "node --test test/resilience.test.js test/operations.test.js test/deployment.test.js",
-    "test:browser": "playwright test",
+    "test:browser": "node scripts/run-browser-tests.mjs",
     "test:copilot-bridge": "node --test test/copilot-mcp-bridge.test.js",
     "copilot:diagram": "node scripts/render-copilot-architecture.mjs",
     "copilot:diagram:check": "node scripts/render-copilot-architecture.mjs --check",
@@ -52,7 +52,8 @@
     "check:continuity": "node scripts/check-continuity.mjs",
     "check:secrets": "node scripts/check-secrets-wiring.mjs",
     "verify:live": "node scripts/verify-live.mjs",
-    "verify:edge": "node scripts/verify-live.mjs --mode edge --url https://celia-phone-google.celiaelazamey.workers.dev"
+    "verify:edge": "node scripts/verify-live.mjs --mode edge --url https://celia-phone-google.celiaelazamey.workers.dev",
+    "test:full": "CELIA_SANDBOX_INTEGRATION=1 node --test"
   },
   "dependencies": {
     "dotenv": "^18.0.9",

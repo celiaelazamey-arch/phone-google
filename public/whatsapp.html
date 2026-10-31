@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>ربط واتساب — سيليا</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <script src="./theme.js"></script>
+  <link rel="stylesheet" href="./theme.css">
+  <link rel="stylesheet" href="./whatsapp.css">
+  <script src="./whatsapp.js" defer></script>
+</head>
+<body>
+  <header><a class="brand" href="./">سيليا</a><span>واتساب للأعمال</span><label class="theme-switch"><span>المظهر</span><select data-theme-switcher aria-label="المظهر"><option value="system">يتبع النظام</option><option value="dark">داكن</option><option value="oled">OLED</option><option value="light">فاتح</option></select></label></header>
+  <main>
+    <section id="account-panel" class="card" aria-labelledby="account-title" hidden>
+      <h1 id="account-title">حساب سيليا</h1>
+      <p class="lead">أنشئ حسابك أو سجّل الدخول، ثم اربط رقم واتساب الخاص بنشاطك.</p>
+      <div class="row" role="group" aria-label="نوع الدخول">
+        <button id="show-register" type="button" aria-pressed="true">إنشاء حساب</button>
+        <button id="show-login" type="button" aria-pressed="false">تسجيل الدخول</button>
+      </div>
+      <form id="account-form">
+        <label for="account-email">البريد الإلكتروني</label>
+        <input id="account-email" type="email" dir="ltr" autocomplete="email" required maxlength="254">
+        <label for="account-password">كلمة المرور</label>
+        <input id="account-password" type="password" dir="ltr" autocomplete="new-password" required minlength="10" maxlength="128" aria-describedby="password-help">
+        <p id="password-help" class="hint">10 أحرف على الأقل. لا تستخدم كلمة مرور واتساب أو Meta.</p>
+        <button id="account-submit" class="primary" type="submit">إنشاء حساب</button>
+      </form>
+      <p id="account-status" role="status" aria-live="polite"></p>
+    </section>
+    <section class="card" id="link-panel" aria-labelledby="title" hidden>
+      <p class="eyebrow">ربط حقيقي عبر Meta</p>
+      <h1 id="title">اربط رقم نشاطك التجاري</h1>
+      <p class="lead">سجّل الدخول في Meta، اختر رقم العمل، ووافق على الربط. تتولى سيليا الإعداد التقني والتحقق من حالة الرقم.</p>
+      <ol class="steps"><li>الدخول إلى Meta</li><li>اختيار رقم العمل</li><li>الموافقة وإثبات الملكية إن طلبت Meta</li><li>رسالة اختبار والوارد</li></ol>
+      <p id="status" class="status" role="status" aria-live="polite">جارٍ فحص حالة الربط…</p>
+      <div class="row"><button id="connect" class="primary" type="button" disabled>اربط واتساب</button><button id="account-logout" type="button">تسجيل الخروج</button></div>
+      <p id="help" class="hint">لا تحتاج إلى إدخال مفاتيح أو إعداد Webhook.</p>
+      <a id="studio-link" href="./index.html?view=models" hidden>العودة لتسجيل دخول المالك في سيليا</a>
+    </section>
+    <section id="connected-panel" class="card" hidden aria-labelledby="connected-title">
+      <h2 id="connected-title">الرقم المرتبط</h2>
+      <p id="business-name"></p><p id="phone-number" dir="ltr"></p>
+      <h3>أرسل رسالة اختبار</h3>
+      <p class="hint">أدخل رقمك الذي سيستقبل الاختبار. يجب أن يكون قد أرسل رسالة إلى رقم العمل خلال آخر 24 ساعة.</p>
+      <label for="test-phone">رقم هاتف المستلم</label>
+      <input id="test-phone" type="tel" dir="ltr" autocomplete="tel" placeholder="+201000000000">
+      <label class="consent"><input id="test-consent" type="checkbox"> أوافق على استقبال رسالة الاختبار هذه على رقمي.</label>
+      <button id="send-test" class="primary" type="button">أرسل رسالة اختبار</button>
+      <p id="test-status" role="status" aria-live="polite"></p>
+    </section>
+    <section id="inbox-panel" class="card" hidden aria-labelledby="inbox-title">
+      <div class="row"><h2 id="inbox-title">صندوق الوارد</h2><button id="refresh-inbox" type="button">تحديث الوارد</button></div>
+      <p class="hint">الرسائل المقبولة من Meta فقط. «قُبلت للإرسال» لا تعني أنها وصلت إلى الهاتف.</p>
+      <ul id="inbox" aria-live="polite"></ul>
+    </section>
+  </main>
+</body>
+</html>
