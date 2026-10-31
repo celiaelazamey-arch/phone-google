@@ -27,6 +27,7 @@ import {
 import { summarizeReplyMetrics, REPLY_CHAR_CAP } from './reply-metrics.js';
 import { createWhatsAppLink, consumeWhatsAppTicket, handleWhatsAppSession, requireWhatsAppSession, assertWhatsAppMutation } from './whatsapp-onboarding.js';
 import { whatsappOnboardingConfig } from './whatsapp-store.js';
+import { deriveCapabilityReadiness } from './capabilities.js';
 import { handleAccountRequest } from './accounts.js';
 import {
   approveIntent,
@@ -71,6 +72,9 @@ const TRACKED_SECRETS = Object.freeze([
   ['YOUR_CODATA_API_KEY', 'workspace-connector', 'codata']
 ]);
 
+// MAN-003: these booleans mean "mounted in this bundle", which is all they ever measured.
+// They stay literal so existing clients keep working; whether the settings behind each one
+// are actually present is reported separately by deriveCapabilityReadiness(env) below.
 export const EDGE_CAPABILITIES = Object.freeze({
   mcp: true,
   mcpToolsCount: EDGE_MCP_TOOLS.length,
@@ -80,6 +84,11 @@ export const EDGE_CAPABILITIES = Object.freeze({
   stateStore: true,
   cronScheduler: true
 });
+
+/** Additive, environment-derived truth. Never replaces the mounted flags above. */
+export function edgeCapabilitiesFor(env = {}) {
+  return { ...EDGE_CAPABILITIES, readiness: deriveCapabilityReadiness(env) };
+}
 
 function hasSecret(env, name) {
   const val = String(env?.[name] || '').trim();
@@ -373,7 +382,7 @@ export default {
           service: 'celia-phone-google-edge',
           cardFreeHosting: true,
           fullEdgeRuntimeMounted: true,
-          capabilities: EDGE_CAPABILITIES,
+          capabilities: edgeCapabilitiesFor(env),
           // VER-09: booleans only. Tells an operator whether the ordinary-user linking
           // flow can start, without exposing app id, config id or any secret value.
           whatsappOnboarding: (() => {
@@ -447,7 +456,7 @@ export default {
           scope: 'cloudflare-edge',
           cardFreeHosting: true,
           fullEdgeRuntimeMounted: true,
-          capabilities: EDGE_CAPABILITIES,
+          capabilities: edgeCapabilitiesFor(env),
           release,
           generatedAt: new Date().toISOString(),
           coreReady: true,

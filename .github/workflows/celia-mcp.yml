@@ -68,6 +68,11 @@ jobs:
       # regenerating it would let the published map claim a permission the code no longer grants.
       - name: Edge UI bundle matches public/ (VER-07)
         run: npm run build:edge-ui:check
+      # MAN-001: the manifest is derived from package.json, wrangler.toml, the Worker import
+      # graph, the tool registries and the migrations. A change to any of them without
+      # regenerating would publish a contract the code no longer honours.
+      - name: System manifest matches its sources (MAN-001)
+        run: npm run build:manifest:check
       - name: Copilot architecture map matches the enforced policy
         run: npm run copilot:diagram:check
       - name: Computer permission matrix matches the enforced policy

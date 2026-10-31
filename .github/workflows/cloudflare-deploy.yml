@@ -67,6 +67,17 @@ jobs:
             --url https://celia-phone-google.celiaelazamey.workers.dev \
             --expect-commit "${{ github.sha }}" \
             --out .validation-artifacts/edge-live-acceptance.json
+      # MAN-007: a green upload is not health. Only now that live acceptance passed for this
+      # exact commit may the slice be marked known_good — that row is what a rollback targets.
+      - name: Promote deployment slice to known_good (proof required)
+        if: success()
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          node scripts/promote-deployment-slice.mjs \
+            --report .validation-artifacts/edge-live-acceptance.json \
+            --expect-commit "${{ github.sha }}"
       - name: Upload card-free Edge live acceptance report (token-free)
         if: always() && hashFiles('.validation-artifacts/edge-live-acceptance.json') != ''
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
