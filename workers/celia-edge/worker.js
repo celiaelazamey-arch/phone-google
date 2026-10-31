@@ -1,4 +1,5 @@
 import { createStateStore, isD1Bound, probeDurability } from './state.js';
+import { EDGE_UI } from './whatsapp-ui.generated.js';
 import {
   EDGE_MCP_TOOLS,
   buildEdgeLiveStatus,
@@ -485,18 +486,19 @@ export default {
     // WA-005: the Arabic onboarding page is served from the same origin as its HttpOnly session.
     if (pathname === '/whatsapp' || pathname === '/whatsapp.html') {
       if (request.method !== 'GET') return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
-      if (!env.WHATSAPP_UI_HTML) return jsonResponse({ error: 'whatsapp_ui_not_deployed' }, 503, baseHeaders);
-      return new Response(env.WHATSAPP_UI_HTML.replace('<body>', '<body data-runtime="edge">'), { status: 200, headers: { ...baseHeaders, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': "default-src 'self'; script-src 'self' https://connect.facebook.net; style-src 'self'; connect-src 'self' https://*.facebook.com https://*.facebook.net; frame-src https://*.facebook.com https://*.facebook.net; img-src 'self' data: https://*.facebook.com https://*.fbcdn.net; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" } });
+      const html = env.WHATSAPP_UI_HTML || EDGE_UI.WHATSAPP_UI_HTML;
+      if (!html) return jsonResponse({ error: 'whatsapp_ui_not_deployed' }, 503, baseHeaders);
+      return new Response(html.replace('<body>', '<body data-runtime="edge">'), { status: 200, headers: { ...baseHeaders, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': "default-src 'self'; script-src 'self' https://connect.facebook.net; style-src 'self'; connect-src 'self' https://*.facebook.com https://*.facebook.net; frame-src https://*.facebook.com https://*.facebook.net; img-src 'self' data: https://*.facebook.com https://*.fbcdn.net; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" } });
     }
     if (pathname === '/whatsapp.js' || pathname === '/whatsapp.css') {
       const js = pathname.endsWith('.js');
-      const asset = js ? env.WHATSAPP_UI_JS : env.WHATSAPP_UI_CSS;
+      const asset = js ? (env.WHATSAPP_UI_JS || EDGE_UI.WHATSAPP_UI_JS) : (env.WHATSAPP_UI_CSS || EDGE_UI.WHATSAPP_UI_CSS);
       if (!asset) return jsonResponse({ error: 'whatsapp_ui_not_deployed' }, 503, baseHeaders);
       return new Response(asset, { status: 200, headers: { ...baseHeaders, 'content-type': js ? 'application/javascript; charset=utf-8' : 'text/css; charset=utf-8', 'cache-control': 'no-store' } });
     }
     if (pathname === '/theme.css' || pathname === '/theme.js') {
       const js = pathname.endsWith('.js');
-      const asset = js ? env.WHATSAPP_UI_THEME_JS : env.WHATSAPP_UI_THEME_CSS;
+      const asset = js ? (env.WHATSAPP_UI_THEME_JS || EDGE_UI.WHATSAPP_UI_THEME_JS) : (env.WHATSAPP_UI_THEME_CSS || EDGE_UI.WHATSAPP_UI_THEME_CSS);
       if (!asset) return jsonResponse({ error: 'whatsapp_ui_not_deployed' }, 503, baseHeaders);
       return new Response(asset, { status: 200, headers: { ...baseHeaders, 'content-type': js ? 'application/javascript; charset=utf-8' : 'text/css; charset=utf-8', 'cache-control': 'no-store' } });
     }

@@ -113,3 +113,28 @@ test('VER-06 the skip gate allows only named environment gaps and fails on anyth
   assert.equal(evaluateSkips([], { allowEnvironmentGates: true }).ok, true);
   assert.deepEqual(parseSkips('ok 1 - a passing test'), []);
 });
+
+test('VER-07 the WhatsApp UI ships as a Worker module, never as an oversized text binding', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { collectWorkerModules, buildWorkerMetadata } = await import('../scripts/deploy-cloudflare-edge.mjs');
+  const { renderUiModule, readUiSources, EDGE_UI_MODULE } = await import('../scripts/build-edge-ui.mjs');
+
+  const modules = await collectWorkerModules();
+  const ui = modules.find((m) => m.name.endsWith('whatsapp-ui.generated.js'));
+  assert.ok(ui, 'the UI must travel in the same upload as the code that serves it');
+  assert.ok(ui.source.length > 5120, 'the real UI is larger than the Cloudflare text-binding cap');
+
+  const metadata = buildWorkerMetadata({ env: {} });
+  for (const binding of metadata.bindings) {
+    if (typeof binding.text === 'string') {
+      assert.ok(new TextEncoder().encode(binding.text).length <= 5120, `${binding.name} exceeds the 5.1 kB text-binding cap`);
+    }
+  }
+  assert.ok(!metadata.bindings.some((b) => b.name === 'WHATSAPP_UI_JS'), 'the 12 kB script is no longer a binding');
+
+  const committed = await readFile(new URL(`../${EDGE_UI_MODULE}`, import.meta.url), 'utf8');
+  assert.equal(committed, renderUiModule(await readUiSources()), 'generated UI must not drift from public/');
+
+  const workflow = await readFile(new URL('../.github/workflows/celia-mcp.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /npm run build:edge-ui:check/, 'CI rejects a stale UI bundle');
+});
