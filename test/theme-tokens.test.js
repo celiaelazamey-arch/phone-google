@@ -121,7 +121,7 @@ test('THM-02 grep gate: no fixed colour outside theme.css in the migrated styles
   const NOT_YET_MIGRATED = new Set(['styles.css', 'system.css', 'protocol.css', 'computer.css', 'deploy.css', 'landing.css', 'fonts.css']);
   const cssFiles = fs.readdirSync(PUBLIC_DIR).filter((f) => f.endsWith('.css'));
   const migrated = cssFiles.filter((f) => f !== 'theme.css' && !NOT_YET_MIGRATED.has(f));
-  assert.deepEqual(migrated.sort(), ['agent.css', 'cron.css', 'kb.css']);
+  assert.deepEqual(migrated.sort(), ['agent.css', 'cron.css', 'kb.css', 'whatsapp.css']);
   for (const file of NOT_YET_MIGRATED) assert.ok(cssFiles.includes(file), `${file} still exists (drop it from the list otherwise)`);
 
   const fixedColour = /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(|\b(?:white|black|red|green|blue|yellow|orange|gray|grey|silver|navy|teal|purple|pink)\b(?=\s*[;,)!])/i;
@@ -264,14 +264,15 @@ test('THM-04 pages with the switcher load theme.js before any stylesheet and imp
     const scriptAt = html.indexOf('<script src="./theme.js"></script>');
     const firstStylesheet = html.indexOf('<link rel="stylesheet"');
     assert.ok(scriptAt > -1 && scriptAt < firstStylesheet, `${file}: theme.js runs before the first stylesheet (no flash)`);
-    assert.ok(html.indexOf('href="./theme.css"') < html.indexOf('href="./agent.css"'), `${file}: tokens load before agent.css`);
+    const pageCss = file === 'whatsapp.html' ? 'whatsapp.css' : 'agent.css';
+    assert.ok(html.indexOf('href="./theme.css"') < html.indexOf(`href="./${pageCss}"`), `${file}: tokens load before ${pageCss}`);
     assert.ok(!/<html[^>]*data-theme=/.test(html), `${file}: no hard-coded data-theme (theme.js decides)`);
     const options = [...html.matchAll(/<option value="([a-z]+)">/g)].map((m) => m[1]);
     assert.deepEqual(options.filter((o) => ['system', ...THEMES].includes(o)), ['system', ...THEMES], `${file}: switcher lists system + ${THEMES.join('/')}`);
     assert.match(html, /<select data-theme-switcher aria-label="/, `${file}: switcher is labelled`);
     assert.ok(html.match(/data-theme-switcher/g).length === 1, `${file}: exactly one switcher`);
   }
-  assert.deepEqual(themed.sort(), ['agent.html', 'cron.html', 'kb.html']);
+  assert.deepEqual(themed.sort(), ['agent.html', 'cron.html', 'kb.html', 'whatsapp.html']);
 });
 
 test('THM-05 the live UI server serves /theme.css and /theme.js by explicit route (the pages reference both)', async (t) => {

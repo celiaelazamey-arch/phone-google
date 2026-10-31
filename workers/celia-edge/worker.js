@@ -24,6 +24,9 @@ import {
   EDGE_MAX_OUTPUT_TOKENS
 } from './runtime.js';
 import { summarizeReplyMetrics, REPLY_CHAR_CAP } from './reply-metrics.js';
+import { createWhatsAppLink, consumeWhatsAppTicket, handleWhatsAppSession, requireWhatsAppSession, assertWhatsAppMutation } from './whatsapp-onboarding.js';
+import { whatsappOnboardingConfig } from './whatsapp-store.js';
+import { handleAccountRequest } from './accounts.js';
 import {
   approveIntent,
   createIntent,
@@ -479,6 +482,62 @@ export default {
       return jsonResponse(skills, 200, baseHeaders);
     }
 
+    // WA-005: the Arabic onboarding page is served from the same origin as its HttpOnly session.
+    if (pathname === '/whatsapp' || pathname === '/whatsapp.html') {
+      if (request.method !== 'GET') return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
+      if (!env.WHATSAPP_UI_HTML) return jsonResponse({ error: 'whatsapp_ui_not_deployed' }, 503, baseHeaders);
+      return new Response(env.WHATSAPP_UI_HTML.replace('<body>', '<body data-runtime="edge">'), { status: 200, headers: { ...baseHeaders, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': "default-src 'self'; script-src 'self' https://connect.facebook.net; style-src 'self'; connect-src 'self' https://*.facebook.com https://*.facebook.net; frame-src https://*.facebook.com https://*.facebook.net; img-src 'self' data: https://*.facebook.com https://*.fbcdn.net; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" } });
+    }
+    if (pathname === '/whatsapp.js' || pathname === '/whatsapp.css') {
+      const js = pathname.endsWith('.js');
+      const asset = js ? env.WHATSAPP_UI_JS : env.WHATSAPP_UI_CSS;
+      if (!asset) return jsonResponse({ error: 'whatsapp_ui_not_deployed' }, 503, baseHeaders);
+      return new Response(asset, { status: 200, headers: { ...baseHeaders, 'content-type': js ? 'application/javascript; charset=utf-8' : 'text/css; charset=utf-8', 'cache-control': 'no-store' } });
+    }
+    if (pathname === '/theme.css' || pathname === '/theme.js') {
+      const js = pathname.endsWith('.js');
+      const asset = js ? env.WHATSAPP_UI_THEME_JS : env.WHATSAPP_UI_THEME_CSS;
+      if (!asset) return jsonResponse({ error: 'whatsapp_ui_not_deployed' }, 503, baseHeaders);
+      return new Response(asset, { status: 200, headers: { ...baseHeaders, 'content-type': js ? 'application/javascript; charset=utf-8' : 'text/css; charset=utf-8', 'cache-control': 'no-store' } });
+    }
+    if (pathname === '/auth/whatsapp') {
+      if (request.method !== 'GET') return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
+      try {
+        const result = await consumeWhatsAppTicket({ request, env });
+        return new Response(null, { status: 302, headers: { ...baseHeaders, location: result.location, 'set-cookie': result.cookie, 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } });
+      } catch (error) { return runtimeErrorResponse(error, baseHeaders); }
+    }
+    if (pathname.startsWith('/api/account/')) {
+      try {
+        const result = await handleAccountRequest({ request, env, pathname });
+        return jsonResponse(result.body, result.status, { ...baseHeaders, ...(result.cookie ? { 'set-cookie': result.cookie } : {}) });
+      } catch (error) { return runtimeErrorResponse(error, baseHeaders); }
+    }
+    if (pathname.startsWith('/api/whatsapp/session/')) {
+      try {
+        if (pathname === '/api/whatsapp/session/inbox' && request.method === 'GET') {
+          const session = await requireWhatsAppSession(request, env);
+          const rows = session.userId === 'owner'
+            ? await env.DB.prepare('SELECT provider_message_id, phone_e164, direction, message_type, body, status, created_at FROM whatsapp_messages ORDER BY id DESC LIMIT 100').all()
+            : await env.DB.prepare('SELECT provider_message_id, phone_e164, direction, message_type, body, status, created_at FROM whatsapp_user_messages WHERE user_id = ? ORDER BY id DESC LIMIT 100').bind(session.userId).all();
+          return jsonResponse({ messages: rows.results || [] }, 200, baseHeaders);
+        }
+        if (pathname === '/api/whatsapp/session/test' && request.method === 'POST') {
+          const session = await requireWhatsAppSession(request, env);
+          assertWhatsAppMutation(request);
+          const parsed = await readBoundedJson(request, MAX_BODY_BYTES);
+          if (!parsed.ok) return jsonResponse({ error: parsed.error }, parsed.status, baseHeaders);
+          if (parsed.data?.consent !== true) return jsonResponse({ error: 'explicit_test_consent_required' }, 403, baseHeaders);
+          await edgeWhatsAppConsentUpsert({ env, userId: session.userId, phone: parsed.data?.phone, optedIn: true, aiOptedIn: false, source: 'user_whatsapp_test' });
+          const result = await edgeWhatsAppSendText({ env, userId: session.userId, phone: parsed.data?.phone, text: 'رسالة اختبار من سيليا: تم ربط رقم واتساب بنجاح.', idempotencyKey: parsed.data?.idempotencyKey, fetchImpl, now });
+          return jsonResponse({ ...result, deliveryStatus: 'accepted_by_meta' }, 200, baseHeaders);
+        }
+        const result = await handleWhatsAppSession({ request, env, pathname, fetchImpl });
+        const headers = { ...baseHeaders, ...(result.cookie ? { 'set-cookie': result.cookie } : {}) };
+        return jsonResponse(result.body, result.status, headers);
+      } catch (error) { return runtimeErrorResponse(error, baseHeaders); }
+    }
+
     // Meta WhatsApp Cloud API Webhook (public route protected by hub.verify_token & raw-bytes HMAC-SHA256).
     if (pathname === '/webhooks/whatsapp') {
       if (request.method === 'GET') {
@@ -557,7 +616,7 @@ export default {
       pathname === '/mcp' ||
       pathname === '/auth/google/link' ||
       pathname.startsWith('/api/google') ||
-      pathname.startsWith('/api/whatsapp') ||
+      (pathname.startsWith('/api/whatsapp') && !pathname.startsWith('/api/whatsapp/session/')) ||
       pathname.startsWith('/api/ai') ||
       pathname.startsWith('/api/secrets') ||
       pathname.startsWith('/api/cron') ||
@@ -705,6 +764,12 @@ export default {
       } catch (err) {
         return runtimeErrorResponse(err, baseHeaders);
       }
+    }
+
+    if (pathname === '/api/whatsapp/connect-link') {
+      if (request.method !== 'POST') return methodNotAllowedResponse(['POST', 'OPTIONS'], baseHeaders);
+      try { return jsonResponse(await createWhatsAppLink(env, url.origin), 200, baseHeaders); }
+      catch (error) { return runtimeErrorResponse(error, baseHeaders); }
     }
 
     if (pathname === '/api/whatsapp/contacts') {

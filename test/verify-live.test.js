@@ -276,6 +276,11 @@ test('verify:live --mode edge — D1 latency is a measured series (min/median/ma
         maxCandidateChars: 1180, lastAt: '2026-10-29T07:00:00.000Z', maxOutputTokens: 220, charCap: 1000, decision: 'DEC-050'
       });
     }
+    if (req.url === '/whatsapp') {
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      return res.end('<!doctype html><html lang="ar" dir="rtl"><body><div id="account-panel"></div><button id="connect"></button></body></html>');
+    }
+    if (req.url === '/api/account/me' || req.url === '/api/whatsapp/session/status') return send(401, { error: 'session_required' });
     return send(404, { error: 'not_found' });
   });
   const baseUrl = await listen(server);
@@ -288,6 +293,9 @@ test('verify:live --mode edge — D1 latency is a measured series (min/median/ma
   assert.deepEqual(byId.d1_latency_series.detail.latencyMs, latencies, 'the series is reported as measured, in order');
   assert.equal(byId.d1_latency_series.detail.samples, 5);
   assert.equal(byId.d1_latency_series.detail.minMs, 130);
+  assert.equal(byId.whatsapp_page.status, 'pass', 'the self-service WhatsApp page is proven deployed');
+  assert.equal(byId.whatsapp_page.detail.hasAccountPanel, true);
+  assert.equal(byId.whatsapp_auth_gate.status, 'pass', 'a visitor is refused, never handed an owner session');
   assert.equal(byId.d1_latency_series.detail.medianMs, 150);
   assert.equal(byId.d1_latency_series.detail.maxMs, 1400);
   assert.equal(byId.d1_latency_series.detail.spreadRatio, 9.33, 'max/median names the 130→1400 variance instead of hiding it in one number');
@@ -340,4 +348,28 @@ test('verify:live --mode edge — a worker that does not report latency, or old 
   assert.equal(byId.edge_reply_metrics.status, 'fail');
   assert.equal(byId.edge_reply_metrics.detail.httpStatus, 404);
   assert.equal(byId.edge_reply_metrics.detail.reason, 'not_found');
+});
+
+test('VER-05 live acceptance refuses a WhatsApp surface that is missing or hands a visitor a session', async (t) => {
+  const server = http.createServer((req, res) => {
+    const send = (status, body) => { res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); };
+    if (req.url === '/healthz') return send(200, { status: 'ok' });
+    if (req.url === '/version') return send(200, { version: '0.2.1', commit: 'c'.repeat(40) });
+    if (req.url === '/readyz') return send(200, { ready: true, storage: { mode: 'd1', durable: true, latencyMs: 10 }, capabilities: { mcp: true, googleOAuth: true, whatsappWebhook: true } });
+    if (req.url === '/mcp') return send(200, { jsonrpc: '2.0', id: 1, result: { tools: Array.from({ length: 12 }, (_, i) => ({ name: `tool_${i}` })) } });
+    if (req.url === '/api/cron/status') return send(200, { ok: true, mode: 'governed-scheduler', writes: 'outbox-approval-only', durable: true, decision: 'DEC-042', outbox: { pending: 0 } });
+    if (req.url.startsWith('/api/whatsapp/reply-metrics')) return send(200, { ok: true, replies: 0, truncated: 0, maxOutputTokens: 220, decision: 'DEC-050' });
+    // A deploy that shipped the runtime but not the page, and an auth gate that leaks.
+    if (req.url === '/whatsapp') { res.writeHead(200, { 'content-type': 'text/html' }); return res.end('<html><body>placeholder</body></html>'); }
+    if (req.url === '/api/account/me') return send(200, { user: { id: 'owner' } });
+    if (req.url === '/api/whatsapp/session/status') return send(200, { connected: true });
+    return send(404, { error: 'not_found' });
+  });
+  const baseUrl = await listen(server);
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const report = await verifyLive({ url: baseUrl, mode: 'edge', token: TOKEN, allowHttp: true, samples: 1, d1Samples: 2, expectVersion: '0.2.1' });
+  const byId = Object.fromEntries(report.checks.map((check) => [check.id, check]));
+  assert.equal(byId.whatsapp_page.status, 'fail', 'a placeholder page is not a deployed linking surface');
+  assert.equal(byId.whatsapp_auth_gate.status, 'fail', 'an unauthenticated 200 is a leaked session, not a pass');
+  assert.equal(report.verdict, 'fail');
 });

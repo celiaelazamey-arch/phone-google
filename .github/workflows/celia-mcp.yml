@@ -45,7 +45,25 @@ jobs:
             exit 1
           fi
       - run: npm ci --no-audit --no-fund
-      - run: npm run check && npm run release:check && npm run check:continuity && npm run test:coverage:ci
+      # VER-06: enable the real-namespace acceptance tests only where the host can run
+      # them. GitHub-hosted runners block unprivileged user namespaces, so forcing the
+      # flag there turns an honest "not run" into a false failure.
+      - name: Detect real sandbox capability
+        run: |
+          if unshare --user --map-root-user true 2>/dev/null; then
+            echo "CELIA_SANDBOX_INTEGRATION=1" >> "$GITHUB_ENV"
+            echo "User namespaces available: real sandbox acceptance will run."
+          else
+            echo '::notice title=sandbox-not-run::User namespaces are blocked on this runner; namespace acceptance is reported as NOT RUN, never as passing.'
+          fi
+      # VER-02/VER-06: keep the mandated :ci wrapper (SP-08 / reporter contract) and gate
+      # the same execution's TAP: only named environment gates may be un-run.
+      - name: Quality gates with an explicit skip gate
+        run: |
+          set -o pipefail
+          npm run check && npm run release:check && npm run check:continuity && npm run test:coverage:ci \
+            -- --test-reporter=tap --test-reporter-destination=/tmp/unit-tap.log
+          node scripts/check-test-skips.mjs /tmp/unit-tap.log --allow-env-gates
       # The Copilot bridge diagram is generated from the policy constants; a policy change without
       # regenerating it would let the published map claim a permission the code no longer grants.
       - name: Copilot architecture map matches the enforced policy
@@ -166,6 +184,8 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npx playwright install --with-deps chromium
+      # VER-02: run-browser-tests.mjs exits non-zero when no Chromium is usable, so this
+      # gate can no longer pass by not running.
       - run: npm run test:browser
       - name: Retain failure traces only
         if: failure()

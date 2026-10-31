@@ -174,14 +174,16 @@ export async function applyMigrations({ accountId, apiToken, databaseId, sql, fe
   return { statements: applied };
 }
 
-export function buildWorkerMetadata({ env = process.env, version = '0.2.1', commit = 'main', d1DatabaseId = null, retirements = loadServiceRetirements() } = {}) {
+export function buildWorkerMetadata({ env = process.env, version = '0.2.1', commit = 'main', d1DatabaseId = null, retirements = loadServiceRetirements(), uiAssets = {} } = {}) {
   // Retired services (DEC-030) travel to the edge as plain_text flags so /api/secrets/status tells the same truth as Git.
   const effectiveEnv = applyRetirementsToEnv(env, retirements);
+  const uiBindings = Object.entries(uiAssets).filter(([, text]) => text).map(([name, text]) => ({ type: 'plain_text', name, text }));
   const retirementBindings = RETIRABLE_FEATURES
     .map((feature) => flagNameFor(feature))
     .filter((flag) => String(effectiveEnv[flag] || '').trim() === 'true')
     .map((flag) => ({ type: 'plain_text', name: flag, text: 'true' }));
   const bindings = [
+    ...uiBindings,
     ...retirementBindings,
     // D1 binding. Absent when the database could not be created — the worker then reports
     // storage.durable = false with the reason instead of pretending to persist.
@@ -220,6 +222,7 @@ export function buildWorkerMetadata({ env = process.env, version = '0.2.1', comm
     'WHATSAPP_ACCESS_TOKEN',
     'WHATSAPP_PHONE_NUMBER_ID',
     'WHATSAPP_APP_SECRET',
+    'WHATSAPP_APP_ID',
     'WHATSAPP_VERIFY_TOKEN',
     'TOKEN_ENCRYPTION_KEY'
   ]) {
@@ -236,6 +239,8 @@ export function buildWorkerMetadata({ env = process.env, version = '0.2.1', comm
   for (const [plainName, fallback] of [
     ['CELIA_TIMEZONE', 'Africa/Cairo'],
     ['WHATSAPP_API_VERSION', 'v26.0'],
+    ['WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID', ''],
+    ['CELIA_PUBLIC_ORIGIN', 'https://celia-phone-google.celiaelazamey.workers.dev'],
     ['WHATSAPP_AUTO_REPLY_ENABLED', 'false'],
     ['APP_OWNER_EMAIL', ''],
     ['GOOGLE_REDIRECT_URI', ''],
@@ -431,7 +436,14 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
 
   const pkg = JSON.parse(await readFile(pkgPath, 'utf8'));
   // Every module reachable from `worker.js` (state.js, runtime.js, crypto.js, cron.js, …) ships in the same upload.
-  const [workerModules, migrationFiles] = await Promise.all([collectWorkerModules(), loadMigrationFiles()]);
+  const [workerModules, migrationFiles, uiHtml, uiJs, uiCss, uiThemeCss, uiThemeJs] = await Promise.all([
+    collectWorkerModules(), loadMigrationFiles(),
+    readFile(path.join(root, 'public/whatsapp.html'), 'utf8'),
+    readFile(path.join(root, 'public/whatsapp.js'), 'utf8'),
+    readFile(path.join(root, 'public/whatsapp.css'), 'utf8'),
+    readFile(path.join(root, 'public/theme.css'), 'utf8'),
+    readFile(path.join(root, 'public/theme.js'), 'utf8')
+  ]);
   const commit = String(env.GITHUB_SHA || 'main').trim();
 
   let d1 = { ok: false, reason: 'dry_run' };
@@ -490,7 +502,8 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
     env,
     version: pkg.version,
     commit,
-    d1DatabaseId: d1BindingId
+    d1DatabaseId: d1BindingId,
+    uiAssets: { WHATSAPP_UI_HTML: uiHtml, WHATSAPP_UI_JS: uiJs, WHATSAPP_UI_CSS: uiCss, WHATSAPP_UI_THEME_CSS: uiThemeCss, WHATSAPP_UI_THEME_JS: uiThemeJs }
   });
   const secretBindingsCount = metadata.bindings.filter((b) => b.type === 'secret_text' && SECRET_KEYS.includes(b.name)).length;
 

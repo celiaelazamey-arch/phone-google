@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import http from 'node:http';
 import { DatabaseSync } from 'node:sqlite';
+import { readFile } from 'node:fs/promises';
 import worker from '../workers/celia-edge/worker.js';
 import {
   decryptEdgeJson,
@@ -478,7 +479,12 @@ test('verify:live --mode edge passes against the Cloudflare Edge + D1 runtime an
     DB,
     CELIA_VERSION: '0.2.1',
     CELIA_BUILD_SHA: 'e'.repeat(40),
-    CELIA_MCP_API_TOKEN: OWNER_TOKEN
+    CELIA_MCP_API_TOKEN: OWNER_TOKEN,
+    // VER-05: the deploy script ships the UI as plain-text bindings. Mirror the real
+    // deployment here so live acceptance exercises the same surface users receive.
+    WHATSAPP_UI_HTML: await readFile(new URL('../public/whatsapp.html', import.meta.url), 'utf8'),
+    WHATSAPP_UI_JS: await readFile(new URL('../public/whatsapp.js', import.meta.url), 'utf8'),
+    WHATSAPP_UI_CSS: await readFile(new URL('../public/whatsapp.css', import.meta.url), 'utf8')
   };
 
   const server = http.createServer(async (req, res) => {

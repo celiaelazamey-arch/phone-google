@@ -55,7 +55,10 @@ a:hover { text-decoration: underline; }
   box-shadow: 0 0 0 6px color-mix(in srgb, var(--ok) 12%, transparent);
 }
 
-nav { display: flex; gap: 1rem; font-size: 0.9rem; }
+/* WA-005: the nav grew by one link. Wrap at every width, not only below 360px,
+   otherwise 361–530px viewports overflow horizontally and push controls off-screen. */
+nav { display: flex; flex-wrap: wrap; gap: 1rem; font-size: 0.9rem; min-width: 0; }
+nav > a, nav > .theme-switch { flex: 0 1 auto; }
 
 .layout {
   display: grid;
@@ -296,5 +299,5 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 @media (max-width: 360px) {
   .layout { padding: 0.75rem; gap: 0.75rem; }
   .card { padding: 0.9rem; }
-  nav { flex-wrap: wrap; gap: 0.6rem; }
+  nav { gap: 0.6rem; }
 }

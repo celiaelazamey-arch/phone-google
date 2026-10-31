@@ -314,12 +314,12 @@ test('RM-05 metrics never break the reply path: broken DB → ok:false, duplicat
   assert.deepEqual(await edgeMetrics.recordReplyMetric({}, base), { ok: false, reason: 'd1_not_bound' });
 });
 
-test('RM-06 the Worker upload carries reply-metrics.js (import graph) and versioned migrations (20 statements across 0001..0005) re-apply cleanly via _migrations', async () => {
+test('RM-06 the Worker upload carries reply-metrics.js (import graph) and versioned migrations (36 statements across 0001..0007) re-apply cleanly via _migrations', async () => {
   const modules = await collectWorkerModules();
   const names = modules.map((m) => m.name ?? m.fileName ?? m.path ?? m).map(String);
   assert.ok(names.some((n) => n.endsWith('reply-metrics.js')), `reply-metrics.js is in the bundle: ${names.join(', ')}`);
   const statements = splitSqlStatements(await loadAllMigrationsSql());
-  assert.equal(statements.length, 20);
+  assert.equal(statements.length, 36);
   assert.ok(statements.some((s) => /CREATE TABLE IF NOT EXISTS whatsapp_reply_metrics/.test(s)));
 
   // Re-applying everything twice via applyVersionedMigrations must succeed with _migrations skipping already-applied files.
@@ -335,8 +335,8 @@ test('RM-06 the Worker upload carries reply-metrics.js (import graph) and versio
   };
   const first = await applyVersionedMigrations({ accountId: 'acc', apiToken: 'tok', databaseId: 'db', databaseCreated: true, fetchImpl: d1Fetch, retryDelayMs: 1 });
   const second = await applyVersionedMigrations({ accountId: 'acc', apiToken: 'tok', databaseId: 'db', databaseCreated: false, fetchImpl: d1Fetch, retryDelayMs: 1 });
-  assert.equal(first.statements, 20);
+  assert.equal(first.statements, 36);
   assert.equal(second.statements, 0);
-  assert.equal(second.skippedFiles, 5);
+  assert.equal(second.skippedFiles, 7);
   assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name = 'whatsapp_reply_metrics'").get().n, 1);
 });

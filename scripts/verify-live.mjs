@@ -342,6 +342,38 @@ export async function verifyLive({
       add('edge_reply_metrics', metricsTitle, 'fail', { reason: error?.code || error?.name || 'request_failed' });
     }
 
+    // WA-007 / VER-05: the self-service WhatsApp surface must be deployed and must NOT
+    // claim a live Meta link. This proves the page and account API shipped; it deliberately
+    // does not assert that onboarding is configured, because that is an operator setting.
+    try {
+      // `get()` parses JSON; the page is HTML, so read it as text on its own.
+      const response = await fetchImpl(`${base}/whatsapp`, { redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) });
+      const html = await response.text();
+      const page = { status: response.status };
+      const served = page.status === 200 && html.includes('id="connect"') && html.includes('dir="rtl"');
+      add('whatsapp_page', 'صفحة /whatsapp منشورة بالعربية وتحتوي زر الربط وحساب المستخدم', served ? 'pass' : 'fail', {
+        httpStatus: page.status,
+        hasConnectButton: html.includes('id="connect"'),
+        hasAccountPanel: html.includes('id="account-panel"'),
+        bytes: html.length
+      });
+    } catch (error) {
+      add('whatsapp_page', 'صفحة /whatsapp منشورة بالعربية وتحتوي زر الربط وحساب المستخدم', 'fail', { reason: error?.code || error?.name || 'request_failed' });
+    }
+
+    try {
+      // An unauthenticated caller must be refused, never handed an owner session.
+      const me = await get('/api/account/me');
+      const status = await get('/api/whatsapp/session/status');
+      const ok = me.status === 401 && status.status === 401;
+      add('whatsapp_auth_gate', 'واجهات الحساب والربط ترفض الزائر بلا جلسة (401) ولا تمنح جلسة مالك', ok ? 'pass' : 'fail', {
+        accountMeStatus: me.status,
+        sessionStatus: status.status
+      });
+    } catch (error) {
+      add('whatsapp_auth_gate', 'واجهات الحساب والربط ترفض الزائر بلا جلسة (401) ولا تمنح جلسة مالك', 'fail', { reason: error?.code || error?.name || 'request_failed' });
+    }
+
     return finish();
   }
 
