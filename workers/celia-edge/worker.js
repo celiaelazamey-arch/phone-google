@@ -374,6 +374,12 @@ export default {
           cardFreeHosting: true,
           fullEdgeRuntimeMounted: true,
           capabilities: EDGE_CAPABILITIES,
+          // VER-09: booleans only. Tells an operator whether the ordinary-user linking
+          // flow can start, without exposing app id, config id or any secret value.
+          whatsappOnboarding: (() => {
+            const onboarding = whatsappOnboardingConfig(env);
+            return { configured: onboarding.configured, missing: onboarding.missing };
+          })(),
           release,
           storage,
           secretsConfiguredCount: readiness.configuredCount,
