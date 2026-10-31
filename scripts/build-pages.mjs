@@ -156,6 +156,8 @@ export async function build() {
     const sourcePath = path.join(PUBLIC_DIR, entry.name);
     const targetPath = path.join(DIST_DIR, entry.name);
     if (entry.isDirectory()) {
+      // لقطات الفحص البصري أدوات عمل محلية، وليست من أصول الموقع المنشور.
+      if (entry.name.startsWith('.')) continue;
       // أصول محلية مثل الخطوط والصور؛ انسخها كما هي إلى النسخة الثابتة.
       await cp(sourcePath, targetPath, { recursive: true });
       continue;

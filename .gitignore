@@ -19,3 +19,7 @@ test-results/
 data/learning/sources/*/transcript*.txt
 data/learning/sources/*/*.srt
 data/learning/sources/*/*.vtt
+
+# Hallmark visual-audit artifacts (local tooling output, never shipped)
+public/.hallmark/
+.hallmark/

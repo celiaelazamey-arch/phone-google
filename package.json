@@ -25,6 +25,7 @@
     "test:coverage:ci": "npm run test:coverage -- --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./scripts/test-reporter-gha.mjs --test-reporter-destination=stdout",
     "check": "node scripts/check.mjs",
     "build:pages": "node scripts/build-pages.mjs",
+    "design:audit": "node vendor/hallmark/scripts/sloplint.mjs",
     "preview:pages": "node scripts/build-pages.mjs && node scripts/serve-pages.mjs",
     "deploy:release": "node scripts/deploy-release.mjs",
     "deploy:render": "node scripts/deploy-render.mjs",
