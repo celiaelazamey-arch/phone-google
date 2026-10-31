@@ -50,6 +50,10 @@ jobs:
           WHATSAPP_APP_ID: ${{ secrets.WHATSAPP_APP_ID || vars.WHATSAPP_APP_ID }}
           WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID: ${{ vars.WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID || secrets.WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID }}
           WHATSAPP_VERIFY_TOKEN: ${{ secrets.WHATSAPP_VERIFY_TOKEN }}
+          # VER-11: the deploy script binds these, but the workflow never passed them, so
+          # stored credentials could never be encrypted on the edge. Wire them explicitly.
+          TOKEN_ENCRYPTION_KEY: ${{ secrets.TOKEN_ENCRYPTION_KEY }}
+          TOKEN_ENCRYPTION_KEY_ID: ${{ vars.TOKEN_ENCRYPTION_KEY_ID }}
           WHATSAPP_API_VERSION: ${{ vars.WHATSAPP_API_VERSION || 'v26.0' }}
           APP_OWNER_EMAIL: ${{ vars.APP_OWNER_EMAIL || secrets.APP_OWNER_EMAIL }}
           CELIA_TIMEZONE: 'Africa/Cairo'

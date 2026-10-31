@@ -138,3 +138,33 @@ test('VER-07 the WhatsApp UI ships as a Worker module, never as an oversized tex
   const workflow = await readFile(new URL('../.github/workflows/celia-mcp.yml', import.meta.url), 'utf8');
   assert.match(workflow, /npm run build:edge-ui:check/, 'CI rejects a stale UI bundle');
 });
+
+test('VER-11 every setting the linking flow needs is actually passed by the deploy workflow', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { whatsappOnboardingConfig } = await import('../workers/celia-edge/whatsapp-store.js');
+  const workflow = await readFile(new URL('../.github/workflows/cloudflare-deploy.yml', import.meta.url), 'utf8');
+
+  // Derived from the runtime requirement, not a hand-copied list that can drift.
+  const required = ['WHATSAPP_APP_ID', 'WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID', 'WHATSAPP_APP_SECRET', 'TOKEN_ENCRYPTION_KEY'];
+  for (const name of required) {
+    assert.match(workflow, new RegExp(`${name}:\\s*\\$\\{\\{`), `${name} must reach the deploy script or linking silently 503s`);
+  }
+
+  // With all four present the runtime reports configured; removing any one names it.
+  const complete = {
+    WHATSAPP_APP_ID: '1234567890',
+    WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID: '9876543210',
+    WHATSAPP_APP_SECRET: 'a-real-looking-app-secret',
+    WHATSAPP_API_VERSION: 'v26.0',
+    TOKEN_ENCRYPTION_KEY: 'a-base64-looking-encryption-key',
+    DB: {},
+  };
+  assert.equal(whatsappOnboardingConfig(complete).configured, true);
+  for (const name of ['WHATSAPP_APP_ID', 'WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID', 'WHATSAPP_APP_SECRET', 'TOKEN_ENCRYPTION_KEY']) {
+    const partial = { ...complete };
+    delete partial[name];
+    const result = whatsappOnboardingConfig(partial);
+    assert.equal(result.configured, false, `${name} is required`);
+    assert.ok(result.missing.length > 0, 'the missing setting is named, never its value');
+  }
+});
