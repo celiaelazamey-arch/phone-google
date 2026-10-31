@@ -281,6 +281,7 @@ test('verify:live --mode edge — D1 latency is a measured series (min/median/ma
       return res.end('<!doctype html><html lang="ar" dir="rtl"><body><div id="account-panel"></div><button id="connect"></button></body></html>');
     }
     if (req.url === '/api/account/me' || req.url === '/api/whatsapp/session/status') return send(401, { error: 'session_required' });
+    if (req.url === '/api/account/login') return send(401, { error: 'invalid_email_or_password' });
     return send(404, { error: 'not_found' });
   });
   const baseUrl = await listen(server);
@@ -362,6 +363,7 @@ test('VER-05 live acceptance refuses a WhatsApp surface that is missing or hands
     // A deploy that shipped the runtime but not the page, and an auth gate that leaks.
     if (req.url === '/whatsapp') { res.writeHead(200, { 'content-type': 'text/html' }); return res.end('<html><body>placeholder</body></html>'); }
     if (req.url === '/api/account/me') return send(200, { user: { id: 'owner' } });
+    if (req.url === '/api/account/login') return send(500, { error: 'no such table: app_accounts' });
     if (req.url === '/api/whatsapp/session/status') return send(200, { connected: true });
     return send(404, { error: 'not_found' });
   });
@@ -371,5 +373,6 @@ test('VER-05 live acceptance refuses a WhatsApp surface that is missing or hands
   const byId = Object.fromEntries(report.checks.map((check) => [check.id, check]));
   assert.equal(byId.whatsapp_page.status, 'fail', 'a placeholder page is not a deployed linking surface');
   assert.equal(byId.whatsapp_auth_gate.status, 'fail', 'an unauthenticated 200 is a leaked session, not a pass');
+  assert.equal(byId.whatsapp_accounts_schema.status, 'fail', 'a missing accounts table must fail the deploy, not hide behind a 401 guard');
   assert.equal(report.verdict, 'fail');
 });
