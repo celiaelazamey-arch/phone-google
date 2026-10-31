@@ -491,7 +491,9 @@ test('verify:live --mode edge passes against the Cloudflare Edge + D1 runtime an
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
     const body = chunks.length ? Buffer.concat(chunks) : undefined;
-    const webReq = new Request(`http://127.0.0.1${req.url}`, {
+    // Preserve the real Host so request.url carries the port, exactly as Cloudflare does.
+    // Dropping it made every same-origin CSRF check compare against a port-less origin.
+    const webReq = new Request(`http://${req.headers.host || '127.0.0.1'}${req.url}`, {
       method: req.method,
       headers: req.headers,
       ...(body && req.method !== 'GET' && req.method !== 'HEAD' ? { body } : {})

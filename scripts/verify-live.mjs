@@ -374,6 +374,29 @@ export async function verifyLive({
       add('whatsapp_auth_gate', 'واجهات الحساب والربط ترفض الزائر بلا جلسة (401) ولا تمنح جلسة مالك', 'fail', { reason: error?.code || error?.name || 'request_failed' });
     }
 
+    // VER-08: prove the account tables really exist in D1. A 401 from /api/account/me
+    // only proves the cookie guard; a login with a non-existent address must reach the
+    // database and answer 401 invalid_email_or_password. A missing table answers 5xx.
+    // This writes one rate-limit row for a synthetic address and creates no account.
+    try {
+      const probe = await fetchImpl(`${base}/api/account/login`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: base, 'x-celia-request': 'whatsapp' },
+        body: JSON.stringify({ email: 'acceptance-probe@example.invalid', password: 'not-a-real-password-000' }),
+        redirect: 'manual',
+        signal: AbortSignal.timeout(timeoutMs)
+      });
+      const body = await probe.json().catch(() => ({}));
+      const ok = probe.status === 401 && body?.error === 'invalid_email_or_password';
+      add('whatsapp_accounts_schema', 'جداول الحسابات مُرحّلة فعليًا في D1 (تسجيل دخول لعنوان غير موجود يرد 401 لا 5xx)', ok ? 'pass' : 'fail', {
+        httpStatus: probe.status,
+        error: body?.error ?? null,
+        note: 'synthetic address; no account is created'
+      });
+    } catch (error) {
+      add('whatsapp_accounts_schema', 'جداول الحسابات مُرحّلة فعليًا في D1 (تسجيل دخول لعنوان غير موجود يرد 401 لا 5xx)', 'fail', { reason: error?.code || error?.name || 'request_failed' });
+    }
+
     return finish();
   }
 

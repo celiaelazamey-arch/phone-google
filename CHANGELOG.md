@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- VER-08 / DEC-070: live acceptance now proves the account tables exist in D1 by signing in with a synthetic address (401 invalid_email_or_password), because "no new migrations" is not evidence of a migrated schema. Fixed the test harness to preserve the Host port so same-origin CSRF checks compare against a real origin.
 - VER-07 / DEC-069: the WhatsApp UI now ships inside the Worker module bundle instead of plain-text bindings. The first live deploy was rejected by Cloudflare (error 10054: a 12 kB text binding exceeds the 5.1 kB cap). A generated, drift-checked module removes the cap, and buildWorkerMetadata now refuses any oversized text binding with a named error.
 - VER-06 / DEC-068: the zero-skip gate no longer produces false failures on hosts that block unprivileged user namespaces. A capability probe enables the real sandbox acceptance only where it can run, and `scripts/check-test-skips.mjs` tolerates only a named list of environment gaps — printing them as NOT RUN and failing on any other skip.
 - VER-05 / DEC-067: live edge acceptance now proves the self-service `/whatsapp` page is actually deployed and that an unauthenticated visitor is refused (401) by both the account and session APIs, exercised against the real worker with the real UI bindings plus a negative test for a placeholder page or a leaked session. Embedded Signup identifiers now resolve from either repository secrets or variables.
