@@ -50,3 +50,30 @@
 - **عمليات غير آمنة لم تُنفَّذ:** لا نشر يدوي، لا ترحيل إنتاجي خارج مسار النشر، لا قراءة أسرار، لا تعديل إعدادات مشاركة.
 - **الخطوة التالية:** فتح PR، وانتظار الفحوص، ثم الدمج والنشر لإثبات أن البوابة والإثبات عملا حيًّا.
 - **باقٍ بصراحة:** `MAN-004` (نشر ذرّي بتراجع) و`MAN-006` (فهرس ARD) لم تُنفَّذ. وربط واتساب `configured=false` بانتظار إعدادات المالك (`DEC-073`) — لا يُقرأ نجاح النشر كإثبات ربط.
+
+---
+
+## الدليل الحيّ بعد الدمج
+
+دُمج **PR #111** في `main@4fc5112`، وتشغيلة **`Deploy (Cloudflare Edge)` 41186251134** ناجحة. ترتيب الخطوات الفعلي من GitHub:
+
+| # | الخطوة | النتيجة |
+|---|---|---|
+| 4 | Install dependencies for the integrity gate | success |
+| 5 | **Verify edge bundle integrity (MAN-002)** | success |
+| 6 | Deploy Cloudflare Worker | success |
+| 7 | **Attest the deployed edge bundle (OIDC)** | success |
+| 8 | Verify live edge + D1 | success |
+| 9 | Promote slice to known_good | success |
+
+**التنبيهات الفعلية:** `integrity verified — 11 modules, bundle sha256:31d56eebbdb5…` · `known_good granted to 4fc5112`.
+
+**الإثبات نفسه مقروء من API:** `GET /attestations/sha256:31d56ee…` ⇒ إثبات واحد، حمولته:
+
+- `predicateType: https://slsa.dev/provenance/v1`
+- الموضوعان: `celia-edge-bundle-4fc51126…` ببصمة الحزمة، و`system.manifest.json`
+- `builder.id: …/cloudflare-deploy.yml@refs/heads/main`
+
+**حدّ صريح:** `gh attestation verify` غير متاح في بيئة الجلسة (`unknown command "attestation"`)، فلم يُجرَ تحقق تشفيري محلي لسلسلة الشهادات. المُثبت: وجود الإثبات ومحتواه عبر API ونجاح خطوته في التشغيلة. التحقق التشفيري الكامل يشغّله المالك أو CI حيث `gh` أحدث.
+
+**وما زال ناقصًا:** `MAN-004` و`MAN-006`؛ وربط واتساب `configured=false` — التنبيه الحيّ ما زال يسمّي الناقص نفسه. نجاح النشر ليس إثبات ربط.
