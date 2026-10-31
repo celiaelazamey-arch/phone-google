@@ -57,7 +57,8 @@
     "build:edge-ui": "node scripts/build-edge-ui.mjs",
     "build:edge-ui:check": "node scripts/build-edge-ui.mjs --check",
     "build:manifest": "node scripts/build-manifest.mjs",
-    "build:manifest:check": "node scripts/build-manifest.mjs --check"
+    "build:manifest:check": "node scripts/build-manifest.mjs --check",
+    "verify:edge-provenance": "node scripts/verify-edge-provenance.mjs"
   },
   "dependencies": {
     "dotenv": "^18.0.9",
