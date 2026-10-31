@@ -77,9 +77,10 @@ test('VER-02 a packed loader that throws degrades to a clear failure, not a cras
 test('VER-02 CI cannot report success while gates are skipped or the browser never launches', async () => {
   const { readFile } = await import('node:fs/promises');
   const workflow = await readFile(new URL('../.github/workflows/celia-mcp.yml', import.meta.url), 'utf8');
-  assert.match(workflow, /CELIA_SANDBOX_INTEGRATION=1/, 'real namespace tests are enabled on the Linux runner');
-  assert.match(workflow, /grep -qE 'skipped \[1-9\]\[0-9\]\*'/, 'any skipped unit test fails the job');
-  assert.match(workflow, /npm run test:coverage:ci 2>&1 \| tee/, 'the skip gate reads the same run it gates, through the mandated :ci wrapper');
+  assert.match(workflow, /unshare --user --map-root-user true/, 'real namespace tests run only where the host supports them');
+  assert.match(workflow, /CELIA_SANDBOX_INTEGRATION=1/, 'the capability probe enables the real acceptance tests');
+  assert.match(workflow, /node scripts\/check-test-skips\.mjs \/tmp\/unit-tap\.log --allow-env-gates/, 'only named environment gates may be un-run');
+  assert.match(workflow, /npm run test:coverage:ci/, 'the skip gate reads the same run it gates, through the mandated :ci wrapper');
   assert.match(workflow, /npm run test:browser/, 'the browser suite still runs in CI');
 
   const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
@@ -87,4 +88,28 @@ test('VER-02 CI cannot report success while gates are skipped or the browser nev
   const runner = await readFile(new URL('../scripts/run-browser-tests.mjs', import.meta.url), 'utf8');
   assert.match(runner, /process\.exit\(1\)/, 'a missing browser exits non-zero instead of passing quietly');
   assert.ok(!/continue-on-error:\s*true/.test(workflow), 'no gate is allowed to fail open');
+});
+
+test('VER-06 the skip gate allows only named environment gaps and fails on anything else', async () => {
+  const { parseSkips, evaluateSkips } = await import('../scripts/check-test-skips.mjs');
+  const tap = [
+    'ok 1 - AGENT-003 creates/destroys a non-root run # SKIP set CELIA_SANDBOX_INTEGRATION=1',
+    'ok 2 - SBX-09 (REAL acceptance): full loop # SKIP namespaces',
+    'ok 3 - MCP_TOOLS preserves strict N/N-1 backward compatibility with 0.2.0 baseline # SKIP shallow clone',
+    'ok 4 - WA-005 onboarding: v5 code exchange # SKIP convenient',
+  ].join('\n');
+  const skips = parseSkips(tap);
+  assert.equal(skips.length, 4);
+
+  const strict = evaluateSkips(skips);
+  assert.equal(strict.ok, false, 'with no allowance, every skip fails');
+
+  const gated = evaluateSkips(skips, { allowEnvironmentGates: true });
+  assert.equal(gated.ok, false, 'an ordinary test skipped for convenience still fails');
+  assert.equal(gated.allowed.length, 3);
+  assert.deepEqual(gated.unexpected.map((s) => s.name), ['WA-005 onboarding: v5 code exchange']);
+  assert.ok(gated.allowed.every((s) => s.capability), 'every tolerated gap names its missing capability');
+
+  assert.equal(evaluateSkips([], { allowEnvironmentGates: true }).ok, true);
+  assert.deepEqual(parseSkips('ok 1 - a passing test'), []);
 });
