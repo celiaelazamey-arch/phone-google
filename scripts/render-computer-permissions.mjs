@@ -164,10 +164,10 @@ ${cards}
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>صلاحيات وكيل الكمبيوتر في CeliaOS — مصفوفة سياسة (غير موصولة)</title>
+    <title>صلاحيات وكيل الكمبيوتر في CeliaOS | مصفوفة سياسة (غير موصولة)</title>
     <meta
       name="description"
-      content="مصفوفة صلاحيات وكيل الكمبيوتر داخل CeliaOS: مسموح، موافقة، مقيّد، محظور — مع NETWORK=DENY وEXTERNAL GATES=CLOSED وIDENTITY=NOT_PROVEN، وميزة الاستقلالية المصحوبة بأدلة."
+      content="مصفوفة صلاحيات وكيل الكمبيوتر داخل CeliaOS: مسموح، موافقة، مقيّد، محظور، مع NETWORK=DENY وEXTERNAL GATES=CLOSED وIDENTITY=NOT_PROVEN، وميزة الاستقلالية المصحوبة بأدلة."
     />
     <link rel="stylesheet" href="./fonts.css" />
     <style>
@@ -178,17 +178,15 @@ ${cards}
       * { box-sizing: border-box; }
       body {
         margin: 0; color: var(--txt); line-height: 1.7;
-        background: radial-gradient(1100px 560px at 82% -10%, #3b2a8f55, transparent),
-          radial-gradient(880px 480px at 8% 8%, #0e749033, transparent), var(--bg);
+        background: var(--bg);
         font-family: "IBM Plex Sans Arabic", system-ui, Tahoma, sans-serif;
       }
       .wrap { max-width: 1200px; margin: 0 auto; padding: 20px 16px 40px; }
-      .skip { position: absolute; inset-inline-start: -9999px; }
-      .skip:focus { inset-inline-start: 12px; top: 8px; background: var(--cy); color: #06102c; padding: 8px 12px; border-radius: 8px; }
+      .skip { position: absolute; inset-inline-start: 12px; top: 8px; opacity: 0; pointer-events: none; }
+      .skip:focus-visible { opacity: 1; pointer-events: auto; background: var(--cy); color: #06102c; padding: 8px 12px; border-radius: 8px; }
       .topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;
         border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; background: #ffffff08; }
-      .brand { font-weight: 800; background: linear-gradient(135deg, var(--vio), var(--cy));
-        -webkit-background-clip: text; background-clip: text; color: transparent; }
+      .brand { font-weight: 800; color: var(--cy); }
       nav { display: flex; flex-wrap: wrap; gap: 6px; }
       nav a { color: var(--mut); text-decoration: none; font-size: 13px; padding: 5px 11px; border-radius: 999px; }
       nav a:hover, nav a:focus-visible { color: var(--txt); background: #ffffff0a; }
@@ -201,7 +199,7 @@ ${cards}
       .state { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
       .state code { background: #00000033; border: 1px solid var(--line); border-radius: 8px; padding: 2px 8px; font-size: 12px; direction: ltr; }
       .cols { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 10px; }
-      .col { background: var(--bg2); border: 1px solid var(--line); border-radius: 16px; padding: 12px; }
+      .col { color: var(--txt); background: var(--bg2); border: 1px solid var(--line); border-radius: 16px; padding: 12px; }
       .col-title { margin: 0 0 4px; font-size: 15px; display: flex; justify-content: space-between; align-items: center; }
       .col-title[data-status="allowed"] { color: var(--ok); }
       .col-title[data-status="approval_required"] { color: var(--warn); }
@@ -223,7 +221,7 @@ ${cards}
       section.block h2 small { font-size: 12.5px; color: var(--mut); font-weight: 400; }
       ol.flow { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
       ol.flow li { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px; display: flex; gap: 8px; }
-      ol.flow b { width: 24px; height: 24px; flex: none; border-radius: 50%; background: var(--vio); color: #fff;
+      ol.flow b { width: 24px; height: 24px; flex: none; border-radius: 50%; background: #5b21b6; color: #f4f1ff;
         display: grid; place-items: center; font-size: 12px; }
       ol.flow small { display: block; color: var(--mut); font-size: 11.5px; }
       ul.rules { margin: 0; padding-inline-start: 18px; color: var(--mut); font-size: 13.5px; }
@@ -268,13 +266,13 @@ ${cards}
 
       <header class="hero">
         <h1>صلاحيات وكيل الكمبيوتر في CeliaOS</h1>
-        <p>مصفوفة سياسة — تُولَّد من الشيفرة نفسها التي تصدر القرار.</p>
+        <p>مصفوفة سياسة تُولَّد من الشيفرة نفسها التي تصدر القرار.</p>
       </header>
 
       <div class="truth" role="note">
         <b>ليست قدرات مُشغَّلة.</b>
         ${summary.wired} من ${summary.total} قدرة موصولة بمحرك Computer Use (Backend <code>AGENT-003</code> المحلي غير موصول بها). القرار يُحسب فعليًا، لكن
-        <code>executable</code> يبقى <code>false</code> — والمخطط يوثّق الحدود بدل أن يوحي بقدرة قائمة.
+        <code>executable</code> يبقى <code>false</code>، والمخطط يوثّق الحدود بدل أن يوحي بقدرة قائمة.
         <div class="state">
           <code>NETWORK = ${SYSTEM_STATE.network}</code>
           <code>EXTERNAL GATES = ${SYSTEM_STATE.externalGates}</code>
@@ -312,7 +310,7 @@ ${rules}
 ${pillars}
             </div>
             <table>
-              <caption class="col-note">المراحل — معيار نجاح لكل مرحلة، لا شعارات</caption>
+              <caption class="col-note">المراحل: معيار نجاح لكل مرحلة، لا شعارات</caption>
               <thead>
                 <tr><th>#</th><th>المرحلة</th><th>ما نبنيه</th><th>معيار النجاح</th></tr>
               </thead>

@@ -3,19 +3,19 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Find Skills — مستكشف مهارات سيليا الحية</title>
+  <title>Find Skills | مستكشف مهارات سيليا الحية</title>
   <link rel="stylesheet" href="./fonts.css" />
   <link rel="stylesheet" href="./styles.css" />
   <style>
     .find-hero{margin:14px 0;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:16px;padding:18px}
-    .chip{padding:6px 10px;border-radius:999px;border:1px solid var(--border-subtle);background:var(--bg-surface-2);cursor:pointer;font-size:.85rem}
-    .chip.active{background:var(--accent);color:#fff;border-color:transparent}
+    .chip{padding:6px 10px;border-radius:999px;border:1px solid var(--field-edge);background:var(--bg-surface-2);cursor:pointer;font-size:.85rem}
+    .chip.active{background:var(--accent);color:var(--accent-fg);border-color:transparent}
     .skill-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
     .skill-card{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:12px;padding:14px}
     .skill-card h4{margin:0 0 6px}
     .meta{color:var(--text-muted);font-size:.85rem}
     .code{font-family:JetBrains Mono,monospace;background:var(--bg-code);color:#e2e8f0;padding:8px;border-radius:8px;direction:ltr;text-align:left;white-space:pre-wrap;font-size:.78rem}
-    .search-box{flex:1;padding:11px 12px;border-radius:10px;border:1px solid var(--border-subtle);background:var(--bg-surface);color:var(--text-primary)}
+    .search-box{flex:1;padding:11px 12px;border-radius:10px;border:1px solid var(--field-edge);background:var(--bg-surface);color:var(--text-primary)}
     .live-strip{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
     .live-strip span{font-size:.8rem;padding:6px 10px;border-radius:999px;background:var(--bg-surface-2);border:1px solid var(--border-subtle)}
   </style>
@@ -27,19 +27,19 @@
     <nav class="nav-pills">
       <a class="nav-pill" href="./studio">مساحة الوكيل</a>
       <a class="nav-pill" href="./live">النظام الحي</a>
-      <a class="nav-pill active" href="./skills">Find Skills ⚡</a>
-      <a class="nav-pill" href="./landing">صفحة الهبوط 🚀</a>
+      <a class="nav-pill active" href="./skills">Find Skills</a>
+      <a class="nav-pill" href="./landing">صفحة الهبوط</a>
     </nav>
-    <div class="topbar-actions"><span class="status-chip"><span class="status-dot ok"></span><span id="count">—</span></span></div>
+    <div class="topbar-actions"><span class="status-chip"><span class="status-dot ok"></span><span id="count">…</span></span></div>
   </header>
   <div class="workspace-body" style="overflow:auto">
     <main class="stage-main" style="max-width:1050px;margin:0 auto;width:100%;padding:16px">
       <div class="find-hero">
-        <h1 style="margin:0 0 6px">مهارة Find Skills — اكتشف قدرات نظامك لحظيًا</h1>
+        <h1 style="margin:0 0 6px">مهارة Find Skills، اكتشف قدرات نظامك لحظيًا</h1>
         <p style="color:var(--text-secondary);margin:0">اكتب كلمة بالعربية أو الإنجليزية وسيبحث الخادم الحي في جميع الأدوات (12 مهارة) ويعيدها مع حالة كل مهارة وطريقة استدعائها. هذه هي المهارة التي طلبتها لرؤية النظام حيًا.</p>
         <div style="display:flex;gap:8px;margin:12px 0;flex-wrap:wrap">
           <input id="q" class="search-box" placeholder="جرّب: whatsapp، gmail، تقويم، إرسال، ذكاء، تشفير، system..." />
-          <button id="btn-find" class="icon-btn" style="background:var(--accent);color:#fff;border:none;padding:10px 14px;border-radius:10px;cursor:pointer">بحث 🔍</button>
+          <button id="btn-find" class="icon-btn" style="background:var(--accent);color:var(--accent-fg);border:none;padding:10px 14px;border-radius:10px;cursor:pointer">بحث</button>
           <button id="btn-all" class="icon-btn" style="padding:10px 12px">عرض الكل</button>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap" id="chips">
@@ -50,11 +50,11 @@
           <button class="chip" data-cat="security">Security</button>
           <button class="chip" data-cat="system">System</button>
         </div>
-        <div class="live-strip"><span id="s-storage">—</span><span id="s-provider">—</span><span id="s-tools">—</span><span style="background:var(--emerald-soft);color:var(--emerald)">حي الآن ●</span></div>
+        <div class="live-strip"><span id="s-storage">…</span><span id="s-provider">…</span><span id="s-tools">…</span><span style="background:var(--emerald-soft);color:var(--emerald)">حي الآن ●</span></div>
       </div>
       <div id="grid" class="skill-grid"></div>
       <h3 style="margin:14px 0 6px">الاستجابة الخام (JSON-RPC)</h3>
-      <pre id="raw" class="code">—</pre>
+      <pre id="raw" class="code">…</pre>
       <div style="margin:12px 0;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:10px;padding:12px">
         <strong>أمثلة سريعة:</strong>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">

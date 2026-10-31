@@ -2,7 +2,7 @@
 
 > **حفظ التاريخ بلا حذف (`DEC-052` / `CONT-004`):** هذه نافذة الاستئناف النشطة؛ السجل التراكمي الكامل حتى ما بعد PR #84 (`main@738d832` / `9f6f8b2` — 983 سطرًا / 142,150 بايت) محفوظ حرفيًا في **[STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md)** وبصمته محروسة بـ`R0-02`. القراءة السريعة المشتقة: **[NOW.md](NOW.md)** (`npm run now`).
 
-**آخر مراجعة:** 31 أكتوبر 2026 · **الجلسة الحالية:** `DSN-001` / `DEC-078` — تدقيق تصميم صفحة الهبوط بمتصفح حقيقي (تفاصيلها أدناه). الجلسة السابقة `MAN-002` مدموجة ومُثبتة حيًّا، وقبلها `PR-2B-PROD-INTEGRITY` المدموجة في [سجلها](sessions/2026-10-31-pr2b-production-integrity-hardening.md).
+**آخر مراجعة:** 31 أكتوبر 2026 · **الجلسة الحالية:** `DSN-002` / `DEC-079` — إصلاح ما قِيس على 12 صفحة بعد صفحة الهبوط (تفاصيلها أدناه). الجلسة السابقة `DSN-001` (PR #113 → `main@ec7da14`) مدموجة ومنشورة حيًّا.
 
 **الجلسة السابقة (29 أكتوبر 2026):** **RELEASE-SIGNAL — «هل `system.html#releases` تعكس التقدّم فعلًا؟»** على `arena/afe3493a-phone-google` من `main@e99ebaf`. **الجواب:** نصفها حيّ ونصفها مجمّد — المكوّنات من `GET /api/system` الحقيقي، وسجل الإصدارات ثلاثة مداخل مكتوبة بيد في `releases/history.json` لا تتحرك إلا بترقية إصدار (`src/version.js` يرمي استثناءً عند المخالفة)، فلا شريحة من PR #93…#98 ظهرت، وGitHub يحمل إصدارًا منشورًا واحدًا (`v0.2.1`) بينما السجل يعرض ثلاثة. **الإصلاح المقيس:** [`src/progress.js`](../../src/progress.js) يقرأ قسم `Unreleased` من `CHANGELOG.md` بلا شبكة ولا نموذج، ويُضاف إلى `GET /api/releases` كحقل `unreleased`، وتعرضه الصفحة بطاقة متقطّعة `.progress-card` **ليست** بطاقة إصدار ولا تحمل تاريخًا أو وسمًا أو ادعاء نشر، وتصمت (`parsed:false`) إن غاب الملف. الاختبارات `PRG-01..07`. سجل الجلسة: [2026-10-29-release-signal](sessions/2026-10-29-release-signal.md) · الشرح التشغيلي: [§8 من دليل الإصدارات](../releases-and-recovery.md).
 
@@ -12,14 +12,15 @@
 **قبلها:** MANUS-C2aL («اجلب ولخّص من ٣ مصادر» → `main@e99ebaf`، PR #98، `DEC-062`) · C1-b/C2-a (PR #96 → `main@00a2386`) · C1-a (PR #95 → `main@97078dc`) · B4 (PR #93 → `main@acafa13`) · B3 + إنقاذ A4 + قارئ العنكبوت (PR #92 → `main@bdfbb6b`) · وما قبلها في `docs/continuity/sessions/` وروابطها في [NOW.md](NOW.md).
 **ملاحظة استمرارية:** **PR #99 مفتوح بانتظار كلمة المالك — لا دمج تلقائي** (`DEC-015`/`DEC-016`). **#97 و#94 أُغلقا كمُستبدَلين** بعد نقل كل نص فريد منهما (لا شيء ضاع).
 
-## الجلسة الحالية — 31 أكتوبر 2026 — DSN-001 / DEC-078 (تصميم مُدقَّق بمتصفح)
+## الجلسة الحالية — 31 أكتوبر 2026 — DSN-002 / DEC-079 (بقية الصفحات)
 
-- **الفرع:** `arena/08948687-phone-google` من `main@2e76151`.
-- **المنفذ:** تدقيق Hallmark (MIT، `4f6a46c`) على صفحة الهبوط بمتصفح حقيقي: **201 FAIL + 105 REFLEX ⇒ 0 و0**. عيوب مقاسة أُصلحت: تباين الزر 2.64–4.14:1، حدود الحقول 1.66:1، رمز 🙏 يظهر ▯، وبطاقات عائمة تغطّي نص المحادثة.
-- **قرار الموضع:** المهارة في `vendor/hallmark/` لا `.agents/skills/` لأن وضعها هناك كسر `R0-04/05` فعليًا؛ لم يُضعف الاختبار.
-- **عطل جانبي:** `build-pages.mjs` كان ينسخ لقطات الفحص إلى `dist` ⇒ استُثنيت الأدلة النقطية فصار **1.4MB بدل 4.8MB**.
-- **القياس:** 928 اختبارًا/927 ناجحًا/0 فشل/1 skipped، تغطية 92.28/77.44/86.95؛ متصفح 38/38؛ R0 6/6. بوابة `LND-01..07` أُثبت التقاطها بعيوب مفتعلة. سجل: [hallmark](sessions/2026-10-31-hallmark-landing-design.md).
-- **باقٍ:** النشر الحيّ لهذه الشريحة؛ `DSN-002` لبقية الصفحات؛ MAN-004/006؛ وواتساب `configured=false` (`DEC-073`).
+- **الفرع:** `arena/9dceca86-phone-google` من `main@ec7da14` (بعد دمج PR #113). **لا دفع ولا PR ولا نشر في هذه الجلسة.**
+- **المنهج:** الفاحص الساكن والبصري قبل أي تعديل. **الساكن 386 ⇒ 283 FAIL** على 25 ملفًا، و**البصري على 13 صفحة 54 ⇒ 4 FAIL**.
+- **أهم ما قِيس وأُصلح:** حدود الحقول كانت `--t-line` بتباين **1.45:1** ⇒ رمز `--t-field-edge` يقي **3.48–5.85:1**؛ حبر الأزرار أبيض على مرجاني **3.03:1** ⇒ `--accent-fg` **6.03/4.83:1**؛ `outline: none` ⇒ **0**؛ 13 حاجبًا و38 رمزًا تعبيريًا ⇒ **0**؛ رابط التجاوز لم يعد على `-9999px`؛ شريط الكتابة سطح معتم؛ `computer-permissions.html` أُصلح من مولّده.
+- **البوابة:** `test/design-system-pages.test.js` — `DSN2-01..08`، وأُثبت قبضها بعيب مفتعل (رمز 🚀 ⇒ فشل).
+- **باقٍ ومُسجَّل بأسبابه:** 244 نتيجة رموز (قاعدة 48)، و30 إيجابية كاذبة للقاعدة 67 على العربية، و12 تسمية طويلة (49)، وشاشات كثيفة في `live`/`skills`/`protocol` (58)، وإيجابية 73 على نص داخل حاوية تمرير مقيسة (748.98px مقابل 758.98px).
+- **القياس الكامل:** `CELIA_SANDBOX_INTEGRATION=1 test:coverage` = **943 اختبارًا / 942 ناجحًا / 0 فشل / 1 skipped**، تغطية **92.28 / 77.43 / 86.95** (الأرضية 89/71/82)؛ `check` 205 ملفًا؛ `build:edge-ui:check` و`computer:permissions:check` و`build:manifest:check` و`check:secrets` و`release:check` و`build:pages` و`now:check` و`check:continuity` (102 وثيقة، 334 رابطًا، 87 مهمة) ناجحة.
+- **السجل:** [dsn002](sessions/2026-10-31-dsn002-pages-design.md) · **التقرير:** [hallmark-pages-audit.md](../design/hallmark-pages-audit.md).
 
 ## جلسة سابقة — 31 أكتوبر 2026 — MAN-002 / DEC-077 (سلامة الحافة قبل الرفع)
 
@@ -29,7 +30,7 @@
 
 نُفّذت ونُشرت في PR #110 (`main@d0c56bb`): عقد مُولَّد ببوابة انحراف، جاهزية مشتقّة، حاجز تكافؤ أدوات، وسجل شرائح `0008` يمنح `known_good` بالإثبات. الدليل الحيّ: تشغيلة **41184103419** ناجحة و`known_good granted to d0c56bb`. التفاصيل في [الخطة](../manifest-atomic-reactive-plan.md) و[سجل الجلسة](sessions/2026-10-31-manifest-atomic-reactive-plan.md).
 
-## الجلسة الحالية — 31 أكتوبر 2026 — WA-005/WA-007/VER-01 / DEC-064/DEC-065/DEC-066
+## جلسة سابقة — 31 أكتوبر 2026 — WA-005/WA-007/VER-01 / DEC-064/DEC-065/DEC-066
 
 - **الفرع:** `arena/2b93587e-phone-google` من `main@044bb1d` (PR #103 مدموج). لا دفع ولا PR ولا نشر في هذه الجلسة.
 - **الخلاصة الحاسمة (DEC-073):** الإنتاج يقول `configured=false` — ناقص: Meta app، Embedded Signup config، app secret، encryption key. الكود منشور؛ الربط محجوب بإعدادات المالك. أُصلح تمرير `TOKEN_ENCRYPTION_KEY` في workflow. الدليل: [إعداد واتساب للمشغّل](../إعداد-واتساب-للمشغل.md).
@@ -84,16 +85,17 @@
 
 ## 3. الاستئناف والفحوص
 
-1. ابقَ على `arena/afe3493a-phone-google`؛ اقرأ [سجل هذه الجلسة](sessions/2026-10-29-release-signal.md) و[§8 من دليل الإصدارات](../releases-and-recovery.md) قبل تعديل `/api/releases` أو `public/system.js`.
-2. لا ترفع الإصدار في `package.json` وحدها؛ الترقية تحتاج `releases/current.json` و`history.json` و`CHANGELOG.md` معًا وإلا رمى `src/version.js`.
-3. لا تُضف بطاقة تقدّم ثانية أو قائمة إصدارات مكتوبة يدويًا في HTML؛ مصدرا الصفحة هما `/api/system` و`/api/releases`.
-4. أول فحص آمن: `node --test test/releases-progress.test.js test/source-providers.test.js test/operations.test.js` ثم `npm run check:continuity`.
-4.b لا تُضف مزوّدًا إلى قائمة سماح أو تهيئة قبل تعديل `docs/source-providers.json` بقرار مكتوب (`SRC-06` سيفشل).
-5. دمج PR #99 ليس تلقائيًا؛ ينتظر كلمة المالك.
+1. ابقَ على فرع الجلسة المعيَّن من البيئة؛ اقرأ [سجل `DSN-002`](sessions/2026-10-31-dsn002-pages-design.md) و[تقرير التصميم](../design/hallmark-pages-audit.md) قبل تعديل أي `public/*.css`.
+2. لا تُصلح صفحة من ناتجها: `computer-permissions.html` يُولَّد بـ`scripts/render-computer-permissions.mjs`؛ عدّل المولّد ثم `npm run computer:permissions`.
+3. لا تُعمَّم إيجابيات الفاحص: القاعدة 67 على العربية، والقاعدة 49 على تسمية عربية طويلة، والقاعدة 73 على نص داخل حاوية تمرير — مسجّلة بأسبابها في التقرير.
+4. لا ترفع الإصدار في `package.json` وحدها؛ الترقية تحتاج `releases/current.json` و`history.json` و`CHANGELOG.md` معًا وإلا رمى `src/version.js`.
+5. الدفعة التالية من `DSN-002` هي هجرة ألوان الصفحات إلى `theme.css` (قاعدة 48: 244 نتيجة) بدءًا من `system.css`، وتحتاج `npm run design:audit` قبلها وبعدها.
 
 ```sh
 git branch --show-current && git status --short && git log -3 --oneline
-node --test test/releases-progress.test.js test/source-providers.test.js test/operations.test.js test/r0-continuity-2026.test.js
-npm run check && npm run now && npm run now:check && npm run check:continuity && npm run check:secrets
+npm run design:audit -- public/
+LD_LIBRARY_PATH=… CHROME_PATH=… npm run design:audit -- public/agent.html --render
+node --test test/design-system-pages.test.js test/landing-design.test.js test/theme-tokens.test.js
+npm run check && npm run build:pages && npm run now && npm run now:check && npm run check:continuity && npm run check:secrets
 npm run test:coverage
 ```

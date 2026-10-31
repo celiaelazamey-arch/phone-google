@@ -152,7 +152,7 @@
   },
   "targets": {
     "edge": {
-      "bundleDigest": "sha256:31d56eebbdb528c55c84edc5c3017a024ce6cf37b87164bf7314bf275f6e73ec",
+      "bundleDigest": "sha256:8429110bf0c8677740eb0b59698c978ca9301c2169949d78dee1811bbcde1cec",
       "compatibilityDate": "2025-01-01",
       "entry": "worker.js",
       "modules": [

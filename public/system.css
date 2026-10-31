@@ -111,7 +111,7 @@ pre,
   font-weight: 500;
 }
 .brand-mark span {
-  color: #fff;
+  color: #f4f7f2;
   font-size: 26px;
 }
 .topbar nav {
@@ -571,6 +571,7 @@ h1 > span {
   gap: 11px;
 }
 .component-card {
+  color: var(--text);
   border: 1px solid var(--border);
   background: #10191f;
   border-radius: 9px;
@@ -646,6 +647,7 @@ h1 > span {
   gap: 12px;
 }
 .release-card {
+  color: var(--text);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 24px;
@@ -658,6 +660,7 @@ h1 > span {
 }
 /* بطاقة التقدّم ليست إصدارًا: ليست في releases/history.json ولا تحمل تاريخًا أو وسمًا. */
 .progress-card {
+  color: var(--text);
   border: 1px dashed #3d4d59;
   border-radius: 10px;
   padding: 24px;
@@ -815,6 +818,7 @@ h1 > span {
   gap: 14px;
 }
 .runbook-card {
+  color: var(--text);
   border: 1px solid var(--border);
   border-radius: 9px;
   background: #0e171d;

@@ -11,8 +11,11 @@
   --border-strong: rgba(255, 255, 255, 0.15);
   --text-primary: #f4f4f6;
   --text-secondary: #a1a8b8;
-  --text-muted: #6e7687;
+  --text-muted: #9aa3b5;
   --accent: #d97757;
+  --accent-fg: #1c0e08;
+  --field-edge: rgba(255, 255, 255, 0.42);
+  --focus-ring: #f4f4f6;
   --accent-hover: #e48769;
   --accent-soft: rgba(217, 119, 87, 0.14);
   --emerald: #10b981;
@@ -40,8 +43,11 @@
   --border-strong: rgba(20, 20, 19, 0.16);
   --text-primary: #141413;
   --text-secondary: #53514c;
-  --text-muted: #7c7870;
+  --text-muted: #67625a;
   --accent: #c96442;
+  --accent-fg: #1c0e08;
+  --field-edge: rgba(20, 20, 19, 0.55);
+  --focus-ring: #141413;
   --accent-hover: #b55434;
   --accent-soft: rgba(201, 100, 66, 0.11);
   --emerald: #059669;
@@ -66,6 +72,7 @@ body {
   margin: 0;
   padding: 0;
   height: 100%;
+  overflow-x: clip;
   background: var(--bg-canvas);
   color: var(--text-primary);
   font-family: 'IBM Plex Sans Arabic', -apple-system, BlinkMacSystemFont, 'Segoe UI', Tahoma, sans-serif;
@@ -85,6 +92,37 @@ input,
 select,
 textarea {
   font-family: inherit;
+}
+
+/* DSN-002: every control shows a keyboard ring, in a colour measured >= 3:1 on its surface. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* DSN-002: a field edge that clears 3:1 against the surface it sits on. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]),
+select,
+textarea {
+  border: 1px solid var(--field-edge);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* App Shell */
@@ -194,7 +232,7 @@ textarea {
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.16s ease;
+  transition: background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease;
 }
 
 .nav-pill:hover {
@@ -273,7 +311,7 @@ a.nav-pill {
   font-size: 0.82rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .icon-btn:hover {
@@ -320,6 +358,7 @@ a.nav-pill {
 /* Studio Chat Area */
 .chat-scroll {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 24px 18px 16px;
   scroll-behavior: smooth;
@@ -388,7 +427,7 @@ a.nav-pill {
   padding: 1px 6px;
   border-radius: 6px;
   background: var(--bg-surface-2);
-  color: var(--accent);
+  color: var(--accent-hover);
   font-size: 0.84em;
 }
 
@@ -680,7 +719,8 @@ a.nav-pill {
 /* Claude Floating Omni-Composer */
 .composer-wrap {
   padding: 10px 18px 14px;
-  background: linear-gradient(to top, var(--bg-canvas) 70%, transparent);
+  background: var(--bg-canvas);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .composer-box {
@@ -700,14 +740,14 @@ a.nav-pill {
 
 .composer-box textarea {
   width: 100%;
-  border: none;
-  outline: none;
-  background: transparent;
+  border: 1px solid var(--field-edge);
+  border-radius: 12px;
+  background: var(--bg-elevated);
   color: var(--text-primary);
   font-size: 0.94rem;
   resize: none;
   line-height: 1.55;
-  padding: 2px 4px 6px;
+  padding: 8px 10px;
 }
 
 .composer-bar {
@@ -743,12 +783,13 @@ a.nav-pill {
 }
 
 .model-select-pill select {
-  background: transparent;
-  border: none;
+  background: var(--bg-elevated);
+  border: 1px solid var(--field-edge);
+  border-radius: 8px;
   color: var(--text-primary);
   font-size: 0.78rem;
   font-weight: 500;
-  outline: none;
+  padding: 2px 6px;
   cursor: pointer;
 }
 
@@ -772,7 +813,7 @@ a.nav-pill {
   align-items: center;
   gap: 6px;
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-fg);
   border: none;
   border-radius: 11px;
   padding: 7px 15px;
@@ -787,7 +828,11 @@ a.nav-pill {
 }
 
 .send-btn:disabled {
-  opacity: 0.55;
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+  cursor: not-allowed;
+  opacity: 0.8;
   cursor: wait;
 }
 
@@ -1138,7 +1183,7 @@ a.nav-pill {
   height: 36px;
   border-radius: 50%;
   background: linear-gradient(135deg, #00a884, #059669);
-  color: #fff;
+  color: var(--accent-fg);
   display: grid;
   place-items: center;
   font-weight: 700;
@@ -1190,7 +1235,7 @@ a.nav-pill {
 .wa-bubble.outbound {
   align-self: flex-end;
   background: var(--wa-out);
-  color: #fff;
+  color: var(--text-primary);
 }
 
 [data-theme="light"] .wa-bubble.outbound {
@@ -1215,12 +1260,11 @@ a.nav-pill {
 .phone-wa-footer input {
   flex: 1;
   background: #2a3942;
-  border: none;
+  border: 1px solid #5b6f7c;
   border-radius: 999px;
   padding: 8px 13px;
   color: #e9edef;
   font-size: 0.81rem;
-  outline: none;
 }
 
 .phone-wa-footer button {
@@ -1229,7 +1273,7 @@ a.nav-pill {
   border-radius: 50%;
   border: none;
   background: #00a884;
-  color: #fff;
+  color: #071e15;
   cursor: pointer;
   font-size: 0.9rem;
 }
@@ -1268,17 +1312,17 @@ a.nav-pill {
 .mono-textarea {
   width: 100%;
   background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--field-edge);
   color: var(--text-primary);
   border-radius: 10px;
   padding: 9px 12px;
   font-size: 0.85rem;
-  outline: none;
 }
 
-.surface-card input:focus,
-.mono-textarea:focus {
-  border-color: var(--accent);
+.surface-card input:focus-visible,
+.mono-textarea:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .toggles-row {
@@ -1291,10 +1335,11 @@ a.nav-pill {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 10px 12px;
-  border-radius: 11px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
+  padding: 10px 0;
+  border: 0;
+  border-top: 1px solid var(--border-subtle);
+  border-radius: 0;
+  background: transparent;
   cursor: pointer;
 }
 
@@ -1316,7 +1361,7 @@ a.nav-pill {
 
 .primary-btn {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-fg);
   border: none;
   border-radius: 10px;
   padding: 8px 15px;

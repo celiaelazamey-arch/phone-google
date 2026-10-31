@@ -4,6 +4,11 @@
    تلقائيًا عند تفضيل تقليل الحركة.
    ============================================================ */
 
+html,
+body {
+  overflow-x: clip;
+}
+
 .cu-page {
   --cu-bg: #0b1030;
   --cu-bg2: #121a4a;
@@ -19,10 +24,7 @@
   --cu-warn: #fbbf24;
 
   margin: 0;
-  background:
-    radial-gradient(1200px 600px at 80% -10%, #3b2a8f55, transparent),
-    radial-gradient(900px 500px at 10% 10%, #0e749033, transparent),
-    var(--cu-bg);
+  background: var(--cu-bg);
   color: var(--cu-txt);
   font-family: "IBM Plex Sans Arabic", system-ui, "Segoe UI", Tahoma, sans-serif;
   line-height: 1.7;
@@ -54,8 +56,10 @@
 
 .cu-skip {
   position: absolute;
-  inset-inline-start: -9999px;
+  inset-inline-start: 12px;
   top: 8px;
+  opacity: 0;
+  pointer-events: none;
   background: var(--cu-cy);
   color: #06102c;
   padding: 8px 14px;
@@ -63,8 +67,9 @@
   font-weight: 700;
   z-index: 5;
 }
-.cu-skip:focus {
-  inset-inline-start: 12px;
+.cu-skip:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .cu-topbar {
@@ -313,7 +318,7 @@
   counter-increment: cu-s;
   content: counter(cu-s);
   background: var(--cu-vio);
-  color: #fff;
+  color: #140b2e;
   border-radius: 50%;
   width: 20px;
   height: 20px;

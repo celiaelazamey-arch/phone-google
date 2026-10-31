@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
-  <title>المهام المجدولة — سيليا</title>
+  <title>المهام المجدولة | سيليا</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <script src="./theme.js"></script>
   <link rel="stylesheet" href="./theme.css">
@@ -56,12 +56,12 @@
       <h2 id="status-title">حالة الخدمة</h2>
       <p class="badge" id="cron-badge">أدخل الرمز لعرض الحالة</p>
       <ul class="facts">
-        <li><span>المفتاح</span><b id="fact-key">—</b></li>
-        <li><span>التخزين الدائم (D1)</span><b id="fact-durable">—</b></li>
-        <li><span>القراءة</span><b id="fact-reads">—</b></li>
-        <li><span>الكتابة</span><b id="fact-writes">—</b></li>
-        <li><span>بانتظار الموافقة</span><b id="fact-pending">—</b></li>
-        <li><span>مجهولة المصير</span><b id="fact-unknown">—</b></li>
+        <li><span>المفتاح</span><b id="fact-key">…</b></li>
+        <li><span>التخزين الدائم (D1)</span><b id="fact-durable">…</b></li>
+        <li><span>القراءة</span><b id="fact-reads">…</b></li>
+        <li><span>الكتابة</span><b id="fact-writes">…</b></li>
+        <li><span>بانتظار الموافقة</span><b id="fact-pending">…</b></li>
+        <li><span>مجهولة المصير</span><b id="fact-unknown">…</b></li>
       </ul>
       <p class="hint" id="cron-note">إن غاب المفتاح أو D1 تقول الصفحة ذلك صراحة؛ لا يوجد وضع تجريبي ولا بيانات مُصطنعة.</p>
     </section>
@@ -71,11 +71,11 @@
         <h2 id="jobs-title">المهام</h2>
         <button id="reload-jobs" class="ghost" type="button" disabled>تحديث</button>
       </div>
-      <p class="hint">الروابط تُعرض بلا سلسلة الاستعلام، وبلا ترويسات ولا بيانات دخول — هكذا يعيدها العامل.</p>
+      <p class="hint">الروابط تُعرض بلا سلسلة الاستعلام، وبلا ترويسات ولا بيانات دخول، هكذا يعيدها العامل.</p>
       <div class="table-wrap">
         <table class="jobs" aria-live="polite">
           <thead><tr><th>#</th><th>العنوان</th><th>الهدف</th><th>الحالة</th><th>آخر تنفيذ</th><th>التالي</th><th>إجراء (نيّة)</th></tr></thead>
-          <tbody id="jobs-body"><tr><td colspan="7" class="empty">—</td></tr></tbody>
+          <tbody id="jobs-body"><tr><td colspan="7" class="empty">…</td></tr></tbody>
         </table>
       </div>
       <div id="history" class="history" hidden></div>
@@ -116,7 +116,7 @@
           <button id="reload-intents" class="ghost" type="button" disabled>تحديث</button>
         </div>
       </div>
-      <p class="hint">الموافقة مربوطة ببصمة الحمولة المعروضة؛ أي تغيير بعد العرض يُرفض. النيّة المجهولة المصير لا تُعاد تلقائيًا — تُسوّى يدويًا بعد التحقق في لوحة cron-job.org.</p>
+      <p class="hint">الموافقة مربوطة ببصمة الحمولة المعروضة؛ أي تغيير بعد العرض يُرفض. النيّة المجهولة المصير لا تُعاد تلقائيًا، تُسوّى يدويًا بعد التحقق في لوحة cron-job.org.</p>
       <ul id="intents" class="intents" aria-live="polite"></ul>
     </section>
   </main>

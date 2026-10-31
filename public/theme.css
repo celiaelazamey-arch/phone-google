@@ -9,6 +9,12 @@
  * والتركيز) — لا يُنشر رمز يكسرها. الشفافيات المشتقة تُصنع في الصفحات بـ color-mix من هذه الرموز لا بأرقام ثابتة.
  */
 
+html,
+body {
+  overflow-x: clip;
+}
+
+
 :root,
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -17,6 +23,7 @@
   --t-card: #151d38;
   --t-field: #0e1530;
   --t-line: #273154;
+  --t-field-edge: #66739e;
   --t-text: #e8ecff;
   --t-muted: #9aa5c9;
   --t-accent: #7c9cff;
@@ -38,6 +45,7 @@
   --t-card: #0a0a0a;
   --t-field: #050505;
   --t-line: #2a2a2a;
+  --t-field-edge: #5f6c96;
   --t-text: #f2f2f2;
   --t-muted: #a8a8a8;
   --t-accent: #8ab4ff;
@@ -59,6 +67,7 @@
   --t-card: #ffffff;
   --t-field: #ffffff;
   --t-line: #cfd6e8;
+  --t-field-edge: #7b849c;
   --t-text: #121a33;
   --t-muted: #525d7a;
   --t-accent: #3451c6;
@@ -82,6 +91,7 @@
     --t-card: #ffffff;
     --t-field: #ffffff;
     --t-line: #cfd6e8;
+    --t-field-edge: #7b849c;
     --t-text: #121a33;
     --t-muted: #525d7a;
     --t-accent: #3451c6;
@@ -109,7 +119,7 @@
   width: auto;
   padding: 0.3rem 0.5rem;
   border-radius: 8px;
-  border: 1px solid var(--t-line);
+  border: 1px solid var(--t-field-edge);
   background: var(--t-field);
   color: var(--t-text);
   font: inherit;
