@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- VER-11 / DEC-073: wire TOKEN_ENCRYPTION_KEY and TOKEN_ENCRYPTION_KEY_ID through the deploy workflow — the deploy script accepted them but the workflow never passed them, so edge credential encryption could never be configured. A test derives the required settings from the runtime check. Added an operator setup guide after live acceptance reported configured=false with four missing Meta settings.
 - VER-10 / DEC-072: live acceptance publishes WhatsApp onboarding readiness as a GitHub annotation on the run summary, so the answer is readable even when job logs and artifacts cannot be fetched. Names of missing settings only, never values.
 - VER-09 / DEC-071: /readyz now reports whether ordinary-user WhatsApp linking can start (whatsappOnboarding.configured plus the names of missing settings, never values), and live acceptance reports it as skipped rather than a false pass when the operator has not configured Meta yet.
 - VER-08 / DEC-070: live acceptance now proves the account tables exist in D1 by signing in with a synthetic address (401 invalid_email_or_password), because "no new migrations" is not evidence of a migrated schema. Fixed the test harness to preserve the Host port so same-origin CSRF checks compare against a real origin.
