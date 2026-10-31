@@ -73,6 +73,10 @@ jobs:
       # regenerating would publish a contract the code no longer honours.
       - name: System manifest matches its sources (MAN-001)
         run: npm run build:manifest:check
+      # MAN-002: the same integrity gate the live deploy runs before uploading. Catching a
+      # mismatch here means it never reaches the deploy job at all.
+      - name: Edge bundle matches the committed manifest (MAN-002)
+        run: node scripts/verify-edge-provenance.mjs --no-write
       - name: Copilot architecture map matches the enforced policy
         run: npm run copilot:diagram:check
       - name: Computer permission matrix matches the enforced policy

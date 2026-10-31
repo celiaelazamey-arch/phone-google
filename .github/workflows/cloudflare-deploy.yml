@@ -11,6 +11,9 @@ concurrency:
 
 permissions:
   contents: read
+  # MAN-002: sign the exact bundle digest that was verified and uploaded.
+  id-token: write
+  attestations: write
 
 jobs:
   deploy-edge:
@@ -24,6 +27,16 @@ jobs:
         with:
           node-version: '24'
           cache: npm
+      # The integrity gate regenerates the manifest, which reads the Node tool registry and
+      # therefore needs the dependency tree. pages.yml and release.yml already install; this
+      # job used to skip it because it only ran the deploy script.
+      - name: Install dependencies for the integrity gate
+        run: npm ci --no-audit --no-fund
+      # MAN-002 — fail closed BEFORE any upload. release.yml attests and pages.yml verifies,
+      # but this path (the one that serves users) used to upload whatever was on disk. The
+      # bundle must hash to exactly what the committed manifest declares.
+      - name: Verify edge bundle integrity against the committed manifest (MAN-002)
+        run: node scripts/verify-edge-provenance.mjs
       - name: Deploy Cloudflare Worker & bind repository secrets
         env:
           AGENETROUTERAPI_KEY: ${{ secrets.AGENETROUTERAPI_KEY }}
@@ -58,6 +71,13 @@ jobs:
           APP_OWNER_EMAIL: ${{ vars.APP_OWNER_EMAIL || secrets.APP_OWNER_EMAIL }}
           CELIA_TIMEZONE: 'Africa/Cairo'
         run: node scripts/deploy-cloudflare-edge.mjs
+      # MAN-002: bind the verified bundle digest to this commit and workflow run via GitHub
+      # OIDC. No signing key lives in the repository. `subject-checksums` carries the bundle
+      # and manifest digests the gate computed before the upload.
+      - name: Attest the deployed edge bundle (OIDC provenance)
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-checksums: .validation-artifacts/edge-subjects.txt
       - name: Verify live card-free Edge + D1 full runtime (MCP 12 tools + D1 durability + 401 gate)
         env:
           CELIA_MCP_API_TOKEN: ${{ secrets.CELIA_MCP_API_TOKEN }}
