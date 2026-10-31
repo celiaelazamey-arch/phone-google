@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- VER-10 / DEC-072: live acceptance publishes WhatsApp onboarding readiness as a GitHub annotation on the run summary, so the answer is readable even when job logs and artifacts cannot be fetched. Names of missing settings only, never values.
 - VER-09 / DEC-071: /readyz now reports whether ordinary-user WhatsApp linking can start (whatsappOnboarding.configured plus the names of missing settings, never values), and live acceptance reports it as skipped rather than a false pass when the operator has not configured Meta yet.
 - VER-08 / DEC-070: live acceptance now proves the account tables exist in D1 by signing in with a synthetic address (401 invalid_email_or_password), because "no new migrations" is not evidence of a migrated schema. Fixed the test harness to preserve the Host port so same-origin CSRF checks compare against a real origin.
 - VER-07 / DEC-069: the WhatsApp UI now ships inside the Worker module bundle instead of plain-text bindings. The first live deploy was rejected by Cloudflare (error 10054: a 12 kB text binding exceeds the 5.1 kB cap). A generated, drift-checked module removes the cap, and buildWorkerMetadata now refuses any oversized text binding with a named error.
