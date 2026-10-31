@@ -150,6 +150,9 @@ function mapToolRun(row) {
     toolName: row.tool_name,
     risk: row.risk,
     idempotencyKey: row.idempotency_key,
+    // ASSUR-002: بصمة المعطيات القانونية. العمود موجود منذ 0002؛ قراءته هنا هي
+    // ما يجعل حارس «التقدّم الصفري» حتميًا عبر الاستئناف. null في الصفوف القديمة.
+    argumentsDigest: row.arguments_digest ?? null,
     status: row.status,
     outcome: row.outcome ?? null,
     createdAt: row.created_at,
@@ -556,14 +559,14 @@ export function createAgentStore({ driver, clock = Date.now, idFactory = crypto.
       const rows = await driver.all('SELECT * FROM agent_steps WHERE run_id = ? ORDER BY step_index ASC', [runId]);
       return rows.map(mapStep);
     },
-    async startToolRun({ runId, stepId = null, toolName, risk, idempotencyKey }) {
+    async startToolRun({ runId, stepId = null, toolName, risk, idempotencyKey, argumentsDigest = null }) {
       const id = idFactory();
       const at = nowIso(clock);
       try {
         await driver.run(
-          `INSERT INTO agent_tool_runs (id, run_id, step_id, tool_name, risk, idempotency_key, status, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [id, runId, stepId, toolName, risk, idempotencyKey, TOOL_RUN_STATUS.started, at, at]
+          `INSERT INTO agent_tool_runs (id, run_id, step_id, tool_name, risk, idempotency_key, arguments_digest, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [id, runId, stepId, toolName, risk, idempotencyKey, argumentsDigest, TOOL_RUN_STATUS.started, at, at]
         );
         return { created: true, toolRun: mapToolRun(await driver.get('SELECT * FROM agent_tool_runs WHERE id = ?', [id])) };
       } catch (error) {

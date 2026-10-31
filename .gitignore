@@ -23,3 +23,6 @@ data/learning/sources/*/*.vtt
 # Hallmark visual-audit artifacts (local tooling output, never shipped)
 public/.hallmark/
 .hallmark/
+
+# ASSUR-003: مسوّدات المهارات المشتقة من سجل التشغيل تبقى محلية (قد تحمل نص هدف المالك)
+data/skill-drafts/

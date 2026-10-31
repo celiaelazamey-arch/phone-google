@@ -13,6 +13,8 @@ import { createProviderPlanner, PROVIDER_PLAN_SCHEMA, validateProviderPlan, CALL
 import { createGeminiPlannerProvider } from './gemini-planner-provider.js';
 import { createGovernedFallbackPlanner, PLANNER_FALLBACK_CODES } from './planner-fallback.js';
 import { createReplanPolicy, REPLAN_LIMITS, REVISION_STEP_TITLE } from './replanner.js';
+import { createNoProgressPolicy, NO_PROGRESS_LIMITS, NO_PROGRESS_CODE } from './no-progress.js';
+import { buildSkillDraft, skillDraftPath, assertSafeDraftPath, SKILL_DRAFT_VERSION, SKILL_DRAFT_DIR } from './skill-draft.js';
 import { createModelRouter, defaultRoute, MODEL_TIERS, ROUTE_REASONS, DECLARED_GEMINI_PRICING, DEFAULT_PER_CALL_CAPS, computeCostMicros } from './model-router.js';
 import {
   HARNESS_LIFECYCLE_STAGES,
@@ -95,6 +97,14 @@ export {
   createReplanPolicy,
   REPLAN_LIMITS,
   REVISION_STEP_TITLE,
+  createNoProgressPolicy,
+  NO_PROGRESS_LIMITS,
+  NO_PROGRESS_CODE,
+  buildSkillDraft,
+  skillDraftPath,
+  assertSafeDraftPath,
+  SKILL_DRAFT_VERSION,
+  SKILL_DRAFT_DIR,
   createModelRouter,
   defaultRoute,
   MODEL_TIERS,
