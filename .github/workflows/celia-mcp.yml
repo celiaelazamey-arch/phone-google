@@ -66,6 +66,8 @@ jobs:
           node scripts/check-test-skips.mjs /tmp/unit-tap.log --allow-env-gates
       # The Copilot bridge diagram is generated from the policy constants; a policy change without
       # regenerating it would let the published map claim a permission the code no longer grants.
+      - name: Edge UI bundle matches public/ (VER-07)
+        run: npm run build:edge-ui:check
       - name: Copilot architecture map matches the enforced policy
         run: npm run copilot:diagram:check
       - name: Computer permission matrix matches the enforced policy

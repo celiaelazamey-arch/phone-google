@@ -138,8 +138,10 @@ test('WA-005 runtime: linked credentials feed real send, webhook challenge, inbo
 });
 
 test('WA-005 deploy/UI: assets ship as bindings, page is Arabic and cannot fake a connection', async () => {
-  const metadata = buildWorkerMetadata({ env: {}, uiAssets: { WHATSAPP_UI_HTML: '<html></html>', WHATSAPP_UI_JS: 'x', WHATSAPP_UI_CSS: 'y' } });
-  for (const name of ['WHATSAPP_UI_HTML', 'WHATSAPP_UI_JS', 'WHATSAPP_UI_CSS']) assert.ok(metadata.bindings.some((b) => b.name === name && b.type === 'plain_text'));
+  const metadata = buildWorkerMetadata({ env: {}, uiAssets: { WHATSAPP_UI_HTML: '<html></html>' } });
+  assert.ok(metadata.bindings.some((b) => b.name === 'WHATSAPP_UI_HTML' && b.type === 'plain_text'));
+  // VER-07: a real 12 kB UI script must never be sent as a text binding again.
+  assert.throws(() => buildWorkerMetadata({ env: {}, uiAssets: { WHATSAPP_UI_JS: 'x'.repeat(6000) } }), /text_binding_too_large/);
   const html = await readFile(new URL('../public/whatsapp.html', import.meta.url), 'utf8');
   const js = await readFile(new URL('../public/whatsapp.js', import.meta.url), 'utf8');
   assert.match(html, /lang="ar" dir="rtl"/);

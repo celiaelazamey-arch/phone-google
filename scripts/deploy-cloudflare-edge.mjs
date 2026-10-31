@@ -177,7 +177,16 @@ export async function applyMigrations({ accountId, apiToken, databaseId, sql, fe
 export function buildWorkerMetadata({ env = process.env, version = '0.2.1', commit = 'main', d1DatabaseId = null, retirements = loadServiceRetirements(), uiAssets = {} } = {}) {
   // Retired services (DEC-030) travel to the edge as plain_text flags so /api/secrets/status tells the same truth as Git.
   const effectiveEnv = applyRetirementsToEnv(env, retirements);
-  const uiBindings = Object.entries(uiAssets).filter(([, text]) => text).map(([name, text]) => ({ type: 'plain_text', name, text }));
+  // VER-07: Cloudflare rejects any text binding over 5.1 kB (error 10054). Fail here with a
+  // named reason instead of letting a live deploy be refused after the build looks green.
+  const MAX_TEXT_BINDING_BYTES = 5120;
+  const uiBindings = Object.entries(uiAssets).filter(([, text]) => text).map(([name, text]) => {
+    const bytes = new TextEncoder().encode(String(text)).length;
+    if (bytes > MAX_TEXT_BINDING_BYTES) {
+      throw new Error(`text_binding_too_large:${name}:${bytes}>${MAX_TEXT_BINDING_BYTES}; bundle it as a Worker module instead`);
+    }
+    return { type: 'plain_text', name, text };
+  });
   const retirementBindings = RETIRABLE_FEATURES
     .map((feature) => flagNameFor(feature))
     .filter((flag) => String(effectiveEnv[flag] || '').trim() === 'true')
@@ -436,13 +445,10 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
 
   const pkg = JSON.parse(await readFile(pkgPath, 'utf8'));
   // Every module reachable from `worker.js` (state.js, runtime.js, crypto.js, cron.js, …) ships in the same upload.
-  const [workerModules, migrationFiles, uiHtml, uiJs, uiCss, uiThemeCss, uiThemeJs] = await Promise.all([
-    collectWorkerModules(), loadMigrationFiles(),
-    readFile(path.join(root, 'public/whatsapp.html'), 'utf8'),
-    readFile(path.join(root, 'public/whatsapp.js'), 'utf8'),
-    readFile(path.join(root, 'public/whatsapp.css'), 'utf8'),
-    readFile(path.join(root, 'public/theme.css'), 'utf8'),
-    readFile(path.join(root, 'public/theme.js'), 'utf8')
+  // VER-07: the UI travels inside the Worker module graph (whatsapp-ui.generated.js).
+  // Text bindings are capped at 5.1 kB by Cloudflare and rejected the 12 kB UI script.
+  const [workerModules, migrationFiles] = await Promise.all([
+    collectWorkerModules(), loadMigrationFiles()
   ]);
   const commit = String(env.GITHUB_SHA || 'main').trim();
 
@@ -502,8 +508,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
     env,
     version: pkg.version,
     commit,
-    d1DatabaseId: d1BindingId,
-    uiAssets: { WHATSAPP_UI_HTML: uiHtml, WHATSAPP_UI_JS: uiJs, WHATSAPP_UI_CSS: uiCss, WHATSAPP_UI_THEME_CSS: uiThemeCss, WHATSAPP_UI_THEME_JS: uiThemeJs }
+    d1DatabaseId: d1BindingId
   });
   const secretBindingsCount = metadata.bindings.filter((b) => b.type === 'secret_text' && SECRET_KEYS.includes(b.name)).length;
 
