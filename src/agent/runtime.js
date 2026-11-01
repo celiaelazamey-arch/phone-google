@@ -29,6 +29,7 @@ import {
 } from './evaluation.js';
 import { deriveNow, timeSteps } from './timing.js';
 import { buildMemoryFromSteps, normalizeMemoryKind } from './memory.js';
+import { planDelegation } from './delegation.js';
 
 export { PLAN_LIFECYCLE_STATE };
 
@@ -51,6 +52,9 @@ export const DEFAULT_LIMITS = Object.freeze({
 });
 
 const CLIENT_ID = /^[A-Za-z0-9_-]{8,64}$/;
+
+/** Same order as `RISK`, local to the runtime so a delegation ceiling can be compared in one place. */
+const DELEGATION_RISK_ORDER = Object.freeze({ [RISK.read]: 0, [RISK.internalWrite]: 1, [RISK.externalEffect]: 2, [RISK.irreversible]: 3 });
 
 function httpError(status, code, message) {
   const error = new Error(message || code);
@@ -505,10 +509,14 @@ export function createAgentRuntime({
           return { run: await finish(runId, RUN_STATUS.failed, { error: 'run_timeout' }), claimed: true };
         }
         const steps = await store.listSteps(runId);
-        if (steps.length >= config.maxSteps) {
+        // Budget already promised to delegated children is spent, not available (DEC-099). A parent
+        // that hands out 8 steps and then keeps 8 of its own has delegated nothing but paperwork.
+        const delegated = await store.delegatedBudget(runId);
+        const stepCeiling = Math.max(0, run.limits.maxSteps - delegated.steps);
+        if (steps.length >= stepCeiling) {
           return { run: await finish(runId, RUN_STATUS.budgetExhausted, { error: 'step_budget_exhausted' }), claimed: true };
         }
-        if (run.usage.costMicros >= run.limits.maxCostMicros) {
+        if (run.usage.costMicros >= run.limits.maxCostMicros - delegated.costMicros) {
           return { run: await finish(runId, RUN_STATUS.budgetExhausted, { error: 'cost_budget_exhausted' }), claimed: true };
         }
 
@@ -1231,6 +1239,108 @@ export function createAgentRuntime({
         emit(created.run.id, { type: 'run.created', run: created.run, goalContract: contract });
       }
       return { run: created.run, created: created.created, duplicate: !created.created };
+    },
+    /**
+     * Delegate bounded tasks from a run to child agents (DEC-099).
+     *
+     * The decision is `planDelegation`'s: this method only turns accepted children into real runs
+     * and writes the link. A child is an ordinary run — same store, same steps, same evidence chain,
+     * same attention queue — with its own smaller ceiling and a pointer back to who asked.
+     *
+     * The parent's ceiling is derived, never assumed upward:
+     *   - risk: the most consequential tool this run actually executed (nothing ran ⇒ `read`);
+     *   - tools: the executor allowlist when the runtime has one, otherwise what the parent ran.
+     * A caller may pass a stricter `maxRisk`/`tools`; it cannot pass a wider one, because the plan
+     * compares the child against whatever the parent ends up with.
+     */
+    async delegate({ parentRunId, tasks = [], roster = [], maxRisk = null, tools: parentTools = null } = {}) {
+      const parent = await store.getRunForOwner(parentRunId, ownerId);
+      if (!parent) throw httpError(404, 'run_not_found', 'run_not_found');
+      const [depth, evidence, parentToolRuns, delegated] = await Promise.all([
+        store.delegationDepth(parentRunId),
+        store.listEvidence(parentRunId),
+        store.listToolRuns(parentRunId),
+        store.delegatedBudget(parentRunId)
+      ]);
+
+      const executed = parentToolRuns.map((toolRun) => toolRun.toolName);
+      const riskOf = (name) => tools.get(name)?.risk || RISK.read;
+      const derivedRisk = executed.reduce(
+        (worst, name) => (DELEGATION_RISK_ORDER[riskOf(name)] > DELEGATION_RISK_ORDER[worst] ? riskOf(name) : worst),
+        RISK.read
+      );
+      const ceiling = maxRisk && DELEGATION_RISK_ORDER[maxRisk] <= DELEGATION_RISK_ORDER[derivedRisk] ? maxRisk : derivedRisk;
+      const scope = parentTools || (plannerToolSet ? [...plannerToolSet] : [...new Set(executed)]);
+
+      const plan = planDelegation(
+        {
+          parent: {
+            runId: parentRunId,
+            status: parent.status,
+            depth,
+            remainingSteps: Math.max(0, parent.limits.maxSteps - parent.usage.steps - delegated.steps),
+            remainingCostMicros: Math.max(0, parent.limits.maxCostMicros - parent.usage.costMicros - delegated.costMicros),
+            maxRisk: ceiling,
+            tools: scope,
+            evidenceIds: evidence.map((record) => record.id)
+          },
+          roster,
+          tasks
+        },
+        { now: new Date(clock()).toISOString() }
+      );
+
+      const children = [];
+      for (const child of plan.accepted) {
+        const created = await store.createRun({
+          threadId: parent.threadId,
+          ownerId,
+          planner: planner.name,
+          maxSteps: child.steps,
+          maxCostMicros: child.costMicros
+        });
+        // A child gets its own goal contract, exactly as a submitted task does: verification has to
+        // have something to verify against, and its objective is the delegated one — not the parent's.
+        if (created.created) {
+          const contract = buildGoalContract({
+            objective: child.objective,
+            limits: { ...config, maxSteps: child.steps, maxCostMicros: child.costMicros },
+            createdAt: clock()
+          });
+          await store.saveGoalContract(created.run.id, contract);
+          await store.appendEvidence({
+            runId: created.run.id,
+            kind: EVIDENCE_KIND.goalContract,
+            input: { contract, delegatedBy: parentRunId, planDigest: plan.digest, taskId: child.taskId },
+            output: null,
+            sourceIds: [parentRunId],
+            verdict: null
+          });
+        }
+        const link = await store.createDelegation({
+          parentRunId,
+          childRunId: created.run.id,
+          taskId: child.taskId,
+          agent: child.agent,
+          objective: child.objective,
+          steps: child.steps,
+          costMicros: child.costMicros,
+          risk: child.risk,
+          depth: child.depth,
+          planDigest: plan.digest,
+          parentDigest: child.parentDigest
+        });
+        children.push({ run: created.run, delegation: link.delegation, reused: !link.created });
+      }
+
+      if (plan.accepted.length || plan.refused.length) {
+        await addStep(parentRunId, {
+          kind: 'delegate',
+          title: plan.accepted.length ? `تفويض ${plan.accepted.length} مهمة` : 'رفض تفويض',
+          summary: `بصمة ${plan.digest} · مقبول ${plan.accepted.length} · مرفوض ${plan.refused.length}`
+        });
+      }
+      return { plan, children };
     },
     async start(runId) {
       if (active.has(runId)) return active.get(runId);

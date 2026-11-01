@@ -93,12 +93,21 @@ test('status is derived from files and tests, not chosen', () => {
 
 test('the audit admits what the system does not have — no domain is painted complete', () => {
   const counts = atlas.capabilityCounts;
-  assert.ok(counts[TRUTH.missing] >= 4, 'the audit must find real gaps');
+  assert.ok(counts[TRUTH.missing] >= 2, 'the audit must keep naming the gaps that remain, not round them away');
+  const absent = atlas.domains.flatMap((domain) => domain.capabilities.filter((capability) => capability.status === TRUTH.missing).map((capability) => capability.id));
+  assert.deepEqual(absent.sort(), ['collaboration_bus', 'conflict_resolution'], 'what is absent is the rest of the multi-agent trio, and nothing else claims to exist');
+  const p0Absent = atlas.domains.filter((domain) => domain.priority === 'P0').flatMap((domain) => domain.capabilities.filter((capability) => capability.status === TRUTH.missing));
+  assert.deepEqual(p0Absent, [], 'P0 has no absent capability left; if one returns, this test fails');
   assert.ok(counts[TRUTH.verified] > counts[TRUTH.missing], 'most declared capabilities are backed by code');
   assert.ok(atlas.stats.partial >= 5, 'most domains are partly there, and the atlas says so');
   const multi = atlas.domains.find((domain) => domain.id === 'multi_agent');
   assert.notEqual(multi.status, TRUTH.verified, 'one agent is not a multi-agent system');
-  assert.ok(multi.tally[TRUTH.missing] >= 3, 'delegation, collaboration and conflict resolution are absent');
+  assert.ok(multi.tally[TRUTH.missing] >= 2, 'the collaboration bus and conflict resolution are still absent');
+  assert.equal(
+    multi.capabilities.find((capability) => capability.id === 'delegation').status,
+    TRUTH.verified,
+    'delegation is implemented and a test names its file'
+  );
   const cognitive = atlas.domains.find((domain) => domain.id === 'cognitive_knowledge');
   const conflict = cognitive.capabilities.find((capability) => capability.id === 'conflict_detection');
   assert.equal(conflict.status, TRUTH.verified, 'conflict detection is implemented and a test names its file');
@@ -107,6 +116,10 @@ test('the audit admits what the system does not have — no domain is painted co
   const consolidation = memory.capabilities.find((capability) => capability.id === 'consolidation');
   assert.equal(consolidation.status, TRUTH.verified, 'consolidation is implemented and a test names its file');
   assert.equal(memory.status, TRUTH.verified, 'every memory capability is now backed and tested');
+  const experience = atlas.domains.find((domain) => domain.id === 'user_experience');
+  const notifications = experience.capabilities.find((capability) => capability.id === 'notifications');
+  assert.equal(notifications.status, TRUTH.verified, 'the attention queue is implemented and tested');
+  assert.equal(experience.tally[TRUTH.missing], 0, 'no capability in the experience domain is absent any more');
 });
 
 test('the seven states are reused, not reinvented', () => {

@@ -170,6 +170,7 @@ export function buildHtml({ facts = factsOf(buildAtlas({ root: ROOT })) } = {}) 
         <p class="next-gap">${esc(next.gap.ar)} <span class="mono">${esc(next.gap.id)}</span></p>
         <p class="next-why">${esc(next.domain.ar)} · لم تُبنَ بعد: لا ملف ولا اختبار يسمّيها في التدقيق حتى الآن.
           <span class="en" lang="en" dir="ltr">${esc(next.domain.en)} · absent from the audit: no file and no test names it yet.</span></p>
+        ${next.priority === 'P0' ? '' : '<p class="next-why" data-p0-clear="true">لا فجوة متبقية في P0 — كل ما تبقّى في P1 أو P2. <span class="en" lang="en" dir="ltr">No P0 gap remains; what is left sits in P1 or P2.</span></p>'}
       </section>`
     : '';
 

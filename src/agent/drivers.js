@@ -189,7 +189,27 @@ const SQLITE_DDL = [
     created_at TEXT NOT NULL
   )`,
   'CREATE UNIQUE INDEX IF NOT EXISTS uq_agent_artifacts_source ON agent_artifacts (run_id, source_artifact_id)',
-  'CREATE INDEX IF NOT EXISTS idx_agent_artifacts_run ON agent_artifacts (run_id, created_at)'
+  'CREATE INDEX IF NOT EXISTS idx_agent_artifacts_run ON agent_artifacts (run_id, created_at)',
+  // M-C (DEC-099): one row per delegated child. The link lives here, not on `agent_runs`,
+  // so a run keeps being a run whether it was submitted by a person or delegated by an agent.
+  `CREATE TABLE IF NOT EXISTS agent_delegations (
+    id TEXT PRIMARY KEY,
+    parent_run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+    child_run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+    task_id TEXT NOT NULL,
+    agent TEXT NOT NULL,
+    objective TEXT NOT NULL,
+    steps INTEGER NOT NULL,
+    cost_micros INTEGER NOT NULL,
+    risk TEXT NOT NULL,
+    depth INTEGER NOT NULL,
+    plan_digest TEXT NOT NULL,
+    parent_digest TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )`,
+  'CREATE UNIQUE INDEX IF NOT EXISTS uq_agent_delegations_task ON agent_delegations (parent_run_id, task_id)',
+  'CREATE INDEX IF NOT EXISTS idx_agent_delegations_parent ON agent_delegations (parent_run_id, created_at)',
+  'CREATE INDEX IF NOT EXISTS idx_agent_delegations_child ON agent_delegations (child_run_id)'
 ];
 
 const MYSQL_AGENT_TABLES = [
@@ -204,7 +224,8 @@ const MYSQL_AGENT_TABLES = [
   'agent_outbox',
   'agent_thread_summaries',
   'agent_owner_facts',
-  'agent_artifacts'
+  'agent_artifacts',
+  'agent_delegations'
 ];
 
 function uniqueViolation(error) {
