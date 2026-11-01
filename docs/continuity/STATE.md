@@ -2,15 +2,15 @@
 
 > **حفظ التاريخ بلا حذف (`DEC-052` / `CONT-004`):** هذه نافذة الاستئناف النشطة؛ السجل التراكمي الكامل حتى ما بعد PR #84 (`main@738d832` / `9f6f8b2` — 983 سطرًا / 142,150 بايت) محفوظ حرفيًا في **[STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md)** وبصمته محروسة بـ`R0-02`. القراءة السريعة المشتقة: **[NOW.md](NOW.md)** (`npm run now`).
 
-**آخر مراجعة:** 31 أكتوبر 2026 · **نوع الجلسة الحالية:** DOC-003 / `DEC-082` — نسخة «Runtime-Verified Architecture» تُنشأ من §8 الحرفي وتستبدل الإنفوجرافيك · **السجل:** [runtime-verified-infographic](sessions/2026-10-31-runtime-verified-infographic.md)
-**الفرع:** `arena/9dceca86-phone-google` من `main@ec7da14` (بعد PR #113). **لا PR ولا نشر في هذه الجلسة.**
+**آخر مراجعة:** 1 نوفمبر 2026 · **الجلسة الحالية:** REL-002 / `DEC-083` — حارس تجميد الإصدارات في خطوة النشر · **السجل:** [release-immutability](sessions/2026-11-01-release-immutability.md)
+**الفرع:** `arena/9dceca86-phone-google` من `main@1993eeb` (بعد PR #115 و#116). الدفع والدمج بكلمة المالك.
 
 ## الجلسة الحالية — 31 أكتوبر 2026 — DSN-002/‏3 (هجرة الألوان)
 
 - **السؤال:** بقيت **244** نتيجة لقاعدة 48 (لون حرفي خارج `theme.css`). هل تُصفَّر بلا تغيير مظهر أي صفحة؟ **نعم — صفرت.**
 - **الشكل المعتمد:** عائلة رموز لكل صفحة في `theme.css` (`--t-sys-*`, `--t-dep-*`, `--t-pro-*`, `--t-cu-*`, `--t-lnd-*`) + `--t-mask` + `--t-sheen`; الورقة المحلية تكتب `--local: var(--t-<page>-local)` فتبقى كل قواعدها كما هي. الشفافيات: `color-mix(in srgb, var(--tok) N%, transparent)` بنسبة = alpha/255 (`0x55 ⇒ 33%`, `0x0a ⇒ 4%`).
 - **الترتيب في كل صفحة:** `theme.js` (إن وُجد مبدّل) ← `theme.css` ← `fonts.css` ← ورقة الصفحة. صفحات الهبوط (`index`/`skills`/`live`) لها كتلة داكنة وأخرى فاتحة في `theme.css` و`styles.css` يربط أسماءه القديمة بها.
-- **الملفات المولّدة من مصادرها:** `scripts/render-computer-permissions.mjs` ثم `npm run computer:permissions`، و`npm run build:edge-ui` بعد تغيّر `theme.css` (الوحدة تحزم 5 أصول منها `theme.css`) — الاختبار كشف الانحراف مرتين.
+- **المولّد لا يُحرَّر:** `npm run computer:permissions` و`npm run build:edge-ui` بعد تغيّر `theme.css` — الاختبار كشف الانحراف مرتين.
 - **عودتان أُصلحتا:** (1) قاعدة 48 وTHM-02 تقرآن **أي كلمة لون تليها `)` أو `;`** كلون حرفي، فرفضت `var(--t-white)` و`var(--t-sys-red)` و`var(--red)` ⇒ أُعيدت التسمية دلاليًا (`--t-sheen`, `--t-sys-bad`, `--t-sys-info`, `--bad`). (2) `THM-04` كانت تشترط `مبدّل ⇔ theme.css` فتمنع الصفحات أحادية السمة ⇒ صارت «المبدّل يستلزم الرموز» + قائمة `SINGLE_IDENTITY`، مع بقاء «`theme.css` قبل `fonts.css`».
 - **القياس الساكن:** **283 ⇒ 43 FAIL** (قاعدة 48 وحدها **244 ⇒ 0**) على 25 ملفًا، 67 WARN. **الباقي ليس ألوانًا:** 24b كثافة، 67 على العربية (إيجابية كاذبة مسجّلة)، 39a، 38iii، سلاسل F.
 - **البوابات:** `THM-01..06` **6/6** (قائمة «لم تُهاجَر» انكمشت إلى `landing.css` و`fonts.css`)، `design-system-pages` + `landing-design` **15/15**، وتحقق بصري على 8 صفحات بلونها الأصلي (`index #0b0c10`, `system #0b1117`, `deploy #091512`, `protocol #070b14`, `computer #0b1030`) وبلا خطأ صفحة.
@@ -19,7 +19,7 @@
 ## الجلسة الحالية — 31 أكتوبر 2026 — DOC-003 / DEC-081 (تدقيق الإنفوجرافيك)
 
 - **السؤال:** صورتان تصفان CeliaOS كـ«نظام إدراكي متكامل» بحزام من **تسع** مراحل وإدراك خارجي عبر **Browser / Playwright / MCP**. أيّ معلومة منها يقف خلفها كود؟
-- **الطريقة:** قراءة الوحدات + **مسبار تشغيل حقيقي** (host فعلي على SQLite مؤقت، مخطط `demo`، موصلات تقويم وهمية) وطبع `runtime.harness()` كما يصف نفسه، ثم قياس أحجام اللغات بـ`git ls-files`.
+- **الطريقة:** قراءة الوحدات + **مسبار تشغيل حقيقي** (host على SQLite مؤقت، مخطط `demo`) وطبع `runtime.harness()` كما يصف نفسه، ثم قياس أحجام اللغات بـ`git ls-files`.
 - **النتيجة: 36 ادعاءً = 18 ✅ + 9 🟡 + 9 ❌.** التقرير: [agent-cognitive-architecture-audit.md](../agent-cognitive-architecture-audit.md) · **القرار:** `DEC-081`.
 - **أخطر ثلاثة تصحيحات:** (1) الحزام **10 مراحل و10 مكونات** لا 9، و`Policy Check` و`Approval` مرحلتان، والناقص `Observe`/`Persist Evidence`/`Update State`. (2) **لا Browser ولا Playwright ولا MCP كمصدر إدراك**: Playwright في `devDependencies`، وMCP اتجاهه معكوس (Celia تُصدِّر)، و`web.search` مؤجّلة بقرار مالك. (3) **التعلم غير منفّذ**: التقييم يقيس ولا يغيّر السياسة، وتحديث المعرفة يدوي.
 - **مؤكَّد وصحيح:** `NETWORK=DENY` مفروض بالكود (`sandbox_network_must_default_deny`)، الموافقة البشرية مربوطة ببصمة الحمولة، سلسلة أدلة SHA-256، مُتحقِّق مستقل `PASS/BLOCK/UNKNOWN`، والملاحظات الأربع في الإنفوجرافيك مطابقة للواقع.
@@ -29,9 +29,7 @@
 
 ## 1 نوفمبر 2026 — REL-002 / DEC-083 (تجميد الإصدارات)
 
-- **العلة:** بعد تفعيل تجميد الإصدارات صار `v0.2.1` `immutable=true`، وخطوة نشر الإصدار تُنفّذ `--clobber` فيفشل `Publish verified release` في كل دفعة إلى `main` بينما بقية السير خضراء.
-- **الإصلاح:** قراءة `.immutable` من الـAPI أولًا، وعند `true` تحذير صريح بأن الحزمة لم تُنشر والحاجة إلى ترقية إصدار، ثم خروج بـ`0`. المسار غير المجمّد بقي حرفيًا.
-- **التحقق:** `npm test` 943/927/0 · `check` · `workflows-static` 2/2 · `check:continuity` مع عقدة `main`.
+- **العلة والإصلاح:** `v0.2.1` صار `immutable=true`، وخطوة النشر تُنفّذ `--clobber` فتسقط وحدها في كل دفعة. صارت تقرأ `.immutable` أولًا: عند `true` تحذير أن الحزمة لم تُنشر والحاجة إلى ترقية إصدار، ثم خروج `0`؛ والمسار غير المجمّد كما هو.
 - **السجل:** [release-immutability](sessions/2026-11-01-release-immutability.md) · **القرار:** `DEC-083`.
 
 ## الجلسة الحالية — 31 أكتوبر 2026 — DOC-003 / DEC-082 (النسخة المصححة)
@@ -67,9 +65,9 @@
 
 - **31 أكتوبر — DSN-002/‏1 / `DEC-079`:** 12 صفحة بعد الهبوط. الساكن **386 ⇒ 283**، البصري **54 ⇒ 4**. `--t-field-edge` (1.45 ⇒ ≥3:1)، `--accent-fg` (3.03 ⇒ 6.03:1)، `outline: none` ⇒ 0، 13 حاجبًا و38 رمزًا تعبيريًا ⇒ 0، روابط تجاوز مقيسة، `computer-permissions` من مولّده. سجل: [dsn002](sessions/2026-10-31-dsn002-pages-design.md).
 - **31 أكتوبر — DSN-001 / `DEC-078`:** تدقيق Hallmark على صفحة الهبوط **201 FAIL + 105 REFLEX ⇒ 0/0**، بوابة `LND-01..07`، وأُصلح تضخّم `dist` من 4.8MB إلى 1.4MB. منشور: PR #113 → `main@ec7da14`.
-- **31 أكتوبر — MAN-002 / `DEC-077`:** بوابة `verify-edge-provenance` ترفض الرفع عند أي انحراف، ثم إثبات OIDC للبصمة (PR #111 → `main@4fc5112`، تشغيلة 41186251134). `gh attestation verify` غير متاح بالجلسة.
-- **31 أكتوبر — MAN-001/003/005/007 (`DEC-074/075/076`):** عقد مُولَّد ببوابة انحراف، جاهزية مشتقّة، حاجز تكافؤ أدوات، وسجل شرائح `0008` يمنح `known_good` (PR #110 → `main@d0c56bb`).
-- **31 أكتوبر — WA-005/WA-007/VER-01 (`DEC-064/065/066`):** ربط WhatsApp Embedded Signup v5 على Cloudflare Edge/D1، حسابات ذاتية الخدمة وعزل لكل مستخدم، حساب ذاتي بدل رمز مالك. **الإنتاج يقول `configured=false`** — ناقص: تطبيق Meta وEmbedded Signup config وapp secret ومفتاح تشفير. Code منشور، الربط محجوب بإعدادات المالك (`DEC-073`). سجل: [whatsapp-embedded-signup](sessions/2026-10-31-whatsapp-embedded-signup.md).
+- **31 أكتوبر — MAN-002 / `DEC-077`:** بوابة `verify-edge-provenance` ترفض أي انحراف، ثم إثبات OIDC للبصمة (PR #111 → `main@4fc5112`). `gh attestation verify` غير متاح بالجلسة.
+- **31 أكتوبر — MAN-001/003/005/007 (`DEC-074/075/076`):** عقد مُولَّد ببوابة انحراف، جاهزية مشتقّة، حاجز تكافؤ أدوات، و`known_good` (PR #110 → `main@d0c56bb`).
+- **31 أكتوبر — WA-005/WA-007/VER-01 (`DEC-064/065/066`):** ربط WhatsApp Embedded Signup v5 على Cloudflare Edge/D1، حسابات ذاتية الخدمة وعزل لكل مستخدم. **الإنتاج يقول `configured=false`**: ناقص تطبيق Meta وconfig وapp secret ومفتاح تشفير؛ Code منشور والربط محجوب بإعدادات المالك (`DEC-073`). سجل: [whatsapp-embedded-signup](sessions/2026-10-31-whatsapp-embedded-signup.md).
 - **29 أكتوبر — RELEASE-SIGNAL:** `system.html#releases` كانت تعرض نصف الحقيقة؛ `src/progress.js` يقرأ `Unreleased` من `CHANGELOG.md` ويعرضه بطاقة متقطّعة لا إصدار (`PRG-01..07`). سجل: [release-signal](sessions/2026-10-29-release-signal.md).
 - **MANUS-GAP-PLAN:** 19 فجوة (G1..G19 + G20) وخطة S1..S8 وستة قرارات مالك في [agent-web-gaps.md](../agent-web-gaps.md).
 
