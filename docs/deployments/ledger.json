@@ -1,1 +1,23 @@
-[]
+[
+  {
+    "seq": 0,
+    "prevHash": "genesis:celiaos-publish-gate-v1",
+    "at": "2026-11-01T07:17:45Z",
+    "actor": "celiaelazamey-arch",
+    "action": "merge",
+    "channel": "main",
+    "version": "0.2.1",
+    "commit": "c662906",
+    "requestFingerprint": "pub:74c9af09add44483",
+    "outcome": "merged",
+    "evidence": {
+      "pullRequest": 118,
+      "method": "squash",
+      "mergedCommit": "c662906",
+      "bypass": "RepositoryRole 5 (admin) · bypass_mode always · ruleset 26270171",
+      "bypassBecause": "owner ordered the merge; the ten commits were unsigned and the last-push approval cannot be given by the account that authored the push",
+      "checksAtMerge": "8 pass · 2 skipping"
+    },
+    "entryHash": "cef172e11e5adec483e8356a01182f20dd3e64d14f70ee82b379c5b16c094464"
+  }
+]
