@@ -33,7 +33,7 @@
 | 5 | الإصدار والحافة الدائمة | ⚠️ | نشر `production-edge` و`github-pages` و`release` مسجّل على **`16bb7cf`**، لكن `v0.2.1` مجمّد ويشير إلى لقطة أقدم | `REL-003` (قرار `0.3.0`) |
 | 6 | الخادم الخلفي الكامل (Express + MySQL) | ❌ | محجوب بمضيف/بطاقة؛ الحافة وحدها هي المنشورة | `HOST-003` 🔑🌐 |
 | 7 | القنوات (Google / WhatsApp) | ❌ | OAuth مُحاكى في الاختبارات؛ الإرسال ينتظر أسرار Meta | `GOOG-004/005` · `WA-005/007` 🔑🌐 |
-| 8 | الحماية والاستعادة | ⚠️ | سلسلة أدلة مُختبَرة؛ **حماية `main` غير مفعّلة** (`GOV-001`) ونسخة MySQL غير مقيسة | `GOV-001` · `DATA-001` 🔑 |
+| 8 | الحماية والاستعادة | ⚠️ | سلسلة أدلة مُختبَرة. **حماية `main` مفعّلة جزئيًا**: ruleset `26270171` نشِط (منع الحذف · منع الكتابة بالقوة · تاريخ خطي · CodeQL errors/high) لكن `required_status_checks` فارغة ولا مراجعة بشرية — ونسخة MySQL غير مقيسة | `GOV-001` (الجزء الباقي) · `DATA-001` 🔑 |
 
 **`B1` = 5.5 / 8.** لا يُعلن «100%» حتى تُغلق 6 و7 و8 بدليل خارجي (تشغيلة + تقرير)، لا بوصف.
 
@@ -78,11 +78,11 @@
 | `version` | الإصدار | 0.2.1 (مجمّد) | `src/version.js` + `package.json` | 🔗 |
 | `deps` | الاعتماديات | 5 prod · 2 dev | `package.json` | 🔗 |
 | `coverage_floor` | أرضية CI للتغطية | 89 / 71 / 82 | `test:coverage` | 🔗 |
-| `syntax_files` | الملفات المفحوصة نحويًا | 253 | نطاق `scripts/check.mjs` نفسه | 🔗 |
-| `continuity` | وثائق الاستمرارية / الروابط / المهام | 137 / 432 / 122 | `npm run check:continuity` | 🔗 |
+| `syntax_files` | الملفات المفحوصة نحويًا | 254 | نطاق `scripts/check.mjs` نفسه | 🔗 |
+| `continuity` | وثائق الاستمرارية / الروابط / المهام | 138 / 436 / 123 | `npm run check:continuity` | 🔗 |
 | `sandbox` | العزل | off | `CELIA_AGENT_SANDBOX` في `src/agent/index.js` | 🔗 |
 | `egress` | الخروج | off | `CELIA_AGENT_EGRESS` في `src/agent/index.js` | 🔗 |
-| `tests` | اختبارات | 1205 · **1188 pass** · 0 fail · 17 skip | `npm test` (تشغيلة 2026-11-01، بعد إضافة PSC-01..11) | 📅 |
+| `tests` | اختبارات | 1214 · **1197 pass** · 0 fail · 17 skip | `npm test` (تشغيلة 2026-11-01، بعد PSC-01..11 وFFP-01..09) | 📅 |
 | `coverage` | التغطية | أسطر **92.33** · فروع **77.73** · دوال **87.80** | `npm run test:coverage` (2026-11-01) | 📅 |
 | `tenants` | تعدّد المستأجرين | 0 (`tenantId` غير موجود؛ 30 جدولًا) | `grep -rl tenantId src/` (2026-11-01) | 📅 |
 | `skills` | المهارات بعقود | 0 / 17 | [خطة الشركة](design/ai-company-executive-plan.md) §2 (2026-11-01) | 📅 |
@@ -161,6 +161,9 @@
 ---
 
 ### W3 — النشر والقنوات · P0 · 8–12 يومًا
+
+> **ترتيب هذا الحزمة وبواباته على المسار المجاني كلها في [`PLAN-003`](plan-free-full-power.md)** — جدول قدرات مقيس
+> (الحافة 1.5/6) وخطوات E0–E7. هذه الحزمة تحتفظ بمعرفاتها؛ `PLAN-003` يشرح *كيف* تُغلق بلا بطاقة.
 
 | المهمة | البوابة |
 |---|---|
@@ -329,6 +332,7 @@ W2 🔑 (متوازٍ) ── HOST-003 ─▶ W3 ──▶ لا شيء بعده�
 | الأنبوب [`.github/workflows/celia-mcp.yml`](../.github/workflows/celia-mcp.yml) | خطوة «Completion plan covers every open task exactly once» | CI |
 | [اتفاقية العمل](../AGENTS.md) | `npm run plan:check` ضمن أوامر خط الأساس | مراجعة بشرية |
 | [خطة الشركة](design/ai-company-executive-plan.md) · [سياسة التفعيل](design/skill-activation-policy.md) | الحزمة `W5` والطبقة `L5` (0/17 مهارة) | بوابة G1–G4 في `DEC-112` |
+| [خطة «بلا بطاقة، بكامل الطاقة»](plan-free-full-power.md) | مسار W3/W4 على المسار المجاني: ست بوابات `F0..F5` وجدول قدرات الحافة | `npm run plan:check` (الرابط) · `test/free-full-power-plan.test.js` |
 
 **قاعدة الوصلة:** إذا أُغلقت مهمة أو أُضيفت أخرى ولم تُحدَّث §3 في التغيير نفسه، يسقط بناء CI ويسمّي المهمة.
 فالخطة لا تصبح «الوثيقة الأسهل» التي تُصدَّق بدلًا من السجل.

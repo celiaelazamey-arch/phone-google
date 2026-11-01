@@ -132,6 +132,10 @@ CELIA_MCP_API_TOKEN="<رمزك_السري>" npm run verify:edge
 
 ## 7) ما يتبقى حصريًا لك (دقيقتان، بلا أي بطاقة)
 
+> **ما بعد الدقيقتين:** ترتيب المتبقي وبواباته (وما تحمله الحافة اليوم فعلًا مقابل ما تحبسه البطاقة) في
+> [خطة «بلا بطاقة، بكامل الطاقة»](plan-free-full-power.md) — `PLAN-003`.
+
+
 1. **ربط Google:** أضف رابط الاستدعاء في Google Cloud Console، ثم نفّذ أمر `/auth/google/link` المذكور في الخطوة ب. بعدها يصير `/api/google/status` → `"connected": true`.
 2. **واتساب (اختياري):** اضبط webhook Meta وأضف أسرار `WHATSAPP_*` الأربعة، ثم أعد تشغيل workflow **Deploy Cloudflare Edge** يدويًا من تبويب Actions.
 
