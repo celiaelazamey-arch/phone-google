@@ -67,9 +67,12 @@ jobs:
             exit 1
           fi
       - name: Record what this snapshot actually is
+        env:
+          # CRIT-01: يُمرَّر عبر env لا بالاستيفاء داخل run (حارس ضد حقن الصدفة).
+          SNAPSHOT_BRANCH: ${{ inputs.branch || github.ref_name }}
         run: |
           {
-            echo "branch: ${{ inputs.branch || github.ref_name }}"
+            echo "branch: $SNAPSHOT_BRANCH"
             echo "commit: $(git rev-parse HEAD)"
             echo "built: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
             echo "pages: $(ls dist/*.html | wc -l) html files"
