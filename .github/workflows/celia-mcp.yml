@@ -98,6 +98,10 @@ jobs:
       # (or a domain painted complete while a capability is missing) fails here.
       - name: System Atlas poster matches the audit (VFE-008)
         run: npm run atlas:poster:check
+      # VFE-011: the dashboard is the same audit, bilingual. It refuses a payload whose numbers do
+      # not re-derive from the capability states, and it carries no date to expire.
+      - name: System Atlas dashboard matches the audit (VFE-011)
+        run: npm run atlas:dashboard:check
       # VFE-001: the board is generated from the visual registry, and every handoff in this range
       # either links an artifact that exists or says «لا يوجد تغيير بصري» and why. Silence fails.
       - name: Visual-First board and handoff evidence (VFE-001)

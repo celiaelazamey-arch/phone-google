@@ -71,7 +71,9 @@
     "build:edge-ui:check": "node scripts/build-edge-ui.mjs --check",
     "build:manifest": "node scripts/build-manifest.mjs",
     "build:manifest:check": "node scripts/build-manifest.mjs --check",
-    "verify:edge-provenance": "node scripts/verify-edge-provenance.mjs"
+    "verify:edge-provenance": "node scripts/verify-edge-provenance.mjs",
+    "atlas:dashboard": "node scripts/render-atlas-dashboard.mjs",
+    "atlas:dashboard:check": "node scripts/render-atlas-dashboard.mjs --check"
   },
   "dependencies": {
     "dotenv": "^18.0.9",
