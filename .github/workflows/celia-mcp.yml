@@ -94,6 +94,10 @@ jobs:
       # run. A domain whose evidence disappears cannot stay painted as covered.
       - name: System Atlas matches the audited domains (VFE-006)
         run: npm run atlas:check
+      # VFE-008: the poster is the same audit at poster size. A number edited by hand on the poster
+      # (or a domain painted complete while a capability is missing) fails here.
+      - name: System Atlas poster matches the audit (VFE-008)
+        run: npm run atlas:poster:check
       # VFE-001: the board is generated from the visual registry, and every handoff in this range
       # either links an artifact that exists or says «لا يوجد تغيير بصري» and why. Silence fails.
       - name: Visual-First board and handoff evidence (VFE-001)

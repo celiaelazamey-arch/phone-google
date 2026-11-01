@@ -13,6 +13,7 @@
  * A domain with an empty citation list is a domain the system does not have, and the atlas says so
  * in the owner's own words: «تعدد الوكلاء لا يعني أن جميع الوكلاء موجودون».
  */
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
@@ -279,6 +280,22 @@ export function buildAtlas({ root = path.resolve(import.meta.dirname, '../..') }
       }))
     }
   };
+}
+
+/**
+ * A content fingerprint of the audit: the same twelve domains, statuses and capability states hash to
+ * the same short string. A poster can therefore name exactly which findings it draws — instead of
+ * carrying a commit or a date that nobody can check.
+ */
+export function fingerprintOf(atlas) {
+  const canonical = JSON.stringify(
+    atlas.domains.map((domain) => ({
+      id: domain.id,
+      status: domain.status,
+      capabilities: domain.capabilities.map((capability) => [capability.id, capability.status])
+    }))
+  );
+  return createHash('sha256').update(canonical).digest('hex').slice(0, 10);
 }
 
 /** The phases the owner asked for: audit → coverage map → staged construction. Never all twelve at once. */

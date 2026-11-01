@@ -52,6 +52,8 @@
     "arch:impact": "node scripts/render-architecture-map.mjs --impact",
     "atlas": "node scripts/render-system-atlas.mjs",
     "atlas:check": "node scripts/render-system-atlas.mjs --check",
+    "atlas:poster": "node scripts/render-atlas-poster.mjs",
+    "atlas:poster:check": "node scripts/render-atlas-poster.mjs --check",
     "test:mysql": "node --test integration/mysql.integration.mjs",
     "eval:ai": "node scripts/eval-ai.mjs",
     "eval:templates": "node scripts/eval-templates.mjs",

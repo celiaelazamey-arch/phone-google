@@ -16,9 +16,11 @@ import {
   TRUTH_MARK,
   buildAtlas,
   capabilityStatus,
+  fingerprintOf,
   phasesOf
 } from '../src/design/system-atlas.js';
 import { PAGE_PATH, buildHtml } from '../scripts/render-system-atlas.mjs';
+import { POSTER_PATH, buildHtml as buildPoster, domainVerdict } from '../scripts/render-atlas-poster.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const atlas = buildAtlas({ root });
@@ -130,4 +132,38 @@ test('the permanent rule names the atlas and the audit-first order', () => {
   assert.match(agents, /System Atlas/);
   assert.match(agents, /npm run atlas:check/);
   assert.match(agents, /audit/i, 'the rule must start with the audit, not the build');
+});
+
+test('the poster is generated from the audit, and every number on it is re-computable', () => {
+  const poster = readFileSync(POSTER_PATH, 'utf8');
+  assert.equal(poster, buildPoster(), 'the poster is stale — run `npm run atlas:poster`');
+  const fingerprint = fingerprintOf(atlas);
+  assert.match(poster, new RegExp(fingerprint), 'the poster names the findings it draws');
+  assert.ok(!/249f1b5/.test(poster), 'a poster may not cite a commit that does not exist');
+  for (const domain of atlas.domains) {
+    assert.ok(poster.includes(`>${domain.coverage}%<`), `${domain.id} prints a coverage that was not measured`);
+    assert.ok(poster.includes(domain.ar.replace(/&/g, '&amp;')), `the poster omits ${domain.id}`);
+  }
+  assert.ok(poster.includes(`${atlas.capabilityCounts[TRUTH.verified]}`), 'the verified count comes from the audit');
+  assert.ok(poster.includes(`${atlas.capabilityCounts[TRUTH.missing]}`), 'the missing count comes from the audit');
+});
+
+test('a domain with a gap can never be painted as complete', () => {
+  for (const domain of atlas.domains) {
+    const verdict = domainVerdict(domain);
+    const missing = domain.capabilities.filter((capability) => capability.status === TRUTH.missing);
+    const unverified = domain.capabilities.filter((capability) => capability.status === TRUTH.unverified);
+    if (missing.length) assert.equal(verdict.kind, 'gap', `${domain.id} has gaps and must say so`);
+    else if (unverified.length) assert.equal(verdict.kind, 'warn', `${domain.id} has untested capabilities and must say so`);
+    else assert.equal(verdict.kind, 'done');
+    if (missing.length) assert.ok(domain.coverage < 100, `${domain.id} cannot be 100% with a missing capability`);
+  }
+});
+
+test('the roadmap counts on the poster equal the domains it partitions', () => {
+  const poster = readFileSync(POSTER_PATH, 'utf8');
+  for (const phase of phasesOf(atlas)) {
+    assert.ok(poster.includes(`${phase.domains.length} مجالات`), `${phase.priority} count is printed`);
+    assert.equal(phase.domains.length, atlas.domains.filter((domain) => domain.priority === phase.priority).length);
+  }
 });
