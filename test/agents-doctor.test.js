@@ -61,15 +61,40 @@ test('AD-02: the doctor prints a human table with one line per check', () => {
   assert.equal(rows.length, REQUIRED.length, 'one row per check, no silent gaps');
 });
 
-const runDoctor = (extraArgs = [], env = {}) => {
+const runDoctor = (extraArgs = [], env = {}, base = process.env) => {
   const child = spawnSync(process.execPath, ['scripts/agents-doctor.mjs', ...extraArgs], {
     cwd: root,
     encoding: 'utf8',
     timeout: 240_000,
-    env: { ...process.env, ...env }
+    env: { ...base, ...env }
   });
   return child;
 };
+
+/**
+ * AD-03 must not depend on the machine it runs on. The service-reality runner exports the real
+ * repository secrets, so a Google-configured runner used to make `--setup` report *fewer* missing
+ * names — correct behaviour, but the assertion below was written as if nothing were configured.
+ * The runbook is tested here against an explicitly empty Google/AI environment, and the second half
+ * proves the derivation still follows the data instead of a hardcoded list.
+ */
+const CONFIGURATION_KEYS = [
+  'GOOGLE_CLIENT_ID',
+  'GOOGLE_CLIENT_SECRET',
+  'GOOGLE_REDIRECT_URI',
+  'APP_BASE_URL',
+  'TOKEN_ENCRYPTION_KEY',
+  'APP_API_TOKEN',
+  'APP_OWNER_EMAIL',
+  'CELIA_DISABLE_GOOGLE',
+  'GEMINI_API_KEY',
+  'GEMINI_MODEL',
+  'AI_GATEWAY_API_KEY',
+  'DEEPSEEK_API_KEY',
+  'AGENETROUTERAPI_KEY',
+  'AGENTROUTER_API_KEY'
+];
+const unconfiguredEnv = () => Object.fromEntries(Object.entries(process.env).filter(([key]) => !CONFIGURATION_KEYS.includes(key)));
 
 const parseJson = (child) => {
   const text = String(child.stdout || '');
@@ -86,21 +111,41 @@ const tempEnvFile = (values) => {
 };
 
 test('AD-03: --setup derives the connect runbook from the code and prints no secret', () => {
-  const json = runDoctor(['--setup', '--json']);
+  const empty = unconfiguredEnv();
+  const json = runDoctor(['--setup', '--json'], {}, empty);
   assert.equal(json.status, 0);
   const setup = parseJson(json);
   assert.equal(setup.version, 'agents-doctor-setup-v1');
   assert.deepEqual(setup.derivedFrom, ['src/google-preflight.js', 'src/config.js']);
   assert.match(setup.google.redirectUri, /\/auth\/google\/callback$/);
-  assert.ok(setup.google.envNames.includes('GOOGLE_CLIENT_ID'));
+  assert.ok(setup.google.envNames.includes('GOOGLE_CLIENT_ID'), 'an absent credential is named as missing');
   assert.equal(setup.google.consentPath, '/auth/google');
   assert.match(setup.google.verifyCommand, /google:doctor/);
   assert.match(setup.recheckCommand, /agents:doctor/);
   assert.equal(setup.ai.defaultModel.length > 0, true);
 
-  const text = runDoctor(['--setup']);
+  const text = runDoctor(['--setup'], {}, empty);
   assert.match(text.stdout, /خطة التوصيل/);
   assert.match(text.stdout, /Authorized redirect URI/);
+});
+
+test('AD-03b: a configured runner changes the missing-name list, never the derivation', () => {
+  const configured = runDoctor(
+    ['--setup', '--json'],
+    {
+      GOOGLE_CLIENT_ID: 'placeholder-client-id-0001.apps.googleusercontent.com',
+      GOOGLE_CLIENT_SECRET: 'placeholder-client-secret-value-0001'
+    },
+    unconfiguredEnv()
+  );
+  assert.equal(configured.status, 0);
+  const setup = parseJson(configured);
+  assert.equal(setup.google.envNames.includes('GOOGLE_CLIENT_ID'), false, 'a present credential is not reported missing');
+  assert.equal(setup.google.envNames.includes('GOOGLE_CLIENT_SECRET'), false);
+  assert.deepEqual(setup.google.envNames.sort(), ['APP_API_TOKEN', 'APP_OWNER_EMAIL', 'TOKEN_ENCRYPTION_KEY']);
+  assert.deepEqual(setup.derivedFrom, ['src/google-preflight.js', 'src/config.js'], 'the same two files, configured or not');
+  const combined = `${configured.stdout}${configured.stderr}`;
+  assert.equal(combined.includes('placeholder-client-secret-value-0001'), false, 'the value never leaves the process');
 });
 
 test('AD-04: --env-file changes the verdicts and never echoes a value', () => {

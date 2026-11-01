@@ -82,7 +82,7 @@
 | `continuity` | وثائق الاستمرارية / الروابط / المهام | 138 / 436 / 123 | `npm run check:continuity` | 🔗 |
 | `sandbox` | العزل | off | `CELIA_AGENT_SANDBOX` في `src/agent/index.js` | 🔗 |
 | `egress` | الخروج | off | `CELIA_AGENT_EGRESS` في `src/agent/index.js` | 🔗 |
-| `tests` | اختبارات | 1214 · **1197 pass** · 0 fail · 17 skip | `npm test` (تشغيلة 2026-11-01، بعد PSC-01..11 وFFP-01..09) | 📅 |
+| `tests` | اختبارات | 1215 · **1198 pass** · 0 fail · 17 skip | `npm test` (تشغيلة 2026-11-01، بعد PSC-01..11 وFFP-01..09 وAD-03b) | 📅 |
 | `coverage` | التغطية | أسطر **92.33** · فروع **77.73** · دوال **87.80** | `npm run test:coverage` (2026-11-01) | 📅 |
 | `tenants` | تعدّد المستأجرين | 0 (`tenantId` غير موجود؛ 30 جدولًا) | `grep -rl tenantId src/` (2026-11-01) | 📅 |
 | `skills` | المهارات بعقود | 0 / 17 | [خطة الشركة](design/ai-company-executive-plan.md) §2 (2026-11-01) | 📅 |
