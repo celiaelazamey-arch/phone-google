@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { appendFile, mkdir, writeFile } from 'node:fs/promises';
+import { classifyProbeError, probeMetadata, publishProbeReport } from './probe-report.mjs';
 import { pathToFileURL } from 'node:url';
 
 const providers = [
@@ -30,9 +30,7 @@ export async function probeAiProviders({ config, generate }) {
       checks.push({ id, status: verified ? 'verified' : 'failed',
         reason: verified ? 'live_response' : 'empty_or_fallback_response' });
     } catch (error) {
-      const status = error?.upstreamStatus;
-      checks.push({ id, status: 'failed', reason: 'request_failed',
-        httpStatus: Number.isInteger(status) && status >= 100 && status <= 599 ? status : null });
+      checks.push({ id, status: 'failed', ...classifyProbeError(error) });
     }
   }
   return { schema: 1, checks, ok: checks.some((c) => c.status === 'verified')
@@ -47,19 +45,7 @@ async function main() {
     CELIA_MCP_API_TOKEN: 'synthetic-probe-only-not-a-production-token',
     CELIA_MCP_DISABLE_MYSQL: 'true', CELIA_DISABLE_OLLAMA: 'true' });
   const report = await probeAiProviders({ config, generate: generateCeliaReply });
-  const safe = JSON.stringify(report, null, 2);
-  await mkdir('.validation-artifacts', { recursive: true });
-  await writeFile('.validation-artifacts/ai-provider-probes.json', `${safe}\n`);
-  console.log(safe);
-  if (process.env.GITHUB_ACTIONS === 'true') {
-    for (const check of report.checks) {
-      console.log(`::notice title=AI provider probe::${check.id}: ${check.status}; HTTP ${check.httpStatus ?? 'n/a'}`);
-    }
-  }
-  if (process.env.GITHUB_STEP_SUMMARY) {
-    await appendFile(process.env.GITHUB_STEP_SUMMARY,
-      `## Isolated AI provider probes\n\nNo OAuth, deployment, or response content.\n\n| Provider | Status | HTTP |\n|---|---|---|\n${report.checks.map((c) => `| ${c.id} | ${c.status} | ${c.httpStatus ?? '—'} |`).join('\n')}\n`);
-  }
+  await publishProbeReport({ ...report, ...probeMetadata(), scope: 'Synthetic AI requests only; not production readiness. No OAuth or deployment.' }, 'ai-provider-probes');
   process.exitCode = report.ok ? 0 : 1;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
