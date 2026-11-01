@@ -2,23 +2,25 @@
 /**
  * Integration in CeliaOS — engineering infographic (Arabic RTL).
  *
- * Output: docs/design/integration-in-celiaos.png (1800px wide).
+ * Output: docs/design/integration-in-celiaos.png (1800px wide, 12 sections).
+ * Claims: every number shown is backed by docs/design/integration-in-celiaos.evidence.md
  *
- * Requirements are intentionally NOT npm dependencies: this is a one-off design
- * artifact generator, not part of the runtime or the CI gates.
+ * Requirements are intentionally NOT npm dependencies: this is a design artifact
+ * generator, not part of the runtime or the CI gates.
  *   1. npm install --no-save @napi-rs/canvas
  *   2. TTF cuts of the repo faces (public/fonts/*.woff2 are woff2, canvas needs TTF):
  *        PlexArabic-{400,500,600,700}.ttf  (IBM Plex Sans Arabic)
  *        Mono-{400,600}.ttf               (JetBrains Mono)
- *      Point CELIA_FONTS_DIR at the directory holding them.
  *
  * Usage: CELIA_FONTS_DIR=/path/to/fonts node scripts/render-integration-infographic.mjs [out.png]
  *
  * Deterministic and offline: no network, no emoji, no external assets.
+ * Same inputs produce a byte-identical PNG.
  */
 import { createCanvas, GlobalFonts } from '@napi-rs/canvas';
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const F = process.env.CELIA_FONTS_DIR || '/home/user/.tools/fonts';
 const FACES = ['PlexArabic-400.ttf', 'PlexArabic-500.ttf', 'PlexArabic-600.ttf', 'PlexArabic-700.ttf', 'Mono-400.ttf', 'Mono-600.ttf'];
@@ -575,7 +577,7 @@ const hubY = y + 386;
 dot(hubX, hubY, 28, 'rgba(226,179,87,0.14)');
 dot(hubX, hubY, 13, C.gold);
 ctext('طبقة واحدة', hubX, hubY + 62, { size: 18, weight: 'Plex5', color: C.muted });
-ctext('O(n) instead of O(n²)', hubX, hubY + 88, { size: 16, weight: 'Mono4', color: C.dim });
+ctext('O(n) links, not system complexity', hubX, hubY + 88, { size: 15, weight: 'Mono4', color: C.dim });
 
 y += defH + 34;
 
@@ -678,7 +680,7 @@ rrect(M + 30, footY - 26, CW - 60, 48, 14);
 ctx.fillStyle = 'rgba(255,255,255,0.04)';
 ctx.fill();
 text('القاعدة الحاكمة: وجود API أو MCP لا يعني السماح بالتنفيذ — السياسة والصلاحية تحدّدان ما يجوز.', XR - 24, footY + 6, { size: 23, weight: 'Plex5', color: C.goldSoft });
-text('لون النقطة = الحالة الفعلية في القسم ١٠', XL + 24, footY + 6, { size: 18, weight: 'Plex4', color: C.dim, align: 'left' });
+text('١٤ أداة مسجّلة · ٥ تتطلب موافقة · sandbox.exec غير قابل للتنفيذ افتراضيًا', XL + 24, footY + 6, { size: 17, weight: 'Plex4', color: C.dim, align: 'left' });
 
 y += archH + 34;
 
@@ -761,13 +763,13 @@ text(loopLabel, W / 2 + lw / 2 - 48, loopY + 8, { size: 22, weight: 'Plex5', col
 y += flowH + 34;
 
 /* ============================== 04 · SECURITY =========================== */
-const secH = 408;
+const secH = 616;
 panel(M, y, CW, secH, { fill: 'rgba(255,123,138,0.045)', stroke: 'rgba(255,123,138,0.26)' });
 sectionHeader(y + 92, {
   num: '04',
   kicker: 'SECURITY',
   title: 'الأمان أولًا: الاتصال ليس إذنًا',
-  note: 'الصفر الافتراضي: لا اتصال بلا تصريح',
+  note: 'قاعدة عامة، لكن تنفيذها محدَّد النطاق — والحدود مُعلنة أدناه',
   accent: C.red
 });
 
@@ -784,9 +786,9 @@ rrect(badgeX, y + 126, badgeW, 162, 22);
   ctx.lineWidth = 1.6;
   ctx.stroke();
 }
-ctext('NETWORK = DENY', badgeX + badgeW / 2, y + 190, { size: 33, weight: 'Mono6', color: C.red });
-ctext('الوجهات تُسمَّح صراحةً، لا تُفتح افتراضيًا', badgeX + badgeW / 2, y + 232, { size: 19, weight: 'Plex4', color: C.body });
-ctext('وما يُسمح يبقى خاضعًا للموافقة والتحقق', badgeX + badgeW / 2, y + 262, { size: 18, weight: 'Plex4', color: C.muted });
+ctext('NETWORK = DENY', badgeX + badgeW / 2, y + 188, { size: 33, weight: 'Mono6', color: C.red });
+ctext('في نطاق الوكيل والـEdge — لا في كل مسار', badgeX + badgeW / 2, y + 230, { size: 19, weight: 'Plex4', color: C.body });
+ctext('الوجهات تُسمَّح صراحةً، و«*» مرفوضة', badgeX + badgeW / 2, y + 260, { size: 18, weight: 'Plex4', color: C.muted });
 
 const rules = [
   'لا اتصال خارجي دون تصريح صريح',
@@ -806,10 +808,38 @@ rules.forEach((r0, i) => {
   const col = i % 2;
   const row = Math.floor(i / 2);
   const rx = rulesArea - col * rcolW;
-  const ryy = y + 148 + row * 50;
-  dot(rx + 12, ryy - 7, 5, C.red);
-  text(r0, rx - 10, ryy, { size: 22, weight: 'Plex4', color: C.body });
+  const ryy = y + 148 + row * 34;
+  dot(rx + 12, ryy - 6, 4.5, C.red);
+  text(r0, rx - 10, ryy, { size: 20, weight: 'Plex4', color: C.body });
 });
+
+// scope table: where the guard is actually proven
+const scTop = y + 320;
+text('أين هذا الحارس فعّال — وأين لا', XR, scTop + 20, { size: 24, weight: 'Plex6', color: C.text });
+text('الحكم مبني على اختبار قابل لإعادة التشغيل، لا على نيّة التصميم', XL, scTop + 20, { size: 18, weight: 'Plex4', color: C.dim, align: 'left' });
+
+const scRows = [
+  ['سطح الوكيل والعزل', 'وسيط خروج · الافتراضي off · قائمة مضيفين صريحة ترفض «*»', 'EP-01..17 · 17/17', 'ok'],
+  ['Edge (cron و worker)', 'isDisallowedTargetHost: loopback · خاص · link-local · metadata', 'SP-10 · 12/12', 'ok'],
+  ['محوّلات التطبيق', 'لا تمرّ بالوسيط: whatsapp · google · ai-providers · ollama', 'لا اختبار شبكي موحّد', 'no']
+];
+const scX = M + 24;
+const scW = CW - 48;
+const scRowH = 62;
+scRows.forEach((r0, i) => {
+  const ry = scTop + 40 + i * scRowH;
+  rrect(scX, ry, scW, scRowH - 8, 12);
+  ctx.fillStyle = i === 2 ? 'rgba(255,123,138,0.10)' : 'rgba(255,255,255,0.035)';
+  ctx.fill();
+  ctx.strokeStyle = i === 2 ? 'rgba(255,123,138,0.38)' : 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+  dot(scX + scW - 22, ry + 27, 6, STATUS[r0[3]]);
+  text(r0[0], scX + scW - 40, ry + 32, { size: 21, weight: 'Plex6', color: C.text });
+  text(r0[1], scX + scW - 330, ry + 32, { size: 18, weight: 'Plex4', color: C.body });
+  text(r0[2], scX + 22, ry + 32, { size: 16, weight: 'Mono4', color: i === 2 ? C.rose : C.muted, dir: 'ltr', align: 'left' });
+});
+text('الخلاصة: «لا اتصال بلا تصريح» قاعدة مُثبتة على سطح الوكيل، وفجوة معلنة على مسار المحوّلات — ولا تُعرض كأنها شاملة.', XR, scTop + 40 + 3 * scRowH + 24, { size: 20, weight: 'Plex5', color: C.goldSoft });
 
 y += secH + 34;
 
@@ -943,38 +973,51 @@ pub.forEach((p, i) => {
 y += obH + 34;
 
 /* ===================== 08 · ONE TASK ACROSS FOUR SERVICES =============== */
-const taskH = 392;
+const taskH = 430;
 panel(M, y, CW, taskH, { fill: C.panel, stroke: C.line });
 sectionHeader(y + 92, {
   num: '08',
   kicker: 'WORKED EXAMPLE',
   title: 'مهمة واحدة عبر أربع خدمات',
-  note: '«رتّب لي اجتماعًا الخميس ٣ عصرًا» — من رسالة واتساب إلى دليل موثّق',
+  note: '«رتّب لي اجتماعًا الخميس ٣ عصرًا» — تصميم مُحاكى لا تكامل حيّ',
   accent: C.blue
 });
 
 const steps = [
-  { s: 'WhatsApp', g: 'src/whatsapp.js', n: '1', d: 'رسالة واردة عبر Webhook موقَّع؛ تُطبَّع إلى طلب موحّد بدل أن تُنفَّذ كما هي.', c: C.green },
-  { s: 'Google Calendar', g: 'src/google.js', n: '2', d: 'فحص صلاحية الإنشاء، ثم إنشاء الحدث؛ الموافقة مطلوبة لأنه أثر خارجي.', c: C.blue },
-  { s: 'WhatsApp', g: 'src/whatsapp.js', n: '3', d: 'إرسال نص التأكيد للمستخدم بعد نجاح الخطوة السابقة، لا قبلها.', c: C.green },
-  { s: 'Store · Evidence', g: 'src/store.js', n: '4', d: 'كتابة السجل وبصمة SHA-256، ثم التحقق قبل اعتبار المهمة ناجحة.', c: C.purple }
+  { s: 'WhatsApp', g: 'src/whatsapp.js', n: '1', badge: 'مُختبر', bc: C.green, d: 'رسالة واردة عبر Webhook موقَّع؛ تُطبَّع إلى طلب موحّد بدل أن تُنفَّذ كما هي.', c: C.green },
+  { s: 'Google Calendar', g: 'src/google.js', n: '2', badge: 'محاكاة', bc: C.amber, d: 'يصل الطلب إلى بوابة الموافقة ثم يتوقف؛ لا يُنشأ حدث ولا يُرسل شيء.', c: C.amber },
+  { s: 'WhatsApp', g: 'src/whatsapp.js', n: '3', badge: 'مشروط', bc: C.amber, d: 'إرسال التأكيد لا يحدث قبل الموافقة، وغير مفعّل لغياب أسرار Meta.', c: C.amber },
+  { s: 'Store · Evidence', g: 'src/store.js', n: '4', badge: 'مُختبر', bc: C.green, d: 'كتابة السجل وبصمة SHA-256، ثم التحقق قبل اعتبار المهمة ناجحة.', c: C.purple }
 ];
 const stGap = 28;
 const stW = (CW - 2 * PAD - 3 * stGap) / 4;
 steps.forEach((st, i) => {
   const sx = XR - stW - i * (stW + stGap);
-  card(sx, y + 132, stW, 176, { fill: 'rgba(255,255,255,0.035)', r: 18, accent: st.c, accentW: 4 });
+  card(sx, y + 132, stW, 196, { fill: 'rgba(255,255,255,0.035)', r: 18, accent: st.c, accentW: 4 });
   text(st.n, sx + stW - 18, y + 162, { size: 17, weight: 'Mono6', color: st.c, dir: 'ltr' });
   text(st.s, sx + stW - 46, y + 162, { size: 22, weight: 'Plex6', color: C.text, dir: 'ltr' });
-  para(st.d, sx + stW - 18, y + 202, stW - 36, { size: 18, color: C.muted, lh: 1.45 });
-  text(st.g, sx + 18, y + 292, { size: 15, weight: 'Mono4', color: C.dim, dir: 'ltr', align: 'left' });
-  if (i < 3) arrow(sx - 5, y + 220, sx - 25, y + 220, { color: 'rgba(124,156,255,0.65)', width: 3.5, head: 11 });
+  const bw = measure(st.badge, 15, 'Plex6') + 26;
+  rrect(sx + 16, y + 142, bw, 30, 15);
+  ctx.fillStyle = st.bc + '22';
+  ctx.fill();
+  ctx.strokeStyle = st.bc + '88';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+  ctext(st.badge, sx + 16 + bw / 2, y + 163, { size: 15, weight: 'Plex6', color: st.bc });
+  para(st.d, sx + stW - 18, y + 206, stW - 36, { size: 18, color: C.muted, lh: 1.45 });
+  text(st.g, sx + 18, y + 308, { size: 15, weight: 'Mono4', color: C.dim, dir: 'ltr', align: 'left' });
+  if (i < 3) arrow(sx - 5, y + 232, sx - 25, y + 232, { color: 'rgba(124,156,255,0.65)', width: 3.5, head: 11 });
 });
 
-rrect(M + PAD, y + 322, CW - 2 * PAD, 46, 14);
-ctx.fillStyle = 'rgba(255,255,255,0.04)';
+rrect(M + PAD, y + 344, CW - 2 * PAD, 66, 14);
+ctx.fillStyle = 'rgba(255,176,80,0.08)';
 ctx.fill();
-text('ما لم يحدث في هذه المهمة: لا كتابة في GitHub، لا متصفح آلي، ولا اتصال بشبكة خارج ما سُمح به صراحةً.', XR - 22, y + 351, { size: 21, weight: 'Plex4', color: C.goldSoft });
+ctx.strokeStyle = 'rgba(255,176,80,0.30)';
+ctx.lineWidth = 1.2;
+ctx.stroke();
+dot(M + CW - PAD - 22, y + 367, 6, C.amber);
+text('هذا التدفق لا يعمل حيًّا اليوم: الخطوة ٢ تتوقف عند بوابة الموافقة ولا تُنشئ حدثًا (اختبار M1)، ولا كتابة في GitHub ولا متصفح آلي في المسار.', XR - 42, y + 372, { size: 20, weight: 'Plex4', color: C.goldSoft });
+text('مصدر الوصف: docs/design/integration-in-celiaos.evidence.md — القسم ٥.', XL + 20, y + 398, { size: 16, weight: 'Mono4', color: C.dim, dir: 'ltr', align: 'left' });
 
 y += taskH + 34;
 
@@ -1028,20 +1071,20 @@ y += trioH + 34;
 
 /* ============================ 10 · REALITY ============================== */
 const realRows = [
-  ['Tool Registry', 'سجل أدوات ورفض غير المسجّل', 'ok', 'src/agent/tools.js'],
-  ['MCP', '١٢ أداة معرَّفة وتكافؤها محروس', 'ok', 'src/celia-mcp.js'],
-  ['Policy & Approval', 'صفوف موافقة وتوقّف قبل الأثر', 'ok', 'src/agent/runtime.js'],
-  ['Evidence & Verification', 'سلسلة بصمات SHA-256 ومُتحقِّق', 'ok', 'src/agent/evidence.js'],
-  ['Database · MySQL', 'مخزن دائم، اختُبر 8.4 و N−1', 'ok', 'src/store.js'],
-  ['Evidence · Audit', 'سجل إلحاق بسلسلة هاش', 'ok', 'workers/celia-edge/state.js'],
-  ['Access policy', '٦٧ صلاحية بمصفوفة مولَّدة', 'ok', 'src/agent/access-policy.js'],
-  ['WhatsApp', 'Webhook مبني؛ بلا أسرار Meta بعد', 'part', 'src/whatsapp.js'],
-  ['Google', 'OAuth2 للخدمات الأربع؛ ربط حي غير متحقق', 'part', 'src/google.js'],
-  ['Event Bus', 'ناقل تسليم وتسجيل، لا يستهلك المحتوى', 'part', 'src/agent/collaboration-bus.js'],
-  ['Execution Sandbox', 'مبني ومُختبَر؛ الافتراضي off', 'part', 'src/agent/sandbox.js'],
-  ['Adapters', 'محوّل لكل خدمة، لا عقد موحّد بعد', 'part', 'src/google.js'],
-  ['GitHub', 'فرز Issue كنص بيانات؛ لا كتابة', 'no', 'src/agent/issue-triage'],
-  ['Browser', 'غير متاح كأداة وكيل (Playwright للاختبار)', 'no', 'docs/computer-use.md']
+  ['Tool Registry', 'الأداة غير المسجّلة تُرفض قبل أي أثر', 'ok', 'test/agent-runtime.test.js'],
+  ['MCP', '١٢ أداة مُعلنة — الإعلان لا يعني التشغيل', 'ok', 'test/celia-mcp-tools.test.js:40'],
+  ['Policy & Approval', '٥ أدوات تتطلب موافقة، والتنفيذ يتوقف قبلها', 'ok', 'test/agent-runtime.test.js:147'],
+  ['Evidence & Verification', 'سلسلة SHA-256 تكشف التعديل والحذف', 'ok', 'test/agent-evidence.test.js:68'],
+  ['Database · MySQL', 'MySQL 8.4 عبر ملف تكامل منفصل (لم يُعَد هنا)', 'part', 'integration/mysql.integration.mjs'],
+  ['Evidence · Audit', 'سجل إلحاق: لا UPDATE ولا DELETE', 'ok', 'test/security-posture.test.js:204'],
+  ['Access policy', '٦٧ صلاحية مسجّلة — التسجيل لا يُثبت التطبيق', 'part', 'src/agent/access-policy.js:242'],
+  ['WhatsApp', 'Webhook مُختبر؛ بلا أسرار Meta', 'part', 'test/whatsapp-onboarding.test.js'],
+  ['Google', 'OAuth2 مُحاكى؛ ربط حي غير متحقق', 'part', 'test/agent-google-read.test.js'],
+  ['Event Bus', 'ناقل تسليم وتسجيل، لا يستهلك المحتوى', 'ok', 'test/collaboration-bus.test.js'],
+  ['Execution Sandbox', 'الافتراضي off · ٣/١٧ يعمل · ١٤ متخطّاة', 'part', 'test/agent-sandbox.test.js:13'],
+  ['Adapters', 'لا عقد موحّد بين الخدمات', 'no', 'لا ملف عقد في src'],
+  ['GitHub', 'فرز Issue كنص؛ لا كتابة ولا PRs', 'no', 'test/issue-triage.test.js'],
+  ['Browser', 'لا أداة متصفح في سجل الوكيل', 'no', 'src/agent/tools.js']
 ];
 const rowH = 48;
 const realH = 158 + realRows.length * rowH + 84;
@@ -1050,7 +1093,7 @@ sectionHeader(y + 92, {
   num: '10',
   kicker: 'STATUS IN THIS REPOSITORY',
   title: 'الحالة الفعلية اليوم — لا تصميم مستهدف',
-  note: 'كل صف بدليله؛ ما لم يُنفَّذ يُقال إنه لم يُنفَّذ',
+  note: 'كل صف بدليل قابل لإعادة الفحص، لا بوصف',
   accent: C.green
 });
 
@@ -1061,25 +1104,71 @@ realRows.forEach((r0, i) => {
     ctx.fillStyle = 'rgba(255,255,255,0.025)';
     ctx.fill();
   }
-  dot(XR - 40, ry0 - 7, 6, STATUS[r0[2]]);
-  text(r0[0], XR - 60, ry0, { size: 21, weight: 'Plex6', color: C.text, dir: /^[A-Za-z]/.test(r0[0]) ? 'ltr' : 'rtl' });
-  text(r0[1], XR - 366, ry0, { size: 20, weight: 'Plex4', color: C.body });
-  text(r0[3], M + 46, ry0, { size: 17, weight: 'Mono4', color: C.dim, dir: 'ltr', align: 'left' });
+  dot(XR - 34, ry0 - 7, 6, STATUS[r0[2]]);
+  text(r0[0], XR - 54, ry0, { size: 20, weight: 'Plex6', color: C.text, dir: /^[A-Za-z]/.test(r0[0]) ? 'ltr' : 'rtl' });
+  text(r0[1], XR - 356, ry0, { size: 18, weight: 'Plex4', color: C.body });
+  text(r0[3], M + 46, ry0, { size: 15, weight: 'Mono4', color: C.dim, dir: 'ltr', align: 'left' });
   ry0 += rowH;
 });
 
-legendRow(M + 46, y + realH - 34, [['ok', 'مُنفَّذ ومُختبَر'], ['part', 'جزئي أو مشروط'], ['no', 'غير منفَّذ']]);
-text('لا يمثّل هذا الجدول «كل ما يمكن بناؤه»، بل ما هو موجود فعلًا في هذا المستودع حتى ١ نوفمبر ٢٠٢٦.', XR, y + realH - 34, { size: 18, weight: 'Plex4', color: C.dim });
+legendRow(M + 46, y + realH - 34, [['ok', 'مُنفَّذ ومُختبَر'], ['part', 'جزئي أو مشروط'], ['no', 'غير منفّذ']]);
+text('الأوامر والنتائج الكاملة في docs/design/integration-in-celiaos.evidence.md', XR, y + realH - 34, { size: 18, weight: 'Plex4', color: C.dim });
 
 y += realH + 34;
 
-/* ============================ 11 · PHILOSOPHY =========================== */
-const philH = 236;
+/* ========================= 11 · OPEN GAPS ============================== */
+const gapH = 420;
+panel(M, y, CW, gapH, { fill: 'rgba(255,203,107,0.05)', stroke: 'rgba(255,203,107,0.26)' });
+sectionHeader(y + 92, {
+  num: '11',
+  kicker: 'OPEN GAPS',
+  title: 'ما لم يُتحقق منه بعد',
+  note: 'الفجوة المعلنة ليست عيبًا في الرسم — العيب أن تُرسم كإنجاز',
+  accent: C.amber
+});
+
+const gaps = [
+  ['ربط Google حي', 'OAuth مُحاكى في الاختبارات؛ لا ربط حساب حقيقي'],
+  ['إرسال WhatsApp فعلي', 'الـWebhook مُختبر، لكن الإرسال ينتظر أسرار Meta'],
+  ['العزل التنفيذي', 'off افتراضيًا، واختباراته الحقيقية متخطّاة محليًا'],
+  ['عقد المحوّلات', 'كل خدمة تُترجم على حِدة؛ لا عقد موحّد بعد'],
+  ['تكامل من طرف إلى طرف', 'لا اختبار واحد يمرّ بالخدمات الأربع كاملة'],
+  ['سلامة الأدلة عند إعادة الترتيب', 'تُكشف ضمنيًا بفراغ التسلسل، بلا اختبار مسمّى'],
+  ['حارس الشبكة للمحوّلات', 'لا يمرّ بوسيط الوكيل؛ لا اختبار يثبت حراسته'],
+  ['N−1 على MySQL', 'نطاقه محدود ولم يُعَد في هذه الجلسة']
+];
+const gGap = 16;
+const gw = (CW - 2 * PAD - 3 * gGap) / 4;
+gaps.forEach((g, i) => {
+  const col = i % 4;
+  const row = Math.floor(i / 4);
+  const gx = XR - gw - col * (gw + gGap);
+  const gy = y + 132 + row * 108;
+  card(gx, gy, gw, 96, { fill: 'rgba(255,255,255,0.035)', r: 16, accent: C.amber, accentW: 3 });
+  text(g[0], gx + gw - 18, gy + 34, { size: 20, weight: 'Plex6', color: C.text });
+  para(g[1], gx + gw - 18, gy + 62, gw - 34, { size: 16, color: C.muted, lh: 1.35 });
+});
+text('حتى تُغلق هذه البنود، يُوصف التكامل بأنه «مبني وجزئيًا مُختبر»، لا بأنه «جاهز للإنتاج».', XR, y + gapH - 40, { size: 20, weight: 'Plex5', color: C.goldSoft });
+
+y += gapH + 34;
+
+/* ============================ 12 · PHILOSOPHY =========================== */
+const philH = 330;
 panel(M, y, CW, philH, { fill: 'rgba(226,179,87,0.06)', stroke: 'rgba(226,179,87,0.28)', r: 26 });
-text('فلسفة التكامل', XR, y + 58, { size: 27, weight: 'Plex7', color: C.goldSoft });
-text('اربط كل شيء · تحكّم في كل إجراء · تحقّق من كل نتيجة', XR, y + 116, { size: 38, weight: 'Plex7', color: C.text });
-text('Connect Everything. Control Every Action. Verify Every Result.', XR, y + 162, { size: 24, weight: 'Mono6', color: C.gold, dir: 'ltr' });
-text('التكامل جسر لا نواة: النواة لا تعرف تفاصيل الخدمات، والسياسة تحدّد ما يجوز، والأدلة تُثبت ما حدث.', XR, y + 206, { size: 20, weight: 'Plex4', color: C.muted });
+text('GOVERNING RULE', XR, y + 36, { size: 17, weight: 'Mono6', color: C.gold, ls: 1.6, dir: 'ltr' });
+text('Freeze the Platform. Grow the Product.', XR, y + 74, { size: 28, weight: 'Mono6', color: C.gold, dir: 'ltr' });
+text('جمّد المنصة · أنمِ المنتج — لا طبقة جديدة لمجرد التعقيد', XL, y + 74, { size: 21, weight: 'Plex5', color: C.goldSoft, align: 'left' });
+text('اربط كل شيء · تحكّم في كل إجراء · تحقّق من كل نتيجة', XR, y + 152, { size: 38, weight: 'Plex7', color: C.text });
+text('Connect Everything. Control Every Action. Verify Every Result.', XR, y + 200, { size: 24, weight: 'Mono6', color: C.gold, dir: 'ltr' });
+text('التكامل جسر لا نواة: النواة لا تعرف تفاصيل الخدمات، والسياسة تحدّد ما يجوز، والأدلة تُثبت ما حدث.', XR, y + 250, { size: 20, weight: 'Plex4', color: C.muted });
+ctx.save();
+ctx.strokeStyle = 'rgba(226,179,87,0.22)';
+ctx.lineWidth = 1.2;
+ctx.beginPath();
+ctx.moveTo(XL, y + 104);
+ctx.lineTo(XR, y + 104);
+ctx.stroke();
+ctx.restore();
 
 y += philH + 36;
 
@@ -1094,6 +1183,8 @@ y += 64 + 44;
 const finalH = y;
 const out = createCanvas(W, finalH);
 out.getContext('2d').drawImage(canvas, 0, 0, W, finalH, 0, 0, W, finalH);
-const target = process.argv[2] || 'docs/design/integration-in-celiaos.png';
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const target = process.argv[2] ? path.resolve(process.argv[2]) : path.join(root, 'docs', 'design', 'integration-in-celiaos.png');
+mkdirSync(path.dirname(target), { recursive: true });
 writeFileSync(target, out.toBuffer('image/png'));
 console.log(`wrote ${target} ${W}x${finalH}`);
