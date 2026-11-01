@@ -364,12 +364,24 @@ export async function generateOpenAiCompatibleReply({
     })
   });
 
-  const result = await response.json().catch(() => ({}));
+  let result;
+  try {
+    result = await response.json();
+  } catch {
+    const error = new UpstreamError(serviceName, response.status);
+    error.diagnosticCode = 'NON_JSON_RESPONSE';
+    throw error;
+  }
   if (!response.ok) {
     const error = new UpstreamError(serviceName, response.status);
     // Provider error text (never the key, never the prompt) so operators learn *why*: balance, scope, model.
     const upstreamMessage = result?.error?.message || result?.error?.code || result?.message || result?.detail?.status || result?.detail;
     if (upstreamMessage) error.upstreamDetail = String(typeof upstreamMessage === 'string' ? upstreamMessage : JSON.stringify(upstreamMessage)).slice(0, 160);
+    throw error;
+  }
+  if (result?.error) {
+    const error = new UpstreamError(serviceName, response.status);
+    error.diagnosticCode = 'PROVIDER_ERROR_ENVELOPE';
     throw error;
   }
   const choice = result?.choices?.[0];
@@ -388,7 +400,12 @@ export async function generateOpenAiCompatibleReply({
       const message = result?.message || result?.msg || result?.detail;
       reasons.push(`no choices in response (keys: ${Object.keys(result || {}).slice(0, 6).join(',') || 'none'}${message ? `; message: ${String(typeof message === 'string' ? message : JSON.stringify(message)).slice(0, 120)}` : ''})`);
     }
-    throw new Error(`${serviceName} returned no usable reply${reasons.length ? ` (${reasons.join('; ')})` : ''}`);
+    const error = new Error(`${serviceName} returned no usable reply${reasons.length ? ` (${reasons.join('; ')})` : ''}`);
+    error.upstreamStatus = response.status;
+    error.diagnosticCode = !choice ? 'MISSING_CHOICES'
+      : choice.message?.reasoning_content || choice.message?.reasoning ? 'REASONING_ONLY'
+        : choice.finish_reason === 'length' ? 'OUTPUT_TOKEN_LIMIT' : 'EMPTY_REPLY';
+    throw error;
   }
   return text.slice(0, 1000);
 }

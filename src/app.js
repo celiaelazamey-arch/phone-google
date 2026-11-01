@@ -11,12 +11,15 @@ import { createAgentHost } from './agent/index.js';
 import { createAgentRouter } from './agent-routes.js';
 import { createKnowledgeHost } from './knowledge/index.js';
 import { createKbRouter } from './kb-routes.js';
+import { mountRateLimits } from './rate-limit.js';
 
 export function createApp({ pool, config, services = createServiceRegistry(config), agentHost, kbHost }) {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', config.nodeEnv === 'production' ? 1 : false);
   app.use(helmet());
+  // SEC-007: الحدّ قبل أي مسار (وقبل mountOperations) كي لا يصل الطلب المرفوض إلى معالج.
+  mountRateLimits(app, config);
   const operations = createOperations({ pool, config, services });
   const authorize = requireApiToken(config);
   app.locals.services = services;

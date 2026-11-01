@@ -8,6 +8,7 @@ import helmet from 'helmet';
 import { createPool, ensureOwner } from './db.js';
 import { resolveEdgeOrigin } from './config.js';
 import { loadMysqlConfig } from './mysql-config.js';
+import { loadRateLimitConfig, mountRateLimits } from './rate-limit.js';
 import { loadHostingConfig, deploymentStatus } from './hosting.js';
 import { bootstrapEmptySchema } from './bootstrap-schema.js';
 import { createIntegratedApiRouter } from './integrated-api.js';
@@ -80,6 +81,7 @@ export function loadCeliaMcpConfig(env = process.env, { requireToken = true } = 
     edgeOrigin: resolveEdgeOrigin(env),
     features: loadFeatures(env),
     resilience: loadResilienceConfig(env),
+    rateLimit: loadRateLimitConfig(env),
     ...extended,
     host: (env.CELIA_MCP_HOST || '0.0.0.0').trim() || '0.0.0.0',
     port,
@@ -1068,6 +1070,8 @@ export function createCeliaMcpApp({ pool, config, services = createServiceRegist
     })
   );
 
+  // SEC-007: نفس حدود سطح Express، وتشمل /mcp حيث تُحتسب محاولات الرمز الفاشلة فقط.
+  mountRateLimits(app, config, { apiPrefixes: ['/api', '/mcp'] });
   mountOperations(app, { operations, authorize });
   app.get('/api/deployment', async (_req, res, next) => {
     try {

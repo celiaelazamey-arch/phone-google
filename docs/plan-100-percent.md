@@ -1,7 +1,7 @@
 # خطة 100% — نظام منشور بلا أخطاء وبلا بطاقة دفع
 
 **التاريخ:** 28 أكتوبر 2026 · **الفرع:** `arena/83dde20a-phone-google` (متفرع من `main@44532f4552c20b8fb51402e14cff8fc15356b97c`) · **الإصدار:** 0.2.1 /
-`schema 1` · **المرجع التشغيلي:** [go-live-plan](go-live-plan.md) · **الخطة التنفيذية لسد الفجوات:**
+`schema 1` · **الخطة اللاحقة (ما بعد الأركان الثمانية):** [خطة إكمال النظام — `PLAN-002`](plan-system-completion.md) · **المرجع التشغيلي:** [go-live-plan](go-live-plan.md) · **الخطة التنفيذية لسد الفجوات:**
 [executive-completion-plan](executive-completion-plan.md) · **جدول واقع الخدمات:**
 [service-reality](service-reality.md) · **حالة المهام:** [BACKLOG](continuity/BACKLOG.md) هو المرجع الوحيد، وهذه الوثيقة
 ترتيبٌ وبوابات لا حالات.
