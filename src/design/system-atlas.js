@@ -283,30 +283,18 @@ export function buildAtlas({ root = path.resolve(import.meta.dirname, '../..') }
 }
 
 /**
- * A content fingerprint of the audit: the same twelve domains, statuses and capability states hash to
- * the same short string. A poster can therefore name exactly which findings it draws — instead of
- * carrying a commit or a date that nobody can check.
- */
-export function fingerprintOf(atlas) {
-  const canonical = JSON.stringify(
-    atlas.domains.map((domain) => ({
-      id: domain.id,
-      status: domain.status,
-      capabilities: domain.capabilities.map((capability) => [capability.id, capability.status])
-    }))
-  );
-  return createHash('sha256').update(canonical).digest('hex').slice(0, 10);
-}
-
-/**
- * The facts an outside renderer is allowed to draw. A poster drawn in another tool cannot be checked
- * against prose, so the audit also publishes these numbers as data: same fingerprint, same coverage,
- * same missing capabilities. Anything not in this object has no business on a picture.
+ * The facts an outside renderer is allowed to draw: the twelve domains, their verified coverage, the
+ * capability states behind that coverage, and the phase tally. This is the only payload a drawing may
+ * be built from, and it carries its own provenance.
+ *
+ * The fingerprint covers **every field below** — names, priorities, coverage, totals, phases and
+ * capability states — because a fingerprint over states alone would let an edited percentage keep a
+ * valid seal. `verifyFacts` adds the second guard: every number that *can* be derived is recomputed
+ * and compared, so a forged coverage fails even if someone recomputes the hash afterwards.
  */
 export function factsOf(atlas) {
-  return {
+  const facts = {
     version: atlas.version,
-    fingerprint: fingerprintOf(atlas),
     totals: {
       domains: atlas.stats.domains,
       capabilities: atlas.stats.capabilities,
@@ -326,6 +314,67 @@ export function factsOf(atlas) {
       missing: domain.capabilities.filter((capability) => capability.status === TRUTH.missing).map((capability) => capability.ar)
     }))
   };
+  return { fingerprint: fingerprintOfFacts(facts), ...facts };
+}
+
+/** Coverage is a published formula, not a number anyone types: verified 1, partial ½, missing 0. */
+export function coverageFrom(capabilities) {
+  const weight = { [TRUTH.verified]: 1, [TRUTH.partial]: 0.5 };
+  const earned = capabilities.reduce((sum, capability) => sum + (weight[capability.status] ?? 0), 0);
+  return capabilities.length === 0 ? 0 : Math.round((earned / capabilities.length) * 100);
+}
+
+/** SHA-256 of the canonical payload, first ten hex characters. Any edited field changes it. */
+export function fingerprintOfFacts(facts) {
+  const canonical = JSON.stringify({
+    version: facts.version,
+    totals: facts.totals,
+    phases: facts.phases,
+    domains: facts.domains
+  });
+  return createHash('sha256').update(canonical).digest('hex').slice(0, 10);
+}
+
+/** The fingerprint of an audit, taken over the payload that would be published. */
+export function fingerprintOf(atlas) {
+  const { fingerprint, ...facts } = factsOf(atlas);
+  return fingerprintOfFacts(facts);
+}
+
+/**
+ * Re-derive every published number from the capability states and report each disagreement.
+ * A seal proves the payload was not touched; this proves the payload was not invented.
+ */
+export function verifyFacts(facts) {
+  const problems = [];
+  const expect = (path, actual, expected) => {
+    if (actual !== expected) problems.push(`${path}: published ${JSON.stringify(actual)} but the states say ${JSON.stringify(expected)}`);
+  };
+  const tally = Object.fromEntries(Object.values(TRUTH).map((status) => [status, 0]));
+  for (const domain of facts.domains ?? []) {
+    const local = Object.fromEntries(Object.values(TRUTH).map((status) => [status, 0]));
+    for (const capability of domain.capabilities ?? []) {
+      if (!Object.hasOwn(tally, capability.status)) problems.push(`${domain.id}/${capability.id}: unknown state ${JSON.stringify(capability.status)}`);
+      else local[capability.status] += 1;
+      tally[capability.status] = (Object.hasOwn(tally, capability.status) ? tally[capability.status] : 0) + 1;
+    }
+    expect(`${domain.id}.coverage`, domain.coverage, coverageFrom(domain.capabilities ?? []));
+    const missing = (domain.capabilities ?? []).filter((capability) => capability.status === TRUTH.missing).map((capability) => capability.ar);
+    if (JSON.stringify(domain.missing) !== JSON.stringify(missing)) {
+      problems.push(`${domain.id}.missing: published ${JSON.stringify(domain.missing)} but the states say ${JSON.stringify(missing)}`);
+    }
+  }
+  const totals = facts.totals ?? {};
+  expect('totals.domains', totals.domains, (facts.domains ?? []).length);
+  expect('totals.capabilities', totals.capabilities, Object.values(tally).reduce((sum, value) => sum + value, 0));
+  expect('totals.verified', totals.verified, tally[TRUTH.verified]);
+  expect('totals.unverified', totals.unverified, tally[TRUTH.unverified]);
+  expect('totals.missing', totals.missing, tally[TRUTH.missing]);
+  for (const phase of facts.phases ?? []) {
+    expect(`phases.${phase.priority}`, phase.domains, (facts.domains ?? []).filter((domain) => domain.priority === phase.priority).length);
+  }
+  expect('fingerprint', facts.fingerprint, fingerprintOfFacts(facts));
+  return problems;
 }
 
 /** The phases the owner asked for: audit → coverage map → staged construction. Never all twelve at once. */

@@ -16,8 +16,12 @@ import {
   TRUTH_MARK,
   buildAtlas,
   capabilityStatus,
+  coverageFrom,
+  factsOf,
   fingerprintOf,
-  phasesOf
+  fingerprintOfFacts,
+  phasesOf,
+  verifyFacts
 } from '../src/design/system-atlas.js';
 import { PAGE_PATH, buildHtml } from '../scripts/render-system-atlas.mjs';
 import { FACTS_PATH, POSTER_PATH, buildFacts, buildHtml as buildPoster, domainVerdict } from '../scripts/render-atlas-poster.mjs';
@@ -25,6 +29,7 @@ import { FACTS_PATH, POSTER_PATH, buildFacts, buildHtml as buildPoster, domainVe
 const root = path.resolve(import.meta.dirname, '..');
 const OFFICIAL = new Set(Object.values(TRUTH));
 const atlas = buildAtlas({ root });
+const publishedFacts = factsOf(atlas);
 
 test('twelve domains, in the owner\'s order, each with a priority he chose', () => {
   assert.equal(DOMAINS.length, 12);
@@ -172,6 +177,7 @@ test('the roadmap counts on the poster equal the domains it partitions', () => {
 test('the facts file is the only allowed source for outside renderings', () => {
   const facts = JSON.parse(readFileSync(FACTS_PATH, 'utf8'));
   assert.equal(readFileSync(FACTS_PATH, 'utf8'), buildFacts(), 'the facts are stale — run `npm run atlas:facts`');
+  assert.deepEqual(verifyFacts(facts), [], 'every published number must re-derive from capability states');
   assert.equal(facts.fingerprint, fingerprintOf(atlas));
   assert.deepEqual(facts.domains.map((domain) => domain.coverage), atlas.domains.map((domain) => domain.coverage));
   assert.deepEqual(facts.totals, {
@@ -184,17 +190,58 @@ test('the facts file is the only allowed source for outside renderings', () => {
   assert.deepEqual(facts.phases, phasesOf(atlas).map((phase) => ({ priority: phase.priority, domains: phase.domains.length })));
   for (const domain of facts.domains) {
     assert.ok(domain.missing.length === 0 || domain.coverage < 100, `${domain.id} has gaps and must stay under 100%`);
+    if (domain.missing.length > 0) assert.ok(domain.status !== TRUTH.verified, `${domain.id} has gaps and must not be green`);
     for (const capability of domain.capabilities) assert.ok(OFFICIAL.has(capability.status), `${capability.id} has an unofficial state`);
   }
 });
 
-test('the facts file cannot drift from the fingerprint it prints', () => {
-  const facts = JSON.parse(readFileSync(FACTS_PATH, 'utf8'));
-  const recomputed = fingerprintOf({
-    domains: facts.domains.map((domain) => ({
-      ...domain,
-      capabilities: domain.capabilities.map((capability) => ({ ...capability }))
-    }))
-  });
-  assert.equal(recomputed, facts.fingerprint, 'any number edited outside the audit breaks the fingerprint');
+const clone = (facts) => JSON.parse(JSON.stringify(facts));
+
+test('an edited coverage is caught by the states, not just by the seal', () => {
+  const facts = clone(publishedFacts);
+  facts.domains.find((domain) => domain.id === 'user_experience').coverage = 88;
+  const problems = verifyFacts(facts);
+  assert.ok(problems.some((problem) => problem.includes('user_experience.coverage')), problems.join('\n'));
+  assert.notEqual(fingerprintOfFacts(facts), facts.fingerprint, 'coverage must sit inside the fingerprint');
+});
+
+test('an edited total or phase is caught by derivation, even when the forger recomputes the seal', () => {
+  const totals = clone(publishedFacts);
+  totals.totals.verified = 45;
+  totals.fingerprint = fingerprintOfFacts(totals);
+  const problems = verifyFacts(totals);
+  assert.ok(problems.some((problem) => problem.startsWith('totals.verified')));
+  assert.equal(problems.filter((problem) => problem.startsWith('fingerprint')).length, 0,
+    'a recomputed seal matches its own payload — only re-derivation catches the forgery');
+
+  const phases = clone(publishedFacts);
+  phases.phases.find((phase) => phase.priority === 'P0').domains = 4;
+  assert.ok(verifyFacts(phases).some((problem) => problem.startsWith('phases.P0')));
+});
+
+test('a forged capability state cannot keep the old numbers', () => {
+  const facts = clone(publishedFacts);
+  const domain = facts.domains.find((item) => item.id === 'multi_agent');
+  const gap = domain.capabilities.find((capability) => capability.status === TRUTH.missing);
+  gap.status = TRUTH.verified;
+  const problems = verifyFacts(facts);
+  assert.ok(problems.some((problem) => problem.includes('multi_agent.coverage')), problems.join('\n'));
+  assert.ok(problems.some((problem) => problem.startsWith('totals.missing')));
+});
+
+test('the fingerprint covers every published field, not only the states', () => {
+  const base = fingerprintOfFacts(publishedFacts);
+  for (const [label, mutate] of [
+    ['coverage', (facts) => { facts.domains[0].coverage += 1; }],
+    ['totals', (facts) => { facts.totals.missing += 1; }],
+    ['phases', (facts) => { facts.phases[1].domains += 1; }],
+    ['name', (facts) => { facts.domains[0].ar += ' '; }],
+    ['priority', (facts) => { facts.domains[0].priority = 'P2'; }],
+    ['capability', (facts) => { facts.domains[0].capabilities[0].status = TRUTH.partial; }]
+  ]) {
+    const facts = clone(publishedFacts);
+    mutate(facts);
+    assert.notEqual(fingerprintOfFacts(facts), base, `editing ${label} must change the fingerprint`);
+  }
+  assert.equal(fingerprintOfFacts({ ...publishedFacts, fingerprint: 'deadbeef00' }), base, 'the seal itself is not part of the seal');
 });

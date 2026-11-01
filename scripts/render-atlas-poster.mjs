@@ -23,6 +23,7 @@ import {
   buildAtlas,
   factsOf,
   fingerprintOf,
+  verifyFacts,
   phasesOf
 } from '../src/design/system-atlas.js';
 
@@ -198,7 +199,7 @@ export function buildHtml() {
 
   <footer>
     <div>مُولَّد من <b class="mono">src/design/system-atlas.js</b> — <span class="mono">npm run atlas:poster</span></div>
-    <div>بصمة البيانات <b class="mono">${fingerprint}</b> · كل رقم هنا يُعاد حسابه، ولا واحد يُكتب بيد</div>
+    <div>بصمة البيانات <b class="mono">${fingerprint}</b> · البصمة تغطّي كل حقل منشور، وكل رقم يُعاد اشتقاقه من حالات القدرات</div>
   </footer>
 </body>
 </html>
@@ -210,11 +211,17 @@ export async function run({ check = false, facts = false } = {}) {
     const body = buildFacts();
     if (check) {
       const current = await readFile(FACTS_PATH, 'utf8').catch(() => null);
-      if (current !== body) {
+      if (current === null) {
+        console.error(`missing: ${path.relative(ROOT, FACTS_PATH)} — run \`npm run atlas:facts\``);
+        return 1;
+      }
+      const problems = verifyFacts(JSON.parse(current));
+      for (const problem of problems) console.error(`  ${problem}`);
+      if (current !== body || problems.length > 0) {
         console.error(`stale: ${path.relative(ROOT, FACTS_PATH)} — run \`npm run atlas:facts\``);
         return 1;
       }
-      console.log(`atlas facts verified: ${JSON.parse(body).fingerprint}`);
+      console.log(`atlas facts verified: ${JSON.parse(body).fingerprint} · every number re-derived from capability states`);
       return 0;
     }
     await mkdir(path.dirname(FACTS_PATH), { recursive: true });
@@ -235,13 +242,15 @@ export async function run({ check = false, facts = false } = {}) {
       console.error(`stale: ${path.relative(ROOT, POSTER_PATH)} — run \`npm run atlas:poster\``);
       return 1;
     }
-    const factsMismatch = (await readFile(FACTS_PATH, 'utf8').catch(() => null)) !== buildFacts();
-    if (factsMismatch) {
+    const published = await readFile(FACTS_PATH, 'utf8').catch(() => null);
+    const problems = published === null ? ['missing facts file'] : verifyFacts(JSON.parse(published));
+    for (const problem of problems) console.error(`  ${problem}`);
+    if (published !== buildFacts() || problems.length > 0) {
       console.error(`stale: ${path.relative(ROOT, FACTS_PATH)} — run \`npm run atlas:facts\``);
       return 1;
     }
     const atlas = buildAtlas({ root: ROOT });
-    console.log(`atlas poster verified: fingerprint ${fingerprintOf(atlas)} matches the audit`);
+    console.log(`atlas poster verified: fingerprint ${fingerprintOf(atlas)} covers every published number`);
     return 0;
   }
   await mkdir(path.dirname(POSTER_PATH), { recursive: true });
