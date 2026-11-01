@@ -24,7 +24,7 @@ permissions:
 jobs:
   verify:
     name: Node ${{ matrix.node }} · tests & failure recovery
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 12
     strategy:
       fail-fast: false
@@ -167,7 +167,7 @@ jobs:
 
   spider:
     name: Python 3.11 · Celia Google Spider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -190,7 +190,7 @@ jobs:
 
   container:
     name: Node 24 container smoke test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -217,7 +217,7 @@ jobs:
 
   browser:
     name: RTL dashboard · desktop / mobile / accessibility
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -240,7 +240,7 @@ jobs:
 
   mysql:
     name: MySQL 8.4 · persistence / N−1 / backup restore
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 12
     services:
       mysql:
@@ -288,7 +288,7 @@ jobs:
   live-gemini:
     name: Optional external provider availability probes
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && (inputs.live_gemini || inputs.live_providers)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: integration-probes
     timeout-minutes: 5
     steps:
@@ -356,3 +356,35 @@ jobs:
             if (!results.length) throw new Error("No requested provider secrets configured in environment");
             console.log(JSON.stringify({ syntheticProbes: results, responseContentLogged: false }, null, 2));
           '
+
+  ubuntu26-canary:
+    name: Ubuntu 26.04 · forward-compatibility canary
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Prove syntax, release contract, and offline test suite on Ubuntu 26.04
+        run: npm run check && npm run release:check && npm run test:ci
+
+  slim-runner-probe:
+    name: Ubuntu-Slim · gh + Node governance smoke
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Prove gh CLI and slim-targeted workflow suites on ubuntu-slim
+        run: |
+          gh --version
+          node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./scripts/test-reporter-gha.mjs --test-reporter-destination=stdout test/ci-failure-notify.test.js test/issue-triage.test.js

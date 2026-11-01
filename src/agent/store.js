@@ -9,6 +9,7 @@ import {
   verifyChain
 } from './evidence.js';
 import { OUTBOX_STATUS } from './outbox.js';
+import { canonicalJson, messageIdOf } from './collaboration-bus.js';
 import { toolRunDurationMs } from './timing.js';
 
 /**
@@ -197,6 +198,31 @@ function mapDelegation(row) {
     depth: Number(row.depth),
     planDigest: row.plan_digest,
     parentDigest: row.parent_digest,
+    createdAt: row.created_at
+  };
+}
+
+function mapBusMessage(row) {
+  if (!row) return null;
+  let payload = null;
+  try {
+    payload = JSON.parse(row.payload);
+  } catch {
+    payload = null;
+  }
+  return {
+    messageId: row.id,
+    traceId: row.trace_id,
+    from: row.from_run_id,
+    to: row.to_ref,
+    kind: row.kind,
+    seq: Number(row.seq),
+    payload,
+    payloadHash: row.payload_hash,
+    causedBy: row.caused_by ?? null,
+    evidenceId: row.evidence_id ?? null,
+    status: row.status,
+    quarantineReason: row.quarantine_reason ?? null,
     createdAt: row.created_at
   };
 }
@@ -1184,6 +1210,16 @@ export function createAgentStore({ driver, clock = Date.now, idFactory = crypto.
     async getDelegationForChild(childRunId) {
       return mapDelegation(await driver.get('SELECT * FROM agent_delegations WHERE child_run_id = ?', [childRunId]));
     },
+    /** The root of this run's delegation chain: the trace a message belongs to. */
+    async busTraceOf(runId, { maxHops = 10 } = {}) {
+      let cursor = runId;
+      for (let hop = 0; hop < maxHops; hop += 1) {
+        const link = await store.getDelegationForChild(cursor);
+        if (!link) return cursor;
+        cursor = link.parentRunId;
+      }
+      return cursor;
+    },
     /**
      * What this run has already promised to its children. The loop subtracts it from the run's own
      * ceiling, so delegation carves budget out of the parent instead of doubling it.
@@ -1209,6 +1245,135 @@ export function createAgentStore({ driver, clock = Date.now, idFactory = crypto.
         cursor = link.parentRunId;
       }
       return depth;
+    },
+    // ── XAG-001 (DEC-106): the collaboration bus ────────────────────────────
+    /**
+     * Append one message and its attestation in the same transaction.
+     *
+     * The sequence is `MAX(seq)+1` inside the transaction and `(trace_id, seq)` is unique: two
+     * writers racing for one slot produce a retry, never two messages numbered alike. The evidence
+     * entry is written first in the same transaction and its input covers the payload hash — so a
+     * message row that reached storage without that attestation cannot exist.
+     */
+    async appendBusMessage({ traceId, fromRunId, toRef, kind, payload, payloadHash, causedBy = null, stepId = null, sourceIds = [] }) {
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          return await driver.transaction(async (tx) => {
+            const row = await tx.get(
+              'SELECT COALESCE(MAX(seq), 0) AS currentSeq FROM agent_bus_messages WHERE trace_id = ?',
+              [traceId]
+            );
+            const seq = Number(row?.currentSeq || 0) + 1;
+            const messageId = messageIdOf({ traceId, from: fromRunId, to: toRef, kind, payloadHash, seq });
+            const evidence = await appendEvidenceRecord(
+              tx,
+              {
+                runId: fromRunId,
+                stepId,
+                kind: 'bus_message',
+                input: { messageId, to: toRef, kind, seq, payloadHash },
+                output: null,
+                sourceIds,
+                verdict: null
+              },
+              { clock, idFactory }
+            );
+            await tx.run(
+              `INSERT INTO agent_bus_messages
+                 (id, trace_id, from_run_id, to_ref, kind, seq, payload, payload_hash, caused_by, evidence_id, status, quarantine_reason, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NULL, ?)`,
+              [
+                messageId,
+                traceId,
+                fromRunId,
+                toRef,
+                kind,
+                seq,
+                canonicalJson(payload),
+                payloadHash,
+                causedBy,
+                evidence.id,
+                nowIso(clock)
+              ]
+            );
+            return { created: true, message: mapBusMessage(await tx.get('SELECT * FROM agent_bus_messages WHERE id = ?', [messageId])) };
+          });
+        } catch (error) {
+          // A unique violation on `(trace_id, seq)` means another writer took the slot: retry with
+          // a fresh sequence. On `(id)` it means the same message is already stored: return it.
+          if (!driver.isUniqueViolation(error)) throw error;
+          const existing = await driver.get('SELECT * FROM agent_bus_messages WHERE trace_id = ? AND payload_hash = ?', [traceId, payloadHash]);
+          if (existing) return { created: false, message: mapBusMessage(existing) };
+          if (attempt === 2) throw error;
+        }
+      }
+      throw codedError('bus_append_failed', 'bus_append_failed');
+    },
+    async getBusMessage(messageId) {
+      return mapBusMessage(await driver.get('SELECT * FROM agent_bus_messages WHERE id = ?', [messageId]));
+    },
+    async listBusMessages({ traceId, toRef = null, afterSeq = 0, limit = 50, status = null } = {}) {
+      const clauses = ['trace_id = ?', 'seq > ?'];
+      const params = [traceId, Math.max(0, Number(afterSeq) || 0)];
+      if (toRef) {
+        clauses.push('to_ref = ?');
+        params.push(toRef);
+      }
+      if (status) {
+        clauses.push('status = ?');
+        params.push(status);
+      }
+      const rows = await driver.all(
+        `SELECT * FROM agent_bus_messages WHERE ${clauses.join(' AND ')} ORDER BY seq ASC LIMIT ?`,
+        [...params, Math.min(Math.max(Number(limit) || 50, 1), 200)]
+      );
+      return rows.map(mapBusMessage);
+    },
+    /** Messages nobody has taken yet, oldest first — the source for the attention queue. */
+    async listBusOutstanding({ limit = 50 } = {}) {
+      const rows = await driver.all(
+        'SELECT * FROM agent_bus_messages WHERE status = ? ORDER BY created_at ASC, seq ASC LIMIT ?',
+        ['pending', Math.min(Math.max(Number(limit) || 50, 1), 200)]
+      );
+      return rows.map(mapBusMessage);
+    },
+    async getBusCursor(consumer, traceId) {
+      const row = await driver.get('SELECT last_seq FROM agent_bus_cursors WHERE consumer = ? AND trace_id = ?', [consumer, traceId]);
+      return Number(row?.last_seq || 0);
+    },
+    /**
+     * Move the cursor forward only. A late acknowledgement that arrives after a newer one is
+     * ignored rather than rewinding delivery — a retried old request must not re-open messages
+     * this consumer already handled.
+     */
+    async ackBusCursor({ consumer, traceId, lastSeq }) {
+      const at = nowIso(clock);
+      const target = Number(lastSeq);
+      const current = await store.getBusCursor(consumer, traceId);
+      if (!Number.isFinite(target) || target <= current) return { advanced: false, cursor: current };
+      if (driver.dialect === 'mysql') {
+        await driver.run(
+          `INSERT INTO agent_bus_cursors (consumer, trace_id, last_seq, updated_at) VALUES (?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE last_seq = GREATEST(last_seq, VALUES(last_seq)), updated_at = VALUES(updated_at)`,
+          [consumer, traceId, target, at]
+        );
+      } else {
+        await driver.run(
+          `INSERT INTO agent_bus_cursors (consumer, trace_id, last_seq, updated_at) VALUES (?, ?, ?, ?)
+           ON CONFLICT(consumer, trace_id) DO UPDATE SET last_seq = excluded.last_seq, updated_at = excluded.updated_at
+           WHERE excluded.last_seq > agent_bus_cursors.last_seq`,
+          [consumer, traceId, target, at]
+        );
+      }
+      const after = await store.getBusCursor(consumer, traceId);
+      return { advanced: after > current, cursor: after };
+    },
+    async quarantineBusMessage({ messageId, reason }) {
+      await driver.run(
+        'UPDATE agent_bus_messages SET status = ?, quarantine_reason = ? WHERE id = ? AND status = ?',
+        ['quarantined', text(reason, 200), messageId, 'pending']
+      );
+      return store.getBusMessage(messageId);
     }
   };
 

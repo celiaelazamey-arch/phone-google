@@ -94,7 +94,7 @@ export async function verifyEdgeProvenance({ log = () => {} } = {}) {
     integrity.problems.push('manifest_stale');
   }
 
-  const commit = String(process.env.GITHUB_SHA || '').trim() || 'local';
+  const commit = String(process.env.CELIA_EXPECT_COMMIT || process.env.GITHUB_SHA || '').trim() || 'local';
   const subjects = renderSubjects({ bundleDigest: integrity.bundleDigest, manifestText, commit });
   return { ...integrity, subjects, commit, moduleCount: modules.length };
 }

@@ -14,7 +14,7 @@ permissions:
 jobs:
   publish:
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: release
     timeout-minutes: 25
     permissions:
@@ -33,17 +33,29 @@ jobs:
       - name: Resolve immutable identity and release sync mode
         id: identity
         env:
+          GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
-          EVENT_NAME: ${{ github.event_name }}
         run: |
           VERSION="$(node -p "JSON.parse(require('fs').readFileSync('package.json')).version")"
           TAG="v$VERSION"
+          SKIP="false"
           if git show-ref --verify --quiet "refs/tags/$TAG"; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
+            EXISTS="true"
+            IMMUTABLE="$(gh api "repos/$REPOSITORY/releases/tags/$TAG" --jq '.immutable' 2>/dev/null || echo false)"
+            if [ "$IMMUTABLE" = "true" ]; then
+              TAG_COMMIT="$(git rev-parse "$TAG^{commit}" 2>/dev/null || echo unknown)"
+              if [ "$TAG_COMMIT" = "$GITHUB_SHA" ]; then
+                echo "::notice title=Release already current::Release $TAG is already published and immutable at $GITHUB_SHA; nothing to publish."
+              else
+                echo "::warning title=Release $TAG is immutable::Release $TAG is frozen at ${TAG_COMMIT:0:7}; refusing to overwrite container tag :$TAG or build throwaway bundles at ${GITHUB_SHA:0:7}. Bump package.json and releases/* after an explicit release decision (REL-003)."
+              fi
+              SKIP="true"
+            fi
           else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
+            EXISTS="false"
           fi
-          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "exists=$EXISTS" >> "$GITHUB_OUTPUT"
+          echo "skip=$SKIP" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "image=ghcr.io/${REPOSITORY,,}" >> "$GITHUB_OUTPUT"

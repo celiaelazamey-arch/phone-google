@@ -42,7 +42,7 @@ jobs:
     name: One tracking issue · named failures · no retries
     # Only pushes to main carry a verdict about main; PR runs and other branches are skipped here and again in the script.
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'push'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

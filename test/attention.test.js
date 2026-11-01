@@ -177,12 +177,31 @@ test('every reason the queue can produce is declared with both languages and a s
       runs: ['waiting_approval', 'needs_reconciliation', 'failed', 'budget_exhausted', 'succeeded'].map((status, index) => run(`r${index}`, status)),
       approvals: [approval('a', 'r0')],
       toolRuns: [toolRun('t', 'r1', 'unknown')],
-      outbox: [outboxRow('o', 'r1', 'unknown'), outboxRow('o2', 'r1', 'dispatching')]
+      outbox: [outboxRow('o', 'r1', 'unknown'), outboxRow('o2', 'r1', 'dispatching')],
+      busMessages: [
+        { messageId: 'msg:0000000000000001', from: 'r1', to: 'owner', kind: 'result.ready', seq: 1, status: 'pending', createdAt: '2026-11-01T09:00:00.000Z' },
+        { messageId: 'msg:0000000000000002', from: 'r1', to: 'run:r2', kind: 'task.handoff', seq: 2, status: 'quarantined', quarantineReason: 'consumer_failed', createdAt: '2026-11-01T09:01:00.000Z' }
+      ]
     }).items
       .concat(build({ runs: [run('r9', 'waiting_approval')] }).items)
       .map((item) => item.reason)
   );
   assert.deepEqual([...produced].sort(), Object.keys(REASON).sort(), 'no reason is declared but unreachable, none produced but undeclared');
+});
+
+test('a message nobody read is owed, not lost: owner-addressed is a decision, quarantined is a failure', () => {
+  const queue = build({
+    busMessages: [
+      { messageId: 'msg:aaaaaaaaaaaaaaaa', from: 'run-child', to: 'owner', kind: 'result.ready', seq: 3, status: 'pending', createdAt: '2026-11-01T09:00:00.000Z' },
+      { messageId: 'msg:bbbbbbbbbbbbbbbb', from: 'run-child', to: 'run:parent', kind: 'task.handoff', seq: 4, status: 'quarantined', quarantineReason: 'consumer_failed', createdAt: '2026-11-01T09:01:00.000Z' },
+      { messageId: 'msg:cccccccccccccccc', from: 'run-child', to: 'run:parent', kind: 'result.ready', seq: 5, status: 'pending', createdAt: '2026-11-01T09:02:00.000Z' }
+    ]
+  }, { now: '2026-11-01T10:00:00.000Z' });
+  assert.deepEqual(queue.items.map((item) => item.reason), ['bus_for_owner', 'bus_quarantined'], 'a pending message with a live reader is not owed yet; only the unreadable ones surface');
+  assert.equal(queue.items[0].severity, 'decision');
+  assert.equal(queue.items[1].severity, 'failure');
+  assert.equal(queue.items[1].evidence.quarantineReason, 'consumer_failed');
+  assert.equal(queue.sends, false, 'the queue still sends nothing; it only lists what is owed');
 });
 
 test('the sentence states the total, the owed count and the digest', () => {
