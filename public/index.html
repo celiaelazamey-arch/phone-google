@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>سيليا 2026 — مساحة الوكيل الذكي ومساعد الهاتف + Google (MCP)</title>
+  <title>سيليا 2026 | مساحة الوكيل الذكي ومساعد الهاتف + Google (MCP)</title>
+  <link rel="stylesheet" href="./theme.css" />
   <link rel="stylesheet" href="./fonts.css" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
@@ -31,28 +32,22 @@
           <span>مساحة الوكيل</span>
         </button>
         <button type="button" class="nav-pill" data-view="tools">
-          <span class="nav-icon">⚡</span>
           <span>أدوات MCP</span>
           <span class="pill-count" id="nav-tools-count">12</span>
         </button>
         <button type="button" class="nav-pill" data-view="whatsapp">
-          <span class="nav-icon">📲</span>
           <span>واتساب والأمان</span>
         </button>
         <button type="button" class="nav-pill" data-view="models">
-          <span class="nav-icon">🆓</span>
           <span>النماذج المجانية</span>
         </button>
         <a class="nav-pill" href="./landing">
-          <span class="nav-icon">🚀</span>
           <span>صفحة الهبوط</span>
         </a>
         <a class="nav-pill" href="./computer">
-          <span class="nav-icon">🖥️</span>
           <span>استخدام الكمبيوتر</span>
         </a>
         <a class="nav-pill" href="./computer-permissions">
-          <span class="nav-icon">🔐</span>
           <span>صلاحيات الكمبيوتر</span>
         </a>
       </nav>
@@ -63,7 +58,7 @@
           <span id="auth-label">مجاني نشط</span>
         </button>
         <button type="button" class="icon-btn computer-toggle-btn" id="btn-toggle-computer" title="فتح حاسوب سيليا والمخرجات التفاعلية">
-          <span>🖥️</span>
+          <span aria-hidden="true">▣</span>
           <span class="hide-sm">حاسوب سيليا</span>
           <span class="step-counter" id="artifact-badge">جاهز</span>
         </button>
@@ -71,7 +66,7 @@
           <span>＋</span>
         </button>
         <button type="button" class="icon-btn" id="btn-theme-toggle" title="تبديل المظهر الفاتح / الداكن">
-          <span id="theme-icon">☀️</span>
+          <span id="theme-icon" aria-hidden="true">◐</span>
         </button>
       </div>
     </header>
@@ -118,13 +113,13 @@
                 </div>
               </div>
 
-              <!-- LIVE NOW Banner — Find Skills -->
-              <div style="margin:14px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:linear-gradient(135deg, rgba(217,119,87,.14), rgba(16,185,129,.10));border:1px solid var(--border-subtle);border-radius:12px;padding:12px 14px">
-                <span style="width:10px;height:10px;background:#10b981;border-radius:999px;box-shadow:0 0 0 6px rgba(16,185,129,.18);display:inline-block;animation:pulse 1.6s infinite"></span>
+              <!-- LIVE NOW Banner، Find Skills -->
+              <div style="margin:14px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:linear-gradient(135deg, color-mix(in srgb, var(--t-lnd-accent) 14%, transparent), color-mix(in srgb, var(--t-lnd-emerald) 10%, transparent));border:1px solid var(--border-subtle);border-radius:12px;padding:12px 14px">
+                <span style="width:10px;height:10px;background:var(--t-lnd-emerald);border-radius:999px;box-shadow:0 0 0 6px color-mix(in srgb, var(--t-lnd-emerald) 18%, transparent);display:inline-block;animation:pulse 1.6s infinite"></span>
                 <strong>نظامك حي الآن على أرض الواقع</strong>
-                <span style="color:var(--text-secondary)">— via مهارة <code>find_skills</code> و <code>system_live_view</code></span>
-                <a href="./live" style="margin-inline-start:auto;background:var(--accent);color:#fff;padding:8px 12px;border-radius:999px;text-decoration:none;font-weight:600">افتح النظام الحي Live ▶</a>
-                <a href="./skills" style="background:var(--bg-surface);border:1px solid var(--border-subtle);padding:8px 12px;border-radius:999px;text-decoration:none;color:var(--text-primary)">Find Skills ⚡</a>
+                <span style="color:var(--text-secondary)">… via مهارة <code>find_skills</code> و <code>system_live_view</code></span>
+                <a href="./live" style="margin-inline-start:auto;background:var(--accent);color:var(--accent-fg);padding:8px 12px;border-radius:999px;text-decoration:none;font-weight:600">افتح النظام الحي</a>
+                <a href="./skills" style="background:var(--bg-surface);border:1px solid var(--border-subtle);padding:8px 12px;border-radius:999px;text-decoration:none;color:var(--text-primary)">Find Skills</a>
               </div>
 
               <!-- 4 Agentic Mission Cards -->
@@ -132,7 +127,7 @@
               <div class="missions-grid">
                 <button type="button" class="mission-card" data-mission="whatsapp-e2e">
                   <div class="mission-top">
-                    <span class="mission-icon emerald">📲</span>
+                    <span class="mission-icon emerald" aria-hidden="true"></span>
                     <span class="mission-tag">4 خطوات حية · واتساب + AI</span>
                   </div>
                   <h3>سيناريو عميل واتساب الكامل</h3>
@@ -141,7 +136,7 @@
 
                 <button type="button" class="mission-card" data-mission="security-audit">
                   <div class="mission-top">
-                    <span class="mission-icon coral">🛡️</span>
+                    <span class="mission-icon coral" aria-hidden="true"></span>
                     <span class="mission-tag">تدقيق تشفير حي · MCP</span>
                   </div>
                   <h3>مصافحة MCP وتدقيق التشفير الجنائي</h3>
@@ -150,7 +145,7 @@
 
                 <button type="button" class="mission-card" data-mission="policy-guard">
                   <div class="mission-top">
-                    <span class="mission-icon violet">🧠</span>
+                    <span class="mission-icon violet" aria-hidden="true"></span>
                     <span class="mission-tag">حارس السياسة · 6 قواعد</span>
                   </div>
                   <h3>اختبار ذكاء خدمة العملاء ومنع الهلوسة</h3>
@@ -159,7 +154,7 @@
 
                 <button type="button" class="mission-card" data-mission="free-stack-blueprint">
                   <div class="mission-top">
-                    <span class="mission-icon amber">⚡</span>
+                    <span class="mission-icon amber" aria-hidden="true"></span>
                     <span class="mission-tag">مخرج جاهز للنسخ · 0$</span>
                   </div>
                   <h3>توليد حزمة الربط المجاني 2026 (Claude &amp; Cursor)</h3>
@@ -186,11 +181,11 @@
                     <span class="spark">✦</span>
                     <select id="studio-provider" aria-label="اختيار المحرك المجاني">
                       <option value="auto">تلقائي ذكي (مجاني 100%)</option>
-                      <option value="gemini-browser">Gemini 2.5 Flash (مجاني — AI Studio)</option>
-                      <option value="gemini-server">Gemini 2.5 Flash (خادم — GEMINI_API_KEY)</option>
-                      <option value="ai-gateway-server">AI Gateway (خادم — AI_GATEWAY_API_KEY)</option>
-                      <option value="deepseek-server">DeepSeek (خادم — DEEPSEEK_API_KEY)</option>
-                      <option value="agentrouter-server">AgentRouter (خادم — AGENETROUTERAPI_KEY)</option>
+                      <option value="gemini-browser">Gemini 2.5 Flash (مجاني، AI Studio)</option>
+                      <option value="gemini-server">Gemini 2.5 Flash (خادم، GEMINI_API_KEY)</option>
+                      <option value="ai-gateway-server">AI Gateway (خادم، AI_GATEWAY_API_KEY)</option>
+                      <option value="deepseek-server">DeepSeek (خادم، DEEPSEEK_API_KEY)</option>
+                      <option value="agentrouter-server">AgentRouter (خادم، AGENETROUTERAPI_KEY)</option>
                       <option value="ollama-local">Ollama محلي (qwen2.5:7b مجاني)</option>
                       <option value="groq-free">Groq مجاني فائق السرعة (Llama 3.3)</option>
                       <option value="celia-builtin">محرك سيليا المدمج (فوري بدون مفتاح)</option>
@@ -256,7 +251,7 @@
                   </div>
                 </div>
                 <div class="phone-wa-messages" id="wa-chat-feed">
-                  <div class="wa-sys-notice">🔒 الرسائل محمية بتحقق HMAC-SHA256 وسياسة الموافقة المزدوجة.</div>
+                  <div class="wa-sys-notice">الرسائل محمية بتحقق HMAC-SHA256 وسياسة الموافقة المزدوجة.</div>
                 </div>
                 <div class="phone-wa-footer">
                   <input type="text" id="wa-sim-text" value="مرحبًا، ما هي مواعيد العمل وكيف يمكنني حجز موعد؟" placeholder="اكتب رسالة واردة من العميل..." />
@@ -320,7 +315,7 @@
                   <span class="badge-pill ok">نشط افتراضيًا · 0$ للأبد</span>
                   <span class="model-cost">بدون مفتاح</span>
                 </div>
-                <h3>🛡️ وكيل سيليا المدمج (Celia Guard 2026)</h3>
+                <h3>وكيل سيليا المدمج (Celia Guard 2026)</h3>
                 <p>مخطّط مهام متعدد الخطوات ومحرّك ردود متوافق مع القواعد الست يعمل مباشرةً داخل الخادم دون الحاجة لأي مفتاح خارجي أو بطاقة بنكية.</p>
               </div>
 
@@ -328,9 +323,9 @@
               <div class="surface-card model-card">
                 <div class="model-card-head">
                   <span class="badge-pill accent">متصل في GitHub Actions ✓</span>
-                  <span class="model-cost">مجاني — AI Studio</span>
+                  <span class="model-cost">مجاني، AI Studio</span>
                 </div>
-                <h3>✨ Google Gemini 2.5 Flash</h3>
+                <h3>Google Gemini 2.5 Flash</h3>
                 <p>متصل بالفعل في مستودعك عبر <code>secrets.GEMINI_API_KEY</code>! ويمكنك اختياريًا وضع مفتاح Google AI Studio المجاني أدناه لتشغيله مباشرة من متصفحك هنا أيضًا:</p>
                 <input type="password" id="vault-gemini-key" placeholder="اختياري: الصق مفتاح Gemini المجاني (AIza...) لجلسة المتصفح" autocomplete="off" dir="ltr" />
               </div>
@@ -341,7 +336,7 @@
                   <span class="badge-pill warn" id="ollama-live-badge">محلي مفتوح المصدر</span>
                   <span class="model-cost">مجاني 100% بلا حدود</span>
                 </div>
-                <h3>🦙 Ollama المحلي (<code>qwen2.5:7b</code>)</h3>
+                <h3>Ollama المحلي (<code>qwen2.5:7b</code>)</h3>
                 <p>يعمل على جهاز الخادم أو شبكة موثوقة. يُستدعى عبر MCP برمز المالك؛ لا يحتاج المتصفح إلى localhost أو فتح CORS للجميع.</p>
                 <code class="inline-cmd" dir="ltr">ollama run qwen2.5:7b</code>
                 <p>اضبط <code>OLLAMA_BASE_URL</code> في أسرار بيئة الخادم فقط.</p>
@@ -353,7 +348,7 @@
                   <span class="badge-pill subtle">سرعة ~300 كلمة/ث</span>
                   <span class="model-cost">طبقة مجانية</span>
                 </div>
-                <h3>🚀 Groq Cloud المجاني (Llama 3.3 70B)</h3>
+                <h3>Groq Cloud المجاني (Llama 3.3 70B)</h3>
                 <p>طبقة سحابية مجانية فائقة السرعة من <code>console.groq.com</code> تعمل مباشرة من متصفحك عند إدخال مفتاح مجاني:</p>
                 <input type="password" id="vault-groq-key" placeholder="اختياري: مفتاح Groq المجاني (gsk_...)" autocomplete="off" dir="ltr" />
               </div>
@@ -363,14 +358,14 @@
             <div class="surface-card owner-vault-card">
               <div class="owner-vault-head">
                 <div>
-                  <h3>🔐 وضع المالك الموثّق (<code>CELIA_MCP_API_TOKEN</code>) وتكامل الأسرار التسعة</h3>
+                  <h3>وضع المالك الموثّق (<code>CELIA_MCP_API_TOKEN</code>) وتكامل الأسرار التسعة</h3>
                   <p>واجهة سيليا تعمل فورًا في وضع الاستوديو الآمن بدون رمز. وعند لصق رمز <code>CELIA_MCP_API_TOKEN</code> هنا، تتحول جميع الطلبات مباشرةً إلى نقاط المالك المحمية (<code>/mcp</code>، <code>/api/secrets/status</code>، <code>/api/ai/reply</code>، <code>/api/voice/speak</code>، <code>/api/figma/*</code>، <code>/api/codata/*</code>) دون كشف أي مفتاح في المتصفح.</p>
                 </div>
               </div>
               <div class="vault-input-row">
                 <input type="password" id="vault-mcp-token" placeholder="اختياري: الصق قيمة CELIA_MCP_API_TOKEN للترقية لوضع المالك المباشر" autocomplete="off" dir="ltr" />
                 <button type="button" class="primary-btn" id="btn-verify-vault">حفظ وفحص الاتصال الحي</button>
-                <button type="button" class="mini-btn" id="btn-test-voice">🔊 تجربة صوت سيليا</button>
+                <button type="button" class="mini-btn" id="btn-test-voice">تجربة صوت سيليا</button>
               </div>
               <div class="vault-feedback" id="vault-feedback"></div>
               <audio id="celia-voice-player" controls hidden style="margin-top:10px;width:100%;max-width:440px;"></audio>
@@ -434,7 +429,7 @@
           <!-- Tab 3: Ready-to-copy MCP Config & Snippets -->
           <div class="dtab-pane" id="dtab-config">
             <div class="config-block">
-              <div class="config-label">إعداد Claude Desktop / Cursor / Windsurf (<code>mcp.json</code> — مجاني عبر stdio)</div>
+              <div class="config-label">إعداد Claude Desktop / Cursor / Windsurf (<code>mcp.json</code>، مجاني عبر stdio)</div>
               <pre class="mono-box" id="mcp-json-snippet" dir="ltr">{
   "mcpServers": {
     "celia-phone-google": {
@@ -463,8 +458,8 @@
       <div class="modal-card">
         <div class="modal-head">
           <div>
-            <span class="modal-tag">تنفيذ أداة MCP حية</span>
             <h3 id="modal-tool-name">celia_status</h3>
+            <span class="modal-tag">تنفيذ أداة MCP حية</span>
           </div>
           <button type="button" class="mini-btn" id="btn-close-modal">✕</button>
         </div>
@@ -474,7 +469,7 @@
           <textarea id="modal-tool-args" class="mono-textarea" rows="5" dir="ltr"></textarea>
         </div>
         <div class="btn-row">
-          <button type="button" class="primary-btn" id="btn-exec-tool">تشغيل الأداة الآن ⚡</button>
+          <button type="button" class="primary-btn" id="btn-exec-tool">تشغيل الأداة الآن</button>
         </div>
         <div class="form-row">
           <label>الاستجابة الفعلية من الخادم</label>

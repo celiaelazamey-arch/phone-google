@@ -8,8 +8,9 @@
       name="description"
       content="مركز سيليا لمراقبة المكونات والإصدارات والترقية والرجوع الآمن."
     />
-    <title>سيليا — مركز استمرارية النظام والإصدارات</title>
+    <title>سيليا | مركز استمرارية النظام والإصدارات</title>
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./theme.css" />
     <link rel="stylesheet" href="./fonts.css" />
     <link rel="stylesheet" href="./system.css" />
     <script src="./system.js" defer></script>
@@ -68,9 +69,6 @@
         <div class="notice" id="notice" role="status" hidden></div>
         <section class="hero" id="overview" aria-labelledby="hero-title">
           <div class="hero-copy">
-            <div class="eyebrow">
-              <span class="line"></span> RESILIENT BY DESIGN
-            </div>
             <h1 id="hero-title">
               نظامك يتقدّم.<br /><span>والباقي يستمر.</span>
             </h1>
@@ -130,25 +128,25 @@
           <article>
             <span class="metric-icon">↗</span
             ><span class="metric-label">إصدار التشغيل</span
-            ><strong class="mono" id="metric-version">—</strong
+            ><strong class="mono" id="metric-version">…</strong
             ><small id="metric-channel">جارٍ قراءة هوية النسخة</small>
           </article>
           <article>
             <span class="metric-icon">◉</span
             ><span class="metric-label">المكوّنات السليمة</span
-            ><strong id="metric-components">— <small>/ —</small></strong
+            ><strong id="metric-components">… <small>/ …</small></strong
             ><small>السليم فقط؛ لا يشمل غير المُهيّأ</small>
           </article>
           <article>
             <span class="metric-icon">◇</span
             ><span class="metric-label">قواطع الدائرة المفتوحة</span
-            ><strong class="mono" id="metric-circuits">—</strong
+            ><strong class="mono" id="metric-circuits">…</strong
             ><small id="metric-circuit-note">العزل عند تكرار فشل الخدمة</small>
           </article>
           <article>
             <span class="metric-icon">▤</span
             ><span class="metric-label">استدامة البيانات</span
-            ><strong id="metric-storage">—</strong
+            ><strong id="metric-storage">…</strong
             ><small id="metric-storage-note">لا تحويل صامت إلى الذاكرة</small>
           </article>
         </section>
@@ -159,7 +157,6 @@
         >
           <div class="section-heading">
             <div>
-              <div class="eyebrow">COMPONENT HEALTH</div>
               <h2 id="components-title">كل مكوّن. بحالته الحقيقية.</h2>
             </div>
             <span class="subtle-pill" id="updated">لم يتم الفحص بعد</span>
@@ -180,7 +177,6 @@
         >
           <div class="section-heading">
             <div>
-              <div class="eyebrow">VERSION CONTROL, WITH A WAY BACK</div>
               <h2 id="releases-title">تقدّم خطوة. واحتفظ بطريق العودة.</h2>
             </div>
             <a
@@ -197,7 +193,6 @@
             </div>
             <aside class="release-detail">
               <span class="detail-symbol">↺</span>
-              <div class="eyebrow">SAFE TRANSITIONS</div>
               <h3>التحديث ليس نقطة<br />اللاعودة.</h3>
               <p>
                 تُفحص الحاوية المرشّحة أولًا. وبعد التبديل تُفحص النسخة الفعّالة
@@ -205,7 +200,7 @@
               </p>
               <div class="compatibility">
                 <span>عقد قاعدة البيانات</span
-                ><strong class="mono" id="schema">SCHEMA —</strong
+                ><strong class="mono" id="schema">SCHEMA …</strong
                 ><small>لا ترحيل هدّام تلقائيًا</small>
               </div>
               <a class="button ghost" href="#runbook"
@@ -225,7 +220,6 @@
         >
           <div class="section-heading">
             <div>
-              <div class="eyebrow">OPERATOR RUNBOOK</div>
               <h2 id="runbook-title">خطوات واضحة. لا وعود سحرية.</h2>
             </div>
             <button class="button ghost small" type="button" id="download">
@@ -234,8 +228,8 @@
           </div>
           <div class="runbook-grid">
             <article class="runbook-card">
-              <span class="step-number mono">01 / UPGRADE</span>
               <h3>اختر صورة غير قابلة للتبديل</h3>
+              <span class="step-number mono">01 / UPGRADE</span>
               <p>
                 استخدم مرجع <bdi>image@sha256</bdi> من حزمة الإصدار. احتفظ بملف
                 الأسرار وحالة النشر خارج Git.
@@ -245,8 +239,8 @@
   --version VERSION</code></pre>
             </article>
             <article class="runbook-card">
-              <span class="step-number mono">02 / ROLLBACK</span>
               <h3>ارجع إلى آخر نسخة سليمة</h3>
+              <span class="step-number mono">02 / ROLLBACK</span>
               <p>
                 متاح بعد تسجيل نشر سابق سليم ومتوافق مع مخطط البيانات. أول إصدار
                 مُدار لا يملك نسخة سابقة تلقائيًا.
@@ -255,8 +249,8 @@
 npm run deploy:release -- rollback</code></pre>
             </article>
             <article class="runbook-card">
-              <span class="step-number mono">03 / RECOVER</span>
               <h3>استعد من تبديل مُنقطع</h3>
+              <span class="step-number mono">03 / RECOVER</span>
               <p>
                 سجل ترحيل ذري وقفل نشر يمنعان تبديلين متزامنين. أمر الاستعادة
                 يُعيد النسخة المسجّلة ولا يخمّن حالة البيانات.

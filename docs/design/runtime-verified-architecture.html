@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<title>CeliaOS — Runtime-Verified Architecture 2026</title>
+<style>
+  @font-face { font-family: "Plex"; src: url("../../public/fonts/ibm-plex-sans-arabic-arabic-400-normal.woff2") format("woff2"); font-weight: 400; font-display: block; }
+  @font-face { font-family: "Plex"; src: url("../../public/fonts/ibm-plex-sans-arabic-arabic-500-normal.woff2") format("woff2"); font-weight: 500; font-display: block; }
+  @font-face { font-family: "Plex"; src: url("../../public/fonts/ibm-plex-sans-arabic-arabic-600-normal.woff2") format("woff2"); font-weight: 600; font-display: block; }
+  @font-face { font-family: "Plex"; src: url("../../public/fonts/ibm-plex-sans-arabic-arabic-700-normal.woff2") format("woff2"); font-weight: 700; font-display: block; }
+  @font-face { font-family: "Mono"; src: url("../../public/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-display: block; }
+  @font-face { font-family: "Mono"; src: url("../../public/fonts/jetbrains-mono-latin-600-normal.woff2") format("woff2"); font-weight: 600; font-display: block; }
+
+  :root{
+    --bg:#080d24; --panel:#0f1738; --panel-2:#131d47; --line:#26346b; --line-2:#33459b;
+    --txt:#eaf0ff; --mut:#a9b6e8; --gold:#fbbf24; --gold-2:#fcd34d;
+    --ok:#34d399; --part:#fbbf24; --bad:#f87171; --cyan:#22d3ee; --violet:#a78bfa;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--txt);font-family:"Plex",system-ui,sans-serif;line-height:1.55}
+  body{width:1440px;padding:44px 48px 40px}
+  .mono{font-family:"Mono",monospace;direction:ltr;unicode-bidi:isolate}
+
+  header{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;padding-bottom:26px;border-bottom:2px solid var(--line-2)}
+  .brand{display:flex;flex-direction:column;gap:6px}
+  .logo{display:flex;align-items:center;gap:12px;font-size:34px;font-weight:700;letter-spacing:.2px}
+  .logo .star{color:var(--gold);font-size:30px;line-height:1}
+  .logo b{color:var(--gold)}
+  .tag{color:var(--mut);font-size:15px;letter-spacing:.4px}
+  .title{text-align:left;max-width:760px}
+  .title h1{margin:0;font-size:42px;line-height:1.25;font-weight:700}
+  .title p{margin:8px 0 0;color:var(--mut);font-size:17px}
+  .title .m{color:var(--gold-2)}
+  .verdicts{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:24px 0 8px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:14px}
+  .stat .n{font-size:38px;font-weight:700;line-height:1}
+  .stat .l{font-size:14.5px;color:var(--mut);line-height:1.35}
+  .stat.ok{border-color:color-mix(in srgb,var(--ok) 55%,transparent)} .stat.ok .n{color:var(--ok)}
+  .stat.part{border-color:color-mix(in srgb,var(--part) 55%,transparent)} .stat.part .n{color:var(--part)}
+  .stat.bad{border-color:color-mix(in srgb,var(--bad) 55%,transparent)} .stat.bad .n{color:var(--bad)}
+  .stat .dot{width:12px;height:12px;border-radius:50%;background:currentColor}
+
+  section{margin-top:26px;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:22px 24px}
+  h2{margin:0 0 4px;font-size:25px;font-weight:700;display:flex;align-items:center;gap:12px}
+  h2 .idx{font-family:"Mono",monospace;font-size:14px;color:var(--bg);background:var(--gold);border-radius:8px;padding:3px 9px;font-weight:600}
+  .hint{color:var(--mut);font-size:15px;margin:0 0 16px}
+
+  /* harness */
+  .chain{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+  .stage{background:var(--panel-2);border:1px solid var(--line);border-radius:14px;padding:12px 12px 11px;position:relative}
+  .stage .num{position:absolute;top:-10px;inset-inline-start:12px;background:var(--gold);color:#1b1403;width:22px;height:22px;border-radius:7px;display:grid;place-items:center;font-size:12.5px;font-weight:700;font-family:"Mono",monospace}
+  .stage .en{font-family:"Mono",monospace;direction:ltr;text-align:left;font-size:14.5px;font-weight:600;color:#fff;margin-top:6px}
+  .stage .ar{font-size:13.5px;color:var(--mut);margin-top:3px}
+  .stage.key{border-color:color-mix(in srgb,var(--gold) 55%,var(--line));background:color-mix(in srgb,var(--gold) 9%,var(--panel-2))}
+  .stage.new{border-color:color-mix(in srgb,var(--cyan) 45%,var(--line))}
+  .stage.new .num{background:var(--cyan);color:#04222a}
+  .stage.new .ar::after{content:" · أُضيفت";color:var(--cyan);font-size:12px}
+
+  .split{display:grid;grid-template-columns:1.15fr 1fr;gap:14px;margin-top:14px}
+  .note{background:color-mix(in srgb,var(--bad) 10%,var(--panel-2));border:1px solid color-mix(in srgb,var(--bad) 40%,transparent);border-radius:14px;padding:13px 15px}
+  .note b{color:var(--bad)}
+  .good{background:color-mix(in srgb,var(--ok) 9%,var(--panel-2));border:1px solid color-mix(in srgb,var(--ok) 40%,transparent);border-radius:14px;padding:13px 15px}
+  .good b{color:var(--ok)}
+  .note p,.good p{margin:6px 0 0;font-size:14.5px;color:#dbe3ff}
+
+  /* chips */
+  .chips{display:flex;flex-wrap:wrap;gap:9px}
+  .chip{font-family:"Mono",monospace;direction:ltr;font-size:13.5px;background:var(--panel-2);border:1px solid var(--line-2);border-radius:999px;padding:7px 12px;color:#dfe7ff}
+  .chip.warn{border-color:color-mix(in srgb,var(--part) 60%,transparent);color:var(--gold-2)}
+
+  /* constraints */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+  .row .k{font-family:"Mono",monospace;direction:ltr;font-size:13.5px;color:#dfe7ff}
+  .row .v{font-size:13.5px;font-weight:600;padding:3px 10px;border-radius:8px;white-space:nowrap}
+  .v.off{background:color-mix(in srgb,var(--bad) 16%,transparent);color:#ffb4b4;border:1px solid color-mix(in srgb,var(--bad) 40%,transparent)}
+  .v.gate{background:color-mix(in srgb,var(--part) 16%,transparent);color:var(--gold-2);border:1px solid color-mix(in srgb,var(--part) 42%,transparent)}
+  .v.none{background:color-mix(in srgb,var(--violet) 14%,transparent);color:#d3c4ff;border:1px solid color-mix(in srgb,var(--violet) 38%,transparent)}
+
+  /* external perception */
+  .cards4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .card{background:var(--panel-2);border:1px solid var(--line);border-radius:14px;padding:13px 14px;display:flex;flex-direction:column;gap:6px}
+  .card .top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .card .name{font-family:"Mono",monospace;direction:ltr;font-size:15px;font-weight:600}
+  .badge{font-size:12px;font-weight:700;border-radius:7px;padding:2px 8px;white-space:nowrap}
+  .b-ok{background:color-mix(in srgb,var(--ok) 18%,transparent);color:#9df3d3}
+  .b-part{background:color-mix(in srgb,var(--part) 18%,transparent);color:var(--gold-2)}
+  .b-bad{background:color-mix(in srgb,var(--bad) 18%,transparent);color:#ffb4b4}
+  .card p{margin:0;font-size:13.5px;color:#cdd7fa}
+
+  /* functions */
+  .funcs{display:grid;grid-template-columns:repeat(7,1fr);gap:10px}
+  .func{background:var(--panel-2);border:1px solid var(--line);border-radius:14px;padding:12px 10px;text-align:center}
+  .func .f{font-size:16px;font-weight:700}
+  .func .why{font-size:12px;color:var(--mut);margin-top:5px;line-height:1.4}
+  .func .mk{margin-top:9px;display:flex;justify-content:center}
+  .pill{font-size:12.5px;font-weight:700;border-radius:999px;padding:3px 10px;border:1px solid}
+  .pill.ok{color:#9df3d3;border-color:color-mix(in srgb,var(--ok) 45%,transparent);background:color-mix(in srgb,var(--ok) 14%,transparent)}
+  .pill.part{color:var(--gold-2);border-color:color-mix(in srgb,var(--part) 45%,transparent);background:color-mix(in srgb,var(--part) 14%,transparent)}
+  .pill.bad{color:#ffb4b4;border-color:color-mix(in srgb,var(--bad) 45%,transparent);background:color-mix(in srgb,var(--bad) 14%,transparent)}
+  .func.ok{border-color:color-mix(in srgb,var(--ok) 50%,transparent)}
+  .func.part{border-color:color-mix(in srgb,var(--part) 50%,transparent)}
+  .func.bad{border-color:color-mix(in srgb,var(--bad) 50%,transparent)}
+
+  /* fixes */
+  .fixes{display:grid;grid-template-columns:1fr 1fr 1fr;gap:11px}
+  .fix{background:var(--panel-2);border:1px solid var(--line);border-radius:13px;padding:11px 13px;display:flex;gap:10px;align-items:flex-start}
+  .fix .n{font-family:"Mono",monospace;color:#0d1330;background:var(--gold);border-radius:7px;min-width:24px;height:24px;display:grid;place-items:center;font-size:13px;font-weight:700}
+  .fix p{margin:0;font-size:14px}
+
+  /* proven */
+  .proven{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  .p{display:flex;gap:10px;align-items:flex-start;background:color-mix(in srgb,var(--ok) 7%,var(--panel-2));border:1px solid color-mix(in srgb,var(--ok) 35%,transparent);border-radius:12px;padding:10px 13px;font-size:14px}
+  .p .ck{color:var(--ok);display:inline-flex;margin-top:2px;flex:0 0 auto}
+  .p code{font-family:"Mono",monospace;direction:ltr;font-size:12.5px;color:#d9e4ff}
+
+  .card p,.fix p,.p,.note p,.good p,.func .why,.row .v,.stat .l{unicode-bidi:plaintext}
+  footer{margin-top:24px;display:flex;align-items:center;justify-content:space-between;gap:20px;color:var(--mut);font-size:13.5px;border-top:1px solid var(--line);padding-top:16px}
+  footer b{color:var(--gold-2);font-weight:600}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo"><span class="star"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 2.5l2.2 6.1 6.3 2.2-6.3 2.2L12 19.1l-2.2-6.1L3.5 10.8l6.3-2.2z"/></svg></span><span>Celia<b>OS</b></span></div>
+    <div class="tag">Runtime-Verified Architecture · 2026</div>
+  </div>
+  <div class="title">
+    <h1>ما أثبته التشغيل — لا ما يفترضه الشكل</h1>
+    <p>36 ادعاءً دُقّقت بمسبار تشغيل حقيقي: <span class="mono" style="direction:ltr">runtime.harness()</span> · DEC-081 · <span class="mono" style="direction:ltr">249f1b5</span></p>
+  </div>
+</header>
+
+<div class="verdicts">
+  <div class="stat ok"><span class="dot"></span><div class="n">18</div><div class="l">مثبتة<br />تعمل وفق المسبار</div></div>
+  <div class="stat part"><span class="dot"></span><div class="n">9</div><div class="l">جزئية<br />تشترط إعدادًا أو علمًا</div></div>
+  <div class="stat bad"><span class="dot"></span><div class="n">9</div><div class="l">غير مثبتة<br />لا تُعرض كوظائف منفذة</div></div>
+  <div class="stat"><span class="dot" style="background:var(--mut)"></span><div class="n">36</div><div class="l">إجمالي الادعاءات<br />المدقّقة في الصورتين</div></div>
+</div>
+
+<section>
+  <h2><span class="idx">01</span>الحزام كما يعلن نفسه — عشر مراحل، بهذا الترتيب حرفيًا</h2>
+  <p class="hint"><span class="mono">HARNESS_LIFECYCLE_STAGES</span> · <span class="mono">src/agent/harness.js:20</span> — الاسم الإنجليزي هو الاسم الرسمي، والعربي ترجمة توضيحية تحته.</p>
+  <div class="chain">
+    <div class="stage"><span class="num">1</span><div class="en">Goal</div><div class="ar">الهدف</div></div>
+    <div class="stage"><span class="num">2</span><div class="en">Plan</div><div class="ar">الخطة</div></div>
+    <div class="stage"><span class="num">3</span><div class="en">Select Tool</div><div class="ar">اختيار الأداة</div></div>
+    <div class="stage key"><span class="num">4</span><div class="en">Policy Check</div><div class="ar">فحص السياسة</div></div>
+    <div class="stage key"><span class="num">5</span><div class="en">Approval</div><div class="ar">الموافقة</div></div>
+    <div class="stage"><span class="num">6</span><div class="en">Sandbox Execute</div><div class="ar">التنفيذ المعزول</div></div>
+    <div class="stage new"><span class="num">7</span><div class="en">Observe</div><div class="ar">الرصد</div></div>
+    <div class="stage"><span class="num">8</span><div class="en">Independently Verify</div><div class="ar">التحقق المستقل</div></div>
+    <div class="stage new"><span class="num">9</span><div class="en">Persist Evidence</div><div class="ar">تثبيت الأدلة</div></div>
+    <div class="stage new"><span class="num">10</span><div class="en">Update State</div><div class="ar">تحديث الحالة</div></div>
+  </div>
+  <div class="split">
+    <div class="note"><b>ما غاب عن النسخة السابقة:</b><p>كانت تسع خانات تدمج <span class="mono">Policy</span> و<span class="mono">Approval</span> في واحدة، وتُسقط <span class="mono">Observe</span> و<span class="mono">Persist Evidence</span> و<span class="mono">Update State</span>. الدمج يُخفي أن الفحص السياسي يسبق طلب الموافقة ويستقل عنه.</p></div>
+    <div class="good"><b>ما بقي صحيحًا:</b><p>الهدف والخطة واختيار الأداة والتحقق والأدلة كلها مراحل معلنة في الكود لا مرسومة في صورة، ولكل منها اختبار.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="idx">02</span>المكونات العشرة — كلها موصولة في مضيف حقيقي</h2>
+  <p class="hint"><span class="mono">HARNESS_COMPONENT_IDS</span> · مسبار تشغيل على مخزن SQLite مؤقت ومخطط <span class="mono">demo</span>: <span class="mono">wired=true</span> للعشرة.</p>
+  <div class="chips">
+    <span class="chip">agent_runtime</span>
+    <span class="chip">model_router</span>
+    <span class="chip">tool_registry</span>
+    <span class="chip">context_memory</span>
+    <span class="chip">policy_approval_gate</span>
+    <span class="chip warn">sandbox_executor · isolatedContainerAvailable=false</span>
+    <span class="chip">independent_verifier</span>
+    <span class="chip">evidence_observability</span>
+    <span class="chip">recovery_idempotency</span>
+    <span class="chip">evaluation_regression</span>
+  </div>
+</section>
+
+<section>
+  <h2><span class="idx">03</span>القيود التشغيلية المقيسة — «موجود» لا يعني «مفعّل»</h2>
+  <p class="hint">قيم الإقلاع الافتراضية في <span class="mono">src/agent/index.js</span>؛ لا ملف في المستودع يفعّلها.</p>
+  <div class="grid2">
+    <div class="row"><span class="k">CELIA_AGENT_RUNTIME</span><span class="v off">off · افتراضي</span></div>
+    <div class="row"><span class="k">CELIA_AGENT_SANDBOX</span><span class="v off">off · sandbox.exec مرفوض</span></div>
+    <div class="row"><span class="k">isolatedContainerAvailable</span><span class="v off">false</span></div>
+    <div class="row"><span class="k">CELIA_AGENT_CONNECTORS</span><span class="v none">none</span></div>
+    <div class="row"><span class="k">CELIA_AGENT_SPIDER</span><span class="v none">off · فهرس محلي للقراءة</span></div>
+    <div class="row"><span class="k">CELIA_AGENT_PLANNER</span><span class="v gate">demo · Gemini خلف علم</span></div>
+    <div class="row"><span class="k">WhatsApp · Meta onboarding</span><span class="v off">configured=false · DEC-073</span></div>
+    <div class="row"><span class="k">web.fetch / web.search</span><span class="v gate">مقيّد / مؤجّل (C2-b)</span></div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="idx">04</span>الإدراك الخارجي — التصحيح الجوهري</h2>
+  <p class="hint">الصورة السابقة قالت: «Browser / Playwright / MCP» مصدر إدراك. الواقع أقرب وأضيق.</p>
+  <div class="cards4">
+    <div class="card"><div class="top"><span class="name">Browser</span><span class="badge b-bad">غير مثبت</span></div><p>لا أداة متصفح في سجل الأدوات أصلًا؛ لا شيء يفتح صفحة نيابة عن المستخدم.</p></div>
+    <div class="card"><div class="top"><span class="name">Playwright</span><span class="badge b-bad">للاختبارات</span></div><p>في <span class="mono">devDependencies</span> فقط (`@playwright/test`) لفحص الواجهة؛ ليست قدرة تشغيل كمبيوتر.</p></div>
+    <div class="card"><div class="top"><span class="name">MCP</span><span class="badge b-bad">اتجاه معكوس</span></div><p>Celia <b>تُصدِّر</b> أدواتها عبر MCP، والعنكبوت يخدم Claude Desktop؛ لا عميل MCP وارد.</p></div>
+    <div class="card"><div class="top"><span class="name">web.fetch</span><span class="badge b-part">مقيّد</span></div><p>جلب عنوان من قائمة سماح بمنحة قصيرة لكل استدعاء وفحص حقن — <b>لا بحث</b>؛ <span class="mono">web.search</span> مؤجّلة بقرار المالك.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="idx">05</span>الوظائف السبع — بالحكم لا بالشعار</h2>
+  <p class="hint">نفس العناوين، لكن كل واحدة تحمل حكمها ودليلها بدل علامة ✔ عامة.</p>
+  <div class="funcs">
+    <div class="func part"><div class="f">إدراك/معلومات</div><div class="why">فهرس محلي + موصلات اختيارية (none)</div><div class="mk"><span class="pill part">جزئي</span></div></div>
+    <div class="func ok"><div class="f">ذاكرة</div><div class="why">ملخصات ووقائع حتمية، بلا فهرس متجهات</div><div class="mk"><span class="pill ok">مثبت</span></div></div>
+    <div class="func ok"><div class="f">تفكير</div><div class="why">مخطط حتمي + مراجعة محكومة</div><div class="mk"><span class="pill ok">مثبت</span></div></div>
+    <div class="func ok"><div class="f">قرار</div><div class="why">سياسة + موافقة ببصمة الحمولة</div><div class="mk"><span class="pill ok">مثبت</span></div></div>
+    <div class="func part"><div class="f">تنفيذ</div><div class="why">سجل أدوات؛ sandbox.exec مطفأ افتراضيًا</div><div class="mk"><span class="pill part">جزئي</span></div></div>
+    <div class="func bad"><div class="f">تعلم</div><div class="why">تقييم ومراجعة وتحديث معرفة يدوي</div><div class="mk"><span class="pill bad">غير مثبت</span></div></div>
+    <div class="func part"><div class="f">تفاعل</div><div class="why">واجهة تعمل؛ WhatsApp غير مهيأ</div><div class="mk"><span class="pill part">جزئي</span></div></div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="idx">06</span>التصحيحات المفاهيمية الستة</h2>
+  <div class="fixes">
+    <div class="fix"><span class="n">1</span><p>فصل <span class="mono">Policy Check</span> عن <span class="mono">Approval</span>: فحص ثم طلب موافقة.</p></div>
+    <div class="fix"><span class="n">2</span><p>إظهار <span class="mono">Observe</span> و<span class="mono">Persist Evidence</span> و<span class="mono">Update State</span>.</p></div>
+    <div class="fix"><span class="n">3</span><p>Playwright ليست قدرة تشغيل كمبيوتر للمستخدم.</p></div>
+    <div class="fix"><span class="n">4</span><p>MCP ليس اتصالًا واردًا؛ بل تصدير من Celia للخارج.</p></div>
+    <div class="fix"><span class="n">5</span><p><span class="mono">web.fetch</span> مقيدة، و<span class="mono">web.search</span> مؤجلة.</p></div>
+    <div class="fix"><span class="n">6</span><p>لا «تعلّم ذاتي»: تقييم + مراجعة + تحديث معرفة يدوي.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="idx">07</span>ما ثبت بالكود والاختبار</h2>
+  <div class="proven">
+    <div class="p"><span class="ck"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><div><code>NETWORK=DENY</code> مفروض: أي وضع غير <span class="mono">deny</span> أو سماح غير فارغ يرمي.</div></div>
+    <div class="p"><span class="ck"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><div>الموافقة البشرية مربوطة ببصمة الحمولة SHA-256 قبل كل أثر خارجي.</div></div>
+    <div class="p"><span class="ck"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><div>سلسلة أدلة قابلة للتحقق (<span class="mono">verifyChain</span>) لكل تشغيل.</div></div>
+    <div class="p"><span class="ck"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><div>مُتحقِّق مستقل بثلاثة أحكام: <span class="mono">PASS / BLOCK / UNKNOWN</span>.</div></div>
+  </div>
+</section>
+
+<footer>
+  <div><b>المصدر:</b> <span class="mono">docs/agent-cognitive-architecture-audit.md</span> · DEC-081 · 31 أكتوبر 2026</div>
+  <div>القاعدة: <b>لا يُعرض مكوّن كقدرة قبل تفعيله تشغيليًا</b></div>
+</footer>
+
+</body>
+</html>

@@ -3,6 +3,12 @@
    SIL Open Font License texts are bundled in public/fonts/.
    ============================================================ */
 
+html,
+body {
+  overflow-x: clip;
+}
+
+
 /* Self-hosted, subsetted fonts: no third-party requests or tracking. */
 @font-face {
   font-family: "IBM Plex Sans Arabic";

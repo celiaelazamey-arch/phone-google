@@ -95,7 +95,7 @@
   function applyTheme(theme) {
     state.theme = theme === 'light' ? 'light' : 'dark';
     el.html.setAttribute('data-theme', state.theme);
-    el.themeIcon.textContent = state.theme === 'dark' ? '☀️' : '🌙';
+    el.themeIcon.textContent = state.theme === 'dark' ? '◐' : '◑';
     localStorage.setItem('celia_theme', state.theme);
   }
 

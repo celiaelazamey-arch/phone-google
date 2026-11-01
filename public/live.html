@@ -3,26 +3,27 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>النظام الحي — سيليا 2026 | Live on Ground</title>
+  <title>النظام الحي | سيليا 2026 | Live on Ground</title>
+  <link rel="stylesheet" href="./theme.css" />
   <link rel="stylesheet" href="./fonts.css" />
   <link rel="stylesheet" href="./styles.css" />
   <style>
-    .live-hero{background:linear-gradient(135deg, rgba(217,119,87,.12), rgba(16,185,129,.08));border:1px solid var(--border-subtle);border-radius:16px;padding:22px 20px;margin:16px 0}
+    .live-hero{background:linear-gradient(135deg, color-mix(in srgb, var(--t-lnd-accent) 12%, transparent), color-mix(in srgb, var(--t-lnd-emerald) 8%, transparent));border:1px solid var(--border-subtle);border-radius:16px;padding:22px 20px;margin:16px 0}
     .live-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:16px 0}
     .stat-card{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:14px;padding:14px}
     .stat-card h4{margin:0 0 6px;font-size:.95rem}
     .stat-card .val{font-weight:700;font-size:1.15rem}
     .stat-card .sub{color:var(--text-muted);font-size:.82rem;margin-top:4px}
-    .pulse{display:inline-block;width:9px;height:9px;background:var(--emerald);border-radius:999px;box-shadow:0 0 0 6px rgba(16,185,129,.15);animation:pulse 1.6s infinite}
-    @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(16,185,129,.35)}70%{box-shadow:0 0 0 8px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
+    .pulse{display:inline-block;width:9px;height:9px;background:var(--emerald);border-radius:999px;box-shadow:0 0 0 6px color-mix(in srgb, var(--t-lnd-emerald) 15%, transparent);animation:pulse 1.6s infinite}
+    @keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb, var(--t-lnd-emerald) 35%, transparent)}70%{box-shadow:0 0 0 8px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
     .find-bar{display:flex;gap:8px;margin:14px 0;flex-wrap:wrap}
-    .find-bar input{flex:1;min-width:180px;padding:10px 12px;border-radius:10px;border:1px solid var(--border-subtle);background:var(--bg-surface);color:var(--text-primary)}
-    .find-bar select,.find-bar button{padding:10px 12px;border-radius:10px;border:1px solid var(--border-subtle);background:var(--bg-surface);color:var(--text-primary);cursor:pointer}
-    .find-bar button.primary{background:var(--accent);color:#fff;border-color:transparent}
+    .find-bar input{flex:1;min-width:180px;padding:10px 12px;border-radius:10px;border:1px solid var(--field-edge);background:var(--bg-surface);color:var(--text-primary)}
+    .find-bar select,.find-bar button{padding:10px 12px;border-radius:10px;border:1px solid var(--field-edge);background:var(--bg-surface);color:var(--text-primary);cursor:pointer}
+    .find-bar button.primary{background:var(--accent);color:var(--accent-fg);border-color:transparent}
     .skill-card{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px}
     .skill-card .meta{font-size:.8rem;color:var(--text-muted)}
     .skill-tag{display:inline-block;background:var(--accent-soft);color:var(--accent);padding:2px 8px;border-radius:999px;font-size:.72rem;margin-inline-end:6px}
-    .log-box{background:var(--bg-code);color:#cbd5e1;border-radius:10px;padding:12px;max-height:360px;overflow:auto;font-size:.82rem;white-space:pre-wrap;direction:ltr;text-align:left}
+    .log-box{background:var(--bg-code);color:var(--t-lnd-log-text);border-radius:10px;padding:12px;max-height:360px;overflow:auto;font-size:.82rem;white-space:pre-wrap;direction:ltr;text-align:left}
     .topbar .nav-pills a{color:inherit;text-decoration:none}
   </style>
 </head>
@@ -33,14 +34,14 @@
         <div class="brand-orb"><span class="orb-core"></span></div>
         <div class="brand-text">
           <div class="brand-title-row"><span class="brand-name">سيليا</span><span class="brand-year">2026 · LIVE</span></div>
-          <span class="brand-sub">النظام الحي على أرض الواقع — Find Skills مفعّل</span>
+          <span class="brand-sub">النظام الحي على أرض الواقع، Find Skills مفعّل</span>
         </div>
       </div>
       <nav class="nav-pills">
         <a class="nav-pill" href="./studio"><span>✦</span><span>مساحة الوكيل</span></a>
         <a class="nav-pill active" href="./live"><span>●</span><span>النظام الحي</span></a>
-        <a class="nav-pill" href="./skills"><span>⚡</span><span>Find Skills</span></a>
-        <a class="nav-pill" href="./landing"><span>🚀</span><span>صفحة الهبوط</span></a>
+        <a class="nav-pill" href="./skills"><span>Find Skills</span></a>
+        <a class="nav-pill" href="./landing"><span>صفحة الهبوط</span></a>
         <span class="pill-count" id="live-count">12 مهارة</span>
       </nav>
       <div class="topbar-actions">
@@ -56,9 +57,9 @@
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
             <span class="pulse"></span>
             <h1 style="margin:0;font-size:1.35rem">نظامك حي على أرض الواقع الآن</h1>
-            <span class="hero-pill"><span id="live-time">—</span> · <span id="live-uptime">—</span></span>
+            <span class="hero-pill"><span id="live-time">…</span> · <span id="live-uptime">…</span></span>
           </div>
-          <p style="margin:8px 0 0;color:var(--text-secondary)">هذه الصفحة تُحدَّث من الخادم الحي مباشرةً عبر <code>/health</code> و <code>system_live_view</code> و <code>find_skills</code> — كل رقم تراه مقاس لحظيًا من عملية Node الحالية.</p>
+          <p style="margin:8px 0 0;color:var(--text-secondary)">هذه الصفحة تُحدَّث من الخادم الحي مباشرةً عبر <code>/health</code> و <code>system_live_view</code> و <code>find_skills</code>، كل رقم تراه مقاس لحظيًا من عملية Node الحالية.</p>
           <div class="find-bar">
             <input id="q" placeholder="ابحث بمهارة: gmail، drive، whatsapp، تقويم، ذكاء، تشفير..." />
             <select id="cat">
@@ -69,14 +70,14 @@
               <option value="security">الأمان والتشفير</option>
               <option value="system">النظام</option>
             </select>
-            <button class="primary" id="btn-find">Find Skills 🔍</button>
-            <button id="btn-live">System Live View ▶</button>
+            <button class="primary" id="btn-find">Find Skills</button>
+            <button id="btn-live">System Live View</button>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <span class="hero-pill subtle">MCP 2024-11-05</span>
             <span class="hero-pill subtle">AES-256-GCM + HMAC-SHA256</span>
-            <span class="hero-pill subtle" id="pill-storage">التخزين: —</span>
-            <span class="hero-pill subtle" id="pill-provider">المحرك: —</span>
+            <span class="hero-pill subtle" id="pill-storage">التخزين: …</span>
+            <span class="hero-pill subtle" id="pill-provider">المحرك: …</span>
           </div>
         </div>
 
@@ -89,7 +90,7 @@
           <div class="telemetry-item"><span class="t-label">التكلفة</span><span class="t-val ok">0.00$ مجانًا</span></div>
         </div>
 
-        <h3 style="margin:18px 0 8px">نتائج Find Skills — مهارات النظام الحي</h3>
+        <h3 style="margin:18px 0 8px">نتائج Find Skills، مهارات النظام الحي</h3>
         <div id="skills-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px"></div>
 
         <h3 style="margin:18px 0 8px">السجل الحي (Live Trace)</h3>
@@ -107,7 +108,7 @@
         <div style="margin:18px 0;padding:14px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:12px">
           <h4 style="margin:0 0 8px">كيف تراه حيًا على أرض الواقع؟</h4>
           <ol style="margin:0;padding-inline-start:18px;color:var(--text-secondary)">
-            <li>كل بطاقة أعلاه تُجلب من الخادم بطلب <code>fetch('/health')</code> مباشر — حدّث الصفحة وسترى الطابع الزمني يتغير.</li>
+            <li>كل بطاقة أعلاه تُجلب من الخادم بطلب <code>fetch('/health')</code> مباشر، حدّث الصفحة وسترى الطابع الزمني يتغير.</li>
             <li>اكتب <code>whatsapp</code> في شريط البحث واضغط Find Skills لمشاهدة مهارات واتساب تُفلتر لحظيًا عبر أداة <code>find_skills</code>.</li>
             <li>جرّب <code>POST /ui/workspace/rpc</code> أو <code>POST /mcp</code> برمز المالك لتنفيذ أي مهارة وتوثيق النتيجة في السجل.</li>
             <li>محاكاة رسالة واتساب حية: <code>POST /ui/workspace/crypto-lab</code> مع <code>{action:"simulate_inbound_whatsapp", phone:"+201065...", text:"مرحبا"}</code></li>
@@ -122,7 +123,7 @@
           </div>
         </div>
 
-        <div style="margin:14px 0;color:var(--text-muted);font-size:.82rem">الخادم يعمل على <code id="host-info">—</code> · الطابع اللحظي <span id="now-tick">—</span></div>
+        <div style="margin:14px 0;color:var(--text-muted);font-size:.82rem">الخادم يعمل على <code id="host-info">…</code> · الطابع اللحظي <span id="now-tick">…</span></div>
       </main>
     </div>
   </div>

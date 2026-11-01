@@ -118,10 +118,10 @@ test('THM-01 every theme passes computed WCAG contrast for the text/background p
 
 test('THM-02 grep gate: no fixed colour outside theme.css in the migrated stylesheets; the not-yet-migrated list only shrinks', () => {
   // قائمة صريحة لما لم يُهاجَر بعد (تنكمش فقط — إضافة اسم هنا تراجع يجب تبريره في DECISIONS).
-  const NOT_YET_MIGRATED = new Set(['styles.css', 'system.css', 'protocol.css', 'computer.css', 'deploy.css', 'landing.css', 'fonts.css']);
+  const NOT_YET_MIGRATED = new Set(['landing.css', 'fonts.css']);
   const cssFiles = fs.readdirSync(PUBLIC_DIR).filter((f) => f.endsWith('.css'));
   const migrated = cssFiles.filter((f) => f !== 'theme.css' && !NOT_YET_MIGRATED.has(f));
-  assert.deepEqual(migrated.sort(), ['agent.css', 'cron.css', 'kb.css', 'whatsapp.css']);
+  assert.deepEqual(migrated.sort(), ['agent.css', 'computer.css', 'cron.css', 'deploy.css', 'kb.css', 'protocol.css', 'styles.css', 'system.css', 'whatsapp.css']);
   for (const file of NOT_YET_MIGRATED) assert.ok(cssFiles.includes(file), `${file} still exists (drop it from the list otherwise)`);
 
   const fixedColour = /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(|\b(?:white|black|red|green|blue|yellow|orange|gray|grey|silver|navy|teal|purple|pink)\b(?=\s*[;,)!])/i;
@@ -131,7 +131,7 @@ test('THM-02 grep gate: no fixed colour outside theme.css in the migrated styles
       assert.ok(!fixedColour.test(line), `${file}:${index + 1} has a fixed colour: ${line.trim()}`);
     }
     // أي شفافية مشتقة تُبنى من رمز (color-mix على var) لا من رقم.
-    for (const mix of css.match(/color-mix\([^)]*\)/g) ?? []) assert.match(mix, /var\(--[a-z-]+\)/, mix);
+    for (const mix of css.match(/color-mix\((?:[^()]|\([^()]*\))*\)/g) ?? []) assert.match(mix, /var\(--[a-z0-9-]+\)/, mix);
   }
   // الرموز --t-* تُعرَّف في theme.css فقط؛ agent.css يربط كل متغيّر محلي برمز.
   for (const file of cssFiles.filter((f) => f !== 'theme.css')) {
@@ -252,15 +252,23 @@ test('THM-03 theme.js resolves before paint: stored choice applied, invalid/miss
 });
 
 test('THM-04 pages with the switcher load theme.js before any stylesheet and import theme.css; no switcher on a page whose CSS ignores the tokens', () => {
+  const SINGLE_IDENTITY = ['computer-permissions.html', 'computer.html', 'deploy.html', 'index.html', 'live.html', 'protocol.html', 'skills.html', 'system.html'];
   const htmlFiles = fs.readdirSync(PUBLIC_DIR).filter((f) => f.endsWith('.html'));
   const themed = [];
   for (const file of htmlFiles) {
     const html = read(file);
     const hasSwitcher = html.includes('data-theme-switcher');
     const hasTokens = html.includes('href="./theme.css"');
-    assert.equal(hasSwitcher, hasTokens, `${file}: switcher ⇔ theme.css (DEC-030, no façade switcher)`);
+    // DEC-030: لا مبدّل على صفحة لا تقرأ الرموز. DEC-080: الصفحات ذات الهوية الواحدة تقرأ الرموز بلا مبدّل.
+    if (hasSwitcher) assert.ok(hasTokens, `${file}: a switcher needs theme.css`);
     if (!hasTokens) continue;
     themed.push(file);
+    if (!hasSwitcher) {
+      assert.ok(SINGLE_IDENTITY.includes(file), `${file}: importing theme.css without a switcher needs DEC-080 listing`);
+      assert.ok(html.indexOf('href="./theme.css"') < html.indexOf('<link rel="stylesheet" href="./fonts.css" />'),
+        `${file}: theme.css loads before fonts.css (no flash)`);
+      continue;
+    }
     const scriptAt = html.indexOf('<script src="./theme.js"></script>');
     const firstStylesheet = html.indexOf('<link rel="stylesheet"');
     assert.ok(scriptAt > -1 && scriptAt < firstStylesheet, `${file}: theme.js runs before the first stylesheet (no flash)`);
@@ -272,7 +280,7 @@ test('THM-04 pages with the switcher load theme.js before any stylesheet and imp
     assert.match(html, /<select data-theme-switcher aria-label="/, `${file}: switcher is labelled`);
     assert.ok(html.match(/data-theme-switcher/g).length === 1, `${file}: exactly one switcher`);
   }
-  assert.deepEqual(themed.sort(), ['agent.html', 'cron.html', 'kb.html', 'whatsapp.html']);
+  assert.deepEqual(themed.sort(), ['agent.html', 'computer-permissions.html', 'computer.html', 'cron.html', 'deploy.html', 'index.html', 'kb.html', 'live.html', 'protocol.html', 'skills.html', 'system.html', 'whatsapp.html']);
 });
 
 test('THM-05 the live UI server serves /theme.css and /theme.js by explicit route (the pages reference both)', async (t) => {

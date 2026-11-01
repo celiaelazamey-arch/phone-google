@@ -1,0 +1,43 @@
+name: Code scanning (CodeQL)
+
+# أُضيف لأن قاعدة «Main Branch Protection» تشترط نتائج Code Scanning قبل أي دمج
+# إلى main، ولم يكن في المستودع أي تحليل CodeQL — فكان كل طلب دمج محجوبًا بحكم
+# غير قابل للاستيفاء. هذا الملف يجعل الشرط ممكنًا بدل أن يُعطَّل.
+#
+# النطاق: JavaScript/TypeScript فقط (المستودع كله Node + صفحات ساكنة بلا بناء).
+# لا نُشغّل `autobuild`؛ CodeQL لهذا اللغة لا يحتاج خطوة بناء.
+# الصلاحيات مقيّدة بالحد الذي يمنحه GitHub للتحليل، والتحذيرات تُرفع لملخص التشغيل
+# بدل فشل صامت.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze JavaScript/TypeScript
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: github/codeql-action/init@4bfa242aa49c5f7c6770b98670d354a7dfac05f8 # v3
+        with:
+          languages: javascript-typescript
+          queries: security-and-quality
+      - uses: github/codeql-action/analyze@4bfa242aa49c5f7c6770b98670d354a7dfac05f8 # v3
+        with:
+          category: '/language:javascript-typescript'

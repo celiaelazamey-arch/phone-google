@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 import express from "express";
 import { DIST_DIR } from "./build-pages.mjs";
-const port = Number(process.env.PORT || 3101);
+// منفذ اختياري من سطر الأوامر: `serve-pages.mjs 3101`. بدونه يُقرأ PORT ثم 3101.
+// (بلا هذا، مرر `serve-pages.mjs public 3101` كان يُتجاهل ويخدم dist على 3101 بصمت.)
+const cliPort = process.argv[2];
+const port = Number(cliPort || process.env.PORT || 3101);
 const base = process.env.CELIA_PAGES_BASE_PATH || "/";
 if (
   !Number.isInteger(port) ||

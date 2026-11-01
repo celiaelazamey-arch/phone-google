@@ -9,6 +9,12 @@
  * والتركيز) — لا يُنشر رمز يكسرها. الشفافيات المشتقة تُصنع في الصفحات بـ color-mix من هذه الرموز لا بأرقام ثابتة.
  */
 
+html,
+body {
+  overflow-x: clip;
+}
+
+
 :root,
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -17,6 +23,7 @@
   --t-card: #151d38;
   --t-field: #0e1530;
   --t-line: #273154;
+  --t-field-edge: #66739e;
   --t-text: #e8ecff;
   --t-muted: #9aa5c9;
   --t-accent: #7c9cff;
@@ -38,6 +45,7 @@
   --t-card: #0a0a0a;
   --t-field: #050505;
   --t-line: #2a2a2a;
+  --t-field-edge: #5f6c96;
   --t-text: #f2f2f2;
   --t-muted: #a8a8a8;
   --t-accent: #8ab4ff;
@@ -59,6 +67,7 @@
   --t-card: #ffffff;
   --t-field: #ffffff;
   --t-line: #cfd6e8;
+  --t-field-edge: #7b849c;
   --t-text: #121a33;
   --t-muted: #525d7a;
   --t-accent: #3451c6;
@@ -82,6 +91,7 @@
     --t-card: #ffffff;
     --t-field: #ffffff;
     --t-line: #cfd6e8;
+    --t-field-edge: #7b849c;
     --t-text: #121a33;
     --t-muted: #525d7a;
     --t-accent: #3451c6;
@@ -97,6 +107,110 @@
   }
 }
 
+/*
+ * هويات الصفحات ذات السمة الواحدة (DEC-030 / DEC-080).
+ *
+ * صفحات مثل /system و/deploy و/protocol و/computer و/whatsapp لا تحمل مبدّل سمة، فلها هوية واحدة
+ * لا تتغيّر مع الوضع. قيمها تبقى هنا لأن theme.css هو الملف الوحيد المسموح أن يحمل لونًا حرفيًا
+ * (THM-02)؛ والصفحة تستورد theme.css وتقرأ --t-<page>-* فلا تحمل ورقتها لونًا واحدًا.
+ */
+:root {
+  /* /system — مركز النظام: فحمي مخضر */
+  --t-sys-bg: #0b1117;
+  --t-sys-surface: #101920;
+  --t-sys-surface-2: #142028;
+  --t-sys-surface-hover: #18232b;
+  --t-sys-sunken: #0b1319;
+  --t-sys-active: #14251f;
+  --t-sys-line: #223039;
+  --t-sys-line-soft: #2a3c41;
+  --t-sys-line-mint: #294237;
+  --t-sys-line-mint-strong: #3b6957;
+  --t-sys-text: #e7edf0;
+  --t-sys-text-strong: #f4f7f2;
+  --t-sys-muted: #8ba4ac;
+  --t-sys-muted-strong: #b9c8d0;
+  --t-sys-mint: #63dfbb;
+  --t-sys-mint-hover: #9aefd5;
+  --t-sys-mint-ink: #0b2720;
+  --t-sys-mint-muted: #7fb3a0;
+  --t-sys-brand: #16372e;
+  --t-sys-gold: #e9b961;
+  --t-sys-gold-muted: #b89c72;
+  --t-sys-gold-line: #6d5a3a;
+  --t-sys-gold-surface: #2a2115;
+  --t-sys-bad: #f18c8c;
+  --t-sys-info: #83b8d6;
+  /* /deploy — مركز النشر: أخضر داكن */
+  --t-dep-bg: #091512;
+  --t-dep-panel: #101f1a;
+  --t-dep-line: #273c32;
+  --t-dep-line-soft: #3a6541;
+  --t-dep-line-strong: #3e6148;
+  --t-dep-mint: #a6efbe;
+  --t-dep-mint-hover: #c0f8d2;
+  --t-dep-mint-ink: #102719;
+  --t-dep-text: #edf4ec;
+  --t-dep-muted: #b0c4b7;
+  --t-dep-text-soft: #c1d2c6;
+  --t-dep-amber: #f3d28e;
+  --t-dep-warn-line: #594b2d;
+  --t-dep-warn-surface: #453922;
+  --t-dep-ok-surface: #253b2d;
+  --t-dep-surface-2: #283932;
+  --t-dep-surface-hover: #1a3024;
+  --t-dep-card: #12271d;
+  --t-dep-card-2: #0d1c16;
+  --t-dep-orb: #b2e9bc;
+  --t-dep-orb-ink: #13301d;
+  /* /protocol — بروتوكول التسليم: كحلي وذهبي */
+  --t-pro-bg: #070b14;
+  --t-pro-card: #0e1626;
+  --t-pro-elevated: #141f35;
+  --t-pro-line: #243554;
+  --t-pro-line-strong: #1e293b;
+  --t-pro-text: #f8fafc;
+  --t-pro-muted: #cbd5e1;
+  --t-pro-gold: #fbbf24;
+  --t-pro-gold-soft: #fcd34d;
+  --t-pro-gold-pale: #fde68a;
+  --t-pro-gold-ink: #422006;
+  --t-pro-gold-line: #b45309;
+  --t-pro-emerald: #34d399;
+  --t-pro-emerald-deep: #059669;
+  --t-pro-emerald-ink: #064e3b;
+  --t-pro-emerald-pale: #a7f3d0;
+  --t-pro-cyan: #38bdf8;
+  --t-pro-rose: #fb7185;
+  --t-pro-rose-deep: #4c0519;
+  --t-pro-rose-pale: #fecdd3;
+  /* /computer — الوكيل يستخدم الكمبيوتر: بنفسجي وكحلي */
+  --t-cu-bg: #0b1030;
+  --t-cu-bg-2: #121a4a;
+  --t-cu-card: #161f55;
+  --t-cu-line: #2e3a8c;
+  --t-cu-text: #eaf0ff;
+  --t-cu-muted: #a9b6e8;
+  --t-cu-violet: #8b5cf6;
+  --t-cu-cyan: #22d3ee;
+  --t-cu-sky: #38bdf8;
+  --t-cu-ok: #34d399;
+  --t-cu-bad: #f87171;
+  --t-cu-term: #070b24;
+  --t-cu-warn: #fbbf24;
+  --t-cu-skip-ink: #06102c;
+  --t-cu-violet-ink: #140b2e;
+  --t-cu-violet-deep: #5b21b6;
+  --t-cu-violet-pale: #f4f1ff;
+  /* الخطوط: عائلتان فقط، مضمّنتان محليًا؛ لا اسم خط حرفي في أي ورقة صفحة. */
+  --t-font-body: "IBM Plex Sans Arabic", system-ui, "Segoe UI", Tahoma, sans-serif;
+  --t-font-display: "Cairo", "Tajawal", system-ui, -apple-system, sans-serif;
+  --t-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* أقنعة التدرّج: قيمة حيادية واحدة بدل لون حرفي في كل ملف. */
+  --t-mask: #000000;
+  --t-sheen: #ffffff;
+}
+
 /* مبدّل السمة المشترك (نفس العنصر في كل صفحة تقرأ الرموز). */
 .theme-switch {
   display: inline-flex;
@@ -109,7 +223,7 @@
   width: auto;
   padding: 0.3rem 0.5rem;
   border-radius: 8px;
-  border: 1px solid var(--t-line);
+  border: 1px solid var(--t-field-edge);
   background: var(--t-field);
   color: var(--t-text);
   font: inherit;
@@ -131,4 +245,144 @@
     animation: none !important;
     transition: none !important;
   }
+}
+
+/*
+ * لوحة صفحة الهبوط (styles.css). تُعلن هنا لأن theme.css هو الملف الوحيد الحامل للون الحرفي (THM-02).
+ * الكتلة الداكنة هي الأصل، والفاتحة تتجاوزها بنفس الرموز، و«يتبع النظام» يطابق الفاتحة.
+ */
+:root,
+:root[data-theme="dark"] {
+  /* / — صفحة الهبوط (styles.css): لوحة داكنة */
+  --t-lnd-bg-canvas: #0b0c10;
+  --t-lnd-bg-elevated: #111319;
+  --t-lnd-bg-surface: #161922;
+  --t-lnd-bg-surface-2: #1c202c;
+  --t-lnd-bg-hover: #222736;
+  --t-lnd-bg-code: #08090d;
+  --t-lnd-border-subtle: rgba(255, 255, 255, 0.075);
+  --t-lnd-border-strong: rgba(255, 255, 255, 0.15);
+  --t-lnd-text-primary: #f4f4f6;
+  --t-lnd-text-secondary: #a1a8b8;
+  --t-lnd-text-muted: #9aa3b5;
+  --t-lnd-accent: #d97757;
+  --t-lnd-accent-fg: #1c0e08;
+  --t-lnd-field-edge: rgba(255, 255, 255, 0.42);
+  --t-lnd-focus-ring: #f4f4f6;
+  --t-lnd-accent-hover: #e48769;
+  --t-lnd-accent-soft: rgba(217, 119, 87, 0.14);
+  --t-lnd-emerald: #10b981;
+  --t-lnd-emerald-soft: rgba(16, 185, 129, 0.13);
+  --t-lnd-violet: #8b5cf6;
+  --t-lnd-violet-soft: rgba(139, 92, 246, 0.14);
+  --t-lnd-amber: #f59e0b;
+  --t-lnd-amber-soft: rgba(245, 158, 11, 0.14);
+  --t-lnd-shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.45);
+  --t-lnd-shadow-card: 0 4px 20px rgba(0, 0, 0, 0.22);
+  --t-lnd-wa-bg: #0b141a;
+  --t-lnd-wa-in: #202c33;
+  --t-lnd-wa-out: #005c4b;
+}
+
+:root[data-theme="light"] {
+  --t-lnd-bg-canvas: #faf9f5;
+  --t-lnd-bg-elevated: #f2f0e8;
+  --t-lnd-bg-surface: #ffffff;
+  --t-lnd-bg-surface-2: #f7f5ee;
+  --t-lnd-bg-hover: #ebe8de;
+  --t-lnd-bg-code: #16161a;
+  --t-lnd-border-subtle: rgba(20, 20, 19, 0.085);
+  --t-lnd-border-strong: rgba(20, 20, 19, 0.16);
+  --t-lnd-text-primary: #141413;
+  --t-lnd-text-secondary: #53514c;
+  --t-lnd-text-muted: #67625a;
+  --t-lnd-accent: #c96442;
+  --t-lnd-accent-fg: #1c0e08;
+  --t-lnd-field-edge: rgba(20, 20, 19, 0.55);
+  --t-lnd-focus-ring: #141413;
+  --t-lnd-accent-hover: #b55434;
+  --t-lnd-accent-soft: rgba(201, 100, 66, 0.11);
+  --t-lnd-emerald: #059669;
+  --t-lnd-emerald-soft: rgba(5, 150, 105, 0.11);
+  --t-lnd-violet: #7c3aed;
+  --t-lnd-violet-soft: rgba(124, 58, 237, 0.11);
+  --t-lnd-amber: #d97706;
+  --t-lnd-amber-soft: rgba(217, 119, 6, 0.11);
+  --t-lnd-shadow-lg: 0 20px 45px rgba(20, 20, 19, 0.12);
+  --t-lnd-shadow-card: 0 2px 12px rgba(20, 20, 19, 0.05);
+  --t-lnd-wa-bg: #efeae2;
+  --t-lnd-wa-in: #ffffff;
+  --t-lnd-wa-out: #d9fdd3;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+  --t-lnd-bg-canvas: #faf9f5;
+  --t-lnd-bg-elevated: #f2f0e8;
+  --t-lnd-bg-surface: #ffffff;
+  --t-lnd-bg-surface-2: #f7f5ee;
+  --t-lnd-bg-hover: #ebe8de;
+  --t-lnd-bg-code: #16161a;
+  --t-lnd-border-subtle: rgba(20, 20, 19, 0.085);
+  --t-lnd-border-strong: rgba(20, 20, 19, 0.16);
+  --t-lnd-text-primary: #141413;
+  --t-lnd-text-secondary: #53514c;
+  --t-lnd-text-muted: #67625a;
+  --t-lnd-accent: #c96442;
+  --t-lnd-accent-fg: #1c0e08;
+  --t-lnd-field-edge: rgba(20, 20, 19, 0.55);
+  --t-lnd-focus-ring: #141413;
+  --t-lnd-accent-hover: #b55434;
+  --t-lnd-accent-soft: rgba(201, 100, 66, 0.11);
+  --t-lnd-emerald: #059669;
+  --t-lnd-emerald-soft: rgba(5, 150, 105, 0.11);
+  --t-lnd-violet: #7c3aed;
+  --t-lnd-violet-soft: rgba(124, 58, 237, 0.11);
+  --t-lnd-amber: #d97706;
+  --t-lnd-amber-soft: rgba(217, 119, 6, 0.11);
+  --t-lnd-shadow-lg: 0 20px 45px rgba(20, 20, 19, 0.12);
+  --t-lnd-shadow-card: 0 2px 12px rgba(20, 20, 19, 0.05);
+  --t-lnd-wa-bg: #efeae2;
+  --t-lnd-wa-in: #ffffff;
+  --t-lnd-wa-out: #d9fdd3;
+  }
+}
+
+/* مكوّنات الصفحة — لا تتغيّر مع السمة. */
+:root {
+  /* مكوّنات صفحة الهبوط: محاكي واتساب، المخرجات، اللوحات */
+  --t-lnd-app-glow-accent: rgba(217, 119, 87, 0.075);
+  --t-lnd-app-glow-emerald: rgba(16, 185, 129, 0.055);
+  --t-lnd-orb-amber: #f59e0b;
+  --t-lnd-orb-glow: rgba(217, 119, 87, 0.32);
+  --t-lnd-orb-core-ring: rgba(255, 255, 255, 0.9);
+  --t-lnd-nav-shadow: rgba(0, 0, 0, 0.2);
+  --t-lnd-err-surface: rgba(239, 68, 68, 0.15);
+  --t-lnd-err: #ef4444;
+  --t-lnd-trace-text: #e2e8f0;
+  --t-lnd-trace-muted: #94a3b8;
+  --t-lnd-mono-box-text: #dbeafe;
+  --t-lnd-inline-cmd: #6ee7b7;
+  --t-lnd-modal-backdrop: rgba(5, 7, 12, 0.72);
+  --t-lnd-wa-shell: #111b21;
+  --t-lnd-wa-shell-line: #232d36;
+  --t-lnd-wa-header: #202c33;
+  --t-lnd-wa-header-text: #e9edef;
+  --t-lnd-wa-avatar-a: #00a884;
+  --t-lnd-wa-avatar-b: #059669;
+  --t-lnd-wa-contact: #8696a0;
+  --t-lnd-wa-notice-surface: rgba(245, 158, 11, 0.14);
+  --t-lnd-wa-notice-text: #fbbf24;
+  --t-lnd-wa-bubble-ink: #111b21;
+  --t-lnd-wa-footer: #202c33;
+  --t-lnd-wa-input: #2a3942;
+  --t-lnd-wa-input-line: #5b6f7c;
+  --t-lnd-wa-input-text: #e9edef;
+  --t-lnd-wa-send: #00a884;
+  --t-lnd-wa-send-ink: #071e15;
+  --t-lnd-hero-glow-accent: rgba(217, 119, 87, 0.12);
+  --t-lnd-pulse-soft: rgba(16, 185, 129, 0.08);
+  --t-lnd-pulse-mid: rgba(16, 185, 129, 0.15);
+  --t-lnd-pulse-ring: rgba(16, 185, 129, 0.35);
+  --t-lnd-log-text: #cbd5e1;
 }

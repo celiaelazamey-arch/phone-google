@@ -1180,10 +1180,17 @@
       'font:12.5px/1.6 "IBM Plex Sans Arabic", system-ui, sans-serif',
       'box-shadow:0 10px 30px rgba(0,0,0,.35)'
     ].join(';');
+    const badgeStyle = document.createElement('style');
+    badgeStyle.textContent =
+      '#celia-static-badge .badge-close{background:none;border:0;padding:0 4px;color:#8fb6ff;cursor:pointer;font:inherit;line-height:1}' +
+      '#celia-static-badge .badge-close:focus-visible{outline:2px solid #dbe9ff;outline-offset:3px;border-radius:4px}' +
+      'html[data-celia-static="true"] body{padding-bottom:68px}' +
+      'html[data-celia-static="true"] .app-shell{height:calc(100vh - 68px)}';
+    document.head.appendChild(badgeStyle);
     badge.innerHTML =
-      '<span aria-hidden="true">🧪</span>' +
+      '<span aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 3h4M12 3v6l5 8a2 2 0 0 1-1.7 3H8.7A2 2 0 0 1 7 17l5-8V3"/><path d="M8.5 14h7"/></svg></span>' +
       '<span>وضع المعاينة الثابتة (GitHub Pages): كل أدوات MCP تعمل داخل متصفحك مجانًا؛ بيانات Google وواتساب تجريبية.</span>' +
-      '<button type="button" aria-label="إخفاء" style="all:unset;cursor:pointer;padding:0 4px;color:#8fb6ff">✕</button>';
+      '<button type="button" class="badge-close" aria-label="إخفاء">✕</button>';
     badge.querySelector('button').addEventListener('click', () => badge.remove());
     document.body.appendChild(badge);
   }

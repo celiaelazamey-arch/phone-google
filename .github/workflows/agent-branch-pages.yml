@@ -1,19 +1,34 @@
-name: Agent branch Pages preview
+name: Branch preview (static snapshot)
 
-# Publishes the *static* build to GitHub Pages so the owner gets a free HTTPS URL
-# without a payment card. It is a static snapshot: /api/agent is not available
-# there, and the page says so instead of pretending to run the agent loop.
+# الغرض: أن يرى المالك عمل أي فرع حيًّا — دون أن يمحو موقع الإنتاج.
 #
-# Verified 2026-10-27: Pages is not enabled on this repository and the GitHub App
-# token available to this session cannot create it — `configure-pages` with
-# `enablement: true` also returned "Resource not accessible by integration".
-# The owner has to click once: Settings → Pages → Source: GitHub Actions.
-# Until then this job reports a clear skip instead of a red failure or a fake deploy.
+# سبب إعادة الكتابة (2026-11-01): النسخة السابقة كانت مربوطة بفرع واحد ميت
+# (`arena/bc862105-phone-google`) وبوابة `github.ref == ...`، فلم تُطلق أي معاينة
+# لأي فرع تالٍ. والأخطر أنها كانت تنشر إلى **نفس** موقع GitHub Pages الذي ينشر
+# إليه `main`؛ أي أن معاينة فرع تمحو الإنتاج بصمت. لذلك:
+#
+#   1. لا نشر تلقائي من أي فرع. الافتراضي هو مخرَج (artifact) قابل للتنزيل.
+#   2. النشر إلى Pages لا يحدث إلا بطلب صريح + متغيّر مستودع `PREVIEW_PAGES=true`،
+#      ويحمل تحذيرًا مكتوبًا في سجل التشغيل بأنه يحل محل الإنتاج حتى ينشر `main` من جديد.
+#   3. اسم الفرع مدخل، لا نص محفور — فلا تتكرر علة «فرع واحد قديم».
+#
+# الطريق المعتمد للنشر الحقيقي يبقى: دمج الفرع في `main` ← `pages.yml` و
+# `cloudflare-deploy.yml` ينشران تلقائيًا (وهو ما أثبتته تشغيلات 31 أكتوبر).
 
 on:
-  push:
-    branches: [arena/bc862105-phone-google]
   workflow_dispatch:
+    inputs:
+      branch:
+        description: 'الفرع المطلوب معاينته (افتراضي: الفرع الذي شُغّل منه)'
+        type: string
+        required: false
+        default: ''
+      publish:
+        description: 'artifact = تنزيل فقط (آمن) · pages = نشر إلى موقع Pages الحقيقي (يحل محل الإنتاج)'
+        type: choice
+        options: [artifact, pages]
+        required: true
+        default: artifact
 
 permissions:
   contents: read
@@ -21,20 +36,23 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages-agent-preview
-  cancel-in-progress: true
+  group: pages
+  cancel-in-progress: false
 
 jobs:
-  deploy:
-    if: github.ref == 'refs/heads/arena/bc862105-phone-google'
+  preview:
+    name: Build the static snapshot and keep it
     runs-on: ubuntu-latest
     timeout-minutes: 12
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Refuse to publish a branch over production unless explicitly armed
+        if: inputs.publish == 'pages' && vars.PREVIEW_PAGES != 'true'
+        run: |
+          echo "::error title=Preview publish not armed::Publishing a branch build replaces the live site. Set the repository variable PREVIEW_PAGES=true first, or merge the branch into main."
+          exit 1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.branch || github.ref_name }}
           fetch-depth: 0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -48,20 +66,34 @@ jobs:
             echo '::error::A secret assignment was found in dist.'
             exit 1
           fi
-      - name: Detect whether this token may configure Pages
-        id: pages
-        continue-on-error: true
-        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
-        with:
-          enablement: true
-      - name: Explain the skip (owner action required)
-        if: steps.pages.outcome == 'failure'
+      - name: Record what this snapshot actually is
+        env:
+          # CRIT-01: يُمرَّر عبر env لا بالاستيفاء داخل run (حارس ضد حقن الصدفة).
+          SNAPSHOT_BRANCH: ${{ inputs.branch || github.ref_name }}
         run: |
-          echo "::warning title=Pages not enabled::GitHub Pages must be enabled once by the repository owner (Settings → Pages → Source: GitHub Actions). This session's token cannot create it, and no payment card is involved."
+          {
+            echo "branch: $SNAPSHOT_BRANCH"
+            echo "commit: $(git rev-parse HEAD)"
+            echo "built: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "pages: $(ls dist/*.html | wc -l) html files"
+            echo "theme.css bytes: $(wc -c < dist/theme.css)"
+          } | tee dist/PREVIEW.txt
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: preview-${{ github.run_number }}
+          path: dist
+          retention-days: 7
+      - name: Warn loudly before replacing the live site
+        if: inputs.publish == 'pages'
+        run: |
+          echo "::warning title=This replaces the production site::You asked to publish the branch build to GitHub Pages. The live site will serve this snapshot until main deploys again."
+      - id: configure
+        if: inputs.publish == 'pages'
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        if: steps.pages.outcome == 'success'
+        if: inputs.publish == 'pages'
         with:
           path: dist
       - id: deployment
-        if: steps.pages.outcome == 'success'
+        if: inputs.publish == 'pages'
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
