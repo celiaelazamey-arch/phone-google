@@ -62,5 +62,36 @@
       "checksAtMerge": "8 pass · 2 skipping"
     },
     "entryHash": "cc0406c598418c48b0917356676e9c514922e1924b339007fc6a677bfc5fc3b4"
+  },
+  {
+    "seq": 3,
+    "prevHash": "cc0406c598418c48b0917356676e9c514922e1924b339007fc6a677bfc5fc3b4",
+    "at": "2026-11-01T09:20:22Z",
+    "actor": "celiaelazamey-arch",
+    "action": "merge",
+    "channel": "main",
+    "version": "0.2.1",
+    "commit": "cb08dbe",
+    "requestFingerprint": "pub:6ba68428ddbefb16",
+    "outcome": "merged",
+    "evidence": {
+      "pullRequest": 122,
+      "supersedes": {
+        "pullRequest": 114,
+        "reason": "conflicting in three documentation files; code merged unchanged through the session branch"
+      },
+      "method": "squash",
+      "mergedCommit": "cb08dbe",
+      "bypass": "RepositoryRole 5 (admin) · base branch policy blocked the merge",
+      "bypassBecause": "the owner ordered merging #114; its own branch could not be updated from this session, so the content landed through #122 and the approval cannot be given by the authoring account",
+      "checksAtMerge": "8 pass · 2 skipping",
+      "production": {
+        "url": "https://celia-phone-google.celiaelazamey.workers.dev/health",
+        "deployedCommit": "cb08dbe0558fa905ccaca365f707f500d3a57ca6",
+        "observedAt": "2026-11-01T09:20:15.927Z",
+        "version": "0.2.1"
+      }
+    },
+    "entryHash": "348191ac08d53143590e9877bf146281a5281002114710b90c11e223a87af6c7"
   }
 ]
