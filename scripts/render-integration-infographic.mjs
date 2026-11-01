@@ -18,8 +18,9 @@
  * Same inputs produce a byte-identical PNG.
  */
 import { createCanvas, GlobalFonts } from '@napi-rs/canvas';
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const F = process.env.CELIA_FONTS_DIR || '/home/user/.tools/fonts';
 const FACES = ['PlexArabic-400.ttf', 'PlexArabic-500.ttf', 'PlexArabic-600.ttf', 'PlexArabic-700.ttf', 'Mono-400.ttf', 'Mono-600.ttf'];
@@ -1182,6 +1183,8 @@ y += 64 + 44;
 const finalH = y;
 const out = createCanvas(W, finalH);
 out.getContext('2d').drawImage(canvas, 0, 0, W, finalH, 0, 0, W, finalH);
-const target = process.argv[2] || '/tmp/integration-in-celiaos.png';
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const target = process.argv[2] ? path.resolve(process.argv[2]) : path.join(root, 'docs', 'design', 'integration-in-celiaos.png');
+mkdirSync(path.dirname(target), { recursive: true });
 writeFileSync(target, out.toBuffer('image/png'));
 console.log(`wrote ${target} ${W}x${finalH}`);

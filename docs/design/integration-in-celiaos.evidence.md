@@ -1,6 +1,6 @@
 # سجل دليل قابل لإعادة الفحص — Integration في CeliaOS
 
-**الملف المصوّر:** [`integration-in-celiaos.png`](integration-in-celiaos.png) · **المولّد:** [`scripts/render-integration-infographic.mjs`](../../scripts/render-integration-infographic.mjs)
+**الملف المصوّر:** [`integration-in-celiaos.png`](integration-in-celiaos.png) · **المولّد:** [`scripts/render-integration-infographic.mjs`](../../scripts/render-integration-infographic.mjs) · **بصمة الملف:** `md5 fb85c8e55afb6b63d36bb254187d2d1a` (تشغيلان متتاليان ⇒ نفس البصمة)
 **التاريخ:** 2026-11-01 · **الإصدار المرجعي:** `0.2.1` — لم يُغيَّر شيء في الكود بهذا العمل.
 
 هذا السجل موجود لسبب واحد: كل رقم أو حالة في الإنفوجرافيك يجب أن يكون **قابلًا لإعادة الفحص** بأمر واحد.
@@ -113,7 +113,20 @@ node -e "import('./src/agent/tools.js').then(m=>{const t=m.createDefaultTools({s
 
 ---
 
-## 7 · حدود هذا السجل
+## 7 · إعادة توليد اللوحة
+
+```bash
+npm install --no-save @napi-rs/canvas             # ليس اعتمادية runtime ولا CI
+CELIA_FONTS_DIR=/path/to/ttf-cuts \
+  node scripts/render-integration-infographic.mjs docs/design/integration-in-celiaos.png
+```
+
+الخطوط TTF ليست في المستودع (`public/fonts/*.woff2` لا يقرأها canvas). المولّد يرفض العمل
+إذا نقص أي ملف خط، ويخرج بكود 1 بدل إنتاج صورة صامتة ناقصة.
+
+---
+
+## 8 · حدود هذا السجل
 
 - الأرقام أعلاه مأخوذة من تشغيل محلي في 2026-11-01، لا من مزوّد CI.
 - «نجاح اختبار» ≠ «سلوك إنتاج مُتحقَّق»: الاختبارات تعمل على مخزن مؤقت ومحاكيات HTTP.
