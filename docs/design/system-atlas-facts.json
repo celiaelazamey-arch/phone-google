@@ -1,12 +1,12 @@
 {
-  "fingerprint": "7e7b67a77c",
+  "fingerprint": "0b0badebe4",
   "version": "celiaos-system-atlas-v1",
   "totals": {
     "domains": 12,
     "capabilities": 54,
-    "verified": 39,
+    "verified": 40,
     "unverified": 9,
-    "missing": 6
+    "missing": 5
   },
   "phases": [
     {
@@ -29,7 +29,7 @@
       "en": "Cognitive & Knowledge",
       "priority": "P0",
       "status": "partial",
-      "coverage": 60,
+      "coverage": 80,
       "capabilities": [
         {
           "id": "kb_search",
@@ -54,12 +54,10 @@
         {
           "id": "conflict_detection",
           "ar": "اكتشاف المعلومات المتضاربة",
-          "status": "not_implemented"
+          "status": "implemented_verified"
         }
       ],
-      "missing": [
-        "اكتشاف المعلومات المتضاربة"
-      ]
+      "missing": []
     },
     {
       "id": "memory_context",

@@ -45,7 +45,7 @@ export const DOMAINS = Object.freeze([
       { id: 'source_trust', ar: 'تحليل موثوقية المصادر', anchors: ['src/knowledge/governance.js', 'src/knowledge/validate.js'] },
       { id: 'citations', ar: 'الاستشهاد بالمراجع داخل الإجابات', anchors: ['src/knowledge/schema.js', 'src/kb-routes.js'] },
       { id: 'web_discovery', ar: 'البحث الخارجي واكتشاف المصادر', anchors: ['src/agent/web-fetch.js', 'src/agent/spider-reader.js'] },
-      { id: 'conflict_detection', ar: 'اكتشاف المعلومات المتضاربة', anchors: [] }
+      { id: 'conflict_detection', ar: 'اكتشاف المعلومات المتضاربة', anchors: ['src/knowledge/conflict.js', 'src/knowledge/index.js', 'scripts/kb-conflicts.mjs'] }
     ]
   }),
   Object.freeze({

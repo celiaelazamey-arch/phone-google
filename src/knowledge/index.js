@@ -2,6 +2,7 @@ import { statSync } from 'node:fs';
 import path from 'node:path';
 import { KnowledgeStore } from './store.js';
 import { ingestDirectory } from './ingest.js';
+import { claimsFromItems, conflictDigest, describeConflicts, findConflicts } from './conflict.js';
 
 /**
  * Explicit knowledge-network host.
@@ -129,6 +130,18 @@ export function createKnowledgeHost({
     async stale(options) {
       const opened = await store();
       return opened.stale(options);
+    },
+    /**
+     * Disagreements across retrieved knowledge, named instead of arbitrated (VFE-007). The report
+     * carries a digest so the finding itself can be cited as evidence in the run's chain.
+     */
+    conflicts(items) {
+      const report = findConflicts(claimsFromItems(items));
+      return { ...report, digest: conflictDigest(report), lines: describeConflicts(report) };
+    },
+    async searchConflicts(options) {
+      const opened = await store();
+      return this.conflicts(opened.search(options).items);
     },
     async exportJsonl() {
       const opened = await store();

@@ -41,7 +41,7 @@ test('twelve cards, in the owner\'s order, with the measured coverage — ready 
   const cards = cardsOf(html);
   assert.equal(cards.length, 12);
   assert.deepEqual(cards.map((card) => card.id), facts.domains.map((domain) => domain.id));
-  assert.deepEqual(cards.map((card) => card.coverage), [60, 80, 40, 25, 80, 100, 100, 75, 25, 100, 75, 100]);
+  assert.deepEqual(cards.map((card) => card.coverage), [80, 80, 40, 25, 80, 100, 100, 75, 25, 100, 75, 100]);
   assert.deepEqual(cards.map((card) => card.priority), ['P0', 'P0', 'P0', 'P1', 'P0', 'P1', 'P1', 'P1', 'P2', 'P2', 'P2', 'P0']);
   for (const [index, card] of cards.entries()) {
     assert.equal(card.coverage, facts.domains[index].coverage);
@@ -75,26 +75,27 @@ test('the summary is the audit, not a retyped summary', () => {
   assert.deepEqual(facts.totals, {
     domains: 12,
     capabilities: 54,
-    verified: 39,
+    verified: 40,
     unverified: 9,
-    missing: 6
+    missing: 5
   });
-  for (const value of [39, 9, 6, 54]) assert.ok(html.includes(`<b>${value}</b>`), `missing total ${value}`);
-  assert.equal(averageCoverage(facts), 72, 'the mean of 60,80,40,25,80,100,100,75,25,100,75,100 is 72');
-  assert.ok(html.includes('<b>72%</b>'));
+  for (const value of [40, 9, 5, 54]) assert.ok(html.includes(`<b>${value}</b>`), `missing total ${value}`);
+  assert.equal(averageCoverage(facts), 73, 'the mean of 80,80,40,25,80,100,100,75,25,100,75,100 is 73');
+  assert.ok(html.includes('<b>73%</b>'));
   assert.ok(html.includes('<b>71.67%</b>') === false, 'no unrounded average may leak into the page');
   const phases = html.match(/<strong>(\d+)<\/strong>/g) ?? [];
   assert.deepEqual(phases.map((value) => Number(value.replace(/\D/g, ''))).slice(0, 3), facts.phases.map((phase) => phase.domains));
   assert.deepEqual(facts.phases.map((phase) => phase.domains), [5, 4, 3]);
 });
 
-test('the next priority is derived from the audit, and today it is conflict detection', () => {
+test('the next priority is derived from the audit — conflict detection is closed, so it moved on', () => {
   const next = nextGap(facts);
-  assert.equal(next.gap.id, 'conflict_detection');
-  assert.equal(next.domain.id, 'cognitive_knowledge');
+  assert.equal(next.gap.id, 'consolidation');
+  assert.equal(next.domain.id, 'memory_context');
   assert.equal(next.priority, 'P0');
-  assert.ok(html.includes('اكتشاف المعلومات المتضاربة'));
-  assert.ok(html.includes('conflict_detection'));
+  assert.ok(html.includes(next.gap.ar), 'the panel must name the new gap in the owner\'s words');
+  assert.ok(html.includes('consolidation'));
+  assert.ok(!html.includes('conflict_detection'), 'a closed gap must not still be advertised as next');
   const settled = clone(facts);
   for (const domain of settled.domains) for (const capability of domain.capabilities) if (capability.status === TRUTH.missing) capability.status = TRUTH.verified;
   assert.equal(nextGap(settled), null, 'when the gaps close, the panel must disappear');
