@@ -2,7 +2,7 @@
 
 > **حفظ التاريخ بلا حذف (`DEC-052` / `CONT-004`):** هذه نافذة الاستئناف النشطة؛ السجل التراكمي الكامل حتى ما بعد PR #84 (`main@738d832` / `9f6f8b2` — 983 سطرًا / 142,150 بايت) محفوظ حرفيًا في **[STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md)** وبصمته محروسة بـ`R0-02`. القراءة السريعة المشتقة: **[NOW.md](NOW.md)** (`npm run now`).
 
-**آخر مراجعة:** 31 أكتوبر 2026 · **نوع الجلسة الحالية:** DSN-002 (الدفعة الثانية) / `DEC-080` — هجرة ألوان الصفحات إلى `theme.css` · **السجل:** [color-tokens-migration](sessions/2026-10-31-color-tokens-migration.md)
+**آخر مراجعة:** 31 أكتوبر 2026 · **نوع الجلسة الحالية:** DOC-003 / `DEC-081` — تدقيق ادعاءات إنفوجرافيك «البنية الإدراكية 2026» بمسبار تشغيل · **السجل:** [cognitive-infographic-audit](sessions/2026-10-31-cognitive-infographic-audit.md)
 **الفرع:** `arena/9dceca86-phone-google` من `main@ec7da14` (بعد PR #113). **لا PR ولا نشر في هذه الجلسة.**
 
 ## الجلسة الحالية — 31 أكتوبر 2026 — DSN-002/‏3 (هجرة الألوان)
@@ -15,6 +15,17 @@
 - **القياس الساكن:** **283 ⇒ 43 FAIL** (قاعدة 48 وحدها **244 ⇒ 0**) على 25 ملفًا، 67 WARN. **الباقي ليس ألوانًا:** 24b كثافة، 67 على العربية (إيجابية كاذبة مسجّلة)، 39a، 38iii، سلاسل F.
 - **البوابات:** `THM-01..06` **6/6** (قائمة «لم تُهاجَر» انكمشت إلى `landing.css` و`fonts.css`)، `design-system-pages` + `landing-design` **15/15**، وتحقق بصري على 8 صفحات بلونها الأصلي (`index #0b0c10`, `system #0b1117`, `deploy #091512`, `protocol #070b14`, `computer #0b1030`) وبلا خطأ صفحة.
 - **التقرير:** [hallmark-pages-audit.md](../design/hallmark-pages-audit.md) · **القرار:** `DEC-080`.
+
+## الجلسة الحالية — 31 أكتوبر 2026 — DOC-003 / DEC-081 (تدقيق الإنفوجرافيك)
+
+- **السؤال:** صورتان تصفان CeliaOS كـ«نظام إدراكي متكامل» بحزام من **تسع** مراحل وإدراك خارجي عبر **Browser / Playwright / MCP**. أيّ معلومة منها يقف خلفها كود؟
+- **الطريقة:** قراءة الوحدات + **مسبار تشغيل حقيقي** (host فعلي على SQLite مؤقت، مخطط `demo`، موصلات تقويم وهمية) وطبع `runtime.harness()` كما يصف نفسه، ثم قياس أحجام اللغات بـ`git ls-files`.
+- **النتيجة: 36 ادعاءً = 18 ✅ + 9 🟡 + 9 ❌.** التقرير: [agent-cognitive-architecture-audit.md](../agent-cognitive-architecture-audit.md) · **القرار:** `DEC-081`.
+- **أخطر ثلاثة تصحيحات:** (1) الحزام **10 مراحل و10 مكونات** لا 9، و`Policy Check` و`Approval` مرحلتان، والناقص `Observe`/`Persist Evidence`/`Update State`. (2) **لا Browser ولا Playwright ولا MCP كمصدر إدراك**: Playwright في `devDependencies`، وMCP اتجاهه معكوس (Celia تُصدِّر)، و`web.search` مؤجّلة بقرار مالك. (3) **التعلم غير منفّذ**: التقييم يقيس ولا يغيّر السياسة، وتحديث المعرفة يدوي.
+- **مؤكَّد وصحيح:** `NETWORK=DENY` مفروض بالكود (`sandbox_network_must_default_deny`)، الموافقة البشرية مربوطة ببصمة الحمولة، سلسلة أدلة SHA-256، مُتحقِّق مستقل `PASS/BLOCK/UNKNOWN`، والملاحظات الأربع في الإنفوجرافيك مطابقة للواقع.
+- **قيود مقيسة:** `sandbox_executor.isolatedContainerAvailable=false` و`CELIA_AGENT_SANDBOX=off` افتراضيًا؛ `CELIA_AGENT_RUNTIME=off` افتراضيًا ولا إعداد في المستودع يفعّله؛ `CELIA_AGENT_CONNECTORS=none`؛ WhatsApp في الإنتاج `configured=false` (`DEC-073`).
+- **عيب جانبي مسجّل:** `docs/celiaos-architecture-map.html` ما زالت تصنّف `model_router` «مقترحًا (A4)» وهو منفّذ ومختبر — لم تُعدَّل هنا.
+- **الحدود:** توثيق فقط؛ لا تغيير في وقت التشغيل ولا في الصور (خارج المستودع). لا PR ولا نشر.
 
 ## جلسات سابقة (ملخّصات، التفاصيل في `sessions/`)
 
