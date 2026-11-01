@@ -14,7 +14,7 @@
 - **آخر مراجعة مسجّلة:** 31 أكتوبر 2026
 - **الجلسة النشطة:** DOC-003 / `DEC-082` — نسخة «Runtime-Verified Architecture» تُنشأ من §8 الحرفي وتستبدل الإنفوجرافيك · السجل: [runtime-verified-infographic](sessions/2026-10-31-runtime-verified-infographic.md)
 - **آخر سجل جلسة مؤرَّخ:** [runtime-verified-infographic](sessions/2026-10-31-runtime-verified-infographic.md)
-- **حجم [STATE.md](STATE.md) النشط:** 77 سطرًا (13506 بايت)
+- **حجم [STATE.md](STATE.md) النشط:** 81 سطرًا (14537 بايت)
 - **الأرشيف التاريخي المحفوظ بلا حذف:**
 - [STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md) — الأساس `9f6f8b2` · **983 سطرًا** محفوظًا حرفيًا (بصمة `f2674637e82e…`)
 
