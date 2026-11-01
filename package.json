@@ -73,7 +73,10 @@
     "build:manifest:check": "node scripts/build-manifest.mjs --check",
     "verify:edge-provenance": "node scripts/verify-edge-provenance.mjs",
     "atlas:dashboard": "node scripts/render-atlas-dashboard.mjs",
-    "atlas:dashboard:check": "node scripts/render-atlas-dashboard.mjs --check"
+    "atlas:dashboard:check": "node scripts/render-atlas-dashboard.mjs --check",
+    "publish:status": "node scripts/publish-gate.mjs",
+    "publish:status:json": "node scripts/publish-gate.mjs --json",
+    "publish:ledger:verify": "node scripts/publish-gate.mjs --verify-ledger"
   },
   "dependencies": {
     "dotenv": "^18.0.9",

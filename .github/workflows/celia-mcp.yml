@@ -102,6 +102,10 @@ jobs:
       # not re-derive from the capability states, and it carries no date to expire.
       - name: System Atlas dashboard matches the audit (VFE-011)
         run: npm run atlas:dashboard:check
+      # PUB-001: the publish ledger is a hash chain. A rewritten or deleted entry fails here even
+      # though nothing publishes in CI: the record of what shipped must not be editable.
+      - name: Publish ledger is an intact hash chain (PUB-001)
+        run: npm run publish:ledger:verify
       # VFE-001: the board is generated from the visual registry, and every handoff in this range
       # either links an artifact that exists or says «لا يوجد تغيير بصري» and why. Silence fails.
       - name: Visual-First board and handoff evidence (VFE-001)

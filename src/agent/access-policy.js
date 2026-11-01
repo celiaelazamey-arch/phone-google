@@ -217,6 +217,7 @@ export const PILLAR_GRANTS = Object.freeze([
   G({ id: 'infra.workers.write', domain: 'infrastructure', ar: 'Cloudflare Workers', tier: 'infra_admin', approval: 'always', evidence: '.github/workflows/cloudflare-deploy.yml' }),
   G({ id: 'infra.d1.write', domain: 'infrastructure', ar: 'قاعدة D1', tier: 'infra_admin', approval: 'always', evidence: 'workers/celia-edge/wrangler.toml' }),
   G({ id: 'infra.render.write', domain: 'infrastructure', ar: 'خدمات Render', tier: 'infra_admin', approval: 'always', evidence: 'render.yaml' }),
+  G({ id: 'infra.publish.execute', domain: 'infrastructure', ar: 'النشر إلى الإنتاج — بموافقة صريحة مربوطة ببصمة الطلب، بلا تجاوز للتوقيعات أو المراجعات المطلوبة', level: 'execute', tier: 'admin', approval: 'always', evidence: 'src/agent/publish-gate.js' }),
   G({ id: 'infra.monitoring.read', domain: 'infrastructure', ar: 'مراقبة الخدمات والنشر', level: 'read', tier: 'read', evidence: 'scripts/service-reality.mjs' })
 ]);
 
