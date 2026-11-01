@@ -102,6 +102,12 @@ jobs:
       # not re-derive from the capability states, and it carries no date to expire.
       - name: System Atlas dashboard matches the audit (VFE-011)
         run: npm run atlas:dashboard:check
+      # PLAN-002: the completion plan is an ordering of the register, not a second source of truth.
+      # Every open BACKLOG row must sit in exactly one wave, every wave must count what it lists, and
+      # every baseline number marked live is recomputed from the code here. A plan that lags the
+      # register fails instead of quietly becoming the more convenient document.
+      - name: Completion plan covers every open task exactly once (PLAN-002)
+        run: npm run plan:check
       # PUB-001: the publish ledger is a hash chain. A rewritten or deleted entry fails here even
       # though nothing publishes in CI: the record of what shipped must not be editable.
       - name: Publish ledger is an intact hash chain (PUB-001)

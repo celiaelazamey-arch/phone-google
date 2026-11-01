@@ -150,7 +150,7 @@ export const DOMAINS = Object.freeze([
     priority: 'P2',
     artifact: 'CHANGELOG.md',
     capabilities: [
-      { id: 'roadmap', ar: 'خارطة طريق التطوير', anchors: ['docs/plan-100-percent.md'] },
+      { id: 'roadmap', ar: 'خارطة طريق التطوير', anchors: ['docs/plan-100-percent.md', 'docs/plan-system-completion.md'] },
       { id: 'releases', ar: 'إدارة الإصدارات', anchors: ['src/version.js', 'CHANGELOG.md'] },
       { id: 'decisions', ar: 'سجل القرارات الهندسية', anchors: ['docs/continuity/DECISIONS.md'] },
       { id: 'compatibility', ar: 'التوافق بين الإصدارات', anchors: ['docs/compatibility-contract.md'] }

@@ -35,7 +35,7 @@
 > الأساس `a1d3f7b` بعد أن كبرت النافذة الحيّة فوق حدّ العشرين كيلوبايت (بايت ببايت، لا تنقيح).
 > الطريقة: استبعد وسمَي النقل، صِلْ الأسطر بـ`\n` وأضف `\n` أخيرًا ⇒ يجب أن يساوي الناتج البايتات والبصمة أدناه.
 
-<!-- state-archive-block: source=docs/continuity/STATE.md baseline=a1d3f7b sha256=2eabd6e0f1b6fdedca39e1204e8dadebf34359895abac7dd3cd2c5b85c771920 bytes=2701 lines=22 -->
+<!-- state-archive-block: source=docs/continuity/STATE.md baseline=5f6bc68 sha256=3218df368354ea0ea07004c4e98c62d4cb42a2c684950a7ceffd14eaf28f2477 bytes=3942 lines=32 -->
 
 <!-- BEGIN MOVED STATE SECTIONS B -->
 ## 31 أكتوبر 2026 — DOC-003 / DEC-081 (تدقيق البنية الإدراكية) — ملخّص
@@ -60,4 +60,14 @@
 - **البوابة:** 12 قاعدة، ثلاثة أحكام، موافقة مربوطة ببصمة `pub:`، سجل هاش، وتراجع — تقرر ولا تنفّذ. [publish-gate](sessions/2026-11-01-publish-gate.md).
 - **الدمج:** #118 → `c662906` و#119 → `5ef33b2` بـsquash بأمر المالك مع تجاوز مسجّل السبب (الإيداعات غير موقّعة و`require_last_push_approval` غير قابل للتحقق بحساب واحد). [merge-118](sessions/2026-11-01-merge-118.md) · [merge-119](sessions/2026-11-01-merge-119.md).
 - **الإنتاج:** ما زال `0.2.1` على `55ed7a2`؛ لم يُنشر شيء.
+## 1 نوفمبر 2026 — SEC-007 / DEC-110 (حدّ الدخل على سطح Express)
+
+- **الفجوة أُغلقت:** كان `src/app.js` يركّب `helmet()` و`requireApiToken` بلا أي محدّد، والمحدّد الوحيد في النظام كان على الحافة.
+  الآن `src/rate-limit.js` يركّب على `/api` و`/mcp` سقف **فشل فقط** (20 رد 401/دقيقة)، وعلى `/auth` (20/دقيقة) و`/webhooks/whatsapp` (300/دقيقة) كل طلب،
+  والرفض `429` + `Retry-After` **قبل** أي معالج ⇒ لا أثر خارجي في الطلب المرفوض.
+- **الحيوية خارج الحدود:** `/health` و`/healthz` و`/readyz` و`/version` لا تُحدّ؛ حجب المراقب يبدو كعطل.
+- **حدود معلنة:** العدّاد في ذاكرة العملية (لا دوام ولا توزيع عبر النسخ)، المفتاح بصمة `sha256(ip)[0:16]` لا عنوانًا خامًا،
+  والتعطيل صريح `CELIA_RATE_LIMIT=off` ويرفض أي قيمة أخرى عند الإقلاع.
+- **الأدلة:** `test/rate-limit.test.js` `RL-01..RL-09` (RL-08 عبر التطبيق الفعلي). [السجل](sessions/2026-11-01-rate-limit.md) · `DEC-110`.
+
 <!-- END MOVED STATE SECTIONS B -->

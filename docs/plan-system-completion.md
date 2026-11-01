@@ -1,7 +1,7 @@
 # خطة إكمال النظام — من «منشور بلا أخطاء» إلى «نظام مكتمل قابل للتشغيل»
 
 **المهمة:** `PLAN-002` · **التاريخ:** 2026-11-01 · **الإصدار المرجعي:** `0.2.1` (مجمّد) · **الفرع:** `arena/d396788a-phone-google`
-**مرجع الحالات الوحيد:** [BACKLOG](../continuity/BACKLOG.md) · **الأساس:** [خطة 100%](plan-100-percent.md) (الأركان الثمانية) + [الخطة التنفيذية](executive-completion-plan.md)
+**مرجع الحالات الوحيد:** [BACKLOG](continuity/BACKLOG.md) · **الأساس:** [خطة 100%](plan-100-percent.md) (الأركان الثمانية) + [الخطة التنفيذية](executive-completion-plan.md)
 **هذه الوثيقة:** ترتيبٌ وبواباتٌ ومسارٌ حرج — لا حالة. كل حالة تعود إلى BACKLOG بدليل.
 
 > **السؤال:** «كيف يكتمل النظام بالكامل؟»
@@ -62,42 +62,50 @@
 
 ---
 
-## 2 · خط الأساس المقيس اليوم (كل رقم بأمره)
+## 2 · خط الأساس — كل رقم مربوط بمصدره، والباقي مُؤرَّخ بصراحة
 
-| المؤشر | القيمة | كيف يُعاد |
-|---|---|---|
-| اختبارات | 1194 · **1177 pass** · 0 fail · 17 skip | `npm test` |
-| التغطية | أسطر **92.32** · فروع **77.78** · دوال **87.82** | `npm run test:coverage` |
-| الأرضية في CI | 89 / 71 / 82 | `COVERAGE_FLOOR` |
-| الملفات المفحوصة نحويًا | 251 | `npm run check` |
-| الوحدات / المكوّنات | 121 / 16 | `npm run arch:map:check` |
-| وثائق الاستمرارية / الروابط / المهام | 136 / 424 / 121 | `npm run check:continuity` |
-| مهام مفتوحة | **59** (22 P0 · 30 P1 · 7 P2) | عدّ BACKLOG |
-| أدوات الوكيل | 14 (5 بموافقة) · صفر متصفح | عدّاد `createDefaultTools().list()` |
-| أدوات MCP | 12 مُعلنة | `test/celia-mcp-tools.test.js:40` |
-| الصلاحيات | 67 (`GRANT_IDS`) | `access-policy.js` |
-| العزل / الخروج | `CELIA_AGENT_SANDBOX=off` · `CELIA_AGENT_EGRESS=off` | `src/agent/index.js` |
-| تعدّد المستأجرين | **0** (`tenantId` غير موجود؛ 30 جدولًا) | `grep -rl tenantId src/` |
-| المهارات بعقود | **0 / 17** | [خطة الشركة](design/ai-company-executive-plan.md) §2 |
-| الاعتماديات | 5 prod · 2 dev | `package.json` |
-| النشر | edge + pages + release على `16bb7cf` | `gh api .../deployments` |
+هذا الجدول ليس نصًّا حرًّا: كل صف يحمل **مفتاحًا** يقرأه الفحص `npm run plan:check`
+([`scripts/check-plan-coverage.mjs`](../scripts/check-plan-coverage.mjs)). الصف الموسوم **🔗** يُعاد حسابه من المستودع
+عند كل تشغيل؛ فإن اختلف الرقم عن الشيفرة يفشل الفحص ويسمّي الصف. والصف الموسوم **📅** قياسُ تشغيلة واحدة بتاريخه،
+ولا يجوز أن يُرتدى وسم **🔗** لأنه لا يوجد ما يعيد حسابه.
+
+| المفتاح | المؤشر | القيمة | كيف يُعاد | الربط |
+|---|---|---|---|---|
+| `open_tasks` | مهام مفتوحة | **59** (22 P0 · 30 P1 · 7 P2) | عدّ `BACKLOG` نفسه | 🔗 |
+| `grants` | الصلاحيات | 67 (`GRANT_IDS`) | `src/agent/access-policy.js` | 🔗 |
+| `agent_tools` | أدوات الوكيل | 14 (5 بموافقة) · صفر متصفح | `createDefaultTools()` | 🔗 |
+| `mcp_tools` | أدوات MCP | 12 مُعلنة | `MCP_TOOLS` في `src/celia-mcp.js` | 🔗 |
+| `version` | الإصدار | 0.2.1 (مجمّد) | `src/version.js` + `package.json` | 🔗 |
+| `deps` | الاعتماديات | 5 prod · 2 dev | `package.json` | 🔗 |
+| `coverage_floor` | أرضية CI للتغطية | 89 / 71 / 82 | `test:coverage` | 🔗 |
+| `syntax_files` | الملفات المفحوصة نحويًا | 253 | نطاق `scripts/check.mjs` نفسه | 🔗 |
+| `continuity` | وثائق الاستمرارية / الروابط / المهام | 137 / 432 / 122 | `npm run check:continuity` | 🔗 |
+| `sandbox` | العزل | off | `CELIA_AGENT_SANDBOX` في `src/agent/index.js` | 🔗 |
+| `egress` | الخروج | off | `CELIA_AGENT_EGRESS` في `src/agent/index.js` | 🔗 |
+| `tests` | اختبارات | 1205 · **1188 pass** · 0 fail · 17 skip | `npm test` (تشغيلة 2026-11-01، بعد إضافة PSC-01..11) | 📅 |
+| `coverage` | التغطية | أسطر **92.33** · فروع **77.73** · دوال **87.80** | `npm run test:coverage` (2026-11-01) | 📅 |
+| `tenants` | تعدّد المستأجرين | 0 (`tenantId` غير موجود؛ 30 جدولًا) | `grep -rl tenantId src/` (2026-11-01) | 📅 |
+| `skills` | المهارات بعقود | 0 / 17 | [خطة الشركة](design/ai-company-executive-plan.md) §2 (2026-11-01) | 📅 |
+| `deploy` | النشر | edge + pages + release على `16bb7cf` | `gh api .../deployments` (2026-11-01) | 📅 |
 
 > **حدّ صريح:** المسابر الحيّة على الرابط العام لم تُعَد من هذه البيئة (خروج الشبكة مقيّد بـGitHub/npm/PyPI).
 > ما أُثبت هنا هو **سجل النشر**، لا استجابة `/version`. إعادة القياس الحيّ مسؤولية المالك أو تشغيلة CI.
 
----
-
 ## 3 · جرد الفجوات — 59 مهمة في ست حزم
 
-| الحزمة | المهام | العدد | الحجم |
+| الحزمة | المهام (كل معرف مكتوب، لا اختصار) | العدد | الحجم |
 |---|---|---|---|
-| **W0** تسوية الحقيقة | تراجع حالة 34 «جارٍ» + قياس موحّد | — | S |
+| **W0** تسوية الحقيقة | — (لا معرف؛ عمل على السجل نفسه لا على مهمة) | — | S |
 | **W1** نزاهة النواة والبيانات | COMP-001 · COMP-002 · COMP-003 · DATA-001 · DATA-002 · DATA-003 · SEC-004 | 7 | L |
-| **W2** قرارات المالك | GOV-001 · REL-001 · REL-003 · DATA-004 | 4 | S (قرار) |
+| **W2** قرارات المالك 🔑 | GOV-001 · REL-001 · REL-003 · DATA-004 | 4 | S (قرار) |
 | **W3** النشر والقنوات | HOST-003 · WA-005 · WA-007 · OPS-005 · OPS-002 · QA-004 | 6 | L |
-| **W4** قدرات الوكيل الكاملة | AGENT-001/002/003/004/005/008/009/010 · KB-001..004 · LEARN-001 · AI-001/002 · MCP-001/002 | 17 | XL |
-| **W5** التكاملات ونظام الشركة | INT-001/002/003 · GOOG-004/005 · WA-006 · DES-002 · SPDR-002 | 8 | XL |
-| **W6** الإدارة والمراقبة والواجهة | OPS-001/003/004 · UX-002/003 · QA-002/003 · VFE-002/005 · MAN-001/002/003/004/006/007 · DSN-002 · PLAN-001 | 17 | L |
+| **W4** قدرات الوكيل الكاملة | AGENT-001 · AGENT-002 · AGENT-003 · AGENT-004 · AGENT-005 · AGENT-008 · AGENT-009 · AGENT-010 · KB-001 · KB-002 · KB-003 · KB-004 · LEARN-001 · AI-001 · AI-002 · MCP-001 · MCP-002 | 17 | XL |
+| **W5** التكاملات ونظام الشركة | INT-001 · INT-002 · INT-003 · GOOG-004 · GOOG-005 · WA-006 · DES-002 · SPDR-002 | 8 | XL |
+| **W6** الإدارة والمراقبة والواجهة | OPS-001 · OPS-003 · OPS-004 · UX-002 · UX-003 · QA-002 · QA-003 · VFE-002 · VFE-005 · MAN-001 · MAN-002 · MAN-003 · MAN-004 · MAN-006 · MAN-007 · DSN-002 · PLAN-001 | 17 | L |
+
+**هذا الجدول محروس آليًا** (`npm run plan:check`): كل مهمة مفتوحة في `BACKLOG` تظهر في حزمة واحدة بالضبط،
+ولا معرف غير موجود، ولا حزمة تُعلن عددًا لا تُعدّه. إغلاق مهمة أو إضافة أخرى **يُفشل الفحص** حتى تُحدَّث هذه الجدول
+في التغيير نفسه — فالخطة لا تتأخر عن السجل ولا تصبح مرجع حالة ثانيًا.
 
 **ملاحظة صادقة على الجرد:** 34 مهمة مكتوب عنها `جارٍ`. بعضها منفّذ فعلًا ولم يُغلق بدليل، وبعضها «جارٍ» منذ أسابيع بلا عائق.
 هذا **دين حالة** لا دين كود، ويُسوّى في W0 قبل أي ميزة جديدة — وإلا ظلّت نسبة الإنجاز غير قابلة للتصديق.
@@ -301,11 +309,37 @@ W2 🔑 (متوازٍ) ── HOST-003 ─▶ W3 ──▶ لا شيء بعده�
 
 ---
 
-## 11 · المراجع
+## 11 · مربوط بالمستودع — كل جزء ووصلته
+
+الخطة ليست ملفًّا حرًّا في `docs/`: كل جزء من المستودع يصل إليها بوصلة قابلة للفحص، وكل وصلة لها بوابة تُفشل التغيير
+إذا انقطعت. الجدول ليس وصفًا للنوايا — إنه ما يفحصه `test/plan-system-completion.test.js` (PSC-11) حرفًا بحرف.
+
+| الجزء في المستودع | الوصلة | البوابة التي تُفشل الانقطاع |
+|---|---|---|
+| سجل المهام [BACKLOG](continuity/BACKLOG.md) | صف `PLAN-002` + كل مهمة مفتوحة مذكورة في §3 | `npm run plan:check` |
+| التغطية الكاملة للحزم | 59 معرفًا موزّعة W1..W6، لا تكرار ولا يتيم | `npm run plan:check` |
+| أرقام §2 الحيّة | تُعاد من `access-policy.js` · `tools.js` · `celia-mcp.js` · `version.js` · `package.json` · `check.mjs` · `check-continuity.mjs` · `agent/index.js` | `npm run plan:check` |
+| فهرس الإصدار [README](../README.md) | سطر الخطط يشير إلى الخطة | `check:continuity` + PSC-11 |
+| [خطة 100%](plan-100-percent.md) | «الخطة اللاحقة» — من الأركان الثمانية إلى الحزم | PSC-11 |
+| [الخطة التنفيذية](executive-completion-plan.md) | «الخطة اللاحقة» — من الجرد إلى الترتيب | PSC-11 |
+| [System Atlas](design/system-atlas.html) | قدرة `roadmap` في نطاق دورة حياة المنتج تستشهد بالخطة | `npm run atlas:check` · `atlas:poster:check` · `atlas:dashboard:check` |
+| [CHANGELOG](../CHANGELOG.md) | سطر وصول الخطة في `Unreleased` | PSC-11 |
+| [حالة الجلسة](continuity/STATE.md) و[NOW](continuity/NOW.md) | سطر الاستئناف يذكر بوابتي `B1`/`B2` والمسار الحرج | `npm run now:check` · `check:continuity` |
+| [تسليم الجلسة](continuity/sessions/2026-11-01-plan-system-completion.md) | ما نُفّذ وما لم يُنفَّذ ودليله البصري | بوابة handoff (`CELIA_CONTINUITY_BASE`) |
+| الأنبوب [`.github/workflows/celia-mcp.yml`](../.github/workflows/celia-mcp.yml) | خطوة «Completion plan covers every open task exactly once» | CI |
+| [اتفاقية العمل](../AGENTS.md) | `npm run plan:check` ضمن أوامر خط الأساس | مراجعة بشرية |
+| [خطة الشركة](design/ai-company-executive-plan.md) · [سياسة التفعيل](design/skill-activation-policy.md) | الحزمة `W5` والطبقة `L5` (0/17 مهارة) | بوابة G1–G4 في `DEC-112` |
+
+**قاعدة الوصلة:** إذا أُغلقت مهمة أو أُضيفت أخرى ولم تُحدَّث §3 في التغيير نفسه، يسقط بناء CI ويسمّي المهمة.
+فالخطة لا تصبح «الوثيقة الأسهل» التي تُصدَّق بدلًا من السجل.
+
+---
+
+## 12 · المراجع
 
 - [خطة 100% — الأركان الثمانية](plan-100-percent.md)
 - [الخطة التنفيذية لسدّ الفجوات](executive-completion-plan.md)
-- [حالة المهام — المرجع الوحيد](../continuity/BACKLOG.md)
+- [حالة المهام — المرجع الوحيد](continuity/BACKLOG.md)
 - [خطة الشركة والمهارات](design/ai-company-executive-plan.md) · [سياسة التفعيل](design/skill-activation-policy.md)
 - [الأمن والوضع الدفاعي](security-posture.md) · [خطة المحافظة](preservation-plan.md)
 - [مسوّدة الإصدار 0.3.0](release-0.3.0-proposal.md) · [النشر بلا فيزا](no-visa-deployment.md)
