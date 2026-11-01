@@ -75,10 +75,10 @@
   <div class="stats">
     <div class="stat"><b>12</b><small>مجالًا</small></div>
     <div class="stat"><b>54</b><small>قدرة معلنة</small></div>
-    <div class="stat"><b style="color:var(--ok)">40</b><small>متحققة</small></div>
+    <div class="stat"><b style="color:var(--ok)">41</b><small>متحققة</small></div>
     <div class="stat"><b style="color:var(--unv)">9</b><small>بلا اختبار</small></div>
-    <div class="stat"><b style="color:var(--miss)">5</b><small>غير موجودة</small></div>
-    <div class="stat"><b style="color:var(--part)">8</b><small>مجالات جزئية</small></div>
+    <div class="stat"><b style="color:var(--miss)">4</b><small>غير موجودة</small></div>
+    <div class="stat"><b style="color:var(--part)">7</b><small>مجالات جزئية</small></div>
   </div>
 
   <h2 class="section">المجالات الاثنا عشر</h2>
@@ -113,13 +113,13 @@
           </li></ul>
           <p class="meta">الأثر: <span class="mono">public/kb.html</span> · تغطية 80%</p>
         </article>
-      <article class="card part" data-domain="memory_context" data-status="partial">
+      <article class="card ok" data-domain="memory_context" data-status="implemented_verified">
           <header>
             <h3>الذاكرة وإدارة السياق</h3>
             <span class="prio">P0</span>
           </header>
-          <div class="sub"><span class="badge">🟡 جزئي</span><span class="mono small">Memory &amp; Context</span></div>
-          <div class="bar" title="تغطية 80%"><span style="width:80%"></span></div>
+          <div class="sub"><span class="badge">🟢 منفّذ ومتحقق</span><span class="mono small">Memory &amp; Context</span></div>
+          <div class="bar" title="تغطية 100%"><span style="width:100%"></span></div>
           <ul class="caps"><li class="ok" data-status="implemented_verified">
             <span class="mark">🟢</span>
             <span class="cap">ذاكرة قصيرة المدى داخل التشغيل</span>
@@ -136,12 +136,12 @@
             <span class="mark">🟢</span>
             <span class="cap">تتبّع مصدر كل معلومة محفوظة</span>
             <span class="ev mono">src/agent/evidence.js</span>
-          </li><li class="miss" data-status="not_implemented">
-            <span class="mark">🔴</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
             <span class="cap">إزالة التكرار وتحديث المعلومات</span>
-            <span class="ev mono">بلا ملف</span>
+            <span class="ev mono">src/agent/consolidation.js · src/knowledge/index.js</span>
           </li></ul>
-          <p class="meta">الأثر: <span class="mono">docs/agent-memory-deployment.md</span> · تغطية 80%</p>
+          <p class="meta">الأثر: <span class="mono">docs/agent-memory-deployment.md</span> · تغطية 100%</p>
         </article>
       <article class="card part" data-domain="user_experience" data-status="partial">
           <header>
@@ -424,7 +424,7 @@
   <h2 class="section">المراحل — بالترتيب لا بالاثني عشر معًا</h2>
       <div class="phase">
           <div class="phase-head"><b>P0</b><span>الأساسات: تُثبت قبل أي توسّع — المعرفة والذاكرة والتجربة والتكامل والحوكمة.</span></div>
-          <div class="phase-body"><span class="tag part">🟡 الإدراك والمعرفة والبحث</span><span class="tag part">🟡 الذاكرة وإدارة السياق</span><span class="tag part">🟡 تجربة المستخدم والتفاعل</span><span class="tag part">🟡 الأدوات والتكاملات الخارجية</span><span class="tag ok">🟢 الأمان والحوكمة</span></div>
+          <div class="phase-body"><span class="tag part">🟡 الإدراك والمعرفة والبحث</span><span class="tag ok">🟢 الذاكرة وإدارة السياق</span><span class="tag part">🟡 تجربة المستخدم والتفاعل</span><span class="tag part">🟡 الأدوات والتكاملات الخارجية</span><span class="tag ok">🟢 الأمان والحوكمة</span></div>
         </div>
       <div class="phase">
           <div class="phase-head"><b>P1</b><span>الطبقة التشغيلية: الأتمتة وتوجيه النماذج والتعافي وتعدد الوكلاء — كل واحد بدليل.</span></div>

@@ -103,6 +103,10 @@ test('the audit admits what the system does not have — no domain is painted co
   const conflict = cognitive.capabilities.find((capability) => capability.id === 'conflict_detection');
   assert.equal(conflict.status, TRUTH.verified, 'conflict detection is implemented and a test names its file');
   assert.notEqual(cognitive.status, TRUTH.verified, 'one untested capability still keeps the domain out of green');
+  const memory = atlas.domains.find((domain) => domain.id === 'memory_context');
+  const consolidation = memory.capabilities.find((capability) => capability.id === 'consolidation');
+  assert.equal(consolidation.status, TRUTH.verified, 'consolidation is implemented and a test names its file');
+  assert.equal(memory.status, TRUTH.verified, 'every memory capability is now backed and tested');
 });
 
 test('the seven states are reused, not reinvented', () => {

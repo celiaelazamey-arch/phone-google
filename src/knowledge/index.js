@@ -3,6 +3,7 @@ import path from 'node:path';
 import { KnowledgeStore } from './store.js';
 import { ingestDirectory } from './ingest.js';
 import { claimsFromItems, conflictDigest, describeConflicts, findConflicts } from './conflict.js';
+import { checkReport, consolidate } from '../agent/consolidation.js';
 
 /**
  * Explicit knowledge-network host.
@@ -138,6 +139,16 @@ export function createKnowledgeHost({
     conflicts(items) {
       const report = findConflicts(claimsFromItems(items));
       return { ...report, digest: conflictDigest(report), lines: describeConflicts(report) };
+    },
+    /** The consolidated view of retrieved knowledge: duplicates merged with every source kept. */
+    consolidated(items) {
+      const report = consolidate(claimsFromItems(items));
+      const check = checkReport(report);
+      return { ...report, verified: check.ok, problems: check.problems };
+    },
+    async searchConsolidated(options) {
+      const opened = await store();
+      return this.consolidated(opened.search(options).items);
     },
     async searchConflicts(options) {
       const opened = await store();
