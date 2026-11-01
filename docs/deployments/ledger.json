@@ -40,5 +40,27 @@
       "checksAtMerge": "8 pass · 2 skipping"
     },
     "entryHash": "11e254fa946c2d700360d86ee7cf5cf0b5707f38649811cd485e16129008acb0"
+  },
+  {
+    "seq": 2,
+    "prevHash": "11e254fa946c2d700360d86ee7cf5cf0b5707f38649811cd485e16129008acb0",
+    "at": "2026-11-01T09:00:41Z",
+    "actor": "celiaelazamey-arch",
+    "action": "merge",
+    "channel": "main",
+    "version": "0.2.1",
+    "commit": "ca00c05",
+    "requestFingerprint": "pub:a1697706d36eaa71",
+    "outcome": "merged",
+    "evidence": {
+      "pullRequest": 120,
+      "method": "squash",
+      "mergedCommit": "ca00c05",
+      "contents": "PUB-003 ledger record + MEM-001 memory consolidation",
+      "bypass": "RepositoryRole 5 (admin) · bypass_mode always · ruleset 26270171",
+      "bypassBecause": "owner ordered the merge; unsigned commits and a last-push approval no single-account repo can satisfy",
+      "checksAtMerge": "8 pass · 2 skipping"
+    },
+    "entryHash": "cc0406c598418c48b0917356676e9c514922e1924b339007fc6a677bfc5fc3b4"
   }
 ]
