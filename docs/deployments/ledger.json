@@ -93,5 +93,61 @@
       }
     },
     "entryHash": "348191ac08d53143590e9877bf146281a5281002114710b90c11e223a87af6c7"
+  },
+  {
+    "seq": 4,
+    "prevHash": "348191ac08d53143590e9877bf146281a5281002114710b90c11e223a87af6c7",
+    "at": "2026-11-01T13:20:58Z",
+    "actor": "celiaelazamey-arch",
+    "action": "merge",
+    "channel": "main",
+    "version": "0.2.1",
+    "commit": "a1d3f7b",
+    "requestFingerprint": "pub:6652a7214043b11d",
+    "outcome": "merged",
+    "evidence": {
+      "pullRequest": 130,
+      "method": "squash",
+      "mergedCommit": "a1d3f7b2f67f1fcf56974887b45b6bdff6aba071",
+      "mergedBy": "celiaelazamey-arch",
+      "candidateHead": "5c1096617b980f84fa8451e6de7e77a933871cbf",
+      "treeEquality": {
+        "candidate": "a372f60884a710b11d9043c185cc108599801df4",
+        "merged": "a372f60884a710b11d9043c185cc108599801df4"
+      },
+      "contents": "PUB-008 deployment verification record (docs + one workflow notice label)",
+      "fingerprintInputs": {
+        "channel": "main",
+        "version": "0.2.1",
+        "commit": "5c1096617b980f84fa8451e6de7e77a933871cbf",
+        "artifacts": []
+      },
+      "deployments": {
+        "githubPages": {
+          "run": 41310829985,
+          "result": "success"
+        },
+        "cloudflareEdge": {
+          "run": 41310945889,
+          "result": "success"
+        },
+        "release": {
+          "run": 41310830049,
+          "result": "skipped — v0.2.1 immutable, steps 5-15 skipped, nothing published"
+        },
+        "render": {
+          "run": 41310945753,
+          "result": "not-configured — no service inputs"
+        }
+      },
+      "liveAfterMerge": {
+        "edgeVersion": "0.2.1@a1d3f7b",
+        "pagesVersion": "0.2.1@a1d3f7b",
+        "checkedAt": "2026-11-01T13:37Z"
+      },
+      "package": "none — no new bundle or image",
+      "checksAtMerge": "11 pass · 1 skipping · mergeable CLEAN"
+    },
+    "entryHash": "f4308d22edfb5b8b2f4d4ec0a6ccbe136d899e5e5ee1011f88ad0e23668e3a62"
   }
 ]
