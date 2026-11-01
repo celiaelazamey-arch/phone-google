@@ -1,0 +1,439 @@
+{
+  "fingerprint": "7e7b67a77c",
+  "version": "celiaos-system-atlas-v1",
+  "totals": {
+    "domains": 12,
+    "capabilities": 54,
+    "verified": 39,
+    "unverified": 9,
+    "missing": 6
+  },
+  "phases": [
+    {
+      "priority": "P0",
+      "domains": 5
+    },
+    {
+      "priority": "P1",
+      "domains": 4
+    },
+    {
+      "priority": "P2",
+      "domains": 3
+    }
+  ],
+  "domains": [
+    {
+      "id": "cognitive_knowledge",
+      "ar": "الإدراك والمعرفة والبحث",
+      "en": "Cognitive & Knowledge",
+      "priority": "P0",
+      "status": "partial",
+      "coverage": 60,
+      "capabilities": [
+        {
+          "id": "kb_search",
+          "ar": "البحث الداخلي في شبكة المعرفة",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "source_trust",
+          "ar": "تحليل موثوقية المصادر",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "citations",
+          "ar": "الاستشهاد بالمراجع داخل الإجابات",
+          "status": "implemented_unverified"
+        },
+        {
+          "id": "web_discovery",
+          "ar": "البحث الخارجي واكتشاف المصادر",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "conflict_detection",
+          "ar": "اكتشاف المعلومات المتضاربة",
+          "status": "not_implemented"
+        }
+      ],
+      "missing": [
+        "اكتشاف المعلومات المتضاربة"
+      ]
+    },
+    {
+      "id": "memory_context",
+      "ar": "الذاكرة وإدارة السياق",
+      "en": "Memory & Context",
+      "priority": "P0",
+      "status": "partial",
+      "coverage": 80,
+      "capabilities": [
+        {
+          "id": "short_term",
+          "ar": "ذاكرة قصيرة المدى داخل التشغيل",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "long_term",
+          "ar": "ذاكرة طويلة المدى دائمة",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "context_window",
+          "ar": "إدارة حجم السياق واختياره",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "provenance",
+          "ar": "تتبّع مصدر كل معلومة محفوظة",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "consolidation",
+          "ar": "إزالة التكرار وتحديث المعلومات",
+          "status": "not_implemented"
+        }
+      ],
+      "missing": [
+        "إزالة التكرار وتحديث المعلومات"
+      ]
+    },
+    {
+      "id": "user_experience",
+      "ar": "تجربة المستخدم والتفاعل",
+      "en": "User Experience",
+      "priority": "P0",
+      "status": "partial",
+      "coverage": 40,
+      "capabilities": [
+        {
+          "id": "arabic_rtl",
+          "ar": "واجهة عربية RTL",
+          "status": "implemented_unverified"
+        },
+        {
+          "id": "conversations",
+          "ar": "المحادثات والملفات",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "voice",
+          "ar": "الأوامر الصوتية والنصية",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "notifications",
+          "ar": "الإشعارات والتنبيهات",
+          "status": "not_implemented"
+        },
+        {
+          "id": "settings",
+          "ar": "إعدادات المستخدم والتخصيص",
+          "status": "implemented_unverified"
+        }
+      ],
+      "missing": [
+        "الإشعارات والتنبيهات"
+      ]
+    },
+    {
+      "id": "multi_agent",
+      "ar": "الوكلاء والتعاون بينهم",
+      "en": "Multi-Agent Collaboration",
+      "priority": "P1",
+      "status": "partial",
+      "coverage": 25,
+      "capabilities": [
+        {
+          "id": "single_agent_runtime",
+          "ar": "وكيل واحد يعمل بالحزام",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "delegation",
+          "ar": "تفويض المهام بين وكلاء",
+          "status": "not_implemented"
+        },
+        {
+          "id": "collaboration_bus",
+          "ar": "قناة تواصل بين الوكلاء",
+          "status": "not_implemented"
+        },
+        {
+          "id": "conflict_resolution",
+          "ar": "حل التعارض بين نتائج وكلاء",
+          "status": "not_implemented"
+        }
+      ],
+      "missing": [
+        "تفويض المهام بين وكلاء",
+        "قناة تواصل بين الوكلاء",
+        "حل التعارض بين نتائج وكلاء"
+      ]
+    },
+    {
+      "id": "integrations",
+      "ar": "الأدوات والتكاملات الخارجية",
+      "en": "Integrations Ecosystem",
+      "priority": "P0",
+      "status": "partial",
+      "coverage": 80,
+      "capabilities": [
+        {
+          "id": "google",
+          "ar": "Google — Gmail وDrive وCalendar",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "whatsapp",
+          "ar": "WhatsApp Business",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "mcp",
+          "ar": "MCP — تصدير الأدوات",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "hosting",
+          "ar": "Cloudflare وRender",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "github",
+          "ar": "GitHub — المستودع وسير العمل",
+          "status": "implemented_unverified"
+        }
+      ],
+      "missing": []
+    },
+    {
+      "id": "automation",
+      "ar": "الأتمتة وإدارة المهام",
+      "en": "Automation & Workflow",
+      "priority": "P1",
+      "status": "implemented_verified",
+      "coverage": 100,
+      "capabilities": [
+        {
+          "id": "scheduled",
+          "ar": "المهام المجدولة",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "triggers",
+          "ar": "المشغلات والأحداث",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "retries",
+          "ar": "إعادة المحاولة ومعالجة الفشل",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "workflow_engine",
+          "ar": "محرّك تدفقات",
+          "status": "implemented_verified"
+        }
+      ],
+      "missing": []
+    },
+    {
+      "id": "model_intelligence",
+      "ar": "النماذج والذكاء والتكلفة",
+      "en": "Model Intelligence & Routing",
+      "priority": "P1",
+      "status": "implemented_verified",
+      "coverage": 100,
+      "capabilities": [
+        {
+          "id": "routing",
+          "ar": "اختيار النموذج وتوجيه المهمة",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "local_cloud",
+          "ar": "نماذج محلية وسحابية",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "latency",
+          "ar": "قياس زمن الاستجابة",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "fallback",
+          "ar": "بدائل عند فشل النموذج",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "cost",
+          "ar": "قياس الاستهلاك والتكلفة",
+          "status": "implemented_verified"
+        }
+      ],
+      "missing": []
+    },
+    {
+      "id": "reliability",
+      "ar": "الاستمرارية والتعافي",
+      "en": "Reliability & Recovery",
+      "priority": "P1",
+      "status": "partial",
+      "coverage": 75,
+      "capabilities": [
+        {
+          "id": "backup",
+          "ar": "النسخ الاحتياطي",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "restore",
+          "ar": "استعادة البيانات والإصدارات",
+          "status": "implemented_unverified"
+        },
+        {
+          "id": "recovery",
+          "ar": "استعادة المهام المتوقفة",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "idempotency",
+          "ar": "منع تنفيذ العمليات المكررة",
+          "status": "implemented_verified"
+        }
+      ],
+      "missing": []
+    },
+    {
+      "id": "product_lifecycle",
+      "ar": "إدارة دورة حياة المنتج",
+      "en": "Product Lifecycle",
+      "priority": "P2",
+      "status": "partial",
+      "coverage": 25,
+      "capabilities": [
+        {
+          "id": "roadmap",
+          "ar": "خارطة طريق التطوير",
+          "status": "implemented_unverified"
+        },
+        {
+          "id": "releases",
+          "ar": "إدارة الإصدارات",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "decisions",
+          "ar": "سجل القرارات الهندسية",
+          "status": "implemented_unverified"
+        },
+        {
+          "id": "compatibility",
+          "ar": "التوافق بين الإصدارات",
+          "status": "implemented_unverified"
+        }
+      ],
+      "missing": []
+    },
+    {
+      "id": "resource_operations",
+      "ar": "إدارة الموارد والعمليات",
+      "en": "Resource & Operations",
+      "priority": "P2",
+      "status": "implemented_verified",
+      "coverage": 100,
+      "capabilities": [
+        {
+          "id": "service_health",
+          "ar": "حالة الخدمات",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "queue",
+          "ar": "إدارة طوابير المهام",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "usage",
+          "ar": "استهلاك الموارد",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "cost_tracking",
+          "ar": "مراقبة التكاليف",
+          "status": "implemented_verified"
+        }
+      ],
+      "missing": []
+    },
+    {
+      "id": "analytics_observability",
+      "ar": "التحليلات والمراقبة",
+      "en": "Analytics & Observability",
+      "priority": "P2",
+      "status": "partial",
+      "coverage": 75,
+      "capabilities": [
+        {
+          "id": "evidence_trail",
+          "ar": "سجل الأدلة",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "trace",
+          "ar": "تتبّع الخطوات في اللوحة",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "test_metrics",
+          "ar": "قياس الاختبارات والتغطية",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "dashboard",
+          "ar": "لوحة حالة تشغيلية",
+          "status": "implemented_unverified"
+        }
+      ],
+      "missing": []
+    },
+    {
+      "id": "security_governance",
+      "ar": "الأمان والحوكمة",
+      "en": "Security & Governance",
+      "priority": "P0",
+      "status": "implemented_verified",
+      "coverage": 100,
+      "capabilities": [
+        {
+          "id": "policy",
+          "ar": "محرّك السياسة والصلاحيات",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "approval",
+          "ar": "بوابة الموافقة المربوطة بالبصمة",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "sandbox",
+          "ar": "العزل التنفيذي",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "secrets",
+          "ar": "حماية الأسرار",
+          "status": "implemented_verified"
+        },
+        {
+          "id": "audit",
+          "ar": "سجل تدقيق غير قابل للعبث",
+          "status": "implemented_verified"
+        }
+      ],
+      "missing": []
+    }
+  ]
+}

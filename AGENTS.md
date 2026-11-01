@@ -24,6 +24,23 @@ These instructions preserve project context between coding sessions. They do not
   - After execution, CeliaOS must explain what actually happened, what is backed by recorded evidence (`verified_facts` + `source_ref`/`evidence_ref`), what remains unverified (`unknowns`), and any material assumptions or risks (`assumptions`, `risks_and_side_effects`).
   - If the system cannot explain the task or detects a contradiction between its explanation and deterministic validation or recorded evidence, it must gather missing information, revise the plan, or halt the path under existing policies. Clarity or persuasiveness of an explanation is never sufficient proof of correctness and must never bypass deterministic validation, tool permissions, owner approvals (`WAITING_FOR_APPROVAL`), or security boundaries.
 
+## Visual-First Engineering (VFE-001 / DEC-085)
+
+**Show the System, Don't Just Describe It.** A text report is not a delivery. Every engineering result ships with a visual that shows what was built, how it runs, and how its parts connect — generated from the code, never drawn beside it.
+
+- The rule, the five states, the eleven master diagrams and the delivery order live in `src/design/visual-registry.js`; the board is generated into `docs/design/visual-first.html` (`npm run visual:first`), and `npm run visual:first:check` fails CI when the page and the registry disagree.
+- Every shape on a page carries one state and only one: 🟢 IMPLEMENTED & VERIFIED · 🟠 IMPLEMENTED BUT NOT VERIFIED · 🟡 PARTIAL · 🔵 PROPOSED · 🔴 NOT IMPLEMENTED · ⚪ DISABLED · ⛔ BLOCKED. A file existing is not evidence that a function works; an unverified element may not be drawn as working.
+- Every element cites the real module or test behind it. Missing evidence is a reason to downgrade the state or leave the box off the page — not to soften the label.
+- Pick the shapes that explain the change (architecture, component, data flow, sequence, workflow, state machine, dependency, before/after, evidence, dashboard). Do not draw all ten for a typo.
+- Deliver in this order: goal and change → before/after visual → changed components and files → execution flow → actual test results → evidence and links → limits and gaps → next step.
+- Session records carry a `## الدليل البصري` section: a link to an existing visual artifact, or the explicit waiver «لا يوجد تغيير بصري» with its reason. The gate audits only handoffs inside the change range.
+- **Map before you change, map after you change.** `npm run arch:impact <files>` prints the components and modules a change reaches through the real import graph (`docs/design/architecture-map.html`); use it before an architectural edit, and regenerate with `npm run arch:map` after one. The map is computed from `src/` and `workers/` — it is never typed by hand, and `npm run arch:map:check` fails when it drifts.
+- **Publishing (PUB-001).** «انشر» is a decision, not a shortcut: `npm run publish:status` must reach `ready` before any actor publishes, the owner's approval is bound to the `pub:` fingerprint of that exact channel/version/commit/artifacts, and the gate never waives signed-commit, review or branch-protection rules. Every publish appends to `docs/deployments/ledger.json`, a hash chain verified in CI; the way back is the last different version in that ledger, never an assumption. The gate holds no token and executes nothing.
+
+**System Atlas (audit first, build second).** `src/design/system-atlas.js` holds the twelve domains of the owner's directive, and every capability in it cites real files; `npm run atlas` renders `docs/design/system-atlas.html`, `npm run atlas:poster` renders the poster from the same audit, `npm run atlas:facts` publishes the same numbers as data for any outside drawing, and `npm run atlas:dashboard` renders the bilingual dashboard from that data (no date, no unmeasured ratio), and `atlas:check` / `atlas:poster:check` fail when either page drifts. The order is fixed: **audit what exists → draw the coverage map → propose phases**. Do not build the twelve at once, and never let a domain claim a capability whose files are not there.
+- **Definition of done:** the code change, the updated diagram, a real test, verifiable evidence, a named gap list, and direct links to the files — all six. A report without them is not a delivery.
+- Visuals grant nothing: `NETWORK = DENY`, human approval for sensitive effects, evidence with trace IDs, independent verification and secret hygiene all survive the prettiest diagram. A diagram is evidence of understanding, never a substitute for a test.
+
 ## Verify and hand off
 
 Use relevant checks; distinguish current execution from historical results and skipped/live-provider tests. Baseline commands:
@@ -34,6 +51,10 @@ npm run check
 npm run release:check
 npm run now:check
 npm run check:continuity
+npm run access:policy:check
+npm run visual:first:check
+npm run arch:map:check
+npm run atlas:check
 npm test
 CELIA_MCP_DISABLE_MYSQL=true CELIA_DISABLE_OLLAMA=true npm run celia:mcp:verify
 npm run build:pages

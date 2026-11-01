@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="celia-visual" content="generated:celiaos-system-atlas-v1:fingerprint=7e7b67a77c:source=src/design/system-atlas.js" />
+<title>CeliaOS — System Atlas Poster 2026</title>
+<style>
+  @font-face { font-family: "Plex"; src: url("../../public/fonts/ibm-plex-sans-arabic-arabic-400-normal.woff2") format("woff2"); font-weight: 400; font-display: block; }
+  @font-face { font-family: "Plex"; src: url("../../public/fonts/ibm-plex-sans-arabic-arabic-600-normal.woff2") format("woff2"); font-weight: 600; font-display: block; }
+  @font-face { font-family: "Plex"; src: url("../../public/fonts/ibm-plex-sans-arabic-arabic-700-normal.woff2") format("woff2"); font-weight: 700; font-display: block; }
+  @font-face { font-family: "Mono"; src: url("../../public/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-display: block; }
+  :root{--bg:#080d24;--panel:#0f1738;--panel-2:#131d47;--line:#26346b;--line-2:#33459b;--txt:#eaf0ff;--mut:#a9b6e8;--gold:#fbbf24;--ok:#34d399;--part:#fbbf24;--miss:#f87171;--unv:#fb923c;--off:#94a3b8}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--txt);font-family:"Plex",system-ui,sans-serif;line-height:1.5}
+  body{width:1440px;padding:34px 40px 26px}
+  .mono{font-family:"Mono",monospace;direction:ltr;unicode-bidi:isolate}
+  header{display:flex;align-items:center;justify-content:space-between;gap:20px;padding-bottom:16px;border-bottom:2px solid var(--line-2)}
+  .logo{display:flex;align-items:center;gap:10px;font-size:30px;font-weight:700}
+  .logo .star{color:var(--gold);font-size:26px}
+  .logo b{color:var(--gold)}
+  .tag{color:var(--mut);font-size:13px}
+  h1{margin:0;font-size:24px}
+  .sub{margin:4px 0 0;color:var(--mut);font-size:13px}
+  .seal{border:1px solid var(--gold);border-radius:12px;padding:8px 14px;color:var(--gold);font-size:12px;text-align:center}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px}
+  .card{background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid var(--line);border-top:3px solid var(--line-2);border-radius:12px;padding:10px 12px}
+  .card.ok{border-top-color:var(--ok)} .card.part{border-top-color:var(--part)} .card.miss{border-top-color:var(--miss)}
+  .card.unv{border-top-color:var(--unv)} .card.prop{border-top-color:var(--prop)} .card.off{border-top-color:var(--off)}
+  .head{display:flex;align-items:center;gap:8px}
+  .idx{font-family:"Mono",monospace;font-size:11px;color:var(--mut)}
+  .head h3{margin:0;font-size:13.5px;flex:1}
+  .prio{font-family:"Mono",monospace;font-size:10px;color:var(--bg);background:var(--gold);border-radius:6px;padding:1px 6px;font-weight:600}
+  .cov{display:flex;align-items:baseline;gap:6px;margin-top:6px}
+  .cov b{font-size:20px;color:var(--gold)}
+  .cov span{font-size:10.5px;color:var(--mut)}
+  .bar{height:5px;background:#0a1230;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin:4px 0 7px}
+  .bar span{display:block;height:100%;background:linear-gradient(90deg,#22d3ee,#33459b)}
+  .caps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px;font-size:11px}
+  .caps .m{margin-inline-end:5px}
+  .caps .more{color:var(--mut);font-size:10px}
+  .verdict{margin:7px 0 0;font-size:10.5px;padding:4px 7px;border-radius:6px}
+  .verdict.gap{color:#fecaca;background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.35)}
+  .verdict.warn{color:#fed7aa;background:rgba(251,146,60,.12);border:1px solid rgba(251,146,60,.35)}
+  .verdict.done{color:#bbf7d0;background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.35)}
+  .bottom{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:12px;margin-top:14px}
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 13px}
+  .box h4{margin:0 0 8px;font-size:12px;color:var(--gold)}
+  .phase{display:flex;align-items:center;gap:8px;font-size:11.5px;margin-bottom:5px}
+  .phase b{font-family:"Mono",monospace;color:var(--gold)}
+  .phase span{color:var(--mut)}
+  .tally{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+  .tally div b{display:block;font-size:20px}
+  .tally div small{font-size:10px;color:var(--mut)}
+  .legend{display:flex;flex-wrap:wrap;gap:10px;font-size:10.5px;color:var(--mut)}
+  footer{display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:10px;border-top:2px solid var(--line-2);color:var(--mut);font-size:11px}
+  footer b{color:var(--gold)}
+</style>
+</head>
+<body>
+  <header>
+    <div>
+      <div class="logo"><span class="star">✦</span><span>Celia<b>OS</b></span></div>
+      <div class="tag">Crafted to Think · Learn · Grow</div>
+    </div>
+    <div style="text-align:center">
+      <h1>System Atlas — خريطة النظام الشاملة</h1>
+      <p class="sub">12 مجالًا · رؤية موحّدة · حالة مُشتقة من التدقيق لا من التقدير</p>
+    </div>
+    <div class="seal">Visual Engineering<br/><span class="mono">celiaos-system-atlas-v1</span></div>
+  </header>
+
+  <div class="grid">
+      <article class="card part">
+          <div class="head">
+            <span class="idx">01</span>
+            <h3>الإدراك والمعرفة والبحث</h3>
+            <span class="prio">P0</span>
+          </div>
+          <div class="cov"><b>60%</b><span>تغطية مقيسة</span></div>
+          <div class="bar"><span style="width:60%"></span></div>
+          <ul class="caps"><li class="ok"><span class="m">🟢</span>البحث الداخلي في شبكة المعرفة</li><li class="ok"><span class="m">🟢</span>تحليل موثوقية المصادر</li><li class="unv"><span class="m">🟠</span>الاستشهاد بالمراجع داخل الإجابات</li><li class="more">+2 قدرة أخرى</li></ul>
+          <p class="verdict gap">فجوة: اكتشاف المعلومات المتضاربة</p>
+        </article>
+      <article class="card part">
+          <div class="head">
+            <span class="idx">02</span>
+            <h3>الذاكرة وإدارة السياق</h3>
+            <span class="prio">P0</span>
+          </div>
+          <div class="cov"><b>80%</b><span>تغطية مقيسة</span></div>
+          <div class="bar"><span style="width:80%"></span></div>
+          <ul class="caps"><li class="ok"><span class="m">🟢</span>ذاكرة قصيرة المدى داخل التشغيل</li><li class="ok"><span class="m">🟢</span>ذاكرة طويلة المدى دائمة</li><li class="ok"><span class="m">🟢</span>إدارة حجم السياق واختياره</li><li class="more">+2 قدرة أخرى</li></ul>
+          <p class="verdict gap">فجوة: إزالة التكرار وتحديث المعلومات</p>
+        </article>
+      <article class="card part">
+          <div class="head">
+            <span class="idx">03</span>
+            <h3>تجربة المستخدم والتفاعل</h3>
+            <span class="prio">P0</span>
+          </div>
+          <div class="cov"><b>40%</b><span>تغطية مقيسة</span></div>
+          <div class="bar"><span style="width:40%"></span></div>
+          <ul class="caps"><li class="unv"><span class="m">🟠</span>واجهة عربية RTL</li><li class="ok"><span class="m">🟢</span>المحادثات والملفات</li><li class="ok"><span class="m">🟢</span>الأوامر الصوتية والنصية</li><li class="more">+2 قدرة أخرى</li></ul>
+          <p class="verdict gap">فجوة: الإشعارات والتنبيهات</p>
+        </article>
+      <article class="card part">
+          <div class="head">
+            <span class="idx">04</span>
+            <h3>الوكلاء والتعاون بينهم</h3>
+            <span class="prio">P1</span>
+          </div>
+          <div class="cov"><b>25%</b><span>تغطية مقيسة</span></div>
+          <div class="bar"><span style="width:25%"></span></div>
+          <ul class="caps"><li class="ok"><span class="m">🟢</span>وكيل واحد يعمل بالحزام</li><li class="miss"><span class="m">🔴</span>تفويض المهام بين وكلاء</li><li class="miss"><span class="m">🔴</span>قناة تواصل بين الوكلاء</li><li class="more">+1 قدرة أخرى</li></ul>
+          <p class="verdict gap">فجوة: تفويض المهام بين وكلاء · قناة تواصل بين الوكلاء · حل التعارض بين نتائج وكلاء</p>
+        </article>
+      <article class="card part">
+          <div class="head">
+            <span class="idx">05</span>
+            <h3>الأدوات والتكاملات الخارجية</h3>
+            <span class="prio">P0</span>
+          </div>
+          <div class="cov"><b>80%</b><span>تغطية مقيسة</span></div>
+          <div class="bar"><span style="width:80%"></span></div>
+          <ul class="caps"><li class="ok"><span class="m">🟢</span>Google — Gmail وDrive وCalendar</li><li class="ok"><span class="m">🟢</span>WhatsApp Business</li><li class="ok"><span class="m">🟢</span>MCP — تصدير الأدوات</li><li class="more">+2 قدرة أخرى</li></ul>
+          <p class="verdict warn">بلا اختبار يسمّي ملفه: GitHub — المستودع وسير العمل</p>
+        </article>
+      <article class="card ok">
+          <div class="head">
+            <span class="idx">06</span>
+            <h3>الأتمتة وإدارة المهام</h3>
+            <span class="prio">P1</span>
+          </div>
+          <div class="cov"><b>100%</b><span>تغطية مقيسة</span></div>
+          <div class="bar"><span style="width:100%"></span></div>
+          <ul class="caps"><li class="ok"><span class="m">🟢</span>المهام المجدولة</li><li class="ok"><span class="m">🟢</span>المشغلات والأحداث</li><li class="ok"><span class="m">🟢</span>إعادة المحاولة ومعالجة الفشل</li><li class="more">+1 قدرة أخرى</li></ul>
+          <p class="verdict done">مكتمل — كل قدرة متحققة باختبار</p>
+        </article>
+      <article class="card ok">
+          <div class="head">
+            <span class="idx">07</span>
+            <h3>النماذج والذكاء والتكلفة</h3>
+            <span class="prio">P1</span>
+          </div>
+          <div class="cov"><b>100%</b><span>تغطية مقيسة</span></div>
+          <div class="bar"><span style="width:100%"></span></div>
+          <ul class="caps"><li class="ok"><span class="m">🟢</span>اختيار النموذج وتوجيه المهمة</li><li class="ok"><span class="m">🟢</span>نماذج محلية وسحابية</li><li class="ok"><span class="m">🟢</span>قياس زمن الاستجابة</li><li class="more">+2 قدرة أخرى</li></ul>
+          <p class="verdict done">مكتمل — كل قدرة متحققة باختبار</p>
+        </article>
+      <article class="card part">
+          <div class="head">
+            <span class="idx">08</span>
+            <h3>الاستمرارية والتعافي</h3>
+            <span class="prio">P1</span>
+          </div>
+          <div class="cov"><b>75%</b><span>تغطية مقيسة</span></div>
+          <div class="bar"><span style="width:75%"></span></div>
+          <ul class="caps"><li class="ok"><span class="m">🟢</span>النسخ الاحتياطي</li><li class="unv"><span class="m">🟠</span>استعادة البيانات والإصدارات</li><li class="ok"><span class="m">🟢</span>استعادة المهام المتوقفة</li><li class="more">+1 قدرة أخرى</li></ul>
+          <p class="verdict warn">بلا اختبار يسمّي ملفه: استعادة البيانات والإصدارات</p>
+        </article>
+      <article class="card part">
+          <div class="head">
+            <span class="idx">09</span>
+            <h3>إدارة دورة حياة المنتج</h3>
+            <span class="prio">P2</span>
+          </div>
+          <div class="cov"><b>25%</b><span>تغطية مقيسة</span></div>
+          <div class="bar"><span style="width:25%"></span></div>
+          <ul class="caps"><li class="unv"><span class="m">🟠</span>خارطة طريق التطوير</li><li class="ok"><span class="m">🟢</span>إدارة الإصدارات</li><li class="unv"><span class="m">🟠</span>سجل القرارات الهندسية</li><li class="more">+1 قدرة أخرى</li></ul>
+          <p class="verdict warn">بلا اختبار يسمّي ملفه: خارطة طريق التطوير · سجل القرارات الهندسية · التوافق بين الإصدارات</p>
+        </article>
+      <article class="card ok">
+          <div class="head">
+            <span class="idx">10</span>
+            <h3>إدارة الموارد والعمليات</h3>
+            <span class="prio">P2</span>
+          </div>
+          <div class="cov"><b>100%</b><span>تغطية مقيسة</span></div>
+          <div class="bar"><span style="width:100%"></span></div>
+          <ul class="caps"><li class="ok"><span class="m">🟢</span>حالة الخدمات</li><li class="ok"><span class="m">🟢</span>إدارة طوابير المهام</li><li class="ok"><span class="m">🟢</span>استهلاك الموارد</li><li class="more">+1 قدرة أخرى</li></ul>
+          <p class="verdict done">مكتمل — كل قدرة متحققة باختبار</p>
+        </article>
+      <article class="card part">
+          <div class="head">
+            <span class="idx">11</span>
+            <h3>التحليلات والمراقبة</h3>
+            <span class="prio">P2</span>
+          </div>
+          <div class="cov"><b>75%</b><span>تغطية مقيسة</span></div>
+          <div class="bar"><span style="width:75%"></span></div>
+          <ul class="caps"><li class="ok"><span class="m">🟢</span>سجل الأدلة</li><li class="ok"><span class="m">🟢</span>تتبّع الخطوات في اللوحة</li><li class="ok"><span class="m">🟢</span>قياس الاختبارات والتغطية</li><li class="more">+1 قدرة أخرى</li></ul>
+          <p class="verdict warn">بلا اختبار يسمّي ملفه: لوحة حالة تشغيلية</p>
+        </article>
+      <article class="card ok">
+          <div class="head">
+            <span class="idx">12</span>
+            <h3>الأمان والحوكمة</h3>
+            <span class="prio">P0</span>
+          </div>
+          <div class="cov"><b>100%</b><span>تغطية مقيسة</span></div>
+          <div class="bar"><span style="width:100%"></span></div>
+          <ul class="caps"><li class="ok"><span class="m">🟢</span>محرّك السياسة والصلاحيات</li><li class="ok"><span class="m">🟢</span>بوابة الموافقة المربوطة بالبصمة</li><li class="ok"><span class="m">🟢</span>العزل التنفيذي</li><li class="more">+2 قدرة أخرى</li></ul>
+          <p class="verdict done">مكتمل — كل قدرة متحققة باختبار</p>
+        </article>
+  </div>
+
+  <div class="bottom">
+    <div class="box">
+      <h4>مراحل التطوير</h4>
+      <div class="phase">
+          <b>P0</b>
+          <span>5 مجالات</span>
+          <i class="arrow">←</i>
+        </div><div class="phase">
+          <b>P1</b>
+          <span>4 مجالات</span>
+          <i class="arrow">←</i>
+        </div><div class="phase">
+          <b>P2</b>
+          <span>3 مجالات</span>
+          
+        </div>
+    </div>
+    <div class="box">
+      <h4>نتائج التدقيق التشغيلي</h4>
+      <div class="tally">
+        <div><b style="color:var(--ok)">39</b><small>متحققة</small></div>
+        <div><b style="color:var(--unv)">9</b><small>بلا اختبار</small></div>
+        <div><b style="color:var(--miss)">6</b><small>غير موجودة</small></div>
+      </div>
+      <p class="sub" style="margin-top:6px">من 54 قدرة · 12 مجالًا</p>
+    </div>
+    <div class="box">
+      <h4>مفتاح الحالات</h4>
+      <div class="legend">
+        <span>🟢 منفّذ ومتحقق</span><span>🟠 منفّذ وغير متحقق</span><span>🟡 جزئي</span><span>🔵 مقترح</span><span>🔴 غير منفّذ</span><span>⚪ موجود ومعطّل</span><span>⛔ محجوب</span>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div>مُولَّد من <b class="mono">src/design/system-atlas.js</b> — <span class="mono">npm run atlas:poster</span></div>
+    <div>بصمة البيانات <b class="mono">7e7b67a77c</b> · البصمة تغطّي كل حقل منشور، وكل رقم يُعاد اشتقاقه من حالات القدرات</div>
+  </footer>
+</body>
+</html>

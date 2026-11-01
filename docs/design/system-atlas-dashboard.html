@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="celia-visual" content="generated:celiaos-system-atlas-v1:fingerprint=7e7b67a77c:source=src/design/system-atlas.js" />
+<title>CeliaOS — System Atlas 2026 · لوحة المعلومات</title>
+<style>
+  @font-face { font-family: "Plex"; src: url("../../public/fonts/ibm-plex-sans-arabic-arabic-400-normal.woff2") format("woff2"); font-weight: 400; font-display: block; }
+  @font-face { font-family: "Plex"; src: url("../../public/fonts/ibm-plex-sans-arabic-arabic-600-normal.woff2") format("woff2"); font-weight: 600; font-display: block; }
+  @font-face { font-family: "Plex"; src: url("../../public/fonts/ibm-plex-sans-arabic-arabic-700-normal.woff2") format("woff2"); font-weight: 700; font-display: block; }
+  @font-face { font-family: "Mono"; src: url("../../public/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-display: block; }
+  :root{
+    --bg:#050a18; --bg-2:#070f26; --panel:#0c1533; --panel-2:#101c45; --line:#1f2f66; --line-2:#2f4699;
+    --txt:#eaf1ff; --mut:#9fb0dd; --blue:#38bdf8; --blue-2:#0ea5e9; --gold:#fbbf24; --gold-2:#f59e0b;
+    --ok:#34d399; --part:#fbbf24; --miss:#f87171; --unv:#fb923c; --off:#94a3b8; --blocked:#a78bfa;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:radial-gradient(1200px 600px at 80% -10%, #10204f 0%, transparent 60%), radial-gradient(900px 500px at 10% 110%, #0b1a3d 0%, transparent 55%), var(--bg);color:var(--txt);font-family:"Plex",system-ui,sans-serif;line-height:1.5}
+  body{padding:28px 32px 22px;max-width:1500px;margin:0 auto}
+  .mono{font-family:"Mono",monospace;direction:ltr;unicode-bidi:isolate}
+  .en{font-family:"Plex",system-ui,sans-serif;direction:ltr;unicode-bidi:isolate;color:var(--mut);font-size:.8em}
+  header{display:flex;align-items:center;justify-content:space-between;gap:18px;padding-bottom:14px;border-bottom:1px solid var(--line-2)}
+  .brand{display:flex;align-items:center;gap:12px}
+  .brand .star{width:38px;height:38px;color:var(--gold)}
+  .brand h1{margin:0;font-size:26px;font-weight:700;letter-spacing:.2px}
+  .brand h1 span{color:var(--gold)}
+  .brand p{margin:2px 0 0;font-size:12.5px;color:var(--mut)}
+  .subtitle{text-align:left}
+  .subtitle h2{margin:0;font-size:21px;font-weight:700}
+  .subtitle p{margin:2px 0 0;font-size:12px;color:var(--mut)}
+  .seal{display:flex;align-items:center;gap:10px;padding:9px 14px;border-radius:12px;border:1px solid var(--blue-2);background:linear-gradient(180deg,#0d2145,#0a1733);box-shadow:0 0 0 1px rgba(56,189,248,.15) inset}
+  .seal b{display:block;font-size:12.5px}
+  .seal small{display:block;font-size:11.5px;color:var(--mut)}
+  .seal .tick{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--ok);color:#04240f;font-weight:700}
+
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
+  .card{position:relative;border:1px solid var(--line);border-radius:14px;padding:12px 13px 11px;background:linear-gradient(180deg,var(--panel-2),var(--panel));overflow:hidden}
+  .card::before{content:"";position:absolute;inset:0 auto auto 0;width:100%;height:2px;background:var(--line-2);opacity:.6}
+  .card.ok::before{background:var(--ok)} .card.part::before{background:var(--part)} .card.miss::before{background:var(--miss)}
+  .card-top{display:flex;align-items:flex-start;gap:8px}
+  .idx{font-size:11.5px;color:var(--mut);border:1px solid var(--line-2);border-radius:6px;padding:1px 6px;background:#0a122c;font-family:"Mono",monospace}
+  .names{flex:1}
+  .names h3{margin:0;font-size:15px;font-weight:700;line-height:1.35}
+  .names .en{margin:1px 0 0;font-size:10.5px}
+  .prio{font-family:"Mono",monospace;font-size:11px;padding:2px 7px;border-radius:999px;border:1px solid currentColor}
+  .p-p0{color:var(--gold)} .p-p1{color:var(--blue)} .p-p2{color:#c4b5fd}
+  .mid{display:flex;gap:11px;align-items:center;margin:9px 0 7px}
+  .donut{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;flex:0 0 auto;position:relative}
+  .donut::after{content:"";position:absolute;inset:6px;border-radius:50%;background:var(--panel)}
+  .donut span{position:relative;z-index:1;font-size:15px;font-weight:700}
+  .meta p{margin:0 0 2px;font-size:11.5px;line-height:1.45}
+  .meta .count{font-weight:600}
+  .meta .state{color:var(--mut)}
+  .meta .state.ok{color:var(--ok)} .meta .state.part{color:var(--part)} .meta .state.miss{color:var(--miss)}
+  .bar{height:5px;border-radius:99px;background:#0a122c;overflow:hidden;border:1px solid #16224c}
+  .bar span{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--gold))}
+  .gap{margin:7px 0 0;font-size:11.5px;padding:5px 8px;border-radius:8px;background:#0a122c;border:1px solid #17244f;color:var(--mut)}
+  .gap.gap{border-color:#5b2230;background:#1c0f1a;color:#fca5a5}
+  .gap.warn{border-color:#5c3d13;background:#1d150a;color:#fcd34d}
+  .gap.done{border-color:#14503a;background:#071c16;color:#86efac}
+
+  .lower{display:grid;grid-template-columns:1.15fr 1.5fr 1fr;gap:12px;margin-top:14px}
+  .box{border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,var(--panel-2),var(--panel));padding:12px 13px}
+  .box h3{margin:0 0 9px;font-size:14px;font-weight:700;color:var(--gold)}
+  .box h3 .en{font-size:.78em;color:var(--mut)}
+  .phases{display:flex;align-items:center;gap:8px;justify-content:space-between}
+  .phase{flex:1;border:1px solid var(--line-2);border-radius:11px;padding:7px 9px;text-align:center;background:#0a122c;position:relative}
+  .phase b{display:block;font-family:"Mono",monospace;font-size:12px}
+  .phase.p-p0 b{color:var(--gold)} .phase.p-p1 b{color:var(--blue)} .phase.p-p2 b{color:#c4b5fd}
+  .phase strong{display:block;font-size:21px;line-height:1.1}
+  .phase span{font-size:11px;color:var(--mut)}
+  .phase i{position:absolute;left:-13px;top:50%;transform:translateY(-50%);font-style:normal;color:var(--mut)}
+
+  .totals{display:flex;gap:10px;align-items:stretch}
+  .totals .cell{flex:1;border:1px solid #182654;border-radius:10px;padding:7px 9px;background:#0a122c;text-align:center}
+  .totals .cell b{display:block;font-size:20px;line-height:1.15}
+  .totals .cell.ok b{color:var(--ok)} .totals .cell.unv b{color:var(--unv)} .totals .cell.miss b{color:var(--miss)} .totals .cell.all b{color:var(--gold)}
+  .totals .cell small{display:block;font-size:10.5px;color:var(--mut);margin-top:1px}
+  .overall{display:flex;gap:12px;align-items:center;margin-top:9px}
+  .overall .donut{width:58px;height:58px}
+  .overall .donut span{font-size:14px}
+  .overall ul{list-style:none;margin:0;padding:0;font-size:11.5px;color:var(--mut)}
+  .overall li{display:flex;justify-content:space-between;gap:8px;padding:1px 0}
+  .overall li b{color:var(--txt)}
+
+  .next{border:1px solid var(--gold-2);border-radius:14px;padding:12px 13px;background:linear-gradient(180deg,#1b1730,#12132b);box-shadow:0 0 0 1px rgba(251,191,36,.12) inset}
+  .next-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .next-head h2{margin:0;font-size:14px;color:var(--gold)}
+  .next-gap{margin:7px 0 5px;font-size:16px;font-weight:700}
+  .next-gap .mono{font-size:.72em;color:var(--mut);margin-inline-start:6px}
+  .next-why{margin:0;font-size:11.5px;color:var(--mut)}
+
+  footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;padding-top:11px;border-top:1px solid var(--line-2);font-size:11.5px;color:var(--mut)}
+  footer .seal-mini{display:flex;align-items:center;gap:7px;padding:5px 10px;border:1px solid var(--blue-2);border-radius:999px;background:#0a1733}
+  footer .seal-mini .mono{color:var(--blue)}
+  .note{color:var(--mut)}
+  @media (max-width:1240px){ .grid{grid-template-columns:repeat(3,1fr)} .lower{grid-template-columns:1fr 1fr} .next{grid-column:1 / -1} }
+  @media (max-width:900px){ .grid{grid-template-columns:repeat(2,1fr)} .lower{grid-template-columns:1fr} body{padding:18px 16px} header{flex-wrap:wrap} }
+  @media (max-width:560px){ .grid{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <svg class="star" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 1.6l2.3 6.4 6.4 2.3-6.4 2.3-2.3 6.4-2.3-6.4L3.3 10.3l6.4-2.3z"/><circle cx="12" cy="10.3" r="1.8" fill="#050a18"/></svg>
+      <div>
+        <h1>Celia<span>OS</span></h1>
+        <p>Crafted to Think · Learn · Grow</p>
+      </div>
+    </div>
+    <div class="subtitle">
+      <h2>System Atlas 2026</h2>
+      <p>خريطة النظام الشاملة + لوحة المعلومات · <span lang="en" dir="ltr">System map &amp; bilingual dashboard</span></p>
+    </div>
+    <div class="seal">
+      <span class="tick" aria-hidden="true">✓</span>
+      <div>
+        <b>تم التحقق من البيانات <span class="en" lang="en" dir="ltr">Data verified</span></b>
+        <small>بصمة التدقيق <span class="mono">7e7b67a77c</span></small>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="grid" aria-label="المجالات الاثنا عشر">
+      <article class="card part" data-domain="cognitive_knowledge" data-coverage="60" data-priority="P0" lang="ar">
+          <div class="card-top">
+            <span class="idx mono">01</span>
+            <div class="names">
+              <h3>الإدراك والمعرفة والبحث</h3>
+              <p class="en" lang="en" dir="ltr">Cognitive &amp; Knowledge</p>
+            </div>
+            <span class="prio p-p0" title="Highest priority">P0</span>
+          </div>
+          <div class="mid">
+            <div class="donut" style="background:conic-gradient(var(--ring) 216deg, rgba(255,255,255,.10) 0deg)"><span><b>60%</b></span></div>
+            <div class="meta">
+              <p class="count">3 من 5 متحققة <span class="en" lang="en" dir="ltr">3/5 verified</span></p>
+              <p class="prio-say">أولوية قصوى <span class="en" lang="en" dir="ltr">Highest priority</span></p>
+              <p class="state part"><span class="m">🟡</span> جزئي <span class="en" lang="en" dir="ltr">Partly implemented</span></p>
+            </div>
+          </div>
+          <div class="bar" aria-hidden="true"><span style="width:60%"></span></div>
+          <p class="gap gap">فجوة: اكتشاف المعلومات المتضاربة <span class="en" lang="en" dir="ltr">Gap: conflict_detection</span></p>
+        </article>
+      <article class="card part" data-domain="memory_context" data-coverage="80" data-priority="P0" lang="ar">
+          <div class="card-top">
+            <span class="idx mono">02</span>
+            <div class="names">
+              <h3>الذاكرة وإدارة السياق</h3>
+              <p class="en" lang="en" dir="ltr">Memory &amp; Context</p>
+            </div>
+            <span class="prio p-p0" title="Highest priority">P0</span>
+          </div>
+          <div class="mid">
+            <div class="donut" style="background:conic-gradient(var(--ring) 288deg, rgba(255,255,255,.10) 0deg)"><span><b>80%</b></span></div>
+            <div class="meta">
+              <p class="count">4 من 5 متحققة <span class="en" lang="en" dir="ltr">4/5 verified</span></p>
+              <p class="prio-say">أولوية قصوى <span class="en" lang="en" dir="ltr">Highest priority</span></p>
+              <p class="state part"><span class="m">🟡</span> جزئي <span class="en" lang="en" dir="ltr">Partly implemented</span></p>
+            </div>
+          </div>
+          <div class="bar" aria-hidden="true"><span style="width:80%"></span></div>
+          <p class="gap gap">فجوة: إزالة التكرار وتحديث المعلومات <span class="en" lang="en" dir="ltr">Gap: consolidation</span></p>
+        </article>
+      <article class="card part" data-domain="user_experience" data-coverage="40" data-priority="P0" lang="ar">
+          <div class="card-top">
+            <span class="idx mono">03</span>
+            <div class="names">
+              <h3>تجربة المستخدم والتفاعل</h3>
+              <p class="en" lang="en" dir="ltr">User Experience</p>
+            </div>
+            <span class="prio p-p0" title="Highest priority">P0</span>
+          </div>
+          <div class="mid">
+            <div class="donut" style="background:conic-gradient(var(--ring) 144deg, rgba(255,255,255,.10) 0deg)"><span><b>40%</b></span></div>
+            <div class="meta">
+              <p class="count">2 من 5 متحققة <span class="en" lang="en" dir="ltr">2/5 verified</span></p>
+              <p class="prio-say">أولوية قصوى <span class="en" lang="en" dir="ltr">Highest priority</span></p>
+              <p class="state part"><span class="m">🟡</span> جزئي <span class="en" lang="en" dir="ltr">Partly implemented</span></p>
+            </div>
+          </div>
+          <div class="bar" aria-hidden="true"><span style="width:40%"></span></div>
+          <p class="gap gap">فجوة: الإشعارات والتنبيهات <span class="en" lang="en" dir="ltr">Gap: notifications</span></p>
+        </article>
+      <article class="card part" data-domain="multi_agent" data-coverage="25" data-priority="P1" lang="ar">
+          <div class="card-top">
+            <span class="idx mono">04</span>
+            <div class="names">
+              <h3>الوكلاء والتعاون بينهم</h3>
+              <p class="en" lang="en" dir="ltr">Multi-Agent Collaboration</p>
+            </div>
+            <span class="prio p-p1" title="High priority">P1</span>
+          </div>
+          <div class="mid">
+            <div class="donut" style="background:conic-gradient(var(--ring) 90deg, rgba(255,255,255,.10) 0deg)"><span><b>25%</b></span></div>
+            <div class="meta">
+              <p class="count">1 من 4 متحققة <span class="en" lang="en" dir="ltr">1/4 verified</span></p>
+              <p class="prio-say">أولوية عالية <span class="en" lang="en" dir="ltr">High priority</span></p>
+              <p class="state part"><span class="m">🟡</span> جزئي <span class="en" lang="en" dir="ltr">Partly implemented</span></p>
+            </div>
+          </div>
+          <div class="bar" aria-hidden="true"><span style="width:25%"></span></div>
+          <p class="gap gap">فجوة: تفويض المهام بين وكلاء · قناة تواصل بين الوكلاء · حل التعارض بين نتائج وكلاء <span class="en" lang="en" dir="ltr">Gap: delegation, collaboration_bus, conflict_resolution</span></p>
+        </article>
+      <article class="card part" data-domain="integrations" data-coverage="80" data-priority="P0" lang="ar">
+          <div class="card-top">
+            <span class="idx mono">05</span>
+            <div class="names">
+              <h3>الأدوات والتكاملات الخارجية</h3>
+              <p class="en" lang="en" dir="ltr">Integrations Ecosystem</p>
+            </div>
+            <span class="prio p-p0" title="Highest priority">P0</span>
+          </div>
+          <div class="mid">
+            <div class="donut" style="background:conic-gradient(var(--ring) 288deg, rgba(255,255,255,.10) 0deg)"><span><b>80%</b></span></div>
+            <div class="meta">
+              <p class="count">4 من 5 متحققة <span class="en" lang="en" dir="ltr">4/5 verified</span></p>
+              <p class="prio-say">أولوية قصوى <span class="en" lang="en" dir="ltr">Highest priority</span></p>
+              <p class="state part"><span class="m">🟡</span> جزئي <span class="en" lang="en" dir="ltr">Partly implemented</span></p>
+            </div>
+          </div>
+          <div class="bar" aria-hidden="true"><span style="width:80%"></span></div>
+          <p class="gap warn">بلا اختبار يسمّي ملفه: GitHub — المستودع وسير العمل <span class="en" lang="en" dir="ltr">No test names: github</span></p>
+        </article>
+      <article class="card ok" data-domain="automation" data-coverage="100" data-priority="P1" lang="ar">
+          <div class="card-top">
+            <span class="idx mono">06</span>
+            <div class="names">
+              <h3>الأتمتة وإدارة المهام</h3>
+              <p class="en" lang="en" dir="ltr">Automation &amp; Workflow</p>
+            </div>
+            <span class="prio p-p1" title="High priority">P1</span>
+          </div>
+          <div class="mid">
+            <div class="donut" style="background:conic-gradient(var(--ring) 360deg, rgba(255,255,255,.10) 0deg)"><span><b>100%</b></span></div>
+            <div class="meta">
+              <p class="count">4 من 4 متحققة <span class="en" lang="en" dir="ltr">4/4 verified</span></p>
+              <p class="prio-say">أولوية عالية <span class="en" lang="en" dir="ltr">High priority</span></p>
+              <p class="state ok"><span class="m">🟢</span> منفّذ ومتحقق <span class="en" lang="en" dir="ltr">Verified by a named test</span></p>
+            </div>
+          </div>
+          <div class="bar" aria-hidden="true"><span style="width:100%"></span></div>
+          <p class="gap done">لا فجوة مقيسة <span class="en" lang="en" dir="ltr">No measured gap</span></p>
+        </article>
+      <article class="card ok" data-domain="model_intelligence" data-coverage="100" data-priority="P1" lang="ar">
+          <div class="card-top">
+            <span class="idx mono">07</span>
+            <div class="names">
+              <h3>النماذج والذكاء والتكلفة</h3>
+              <p class="en" lang="en" dir="ltr">Model Intelligence &amp; Routing</p>
+            </div>
+            <span class="prio p-p1" title="High priority">P1</span>
+          </div>
+          <div class="mid">
+            <div class="donut" style="background:conic-gradient(var(--ring) 360deg, rgba(255,255,255,.10) 0deg)"><span><b>100%</b></span></div>
+            <div class="meta">
+              <p class="count">5 من 5 متحققة <span class="en" lang="en" dir="ltr">5/5 verified</span></p>
+              <p class="prio-say">أولوية عالية <span class="en" lang="en" dir="ltr">High priority</span></p>
+              <p class="state ok"><span class="m">🟢</span> منفّذ ومتحقق <span class="en" lang="en" dir="ltr">Verified by a named test</span></p>
+            </div>
+          </div>
+          <div class="bar" aria-hidden="true"><span style="width:100%"></span></div>
+          <p class="gap done">لا فجوة مقيسة <span class="en" lang="en" dir="ltr">No measured gap</span></p>
+        </article>
+      <article class="card part" data-domain="reliability" data-coverage="75" data-priority="P1" lang="ar">
+          <div class="card-top">
+            <span class="idx mono">08</span>
+            <div class="names">
+              <h3>الاستمرارية والتعافي</h3>
+              <p class="en" lang="en" dir="ltr">Reliability &amp; Recovery</p>
+            </div>
+            <span class="prio p-p1" title="High priority">P1</span>
+          </div>
+          <div class="mid">
+            <div class="donut" style="background:conic-gradient(var(--ring) 270deg, rgba(255,255,255,.10) 0deg)"><span><b>75%</b></span></div>
+            <div class="meta">
+              <p class="count">3 من 4 متحققة <span class="en" lang="en" dir="ltr">3/4 verified</span></p>
+              <p class="prio-say">أولوية عالية <span class="en" lang="en" dir="ltr">High priority</span></p>
+              <p class="state part"><span class="m">🟡</span> جزئي <span class="en" lang="en" dir="ltr">Partly implemented</span></p>
+            </div>
+          </div>
+          <div class="bar" aria-hidden="true"><span style="width:75%"></span></div>
+          <p class="gap warn">بلا اختبار يسمّي ملفه: استعادة البيانات والإصدارات <span class="en" lang="en" dir="ltr">No test names: restore</span></p>
+        </article>
+      <article class="card part" data-domain="product_lifecycle" data-coverage="25" data-priority="P2" lang="ar">
+          <div class="card-top">
+            <span class="idx mono">09</span>
+            <div class="names">
+              <h3>إدارة دورة حياة المنتج</h3>
+              <p class="en" lang="en" dir="ltr">Product Lifecycle</p>
+            </div>
+            <span class="prio p-p2" title="Medium priority">P2</span>
+          </div>
+          <div class="mid">
+            <div class="donut" style="background:conic-gradient(var(--ring) 90deg, rgba(255,255,255,.10) 0deg)"><span><b>25%</b></span></div>
+            <div class="meta">
+              <p class="count">1 من 4 متحققة <span class="en" lang="en" dir="ltr">1/4 verified</span></p>
+              <p class="prio-say">أولوية متوسطة <span class="en" lang="en" dir="ltr">Medium priority</span></p>
+              <p class="state part"><span class="m">🟡</span> جزئي <span class="en" lang="en" dir="ltr">Partly implemented</span></p>
+            </div>
+          </div>
+          <div class="bar" aria-hidden="true"><span style="width:25%"></span></div>
+          <p class="gap warn">بلا اختبار يسمّي ملفه: خارطة طريق التطوير · سجل القرارات الهندسية · التوافق بين الإصدارات <span class="en" lang="en" dir="ltr">No test names: roadmap, decisions, compatibility</span></p>
+        </article>
+      <article class="card ok" data-domain="resource_operations" data-coverage="100" data-priority="P2" lang="ar">
+          <div class="card-top">
+            <span class="idx mono">10</span>
+            <div class="names">
+              <h3>إدارة الموارد والعمليات</h3>
+              <p class="en" lang="en" dir="ltr">Resource &amp; Operations</p>
+            </div>
+            <span class="prio p-p2" title="Medium priority">P2</span>
+          </div>
+          <div class="mid">
+            <div class="donut" style="background:conic-gradient(var(--ring) 360deg, rgba(255,255,255,.10) 0deg)"><span><b>100%</b></span></div>
+            <div class="meta">
+              <p class="count">4 من 4 متحققة <span class="en" lang="en" dir="ltr">4/4 verified</span></p>
+              <p class="prio-say">أولوية متوسطة <span class="en" lang="en" dir="ltr">Medium priority</span></p>
+              <p class="state ok"><span class="m">🟢</span> منفّذ ومتحقق <span class="en" lang="en" dir="ltr">Verified by a named test</span></p>
+            </div>
+          </div>
+          <div class="bar" aria-hidden="true"><span style="width:100%"></span></div>
+          <p class="gap done">لا فجوة مقيسة <span class="en" lang="en" dir="ltr">No measured gap</span></p>
+        </article>
+      <article class="card part" data-domain="analytics_observability" data-coverage="75" data-priority="P2" lang="ar">
+          <div class="card-top">
+            <span class="idx mono">11</span>
+            <div class="names">
+              <h3>التحليلات والمراقبة</h3>
+              <p class="en" lang="en" dir="ltr">Analytics &amp; Observability</p>
+            </div>
+            <span class="prio p-p2" title="Medium priority">P2</span>
+          </div>
+          <div class="mid">
+            <div class="donut" style="background:conic-gradient(var(--ring) 270deg, rgba(255,255,255,.10) 0deg)"><span><b>75%</b></span></div>
+            <div class="meta">
+              <p class="count">3 من 4 متحققة <span class="en" lang="en" dir="ltr">3/4 verified</span></p>
+              <p class="prio-say">أولوية متوسطة <span class="en" lang="en" dir="ltr">Medium priority</span></p>
+              <p class="state part"><span class="m">🟡</span> جزئي <span class="en" lang="en" dir="ltr">Partly implemented</span></p>
+            </div>
+          </div>
+          <div class="bar" aria-hidden="true"><span style="width:75%"></span></div>
+          <p class="gap warn">بلا اختبار يسمّي ملفه: لوحة حالة تشغيلية <span class="en" lang="en" dir="ltr">No test names: dashboard</span></p>
+        </article>
+      <article class="card ok" data-domain="security_governance" data-coverage="100" data-priority="P0" lang="ar">
+          <div class="card-top">
+            <span class="idx mono">12</span>
+            <div class="names">
+              <h3>الأمان والحوكمة</h3>
+              <p class="en" lang="en" dir="ltr">Security &amp; Governance</p>
+            </div>
+            <span class="prio p-p0" title="Highest priority">P0</span>
+          </div>
+          <div class="mid">
+            <div class="donut" style="background:conic-gradient(var(--ring) 360deg, rgba(255,255,255,.10) 0deg)"><span><b>100%</b></span></div>
+            <div class="meta">
+              <p class="count">5 من 5 متحققة <span class="en" lang="en" dir="ltr">5/5 verified</span></p>
+              <p class="prio-say">أولوية قصوى <span class="en" lang="en" dir="ltr">Highest priority</span></p>
+              <p class="state ok"><span class="m">🟢</span> منفّذ ومتحقق <span class="en" lang="en" dir="ltr">Verified by a named test</span></p>
+            </div>
+          </div>
+          <div class="bar" aria-hidden="true"><span style="width:100%"></span></div>
+          <p class="gap done">لا فجوة مقيسة <span class="en" lang="en" dir="ltr">No measured gap</span></p>
+        </article>
+    </section>
+
+    <section class="lower">
+      <div class="box">
+        <h3>مراحل التطوير <span class="en" lang="en" dir="ltr">Roadmap</span></h3>
+        <div class="phases"><div class="phase p-p0">
+            <b>P0</b>
+            <strong>5</strong>
+            <span>مجالات <span class="en" lang="en" dir="ltr">domains</span></span>
+            <i aria-hidden="true">←</i>
+          </div><div class="phase p-p1">
+            <b>P1</b>
+            <strong>4</strong>
+            <span>مجالات <span class="en" lang="en" dir="ltr">domains</span></span>
+            <i aria-hidden="true">←</i>
+          </div><div class="phase p-p2">
+            <b>P2</b>
+            <strong>3</strong>
+            <span>مجالات <span class="en" lang="en" dir="ltr">domains</span></span>
+            
+          </div></div>
+        <p class="note" style="margin:9px 0 0;font-size:11px">P0 أولًا، ولا يبدأ مجال قبل دليله. <span class="en" lang="en" dir="ltr">P0 first; no domain starts without its evidence.</span></p>
+      </div>
+
+      <div class="box">
+        <h3>نتائج التدقيق <span class="en" lang="en" dir="ltr">Audit results</span></h3>
+        <div class="totals">
+          <div class="cell ok"><b>39</b><small>متحققة باختبار <span class="en" lang="en" dir="ltr">verified</span></small></div>
+          <div class="cell unv"><b>9</b><small>بلا اختبار يسمّي ملفها <span class="en" lang="en" dir="ltr">no test</span></small></div>
+          <div class="cell miss"><b>6</b><small>غائبة <span class="en" lang="en" dir="ltr">missing</span></small></div>
+          <div class="cell all"><b>54</b><small>إجمالي القدرات <span class="en" lang="en" dir="ltr">capabilities</span></small></div>
+        </div>
+        <div class="overall">
+          <div class="donut" style="background:conic-gradient(var(--ring) 259.2deg, rgba(255,255,255,.10) 0deg)"><span><b>72%</b></span></div>
+          <ul>
+            <li><span>متوسط التغطية المقيس <span class="en" lang="en" dir="ltr">measured average</span></span><b>72%</b></li>
+            <li><span>مجالات مكتملة <span class="en" lang="en" dir="ltr">complete</span></span><b>4</b></li>
+            <li><span>مجالات جزئية <span class="en" lang="en" dir="ltr">partial</span></span><b>8</b></li>
+            <li><span>مجالات مفقودة <span class="en" lang="en" dir="ltr">absent</span></span><b>0</b></li>
+          </ul>
+        </div>
+      </div>
+
+      <section class="next" aria-labelledby="next-title">
+        <div class="next-head">
+          <h2 id="next-title">الأولوية التالية <span class="en" lang="en" dir="ltr">Next priority</span></h2>
+          <span class="prio p-p0">P0</span>
+        </div>
+        <p class="next-gap">اكتشاف المعلومات المتضاربة <span class="mono">conflict_detection</span></p>
+        <p class="next-why">الإدراك والمعرفة والبحث · لم تُبنَ بعد: لا ملف ولا اختبار يسمّيها في التدقيق حتى الآن.
+          <span class="en" lang="en" dir="ltr">Cognitive &amp; Knowledge · absent from the audit: no file and no test names it yet.</span></p>
+      </section>
+    </section>
+  </main>
+
+  <footer>
+    <div class="seal-mini">
+      <span aria-hidden="true">✓</span>
+      <span>بصمة البيانات <span class="mono">7e7b67a77c</span></span>
+    </div>
+    <div class="note">مُولَّد من <span class="mono">src/design/system-atlas.js</span> — <span class="mono">npm run atlas:dashboard</span> · لا تاريخ ولا نسبة غير مقيسة <span class="en" lang="en" dir="ltr">no date, no unmeasured ratio</span></div>
+  </footer>
+</body>
+</html>

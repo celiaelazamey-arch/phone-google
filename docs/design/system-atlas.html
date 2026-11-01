@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="celia-visual" content="generated:celiaos-system-atlas-v1:source=src/design/system-atlas.js" />
+<title>CeliaOS — System Atlas 2026</title>
+<style>
+  @font-face { font-family: "Plex"; src: url("../../public/fonts/ibm-plex-sans-arabic-arabic-400-normal.woff2") format("woff2"); font-weight: 400; font-display: block; }
+  @font-face { font-family: "Plex"; src: url("../../public/fonts/ibm-plex-sans-arabic-arabic-600-normal.woff2") format("woff2"); font-weight: 600; font-display: block; }
+  @font-face { font-family: "Plex"; src: url("../../public/fonts/ibm-plex-sans-arabic-arabic-700-normal.woff2") format("woff2"); font-weight: 700; font-display: block; }
+  @font-face { font-family: "Mono"; src: url("../../public/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-display: block; }
+  :root{--bg:#080d24;--panel:#0f1738;--panel-2:#131d47;--line:#26346b;--line-2:#33459b;--txt:#eaf0ff;--mut:#a9b6e8;--gold:#fbbf24;--ok:#34d399;--part:#fbbf24;--miss:#f87171;--unv:#fb923c;--off:#94a3b8;--prop:#60a5fa;--blocked:#e879f9}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--txt);font-family:"Plex",system-ui,sans-serif;line-height:1.55}
+  body{width:1440px;padding:40px 46px 34px}
+  .mono{font-family:"Mono",monospace;direction:ltr;unicode-bidi:isolate}
+  .small{font-size:10.5px}
+  header.top{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;padding-bottom:20px;border-bottom:2px solid var(--line-2)}
+  .logo{display:flex;align-items:center;gap:12px;font-size:32px;font-weight:700}
+  .logo .star{color:var(--gold);font-size:28px}
+  .logo b{color:var(--gold)}
+  .tagline{color:var(--mut);font-size:14px}
+  .title{text-align:left;max-width:720px}
+  .title h1{margin:0 0 6px;font-size:22px}
+  .title p{margin:0;color:var(--mut);font-size:13.5px}
+  .pill{display:inline-block;margin-top:8px;padding:4px 12px;border:1px solid var(--line-2);border-radius:999px;color:var(--gold);font-size:11.5px}
+  h2.section{margin:26px 0 12px;font-size:17px;color:var(--gold);display:flex;align-items:center;gap:10px}
+  h2.section:after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--line-2),transparent)}
+  .stats{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;text-align:center}
+  .stat b{display:block;font-size:23px}
+  .stat small{color:var(--mut);font-size:11.5px}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .card{background:var(--panel);border:1px solid var(--line);border-right:4px solid var(--line-2);border-radius:12px;padding:12px 14px}
+  .card header{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+  .card h3{margin:0;font-size:14px}
+  .prio{font-family:"Mono",monospace;font-size:10.5px;color:var(--gold);border:1px solid var(--line-2);border-radius:6px;padding:1px 6px}
+  .card .sub{display:flex;justify-content:space-between;gap:8px;margin:6px 0 8px;color:var(--mut);font-size:11px}
+  .bar{height:6px;background:#0a1230;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin-bottom:10px}
+  .bar span{display:block;height:100%;background:linear-gradient(90deg,#22d3ee,#33459b)}
+  .caps{list-style:none;margin:0 0 8px;padding:0;display:flex;flex-direction:column;gap:5px}
+  .caps li{display:flex;gap:6px;align-items:baseline;font-size:12px}
+  .caps li .cap{flex:1}
+  .caps li .ev{font-size:9.5px;color:#7d8dc9;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:ltr;text-align:right}
+  .mark{font-size:11px}
+  .card .meta{margin:0;font-size:10.5px;color:var(--mut)}
+  .ok{border-right-color:var(--ok)} .part{border-right-color:var(--part)} .miss{border-right-color:var(--miss)}
+  .unv{border-right-color:var(--unv)} .off{border-right-color:var(--off)} .prop{border-right-color:var(--prop)} .blocked{border-right-color:var(--blocked)}
+  .ok .mark{color:var(--ok)} .part .mark{color:var(--part)} .miss .mark{color:var(--miss)} .unv .mark{color:var(--unv)}
+  .phase{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+  .phase-head{display:flex;gap:10px;align-items:baseline;margin-bottom:8px}
+  .phase-head b{color:var(--gold);font-family:"Mono",monospace;font-size:13px}
+  .phase-head span{color:var(--mut);font-size:12px}
+  .phase-body{display:flex;flex-wrap:wrap;gap:6px}
+  .tag{border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:11px;background:var(--panel-2)}
+  .legend{display:flex;flex-wrap:wrap;gap:16px;color:var(--mut);font-size:11.5px}
+  footer{margin-top:24px;padding-top:12px;border-top:2px solid var(--line-2);display:flex;justify-content:space-between;color:var(--mut);font-size:11.5px}
+  footer a{color:#93c5fd;text-decoration:none}
+</style>
+</head>
+<body>
+  <header class="top">
+    <div>
+      <div class="logo"><span class="star">✦</span><span>Celia<b>OS</b></span></div>
+      <div class="tagline">System Atlas · خريطة النطاق الكامل</div>
+    </div>
+    <div class="title">
+      <h1>اثنا عشر مجالًا — بتغطيتها المقيسة لا الموعودة</h1>
+      <p>كل قدرة تشير إلى ملفاتها، وحالتها تُحسب من الوجود والاختبار. هذه خريطة تدقيق قبل البناء.</p>
+      <span class="pill mono">celiaos-system-atlas-v1</span>
+    </div>
+  </header>
+
+  <h2 class="section">ما قيس الآن</h2>
+  <div class="stats">
+    <div class="stat"><b>12</b><small>مجالًا</small></div>
+    <div class="stat"><b>54</b><small>قدرة معلنة</small></div>
+    <div class="stat"><b style="color:var(--ok)">39</b><small>متحققة</small></div>
+    <div class="stat"><b style="color:var(--unv)">9</b><small>بلا اختبار</small></div>
+    <div class="stat"><b style="color:var(--miss)">6</b><small>غير موجودة</small></div>
+    <div class="stat"><b style="color:var(--part)">8</b><small>مجالات جزئية</small></div>
+  </div>
+
+  <h2 class="section">المجالات الاثنا عشر</h2>
+  <div class="grid">
+      <article class="card part" data-domain="cognitive_knowledge" data-status="partial">
+          <header>
+            <h3>الإدراك والمعرفة والبحث</h3>
+            <span class="prio">P0</span>
+          </header>
+          <div class="sub"><span class="badge">🟡 جزئي</span><span class="mono small">Cognitive &amp; Knowledge</span></div>
+          <div class="bar" title="تغطية 60%"><span style="width:60%"></span></div>
+          <ul class="caps"><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">البحث الداخلي في شبكة المعرفة</span>
+            <span class="ev mono">src/knowledge/store.js · src/knowledge/index.js</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">تحليل موثوقية المصادر</span>
+            <span class="ev mono">src/knowledge/governance.js · src/knowledge/validate.js</span>
+          </li><li class="unv" data-status="implemented_unverified">
+            <span class="mark">🟠</span>
+            <span class="cap">الاستشهاد بالمراجع داخل الإجابات</span>
+            <span class="ev mono">src/knowledge/schema.js · src/kb-routes.js</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">البحث الخارجي واكتشاف المصادر</span>
+            <span class="ev mono">src/agent/web-fetch.js · src/agent/spider-reader.js</span>
+          </li><li class="miss" data-status="not_implemented">
+            <span class="mark">🔴</span>
+            <span class="cap">اكتشاف المعلومات المتضاربة</span>
+            <span class="ev mono">بلا ملف</span>
+          </li></ul>
+          <p class="meta">الأثر: <span class="mono">public/kb.html</span> · تغطية 60%</p>
+        </article>
+      <article class="card part" data-domain="memory_context" data-status="partial">
+          <header>
+            <h3>الذاكرة وإدارة السياق</h3>
+            <span class="prio">P0</span>
+          </header>
+          <div class="sub"><span class="badge">🟡 جزئي</span><span class="mono small">Memory &amp; Context</span></div>
+          <div class="bar" title="تغطية 80%"><span style="width:80%"></span></div>
+          <ul class="caps"><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">ذاكرة قصيرة المدى داخل التشغيل</span>
+            <span class="ev mono">src/agent/memory.js</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">ذاكرة طويلة المدى دائمة</span>
+            <span class="ev mono">src/agent/store.js</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">إدارة حجم السياق واختياره</span>
+            <span class="ev mono">src/context-policy.js</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">تتبّع مصدر كل معلومة محفوظة</span>
+            <span class="ev mono">src/agent/evidence.js</span>
+          </li><li class="miss" data-status="not_implemented">
+            <span class="mark">🔴</span>
+            <span class="cap">إزالة التكرار وتحديث المعلومات</span>
+            <span class="ev mono">بلا ملف</span>
+          </li></ul>
+          <p class="meta">الأثر: <span class="mono">docs/agent-memory-deployment.md</span> · تغطية 80%</p>
+        </article>
+      <article class="card part" data-domain="user_experience" data-status="partial">
+          <header>
+            <h3>تجربة المستخدم والتفاعل</h3>
+            <span class="prio">P0</span>
+          </header>
+          <div class="sub"><span class="badge">🟡 جزئي</span><span class="mono small">User Experience</span></div>
+          <div class="bar" title="تغطية 40%"><span style="width:40%"></span></div>
+          <ul class="caps"><li class="unv" data-status="implemented_unverified">
+            <span class="mark">🟠</span>
+            <span class="cap">واجهة عربية RTL</span>
+            <span class="ev mono">public/system.html · e2e/system.spec.js</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">المحادثات والملفات</span>
+            <span class="ev mono">public/agent.html · src/agent-routes.js</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">الأوامر الصوتية والنصية</span>
+            <span class="ev mono">public/agent.js</span>
+          </li><li class="miss" data-status="not_implemented">
+            <span class="mark">🔴</span>
+            <span class="cap">الإشعارات والتنبيهات</span>
+            <span class="ev mono">بلا ملف</span>
+          </li><li class="unv" data-status="implemented_unverified">
+            <span class="mark">🟠</span>
+            <span class="cap">إعدادات المستخدم والتخصيص</span>
+            <span class="ev mono">public/system.html</span>
+          </li></ul>
+          <p class="meta">الأثر: <span class="mono">public/system.html</span> · تغطية 40%</p>
+        </article>
+      <article class="card part" data-domain="multi_agent" data-status="partial">
+          <header>
+            <h3>الوكلاء والتعاون بينهم</h3>
+            <span class="prio">P1</span>
+          </header>
+          <div class="sub"><span class="badge">🟡 جزئي</span><span class="mono small">Multi-Agent Collaboration</span></div>
+          <div class="bar" title="تغطية 25%"><span style="width:25%"></span></div>
+          <ul class="caps"><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">وكيل واحد يعمل بالحزام</span>
+            <span class="ev mono">src/agent/runtime.js · src/agent/harness.js</span>
+          </li><li class="miss" data-status="not_implemented">
+            <span class="mark">🔴</span>
+            <span class="cap">تفويض المهام بين وكلاء</span>
+            <span class="ev mono">بلا ملف</span>
+          </li><li class="miss" data-status="not_implemented">
+            <span class="mark">🔴</span>
+            <span class="cap">قناة تواصل بين الوكلاء</span>
+            <span class="ev mono">بلا ملف</span>
+          </li><li class="miss" data-status="not_implemented">
+            <span class="mark">🔴</span>
+            <span class="cap">حل التعارض بين نتائج وكلاء</span>
+            <span class="ev mono">بلا ملف</span>
+          </li></ul>
+          <p class="meta">لا أثر بصري لهذا المجال بعد · تغطية 25%</p>
+        </article>
+      <article class="card part" data-domain="integrations" data-status="partial">
+          <header>
+            <h3>الأدوات والتكاملات الخارجية</h3>
+            <span class="prio">P0</span>
+          </header>
+          <div class="sub"><span class="badge">🟡 جزئي</span><span class="mono small">Integrations Ecosystem</span></div>
+          <div class="bar" title="تغطية 80%"><span style="width:80%"></span></div>
+          <ul class="caps"><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">Google — Gmail وDrive وCalendar</span>
+            <span class="ev mono">src/agent/gmail.js · src/agent/google-read.js</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">WhatsApp Business</span>
+            <span class="ev mono">src/whatsapp.js · workers/celia-edge/whatsapp-store.js</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">MCP — تصدير الأدوات</span>
+            <span class="ev mono">src/mcp-contract.js · src/celia-mcp.js</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">Cloudflare وRender</span>
+            <span class="ev mono">workers/celia-edge/worker.js · render.yaml</span>
+          </li><li class="unv" data-status="implemented_unverified">
+            <span class="mark">🟠</span>
+            <span class="cap">GitHub — المستودع وسير العمل</span>
+            <span class="ev mono">.github/workflows/celia-mcp.yml</span>
+          </li></ul>
+          <p class="meta">الأثر: <span class="mono">public/deploy.html</span> · تغطية 80%</p>
+        </article>
+      <article class="card ok" data-domain="automation" data-status="implemented_verified">
+          <header>
+            <h3>الأتمتة وإدارة المهام</h3>
+            <span class="prio">P1</span>
+          </header>
+          <div class="sub"><span class="badge">🟢 منفّذ ومتحقق</span><span class="mono small">Automation &amp; Workflow</span></div>
+          <div class="bar" title="تغطية 100%"><span style="width:100%"></span></div>
+          <ul class="caps"><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">المهام المجدولة</span>
+            <span class="ev mono">workers/celia-edge/cron.js</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">المشغلات والأحداث</span>
+            <span class="ev mono">src/agent/outbox.js</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">إعادة المحاولة ومعالجة الفشل</span>
+            <span class="ev mono">src/resilience.js · src/idempotency.js</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">محرّك تدفقات</span>
+            <span class="ev mono">src/agent/automation/index.js</span>
+          </li></ul>
+          <p class="meta">لا أثر بصري لهذا المجال بعد · تغطية 100%</p>
+        </article>
+      <article class="card ok" data-domain="model_intelligence" data-status="implemented_verified">
+          <header>
+            <h3>النماذج والذكاء والتكلفة</h3>
+            <span class="prio">P1</span>
+          </header>
+          <div class="sub"><span class="badge">🟢 منفّذ ومتحقق</span><span class="mono small">Model Intelligence &amp; Routing</span></div>
+          <div class="bar" title="تغطية 100%"><span style="width:100%"></span></div>
+          <ul class="caps"><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">اختيار النموذج وتوجيه المهمة</span>
+            <span class="ev mono">src/agent/model-router.js</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">نماذج محلية وسحابية</span>
+            <span class="ev mono">src/ollama.js · src/gemini.js</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">قياس زمن الاستجابة</span>
+            <span class="ev mono">src/agent/timing.js</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">بدائل عند فشل النموذج</span>
+            <span class="ev mono">src/agent/planner-fallback.js</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">قياس الاستهلاك والتكلفة</span>
+            <span class="ev mono">src/reply-metrics.js</span>
+          </li></ul>
+          <p class="meta">لا أثر بصري لهذا المجال بعد · تغطية 100%</p>
+        </article>
+      <article class="card part" data-domain="reliability" data-status="partial">
+          <header>
+            <h3>الاستمرارية والتعافي</h3>
+            <span class="prio">P1</span>
+          </header>
+          <div class="sub"><span class="badge">🟡 جزئي</span><span class="mono small">Reliability &amp; Recovery</span></div>
+          <div class="bar" title="تغطية 75%"><span style="width:75%"></span></div>
+          <ul class="caps"><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">النسخ الاحتياطي</span>
+            <span class="ev mono">scripts/deploy-release.mjs</span>
+          </li><li class="unv" data-status="implemented_unverified">
+            <span class="mark">🟠</span>
+            <span class="cap">استعادة البيانات والإصدارات</span>
+            <span class="ev mono">docs/releases-and-recovery.md</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">استعادة المهام المتوقفة</span>
+            <span class="ev mono">src/agent/outbox.js · src/agent/runtime.js</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">منع تنفيذ العمليات المكررة</span>
+            <span class="ev mono">src/idempotency.js</span>
+          </li></ul>
+          <p class="meta">الأثر: <span class="mono">docs/releases-and-recovery.md</span> · تغطية 75%</p>
+        </article>
+      <article class="card part" data-domain="product_lifecycle" data-status="partial">
+          <header>
+            <h3>إدارة دورة حياة المنتج</h3>
+            <span class="prio">P2</span>
+          </header>
+          <div class="sub"><span class="badge">🟡 جزئي</span><span class="mono small">Product Lifecycle</span></div>
+          <div class="bar" title="تغطية 25%"><span style="width:25%"></span></div>
+          <ul class="caps"><li class="unv" data-status="implemented_unverified">
+            <span class="mark">🟠</span>
+            <span class="cap">خارطة طريق التطوير</span>
+            <span class="ev mono">docs/plan-100-percent.md</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">إدارة الإصدارات</span>
+            <span class="ev mono">src/version.js · CHANGELOG.md</span>
+          </li><li class="unv" data-status="implemented_unverified">
+            <span class="mark">🟠</span>
+            <span class="cap">سجل القرارات الهندسية</span>
+            <span class="ev mono">docs/continuity/DECISIONS.md</span>
+          </li><li class="unv" data-status="implemented_unverified">
+            <span class="mark">🟠</span>
+            <span class="cap">التوافق بين الإصدارات</span>
+            <span class="ev mono">docs/compatibility-contract.md</span>
+          </li></ul>
+          <p class="meta">الأثر: <span class="mono">CHANGELOG.md</span> · تغطية 25%</p>
+        </article>
+      <article class="card ok" data-domain="resource_operations" data-status="implemented_verified">
+          <header>
+            <h3>إدارة الموارد والعمليات</h3>
+            <span class="prio">P2</span>
+          </header>
+          <div class="sub"><span class="badge">🟢 منفّذ ومتحقق</span><span class="mono small">Resource &amp; Operations</span></div>
+          <div class="bar" title="تغطية 100%"><span style="width:100%"></span></div>
+          <ul class="caps"><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">حالة الخدمات</span>
+            <span class="ev mono">scripts/service-reality.mjs</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">إدارة طوابير المهام</span>
+            <span class="ev mono">src/agent/outbox.js</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">استهلاك الموارد</span>
+            <span class="ev mono">src/memory-pool.js</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">مراقبة التكاليف</span>
+            <span class="ev mono">src/reply-metrics.js</span>
+          </li></ul>
+          <p class="meta">الأثر: <span class="mono">public/system.html</span> · تغطية 100%</p>
+        </article>
+      <article class="card part" data-domain="analytics_observability" data-status="partial">
+          <header>
+            <h3>التحليلات والمراقبة</h3>
+            <span class="prio">P2</span>
+          </header>
+          <div class="sub"><span class="badge">🟡 جزئي</span><span class="mono small">Analytics &amp; Observability</span></div>
+          <div class="bar" title="تغطية 75%"><span style="width:75%"></span></div>
+          <ul class="caps"><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">سجل الأدلة</span>
+            <span class="ev mono">src/agent/evidence.js</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">تتبّع الخطوات في اللوحة</span>
+            <span class="ev mono">public/agent.js</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">قياس الاختبارات والتغطية</span>
+            <span class="ev mono">scripts/test-reporter-gha.mjs</span>
+          </li><li class="unv" data-status="implemented_unverified">
+            <span class="mark">🟠</span>
+            <span class="cap">لوحة حالة تشغيلية</span>
+            <span class="ev mono">public/system.html</span>
+          </li></ul>
+          <p class="meta">الأثر: <span class="mono">public/system.html</span> · تغطية 75%</p>
+        </article>
+      <article class="card ok" data-domain="security_governance" data-status="implemented_verified">
+          <header>
+            <h3>الأمان والحوكمة</h3>
+            <span class="prio">P0</span>
+          </header>
+          <div class="sub"><span class="badge">🟢 منفّذ ومتحقق</span><span class="mono small">Security &amp; Governance</span></div>
+          <div class="bar" title="تغطية 100%"><span style="width:100%"></span></div>
+          <ul class="caps"><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">محرّك السياسة والصلاحيات</span>
+            <span class="ev mono">src/agent/access-policy.js</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">بوابة الموافقة المربوطة بالبصمة</span>
+            <span class="ev mono">src/agent/harness.js</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">العزل التنفيذي</span>
+            <span class="ev mono">src/agent/sandbox-policy.js</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">حماية الأسرار</span>
+            <span class="ev mono">src/secrets-hub.js · src/security.js</span>
+          </li><li class="ok" data-status="implemented_verified">
+            <span class="mark">🟢</span>
+            <span class="cap">سجل تدقيق غير قابل للعبث</span>
+            <span class="ev mono">src/agent/evidence.js</span>
+          </li></ul>
+          <p class="meta">الأثر: <span class="mono">docs/access-policy/README.md</span> · تغطية 100%</p>
+        </article>
+  </div>
+
+  <h2 class="section">المراحل — بالترتيب لا بالاثني عشر معًا</h2>
+      <div class="phase">
+          <div class="phase-head"><b>P0</b><span>الأساسات: تُثبت قبل أي توسّع — المعرفة والذاكرة والتجربة والتكامل والحوكمة.</span></div>
+          <div class="phase-body"><span class="tag part">🟡 الإدراك والمعرفة والبحث</span><span class="tag part">🟡 الذاكرة وإدارة السياق</span><span class="tag part">🟡 تجربة المستخدم والتفاعل</span><span class="tag part">🟡 الأدوات والتكاملات الخارجية</span><span class="tag ok">🟢 الأمان والحوكمة</span></div>
+        </div>
+      <div class="phase">
+          <div class="phase-head"><b>P1</b><span>الطبقة التشغيلية: الأتمتة وتوجيه النماذج والتعافي وتعدد الوكلاء — كل واحد بدليل.</span></div>
+          <div class="phase-body"><span class="tag part">🟡 الوكلاء والتعاون بينهم</span><span class="tag ok">🟢 الأتمتة وإدارة المهام</span><span class="tag ok">🟢 النماذج والذكاء والتكلفة</span><span class="tag part">🟡 الاستمرارية والتعافي</span></div>
+        </div>
+      <div class="phase">
+          <div class="phase-head"><b>P2</b><span>القياس والإدارة: الموارد والتحليلات ودورة حياة المنتج.</span></div>
+          <div class="phase-body"><span class="tag part">🟡 إدارة دورة حياة المنتج</span><span class="tag ok">🟢 إدارة الموارد والعمليات</span><span class="tag part">🟡 التحليلات والمراقبة</span></div>
+        </div>
+  <p class="legend" style="margin-top:6px">يُبنى أولًا: اكتشاف المعرفة، استمراريتها، منتج قابل للاستخدام، والربط بالعالم · بعد أن تثبت الأساسات: الأتمتة، توجيه النماذج، التعافي، وتعدد الوكلاء · تحسين وقياس: الموارد والتحليلات ودورة حياة المنتج</p>
+
+  <h2 class="section">مفتاح الحالات</h2>
+  <p class="legend"><span class="ok"><b>🟢</b> منفّذ ومتحقق</span><span class="unv"><b>🟠</b> منفّذ وغير متحقق</span><span class="part"><b>🟡</b> جزئي</span><span class="prop"><b>🔵</b> مقترح</span><span class="miss"><b>🔴</b> غير منفّذ</span><span class="off"><b>⚪</b> موجود ومعطّل</span><span class="blocked"><b>⛔</b> محجوب</span></p>
+
+  <footer>
+    <div>مُولَّد من <b class="mono">src/design/system-atlas.js</b> — <span class="mono">npm run atlas</span> · الخريطة المعمارية: <a href="./architecture-map.html">architecture-map.html</a></div>
+    <div>لا مجال يُرسم أعلى من دليله.</div>
+  </footer>
+</body>
+</html>
