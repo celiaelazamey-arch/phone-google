@@ -272,7 +272,7 @@ export const MANAGEMENT_LOOP = Object.freeze([
   Object.freeze({ n: 5, ar: 'تشغيل الاختبارات', stage: 'Sandbox Execute', note: 'الفشل يُسمّى لا يُستهلك' }),
   Object.freeze({ n: 6, ar: 'التحقق من الأدلة', stage: 'Independently Verify', note: 'حكم مستقل لا تقييم ذاتي' }),
   Object.freeze({ n: 7, ar: 'طلب الموافقة', stage: 'Approval', note: 'مربوطة ببصمة الحمولة' }),
-  Object.freeze({ n: 8, ar: 'الدمج والنشر', stage: null, note: 'خارج الحزام: بوابات المستودع وكلمة المالك' }),
+  Object.freeze({ n: 8, ar: 'الدمج والنشر', stage: null, note: 'بوابات المستودع وكلمة المالك' }),
   Object.freeze({ n: 9, ar: 'مراقبة النتائج', stage: 'Observe', note: 'ما جرى فعلًا لا ما قيل' }),
   Object.freeze({ n: 10, ar: 'تحديث المعرفة', stage: 'Update State', note: 'بعد حفظ الدليل' })
 ]);
