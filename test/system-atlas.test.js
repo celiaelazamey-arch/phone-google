@@ -93,16 +93,21 @@ test('status is derived from files and tests, not chosen', () => {
 
 test('the audit admits what the system does not have — no domain is painted complete', () => {
   const counts = atlas.capabilityCounts;
-  assert.ok(counts[TRUTH.missing] >= 3, 'the audit must keep naming the gaps that remain, not round them away');
+  assert.ok(counts[TRUTH.missing] >= 2, 'the audit must keep naming the gaps that remain, not round them away');
   const absent = atlas.domains.flatMap((domain) => domain.capabilities.filter((capability) => capability.status === TRUTH.missing).map((capability) => capability.id));
-  assert.deepEqual(absent.sort(), ['collaboration_bus', 'conflict_resolution', 'delegation'], 'what is absent is the multi-agent trio, and nothing else claims to exist');
+  assert.deepEqual(absent.sort(), ['collaboration_bus', 'conflict_resolution'], 'what is absent is the rest of the multi-agent trio, and nothing else claims to exist');
   const p0Absent = atlas.domains.filter((domain) => domain.priority === 'P0').flatMap((domain) => domain.capabilities.filter((capability) => capability.status === TRUTH.missing));
   assert.deepEqual(p0Absent, [], 'P0 has no absent capability left; if one returns, this test fails');
   assert.ok(counts[TRUTH.verified] > counts[TRUTH.missing], 'most declared capabilities are backed by code');
   assert.ok(atlas.stats.partial >= 5, 'most domains are partly there, and the atlas says so');
   const multi = atlas.domains.find((domain) => domain.id === 'multi_agent');
   assert.notEqual(multi.status, TRUTH.verified, 'one agent is not a multi-agent system');
-  assert.ok(multi.tally[TRUTH.missing] >= 3, 'delegation, collaboration and conflict resolution are absent');
+  assert.ok(multi.tally[TRUTH.missing] >= 2, 'the collaboration bus and conflict resolution are still absent');
+  assert.equal(
+    multi.capabilities.find((capability) => capability.id === 'delegation').status,
+    TRUTH.verified,
+    'delegation is implemented and a test names its file'
+  );
   const cognitive = atlas.domains.find((domain) => domain.id === 'cognitive_knowledge');
   const conflict = cognitive.capabilities.find((capability) => capability.id === 'conflict_detection');
   assert.equal(conflict.status, TRUTH.verified, 'conflict detection is implemented and a test names its file');

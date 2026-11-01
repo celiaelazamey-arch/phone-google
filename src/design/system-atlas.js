@@ -84,7 +84,7 @@ export const DOMAINS = Object.freeze([
     artifact: null,
     capabilities: [
       { id: 'single_agent_runtime', ar: 'وكيل واحد يعمل بالحزام', anchors: ['src/agent/runtime.js', 'src/agent/harness.js'] },
-      { id: 'delegation', ar: 'تفويض المهام بين وكلاء', anchors: [] },
+      { id: 'delegation', ar: 'تفويض المهام بين وكلاء', anchors: ['src/agent/delegation.js', 'scripts/delegation.mjs'] },
       { id: 'collaboration_bus', ar: 'قناة تواصل بين الوكلاء', anchors: [] },
       { id: 'conflict_resolution', ar: 'حل التعارض بين نتائج وكلاء', anchors: [] }
     ]

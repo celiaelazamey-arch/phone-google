@@ -179,6 +179,25 @@ function mapApproval(row) {
   };
 }
 
+function mapDelegation(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    parentRunId: row.parent_run_id,
+    childRunId: row.child_run_id,
+    taskId: row.task_id,
+    agent: row.agent,
+    objective: row.objective,
+    steps: Number(row.steps),
+    costMicros: Number(row.cost_micros),
+    risk: row.risk,
+    depth: Number(row.depth),
+    planDigest: row.plan_digest,
+    parentDigest: row.parent_digest,
+    createdAt: row.created_at
+  };
+}
+
 function mapEvidence(row) {
   if (!row) return null;
   let sourceIds = [];
@@ -1129,6 +1148,64 @@ export function createAgentStore({ driver, clock = Date.now, idFactory = crypto.
         [OUTBOX_STATUS.dispatching, at, Math.min(Math.max(Number(limit) || 20, 1), 100)]
       );
       return rows.map(mapOutbox);
+    },
+    // ── M-C (DEC-099): delegation links ────────────────────────────────────
+    /**
+     * One row per delegated child. `(parent_run_id, task_id)` is unique, so asking twice for the
+     * same task returns the child that already exists rather than minting a second budget for it.
+     */
+    async createDelegation({ id = idFactory(), parentRunId, childRunId, taskId, agent, objective, steps, costMicros, risk, depth, planDigest, parentDigest }) {
+      const at = nowIso(clock);
+      try {
+        await driver.run(
+          `INSERT INTO agent_delegations
+             (id, parent_run_id, child_run_id, task_id, agent, objective, steps, cost_micros, risk, depth, plan_digest, parent_digest, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [id, parentRunId, childRunId, text(taskId, 64), text(agent, 64), text(objective, 500), steps, costMicros, text(risk, 32), depth, text(planDigest, 12), text(parentDigest, 12), at]
+        );
+        return { created: true, delegation: await store.getDelegation(id) };
+      } catch (error) {
+        if (!driver.isUniqueViolation(error)) throw error;
+        const existing = await driver.get('SELECT * FROM agent_delegations WHERE parent_run_id = ? AND task_id = ?', [parentRunId, text(taskId, 64)]);
+        return { created: false, delegation: mapDelegation(existing) };
+      }
+    },
+    async getDelegation(id) {
+      return mapDelegation(await driver.get('SELECT * FROM agent_delegations WHERE id = ?', [id]));
+    },
+    async listDelegations(parentRunId) {
+      const rows = await driver.all('SELECT * FROM agent_delegations WHERE parent_run_id = ? ORDER BY task_id ASC', [parentRunId]);
+      return rows.map(mapDelegation);
+    },
+    /** The link that makes this run a child, or null when it was submitted by a person. */
+    async getDelegationForChild(childRunId) {
+      return mapDelegation(await driver.get('SELECT * FROM agent_delegations WHERE child_run_id = ?', [childRunId]));
+    },
+    /**
+     * What this run has already promised to its children. The loop subtracts it from the run's own
+     * ceiling, so delegation carves budget out of the parent instead of doubling it.
+     */
+    async delegatedBudget(parentRunId) {
+      const row = await driver.get(
+        'SELECT COALESCE(SUM(steps), 0) AS steps, COALESCE(SUM(cost_micros), 0) AS cost FROM agent_delegations WHERE parent_run_id = ?',
+        [parentRunId]
+      );
+      return { steps: Number(row?.steps || 0), costMicros: Number(row?.cost || 0) };
+    },
+    /**
+     * How many hops from a root run. Walked, never stored: a cached depth would drift the moment a
+     * link is re-pointed, and depth is exactly the value that must not be guessable.
+     */
+    async delegationDepth(runId, { maxHops = 10 } = {}) {
+      let depth = 0;
+      let cursor = runId;
+      for (let hop = 0; hop < maxHops; hop += 1) {
+        const link = await store.getDelegationForChild(cursor);
+        if (!link) return depth;
+        depth += 1;
+        cursor = link.parentRunId;
+      }
+      return depth;
     }
   };
 

@@ -1,12 +1,12 @@
 {
-  "fingerprint": "76d32bc23e",
+  "fingerprint": "161b2027d3",
   "version": "celiaos-system-atlas-v1",
   "totals": {
     "domains": 12,
     "capabilities": 54,
-    "verified": 42,
+    "verified": 43,
     "unverified": 9,
-    "missing": 3
+    "missing": 2
   },
   "phases": [
     {
@@ -137,7 +137,7 @@
       "en": "Multi-Agent Collaboration",
       "priority": "P1",
       "status": "partial",
-      "coverage": 25,
+      "coverage": 50,
       "capabilities": [
         {
           "id": "single_agent_runtime",
@@ -147,7 +147,7 @@
         {
           "id": "delegation",
           "ar": "تفويض المهام بين وكلاء",
-          "status": "not_implemented"
+          "status": "implemented_verified"
         },
         {
           "id": "collaboration_bus",
@@ -161,7 +161,6 @@
         }
       ],
       "missing": [
-        "تفويض المهام بين وكلاء",
         "قناة تواصل بين الوكلاء",
         "حل التعارض بين نتائج وكلاء"
       ]

@@ -41,7 +41,7 @@ test('twelve cards, in the owner\'s order, with the measured coverage — ready 
   const cards = cardsOf(html);
   assert.equal(cards.length, 12);
   assert.deepEqual(cards.map((card) => card.id), facts.domains.map((domain) => domain.id));
-  assert.deepEqual(cards.map((card) => card.coverage), [80, 100, 60, 25, 80, 100, 100, 75, 25, 100, 75, 100]);
+  assert.deepEqual(cards.map((card) => card.coverage), [80, 100, 60, 50, 80, 100, 100, 75, 25, 100, 75, 100]);
   assert.deepEqual(cards.map((card) => card.priority), ['P0', 'P0', 'P0', 'P1', 'P0', 'P1', 'P1', 'P1', 'P2', 'P2', 'P2', 'P0']);
   for (const [index, card] of cards.entries()) {
     assert.equal(card.coverage, facts.domains[index].coverage);
@@ -75,13 +75,13 @@ test('the summary is the audit, not a retyped summary', () => {
   assert.deepEqual(facts.totals, {
     domains: 12,
     capabilities: 54,
-    verified: 42,
+    verified: 43,
     unverified: 9,
-    missing: 3
+    missing: 2
   });
-  for (const value of [42, 9, 3, 54]) assert.ok(html.includes(`<b>${value}</b>`), `missing total ${value}`);
-  assert.equal(averageCoverage(facts), 77, 'the mean of 80,100,60,25,80,100,100,75,25,100,75,100 is 77');
-  assert.ok(html.includes('<b>77%</b>'));
+  for (const value of [43, 9, 2, 54]) assert.ok(html.includes(`<b>${value}</b>`), `missing total ${value}`);
+  assert.equal(averageCoverage(facts), 79, 'the mean of 80,100,60,50,80,100,100,75,25,100,75,100 is 78.75, published as 79');
+  assert.ok(html.includes('<b>79%</b>'));
   assert.ok(html.includes('<b>71.67%</b>') === false, 'no unrounded average may leak into the page');
   const phases = html.match(/<strong>(\d+)<\/strong>/g) ?? [];
   assert.deepEqual(phases.map((value) => Number(value.replace(/\D/g, ''))).slice(0, 3), facts.phases.map((phase) => phase.domains));
@@ -90,12 +90,12 @@ test('the summary is the audit, not a retyped summary', () => {
 
 test('the next priority is derived from the audit — every P0 gap is closed, so it moved to P1', () => {
   const next = nextGap(facts);
-  assert.equal(next.gap.id, 'delegation');
+  assert.equal(next.gap.id, 'collaboration_bus');
   assert.equal(next.domain.id, 'multi_agent');
   assert.equal(next.priority, 'P1');
   assert.ok(html.includes(next.gap.ar), 'the panel must name the new gap in the owner\'s words');
   assert.ok(html.includes('data-p0-clear="true"'), 'with no P0 gap left, the panel must say so');
-  for (const closed of ['conflict_detection', 'consolidation', 'notifications']) {
+  for (const closed of ['conflict_detection', 'consolidation', 'notifications', 'delegation']) {
     assert.ok(!html.includes(closed), `${closed} is closed and must not be advertised as next`);
   }
   const p0Gaps = facts.domains.filter((domain) => domain.priority === 'P0').flatMap((domain) => domain.missing);
