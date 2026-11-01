@@ -209,7 +209,36 @@ const SQLITE_DDL = [
   )`,
   'CREATE UNIQUE INDEX IF NOT EXISTS uq_agent_delegations_task ON agent_delegations (parent_run_id, task_id)',
   'CREATE INDEX IF NOT EXISTS idx_agent_delegations_parent ON agent_delegations (parent_run_id, created_at)',
-  'CREATE INDEX IF NOT EXISTS idx_agent_delegations_child ON agent_delegations (child_run_id)'
+  'CREATE INDEX IF NOT EXISTS idx_agent_delegations_child ON agent_delegations (child_run_id)',
+  // XAG-001 (DEC-106): the bus keeps message *bodies*, which the evidence ledger never stored
+  // (it stores hashes). Every row is attested by an evidence entry whose input covers its hash.
+  `CREATE TABLE IF NOT EXISTS agent_bus_messages (
+    id TEXT PRIMARY KEY,
+    trace_id TEXT NOT NULL,
+    from_run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+    to_ref TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    seq INTEGER NOT NULL,
+    payload TEXT NOT NULL,
+    payload_hash TEXT NOT NULL,
+    caused_by TEXT NULL,
+    evidence_id TEXT NULL,
+    status TEXT NOT NULL,
+    quarantine_reason TEXT NULL,
+    created_at TEXT NOT NULL
+  )`,
+  'CREATE UNIQUE INDEX IF NOT EXISTS uq_agent_bus_trace_seq ON agent_bus_messages (trace_id, seq)',
+  'CREATE INDEX IF NOT EXISTS idx_agent_bus_to ON agent_bus_messages (to_ref, seq)',
+  'CREATE INDEX IF NOT EXISTS idx_agent_bus_status ON agent_bus_messages (status, created_at)',
+  // Consumer position, not a second ledger: derived from what was read, rebuildable, and only
+  // ever moves forward (compare-and-set), so an old acknowledgement cannot rewind it.
+  `CREATE TABLE IF NOT EXISTS agent_bus_cursors (
+    consumer TEXT NOT NULL,
+    trace_id TEXT NOT NULL,
+    last_seq INTEGER NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (consumer, trace_id)
+  )`
 ];
 
 const MYSQL_AGENT_TABLES = [
@@ -225,7 +254,9 @@ const MYSQL_AGENT_TABLES = [
   'agent_thread_summaries',
   'agent_owner_facts',
   'agent_artifacts',
-  'agent_delegations'
+  'agent_delegations',
+  'agent_bus_messages',
+  'agent_bus_cursors'
 ];
 
 function uniqueViolation(error) {

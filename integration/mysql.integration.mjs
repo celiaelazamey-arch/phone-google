@@ -263,19 +263,21 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
       '0004_agent-outbox.sql',
       '0005_agent-memory.sql',
       '0006_agent-artifacts.sql',
-      '0007_agent-delegation.sql'
+      '0007_agent-delegation.sql',
+      '0008_agent-collaboration-bus.sql'
     ]);
 
     const second = await runMigrations({ connection: migrationConnection, directory, apply: true });
     assert.deepEqual(second.pending, [], 'a second apply is a no-op');
     const status = await runMigrations({ connection: migrationConnection, directory, statusOnly: true });
-    assert.equal(status.applied.length, 6);
+    assert.equal(status.applied.length, 7);
     assert.equal(status.applied[0].version, 2);
     assert.equal(status.applied[1].version, 3);
     assert.equal(status.applied[2].version, 4);
     assert.equal(status.applied[3].version, 5);
     assert.equal(status.applied[4].version, 6);
     assert.equal(status.applied[5].version, 7);
+    assert.equal(status.applied[6].version, 8);
   } finally {
     await migrationConnection.end();
   }
@@ -286,7 +288,7 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
       cwd: root,
       env: { ...process.env, ...mysqlEnv }
     });
-    assert.equal(JSON.parse(stdout).applied.length, 6);
+    assert.equal(JSON.parse(stdout).applied.length, 7);
   } catch (error) {
     throw new Error(`migrate CLI failed: ${String(error?.stderr || error?.message || '').slice(0, 600)}`);
   }
@@ -528,11 +530,13 @@ test('real MySQL 8.4: agent ledger, durable run, dedupe and unknown-outcome reco
   // The five core tables are untouched by the additive migration.
   const [tables] = await pool.execute('SELECT TABLE_NAME AS name FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()');
   const names = tables.map((row) => row.name);
-  assert.equal(names.filter((name) => name.startsWith('agent_')).length, 13);
+  assert.equal(names.filter((name) => name.startsWith('agent_')).length, 15);
   assert.ok(names.includes('agent_artifacts'));
   assert.ok(names.includes('agent_outbox'));
   assert.ok(names.includes('agent_thread_summaries'));
   assert.ok(names.includes('agent_owner_facts'));
   assert.ok(names.includes('agent_delegations'));
+  assert.ok(names.includes('agent_bus_messages'));
+  assert.ok(names.includes('agent_bus_cursors'));
   assert.ok(['app_users', 'oauth_states', 'google_credentials', 'whatsapp_contacts', 'whatsapp_messages'].every((name) => names.includes(name)));
 });

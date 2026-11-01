@@ -31,6 +31,7 @@ import {
 import { deriveNow, timeSteps } from './timing.js';
 import { buildMemoryFromSteps, normalizeMemoryKind } from './memory.js';
 import { planDelegation } from './delegation.js';
+import { BusRefusal, buildMessage, hashPayload, verifyMessage } from './collaboration-bus.js';
 
 export { PLAN_LIFECYCLE_STATE };
 
@@ -488,6 +489,28 @@ export function createAgentRuntime({
     return run;
   }
 
+  /**
+   * Delivery at the start of a run's own cycle (DEC-106): whatever was addressed to this run and not
+   * yet acknowledged is written into its durable step log, then acknowledged. Reading the store is
+   * the delivery — nothing is pushed, and a run that never starts never takes a message.
+   */
+  async function deliverPendingMessages(runId) {
+    const traceId = await store.busTraceOf(runId);
+    const cursor = await store.getBusCursor(runId, traceId);
+    const messages = await store.listBusMessages({ traceId, toRef: `run:${runId}`, afterSeq: cursor, status: 'pending' });
+    if (!messages.length) return { delivered: 0, cursor };
+    for (const message of messages) {
+      await addStep(runId, {
+        kind: 'bus',
+        title: `رسالة ${message.kind}`,
+        summary: `من ${message.from} · #${message.seq} · ${message.messageId}`
+      });
+      emit(runId, { type: 'bus.received', message });
+    }
+    const acked = await store.ackBusCursor({ consumer: runId, traceId, lastSeq: messages.at(-1).seq });
+    return { delivered: messages.length, cursor: acked.cursor };
+  }
+
   async function executeOnce(runId) {
     const claimed = await store.claimRun(runId, { leaseMs: config.leaseMs, workerId });
     if (!claimed) {
@@ -502,6 +525,8 @@ export function createAgentRuntime({
     heartbeat.unref?.();
     let run = await store.getRun(runId);
     emit(runId, { type: 'run.started', run });
+    // Messages are taken once, at the start of the cycle, and recorded in the run's own history.
+    await deliverPendingMessages(runId);
     const deadline = Date.parse(run.createdAt) + config.maxDurationMs;
     try {
       for (;;) {
@@ -1401,6 +1426,122 @@ export function createAgentRuntime({
         });
       }
       return { plan, children };
+    },
+    /**
+     * Send one message from a run to another run in the same trace, or to the owner (DEC-106).
+     *
+     * The write is the send: nothing is announced before it lands, the attestation and the row are
+     * one transaction, and the sequence comes from the durable chain. `to: 'parent'` is resolved
+     * here, so a child cannot invent a recipient it does not have; a cross-trace address is refused
+     * rather than delivered — a bus that lets any run talk to any run is not a bus, it is a leak.
+     */
+    async sendMessage({ fromRunId, to, kind, payload = {}, causedBy = null } = {}) {
+      const from = await store.getRunForOwner(fromRunId, ownerId);
+      if (!from) throw httpError(404, 'run_not_found', 'run_not_found');
+      if (isTerminalStatus(from.status)) throw httpError(409, 'run_closed', 'run_closed');
+
+      const traceId = await store.busTraceOf(fromRunId);
+      let resolved = String(to ?? '').trim();
+      if (resolved === 'parent') {
+        const link = await store.getDelegationForChild(fromRunId);
+        if (!link) throw httpError(409, 'no_parent', 'no_parent');
+        resolved = `run:${link.parentRunId}`;
+      }
+      if (resolved.startsWith('run:')) {
+        const targetId = resolved.slice(4);
+        const target = await store.getRun(targetId);
+        if (!target) throw httpError(404, 'recipient_not_found', 'recipient_not_found');
+        if (target.ownerId !== ownerId) throw httpError(404, 'recipient_not_found', 'recipient_not_found');
+        const targetTrace = await store.busTraceOf(target.id);
+        if (targetTrace !== traceId) throw httpError(409, 'cross_trace', 'cross_trace');
+      }
+
+      let digest;
+      try {
+        digest = hashPayload(payload);
+        // Validate the rest of the envelope before any write: a refused kind must leave no trace.
+        buildMessage({ traceId, from: fromRunId, to: resolved, kind, payload, seq: 1, causedBy });
+      } catch (error) {
+        if (error instanceof BusRefusal) throw httpError(400, error.code, error.detail);
+        throw error;
+      }
+
+      const appended = await store.appendBusMessage({
+        traceId,
+        fromRunId,
+        toRef: resolved,
+        kind,
+        payload,
+        payloadHash: digest.payloadHash,
+        causedBy,
+        sourceIds: [fromRunId]
+      });
+      if (appended.created) {
+        emit(fromRunId, { type: 'bus.sent', message: appended.message });
+        await addStep(fromRunId, {
+          kind: 'bus',
+          title: `رسالة ${kind}`,
+          summary: `إلى ${resolved} · #${appended.message.seq} · ${appended.message.messageId}`
+        });
+      }
+      return appended;
+    },
+    /**
+     * Pull what is addressed to this run and not yet acknowledged. Pulling does not acknowledge:
+     * a consumer that dies before `ackMessages` sees the same messages again, with the same ids.
+     */
+    async pullMessages({ runId, limit = 20 } = {}) {
+      const run = await store.getRunForOwner(runId, ownerId);
+      if (!run) throw httpError(404, 'run_not_found', 'run_not_found');
+      const traceId = await store.busTraceOf(runId);
+      const cursor = await store.getBusCursor(runId, traceId);
+      const messages = await store.listBusMessages({
+        traceId,
+        toRef: `run:${runId}`,
+        afterSeq: cursor,
+        limit,
+        status: 'pending'
+      });
+      return {
+        traceId,
+        consumer: runId,
+        cursor,
+        messages,
+        nextSeq: messages.length ? messages.at(-1).seq : cursor
+      };
+    },
+    /** Acknowledge up to `lastSeq`. Forward only; an old acknowledgement cannot rewind delivery. */
+    async ackMessages({ runId, lastSeq } = {}) {
+      const run = await store.getRunForOwner(runId, ownerId);
+      if (!run) throw httpError(404, 'run_not_found', 'run_not_found');
+      const traceId = await store.busTraceOf(runId);
+      const head = await store.listBusMessages({ traceId, limit: 200 });
+      const maxSeq = head.length ? head.at(-1).seq : 0;
+      if (!Number.isInteger(Number(lastSeq)) || Number(lastSeq) > maxSeq) {
+        throw httpError(400, 'ack_beyond_head', 'ack_beyond_head');
+      }
+      const result = await store.ackBusCursor({ consumer: runId, traceId, lastSeq: Number(lastSeq) });
+      return { ...result, traceId, lastSeq: Number(lastSeq) };
+    },
+    /**
+     * Quarantine a message that keeps failing its consumer, by name and with a reason. The message
+     * stays in the store and surfaces in the attention queue; nothing is deleted or silently dropped.
+     */
+    async quarantineMessage({ messageId, reason, byRunId } = {}) {
+      const message = await store.getBusMessage(messageId);
+      if (!message) throw httpError(404, 'message_not_found', 'message_not_found');
+      const run = await store.getRunForOwner(byRunId, ownerId);
+      if (!run) throw httpError(404, 'run_not_found', 'run_not_found');
+      if ((await store.busTraceOf(byRunId)) !== message.traceId) throw httpError(409, 'cross_trace', 'cross_trace');
+      const updated = await store.quarantineBusMessage({ messageId, reason: reason || 'consumer_failed' });
+      emit(byRunId, { type: 'bus.quarantined', message: updated });
+      return updated;
+    },
+    /** Re-derive one message from its stored bytes: the check a reader can run before acting on it. */
+    async verifyBusMessage(messageId) {
+      const message = await store.getBusMessage(messageId);
+      if (!message) throw httpError(404, 'message_not_found', 'message_not_found');
+      return { message, check: verifyMessage(message) };
     },
     async start(runId) {
       if (active.has(runId)) return active.get(runId);

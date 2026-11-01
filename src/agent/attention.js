@@ -49,7 +49,11 @@ export const REASON = Object.freeze({
   outbox_dispatching: { severity: SEVERITY.ambiguous, ar: 'أثر خارجي قيد الإرسال ولم يُحسم', en: 'an external effect is mid-dispatch' },
   run_failed: { severity: SEVERITY.failure, ar: 'تشغيل فشل', en: 'a run failed' },
   budget_exhausted: { severity: SEVERITY.failure, ar: 'تشغيل توقّف لاستنفاد الميزانية', en: 'a run stopped on its budget' },
-  run_succeeded: { severity: SEVERITY.info, ar: 'تشغيل اكتمل', en: 'a run completed' }
+  run_succeeded: { severity: SEVERITY.info, ar: 'تشغيل اكتمل', en: 'a run completed' },
+  // XAG-001: a message that found no reader is owed, not lost. Quarantine means a consumer kept
+  // failing; a message addressed to the owner is a decision, because nobody else can take it.
+  bus_for_owner: { severity: SEVERITY.decision, ar: 'رسالة من وكيل تنتظرك', en: 'a message from an agent is waiting for you' },
+  bus_quarantined: { severity: SEVERITY.failure, ar: 'رسالة حُجِزت بعد فشل قارئها', en: 'a message was quarantined after its reader failed' }
 });
 
 /** What a person can do next. Named, never performed here. */
@@ -112,7 +116,7 @@ const makeItem = ({ reason, id, runId = null, since = null, now, title = null, e
  * Build the queue from durable records. Pure and deterministic: the same snapshot and clock produce
  * the same bytes, so the digest can be quoted as evidence.
  */
-export function buildAttention({ runs = [], approvals = [], toolRuns = [], outbox = [] } = {}, { now = null } = {}) {
+export function buildAttention({ runs = [], approvals = [], toolRuns = [], outbox = [], busMessages = [] } = {}, { now = null } = {}) {
   const items = [];
   const dropped = [];
   const approvalsByRun = new Map();
@@ -241,6 +245,32 @@ export function buildAttention({ runs = [], approvals = [], toolRuns = [], outbo
         now,
         evidence: { outboxId: entry.id ?? null, toolName: entry.toolName ?? entry.tool_name ?? null },
         next: NEXT.reconcile
+      })
+    );
+  }
+
+  // XAG-001: messages that nobody consumed. A quarantined message is a failure by definition; a
+  // message waiting for the owner is a decision only the owner can take. Neither opens a run.
+  for (const message of busMessages) {
+    const status = message?.status ?? 'pending';
+    const to = String(message?.to ?? '');
+    if (status !== 'quarantined' && !(status === 'pending' && to === 'owner')) continue;
+    items.push(
+      makeItem({
+        reason: status === 'quarantined' ? 'bus_quarantined' : 'bus_for_owner',
+        id: `bus:${message.messageId}`,
+        runId: message.from ?? null,
+        since: message.createdAt ?? null,
+        now,
+        title: message.kind ?? null,
+        evidence: {
+          messageId: message.messageId ?? null,
+          kind: message.kind ?? null,
+          to,
+          sequence: message.seq ?? null,
+          quarantineReason: message.quarantineReason ?? null
+        },
+        next: status === 'quarantined' ? NEXT.inspect : NEXT.decide
       })
     );
   }
