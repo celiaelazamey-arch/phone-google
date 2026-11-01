@@ -56,10 +56,14 @@ test('DA-05: الفجوة المقاسة مسجّلة مخططة ولا تُدّ
   const backlog = readFileSync(path.join(root, 'docs/continuity/BACKLOG.md'), 'utf8');
   const row = backlog.split('\n').find((line) => line.startsWith('| SEC-007 |'));
   assert.ok(row, 'SEC-007 مسجّلة');
-  assert.match(row, /\| P1 \| مخطط/);
-  // والوثيقة تنسب الحماية للحافة حيث توجد فعلًا — لا تعميم كاذب.
+  // الفجوة أُغلقت في 2026-11-01 بحدّ دخل على سطح Express — والصف يحمل دليله لا كلمة «تم».
+  assert.match(row, /\| P1 \| متحقق/);
+  assert.match(row, /src\/rate-limit\.js/);
+  // والوثيقة تنسب الحماية للحافة حيث توجد فعلًا، ولا تعمّمها على ما لا يغطيه الحدّ.
   assert.match(doc, /workers\/celia-edge\/accounts\.js/);
   assert.match(doc, /سطح Express/);
+  assert.match(doc, /src\/rate-limit\.js/);
+  assert.match(doc, /ذاكرة العملية/, 'الحدّ المعلن: العدّاد في الذاكرة لا موزّع');
 });
 
 test('DA-06: صفر استيراد لمكتبة الهجوم — إسناد فقط', () => {
