@@ -81,6 +81,11 @@ jobs:
         run: npm run copilot:diagram:check
       - name: Computer permission matrix matches the enforced policy
         run: npm run computer:permissions:check
+      # GOV-002: the published access matrix is generated from access-policy.js. A grant edited in
+      # code without regenerating the table (or a table edited by hand) fails here, so the document
+      # can never promise a permission the resolver does not enforce.
+      - name: Access policy matrix matches the enforced policy (GOV-002)
+        run: npm run access:policy:check
       - name: Require handoff for implementation changes
         if: github.event_name == 'pull_request'
         env:
