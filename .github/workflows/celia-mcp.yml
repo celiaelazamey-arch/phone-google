@@ -90,6 +90,10 @@ jobs:
       # without regenerating it (or a node typed by hand) fails here.
       - name: Living architecture map matches the source (VFE-003)
         run: npm run arch:map:check
+      # VFE-006: the atlas is an audit of twelve domains, generated from the same checks the tests
+      # run. A domain whose evidence disappears cannot stay painted as covered.
+      - name: System Atlas matches the audited domains (VFE-006)
+        run: npm run atlas:check
       # VFE-001: the board is generated from the visual registry, and every handoff in this range
       # either links an artifact that exists or says «لا يوجد تغيير بصري» and why. Silence fails.
       - name: Visual-First board and handoff evidence (VFE-001)
