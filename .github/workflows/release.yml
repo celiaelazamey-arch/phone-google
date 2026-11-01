@@ -114,6 +114,14 @@ jobs:
               echo "::notice title=Release already current::Release $TAG already carries byte-identical assets at $GITHUB_SHA; nothing to publish (idempotent no-op)."
               exit 0
             fi
+            # Release immutability (repository setting) forbids uploading or editing a published
+            # release. Refuse to even try: the API would reject the clobber and turn every main push
+            # red. A frozen release is a policy, not a failure — new artifacts need a version bump.
+            IMMUTABLE="$(gh api "repos/$GH_REPO/releases/tags/$TAG" --jq '.immutable' 2>/dev/null || echo false)"
+            if [ "$IMMUTABLE" = "true" ]; then
+              echo "::warning title=Release $TAG is immutable::Assets on $TAG are frozen by the release-immutability setting, so the bundle built at $GITHUB_SHA was NOT published. Bump the version in package.json/releases/* to ship new artifacts."
+              exit 0
+            fi
             gh release upload "$TAG" .release-artifacts/* --clobber
             gh release edit "$TAG" --target "$GITHUB_SHA" --title "Celia $TAG" --notes "$NOTES"
           else
