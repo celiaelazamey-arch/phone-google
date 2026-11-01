@@ -10,6 +10,7 @@ import path from 'node:path';
 import {
   ACCEPTANCE,
   DELIVERY_ORDER,
+  PRODUCTS,
   DIAGRAM_KINDS,
   MASTER_IDS,
   MASTER_VISUALS,
@@ -20,6 +21,7 @@ import {
   STATUS_MARK,
   VFE_VERSION,
   VERIFICATION_RULES,
+  productSummary,
   visualSummary
 } from '../src/design/visual-registry.js';
 import { PAGE_PATH, buildHtml } from '../scripts/render-visual-first.mjs';
@@ -50,11 +52,27 @@ test('registry: every master diagram carries exactly one state and real evidence
   }
 });
 
-test('registry: the five states are the owner\'s, with the owner\'s wording', () => {
+test('registry: the seven states are the owner\'s, with the owner\'s wording', () => {
   assert.deepEqual(Object.keys(STATUS_MARK), Object.values(STATUS));
-  assert.deepEqual(Object.values(STATUS_MARK), ['🟢', '🟡', '🔵', '🔴', '⚪']);
-  assert.deepEqual(Object.values(STATUS_LABEL), ['موجود ومتحقق', 'جزئي أو بقيود', 'مقترح', 'غير موجود', 'موجود وغير مفعّل']);
-  assert.equal(Object.keys(STATUS).length, 5);
+  assert.deepEqual(Object.values(STATUS_MARK), ['🟢', '🟠', '🟡', '🔵', '🔴', '⚪', '⛔']);
+  assert.deepEqual(Object.values(STATUS_LABEL), ['منفّذ ومتحقق', 'منفّذ وغير متحقق', 'جزئي أو بقيود', 'مقترح', 'غير منفّذ', 'موجود ومعطّل', 'محجوب']);
+  assert.equal(Object.keys(STATUS).length, 7);
+});
+
+test('the seven Engineering-Center products answer the roadmap in order', () => {
+  assert.equal(PRODUCTS.length, 7);
+  assert.deepEqual(PRODUCTS.map((product) => product.priority), ['P0', 'P0', 'P0', 'P0', 'P1', 'P1', 'P1']);
+  assert.equal(PRODUCTS[0].ar, 'Living Architecture Map');
+  assert.equal(PRODUCTS[6].ar, 'Visual Command Center');
+  for (const product of PRODUCTS) {
+    assert.ok(Object.values(STATUS).includes(product.status), `${product.id} has an unknown state`);
+    if (product.artifact) assert.ok(existsSync(path.join(root, product.artifact)), `${product.id} points at a missing artifact`);
+    for (const file of product.evidence) assert.ok(existsSync(path.join(root, file)), `${product.id} cites ${file}, which is missing`);
+  }
+  const summary = productSummary();
+  assert.equal(summary.total, 7);
+  assert.ok(summary.implemented >= 2, 'the architecture map and the impact map are built');
+  assert.ok(summary.missing >= 1, 'the roadmap is not finished, and the board says so');
 });
 
 test('registry: the summary reports the honest number, not the flattering one', () => {
@@ -106,6 +124,8 @@ test('AGENTS.md carries the rule permanently, and the baseline commands include 
   assert.match(agents, /## Visual-First Engineering \(VFE-001 \/ DEC-085\)/);
   assert.match(agents, /Show the System, Don't Just Describe It/);
   assert.match(agents, /🟢 IMPLEMENTED & VERIFIED/);
+  assert.match(agents, /⛔ BLOCKED/);
+  assert.match(agents, /npm run arch:map:check/);
   assert.match(agents, /## الدليل البصري/);
   assert.match(agents, /npm run visual:first:check/);
   const template = read('docs/continuity/SESSION_TEMPLATE.md');

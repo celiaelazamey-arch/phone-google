@@ -20,6 +20,7 @@ import {
   DIAGRAM_KINDS,
   MASTER_VISUALS,
   PIPELINE,
+  PRODUCTS,
   SAFETY_KEPT,
   STATUS,
   STATUS_LABEL,
@@ -27,6 +28,7 @@ import {
   STATUS_RULE,
   VFE_VERSION,
   VERIFICATION_RULES,
+  productSummary,
   visualSummary
 } from '../src/design/visual-registry.js';
 
@@ -39,14 +41,17 @@ const esc = (value) =>
 
 const STATUS_CLASS = {
   [STATUS.implemented]: 'ok',
+  [STATUS.unverified]: 'unv',
   [STATUS.partial]: 'part',
   [STATUS.proposed]: 'prop',
   [STATUS.missing]: 'miss',
-  [STATUS.disabled]: 'off'
+  [STATUS.disabled]: 'off',
+  [STATUS.blocked]: 'blocked'
 };
 
 export function buildHtml() {
   const summary = visualSummary();
+  const products = productSummary();
   const pipeline = PIPELINE.map(
     (step, index) =>
       `<li><span class="num">${String(index + 1).padStart(2, '0')}</span><b>${esc(step)}</b></li>`
@@ -69,6 +74,13 @@ export function buildHtml() {
     (step) => `<li><span class="num">${String(step.n).padStart(2, '0')}</span><b>${esc(step.ar)}</b><small>${esc(step.en)}</small></li>`
   ).join('');
   const kinds = DIAGRAM_KINDS.map((kind) => `<li><b>${esc(kind.ar)}</b><small class="mono">${esc(kind.en)}</small></li>`).join('');
+  const productCards = PRODUCTS.map(
+    (product) => `<article class="card ${STATUS_CLASS[product.status]}">
+          <header><h3>${esc(product.ar)}</h3><span class="mark">${STATUS_MARK[product.status]} ${esc(STATUS_LABEL[product.status])}</span></header>
+          <p class="artifact mono">${product.artifact ? esc(product.artifact) : 'لا يوجد أثر بعد'} · ${esc(product.priority)}</p>
+          <p class="gap">${esc(product.gap)}</p>
+        </article>`
+  ).join('\n        ');
   const rules = VERIFICATION_RULES.map((rule) => `<li>${esc(rule)}</li>`).join('');
   const acceptance = ACCEPTANCE.map((item) => `<li>${esc(item)}</li>`).join('');
   const safety = SAFETY_KEPT.map((item) => `<li>${esc(item)}</li>`).join('');
@@ -89,7 +101,7 @@ export function buildHtml() {
   :root{
     --bg:#080d24; --panel:#0f1738; --panel-2:#131d47; --line:#26346b; --line-2:#33459b;
     --txt:#eaf0ff; --mut:#a9b6e8; --gold:#fbbf24; --gold-2:#fcd34d;
-    --ok:#34d399; --part:#fbbf24; --miss:#f87171; --cyan:#22d3ee; --prop:#60a5fa; --off:#94a3b8;
+    --ok:#34d399; --part:#fbbf24; --miss:#f87171; --cyan:#22d3ee; --prop:#60a5fa; --off:#94a3b8; --unv:#fb923c; --blocked:#e879f9;
   }
   *{box-sizing:border-box}
   html,body{margin:0;background:var(--bg);color:var(--txt);font-family:"Plex",system-ui,sans-serif;line-height:1.55}
@@ -111,11 +123,11 @@ export function buildHtml() {
   ol.pipeline li{background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid var(--line-2);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
   ol.pipeline .num{color:var(--cyan);font-size:12px;font-family:"Mono",monospace}
   ol.pipeline b{font-size:13px;letter-spacing:.6px}
-  .legend{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+  .legend{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
   .legend-item{display:flex;gap:10px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
   .legend-item small{display:block;color:var(--mut);font-size:11.5px;line-height:1.45}
   .mark{font-size:14px;white-space:nowrap}
-  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .stats{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
   .stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;text-align:center}
   .stat b{display:block;font-size:26px}
   .stat small{color:var(--mut);font-size:12px}
@@ -128,8 +140,9 @@ export function buildHtml() {
   .card .ev{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:4px}
   .card .ev li{font-size:10.5px;color:var(--mut);border:1px solid var(--line);border-radius:6px;padding:2px 6px}
   .ok{border-right-color:var(--ok)} .part{border-right-color:var(--part)} .miss{border-right-color:var(--miss)}
+  .unv{border-right-color:var(--unv)} .blocked{border-right-color:var(--blocked)}
   .prop{border-right-color:var(--prop)} .off{border-right-color:var(--off)}
-  .ok .mark{color:var(--ok)} .part .mark{color:var(--part)} .miss .mark{color:var(--miss)}
+  .ok .mark{color:var(--ok)} .part .mark{color:var(--part)} .miss .mark{color:var(--miss)} .unv .mark{color:var(--unv)} .blocked .mark{color:var(--blocked)}
   .prop .mark{color:var(--prop)} .off .mark{color:var(--off)}
   ol.order{list-style:none;display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:0;padding:0}
   ol.order li{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
@@ -171,12 +184,25 @@ export function buildHtml() {
   <h2 class="section">تغطية المخططات الرئيسية</h2>
   <div class="stats">
     <div class="stat"><b>${summary.total}</b><small>مخططًا رئيسيًا مطلوبًا</small></div>
-    <div class="stat"><b style="color:var(--ok)">${summary.implemented}</b><small>موجود ومتحقق</small></div>
-    <div class="stat"><b style="color:var(--part)">${summary.partial}</b><small>جزئي أو بقيود</small></div>
-    <div class="stat"><b style="color:var(--miss)">${summary.missing}</b><small>غير موجود</small></div>
+    <div class="stat"><b style="color:var(--ok)">${summary.implemented}</b><small>منفّذ ومتحقق</small></div>
+    <div class="stat"><b style="color:var(--unv)">${summary.counts[STATUS.unverified]}</b><small>منفّذ وغير متحقق</small></div>
+    <div class="stat"><b style="color:var(--part)">${summary.partial}</b><small>جزئي</small></div>
+    <div class="stat"><b style="color:var(--miss)">${summary.missing}</b><small>غير منفّذ</small></div>
+    <div class="stat"><b style="color:var(--off)">${summary.counts[STATUS.disabled] + summary.counts[STATUS.blocked]}</b><small>معطّل أو محجوب</small></div>
   </div>
   <div class="grid" style="margin-top:12px">
         ${cards}
+  </div>
+
+  <h2 class="section">منتجات مركز الهندسة البصرية — سبعة، بهذا الترتيب</h2>
+  <div class="stats" style="margin-bottom:10px">
+    <div class="stat"><b>${products.total}</b><small>منتجًا مقترحًا</small></div>
+    <div class="stat"><b style="color:var(--ok)">${products.implemented}</b><small>مبنيّ الآن</small></div>
+    <div class="stat"><b style="color:var(--part)">${products.partial}</b><small>جزئي</small></div>
+    <div class="stat"><b style="color:var(--miss)">${products.missing}</b><small>لم يبدأ</small></div>
+  </div>
+  <div class="grid" style="grid-template-columns:repeat(4,1fr)">
+        ${productCards}
   </div>
 
   <h2 class="section">ترتيب تقديم كل مهمة</h2>
@@ -215,6 +241,7 @@ export async function run({ check = false } = {}) {
       return 1;
     }
     const summary = visualSummary();
+  const products = productSummary();
     console.log(
       `visual-first board verified: ${summary.total} master diagrams (${summary.implemented} verified · ${summary.partial} partial · ${summary.missing} missing)`
     );

@@ -14,7 +14,7 @@
   :root{
     --bg:#080d24; --panel:#0f1738; --panel-2:#131d47; --line:#26346b; --line-2:#33459b;
     --txt:#eaf0ff; --mut:#a9b6e8; --gold:#fbbf24; --gold-2:#fcd34d;
-    --ok:#34d399; --part:#fbbf24; --miss:#f87171; --cyan:#22d3ee; --prop:#60a5fa; --off:#94a3b8;
+    --ok:#34d399; --part:#fbbf24; --miss:#f87171; --cyan:#22d3ee; --prop:#60a5fa; --off:#94a3b8; --unv:#fb923c; --blocked:#e879f9;
   }
   *{box-sizing:border-box}
   html,body{margin:0;background:var(--bg);color:var(--txt);font-family:"Plex",system-ui,sans-serif;line-height:1.55}
@@ -36,11 +36,11 @@
   ol.pipeline li{background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid var(--line-2);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
   ol.pipeline .num{color:var(--cyan);font-size:12px;font-family:"Mono",monospace}
   ol.pipeline b{font-size:13px;letter-spacing:.6px}
-  .legend{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+  .legend{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
   .legend-item{display:flex;gap:10px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
   .legend-item small{display:block;color:var(--mut);font-size:11.5px;line-height:1.45}
   .mark{font-size:14px;white-space:nowrap}
-  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .stats{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
   .stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;text-align:center}
   .stat b{display:block;font-size:26px}
   .stat small{color:var(--mut);font-size:12px}
@@ -53,8 +53,9 @@
   .card .ev{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:4px}
   .card .ev li{font-size:10.5px;color:var(--mut);border:1px solid var(--line);border-radius:6px;padding:2px 6px}
   .ok{border-right-color:var(--ok)} .part{border-right-color:var(--part)} .miss{border-right-color:var(--miss)}
+  .unv{border-right-color:var(--unv)} .blocked{border-right-color:var(--blocked)}
   .prop{border-right-color:var(--prop)} .off{border-right-color:var(--off)}
-  .ok .mark{color:var(--ok)} .part .mark{color:var(--part)} .miss .mark{color:var(--miss)}
+  .ok .mark{color:var(--ok)} .part .mark{color:var(--part)} .miss .mark{color:var(--miss)} .unv .mark{color:var(--unv)} .blocked .mark{color:var(--blocked)}
   .prop .mark{color:var(--prop)} .off .mark{color:var(--off)}
   ol.order{list-style:none;display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:0;padding:0}
   ol.order li{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
@@ -90,29 +91,33 @@
 
   <h2 class="section">حالات العنصر البصري</h2>
   <div class="legend">
-        <div class="legend-item ok"><span class="mark">🟢</span><div><b>موجود ومتحقق</b><small>الشكل مطابق للكود، وله اختبار أو قياس حقيقي</small></div></div>
+        <div class="legend-item ok"><span class="mark">🟢</span><div><b>منفّذ ومتحقق</b><small>الشكل مطابق للكود، وله اختبار أو قياس حقيقي</small></div></div>
+        <div class="legend-item unv"><span class="mark">🟠</span><div><b>منفّذ وغير متحقق</b><small>الكود موجود ولم يُثبت باختبار أو قياس</small></div></div>
         <div class="legend-item part"><span class="mark">🟡</span><div><b>جزئي أو بقيود</b><small>موجود ومثبت، وبعض أجزائه ناقصة أو مقيّدة</small></div></div>
         <div class="legend-item prop"><span class="mark">🔵</span><div><b>مقترح</b><small>مصمَّم ولم يُنفَّذ؛ لا يُعرض كأنه يعمل</small></div></div>
-        <div class="legend-item miss"><span class="mark">🔴</span><div><b>غير موجود</b><small>لا وجود له؛ يُذكر كفجوة لا كصندوق</small></div></div>
-        <div class="legend-item off"><span class="mark">⚪</span><div><b>موجود وغير مفعّل</b><small>الكود موجود ولا يعمل افتراضيًا؛ يُعرض بعلامة إيقاف</small></div></div>
+        <div class="legend-item miss"><span class="mark">🔴</span><div><b>غير منفّذ</b><small>لا وجود له؛ يُذكر كفجوة لا كصندوق</small></div></div>
+        <div class="legend-item off"><span class="mark">⚪</span><div><b>موجود ومعطّل</b><small>الكود موجود ولا يعمل افتراضيًا؛ يُعرض بعلامة إيقاف</small></div></div>
+        <div class="legend-item blocked"><span class="mark">⛔</span><div><b>محجوب</b><small>جاهز لكنه موقوف بعائق خارجي مسمّى</small></div></div>
   </div>
 
   <h2 class="section">تغطية المخططات الرئيسية</h2>
   <div class="stats">
     <div class="stat"><b>11</b><small>مخططًا رئيسيًا مطلوبًا</small></div>
-    <div class="stat"><b style="color:var(--ok)">1</b><small>موجود ومتحقق</small></div>
-    <div class="stat"><b style="color:var(--part)">6</b><small>جزئي أو بقيود</small></div>
-    <div class="stat"><b style="color:var(--miss)">4</b><small>غير موجود</small></div>
+    <div class="stat"><b style="color:var(--ok)">1</b><small>منفّذ ومتحقق</small></div>
+    <div class="stat"><b style="color:var(--unv)">0</b><small>منفّذ وغير متحقق</small></div>
+    <div class="stat"><b style="color:var(--part)">6</b><small>جزئي</small></div>
+    <div class="stat"><b style="color:var(--miss)">4</b><small>غير منفّذ</small></div>
+    <div class="stat"><b style="color:var(--off)">0</b><small>معطّل أو محجوب</small></div>
   </div>
   <div class="grid" style="margin-top:12px">
         <article class="card part">
           <header><h3>Kernel Architecture</h3><span class="mark">🟡 جزئي أو بقيود</span></header>
-          <p class="artifact mono">docs/celiaos-architecture-map.html</p>
-          <p class="gap">الخريطة ما زالت تصنّف model_router «مقترحًا» وهو منفّذ (DEC-081)؛ لم تُحدَّث.</p>
-          <ul class="ev"><li class="mono">docs/celiaos-architecture-map.html</li><li class="mono">src/agent/harness.js</li></ul>
+          <p class="artifact mono">docs/design/architecture-map.html</p>
+          <p class="gap">الخريطة الحية تُظهر البنية والاعتماديات مقيسةً؛ ولا تُظهر دلالات وقت التشغيل (أي مرحلة نُفِّذت فعلًا).</p>
+          <ul class="ev"><li class="mono">docs/design/architecture-map.html</li><li class="mono">src/agent/harness.js</li><li class="mono">src/design/architecture-map.js</li></ul>
         </article>
         <article class="card ok">
-          <header><h3>Agent Harness</h3><span class="mark">🟢 موجود ومتحقق</span></header>
+          <header><h3>Agent Harness</h3><span class="mark">🟢 منفّذ ومتحقق</span></header>
           <p class="artifact mono">docs/design/runtime-verified-architecture.html</p>
           <p class="gap">لا شيء في هذا الرسم؛ أسماؤه مأخوذة من HARNESS_LIFECYCLE_STAGES حرفيًا.</p>
           <ul class="ev"><li class="mono">docs/design/runtime-verified-architecture.html</li><li class="mono">src/agent/harness.js</li><li class="mono">test/agent-harness.test.js</li></ul>
@@ -130,7 +135,7 @@
           <ul class="ev"><li class="mono">src/agent/harness.js</li><li class="mono">src/agent/sandbox-policy.js</li><li class="mono">test/agent-egress-proxy.test.js</li></ul>
         </article>
         <article class="card miss">
-          <header><h3>Executor → Verifier → Evidence</h3><span class="mark">🔴 غير موجود</span></header>
+          <header><h3>Executor → Verifier → Evidence</h3><span class="mark">🔴 غير منفّذ</span></header>
           <p class="artifact mono">لا يوجد رسم بعد</p>
           <p class="gap">لا رسم يبيّن سلسلة SHA-256 والأحكام الثلاثة PASS/BLOCK/UNKNOWN.</p>
           <ul class="ev"><li class="mono">src/agent/verifier.js</li><li class="mono">src/agent/evidence.js</li><li class="mono">test/agent-verifier.test.js</li></ul>
@@ -148,13 +153,13 @@
           <ul class="ev"><li class="mono">src/agent/computer-policy.js</li><li class="mono">docs/computer-permissions/README.md</li><li class="mono">src/mcp-contract.js</li></ul>
         </article>
         <article class="card miss">
-          <header><h3>Event Bus &amp; Tool Registry</h3><span class="mark">🔴 غير موجود</span></header>
+          <header><h3>Event Bus &amp; Tool Registry</h3><span class="mark">🔴 غير منفّذ</span></header>
           <p class="artifact mono">لا يوجد رسم بعد</p>
           <p class="gap">لا رسم يبيّن من يستهلك الحدث ومن يملك تسجيل الأداة.</p>
           <ul class="ev"><li class="mono">src/agent/runtime.js</li><li class="mono">src/knowledge/tool-policy.js</li></ul>
         </article>
         <article class="card miss">
-          <header><h3>Database &amp; Persistence</h3><span class="mark">🔴 غير موجود</span></header>
+          <header><h3>Database &amp; Persistence</h3><span class="mark">🔴 غير منفّذ</span></header>
           <p class="artifact mono">لا يوجد رسم بعد</p>
           <p class="gap">لا رسم يبيّن MySQL وD1 والهجرات وما يُفقد عند الفشل.</p>
           <ul class="ev"><li class="mono">src/db.js</li><li class="mono">src/mysql-config.js</li><li class="mono">src/schema-migrations.js</li></ul>
@@ -166,10 +171,55 @@
           <ul class="ev"><li class="mono">docs/access-policy/README.md</li><li class="mono">src/agent/access-policy.js</li><li class="mono">docs/agent-risk-matrix.md</li></ul>
         </article>
         <article class="card miss">
-          <header><h3>Deployment &amp; Infrastructure</h3><span class="mark">🔴 غير موجود</span></header>
+          <header><h3>Deployment &amp; Infrastructure</h3><span class="mark">🔴 غير منفّذ</span></header>
           <p class="artifact mono">لا يوجد رسم بعد</p>
           <p class="gap">لا رسم يبيّن مسار main إلى Cloudflare وPages وRender وأين تنكسر الحلقة.</p>
           <ul class="ev"><li class="mono">.github/workflows/pages.yml</li><li class="mono">.github/workflows/cloudflare-deploy.yml</li><li class="mono">render.yaml</li></ul>
+        </article>
+  </div>
+
+  <h2 class="section">منتجات مركز الهندسة البصرية — سبعة، بهذا الترتيب</h2>
+  <div class="stats" style="margin-bottom:10px">
+    <div class="stat"><b>7</b><small>منتجًا مقترحًا</small></div>
+    <div class="stat"><b style="color:var(--ok)">2</b><small>مبنيّ الآن</small></div>
+    <div class="stat"><b style="color:var(--part)">2</b><small>جزئي</small></div>
+    <div class="stat"><b style="color:var(--miss)">3</b><small>لم يبدأ</small></div>
+  </div>
+  <div class="grid" style="grid-template-columns:repeat(4,1fr)">
+        <article class="card ok">
+          <header><h3>Living Architecture Map</h3><span class="mark">🟢 منفّذ ومتحقق</span></header>
+          <p class="artifact mono">docs/design/architecture-map.html · P0</p>
+          <p class="gap">تُبني من الاستيراد الفعلي في كل مرة؛ لا تُظهر بعدُ ملفات الاختبارات كعقد مستقلة.</p>
+        </article>
+        <article class="card ok">
+          <header><h3>Dependency &amp; Impact Map</h3><span class="mark">🟢 منفّذ ومتحقق</span></header>
+          <p class="artifact mono">docs/design/architecture-map.html · P0</p>
+          <p class="gap">الأثر يُحسب بالاعتماديات لا ببيانات git؛ لا يقدّر المخاطر نوعيًا.</p>
+        </article>
+        <article class="card part">
+          <header><h3>Live Execution Visualization</h3><span class="mark">🟡 جزئي أو بقيود</span></header>
+          <p class="artifact mono">public/agent.html · P0</p>
+          <p class="gap">تعرض الخطوات والحالة والأدلة عند تشغيل الوكيل، والوكيل معطّل افتراضيًا (`CELIA_AGENT_RUNTIME=off`)؛ لا Trace ID ظاهر في اللوحة.</p>
+        </article>
+        <article class="card miss">
+          <header><h3>Visual Testing &amp; Evidence</h3><span class="mark">🔴 غير منفّذ</span></header>
+          <p class="artifact mono">لا يوجد أثر بعد · P0</p>
+          <p class="gap">النتائج والتغطية تُقرأ من TAP والسجلات، ولا لوحة بصرية تربط اختبارًا بمكوّن.</p>
+        </article>
+        <article class="card part">
+          <header><h3>Security &amp; Governance Map</h3><span class="mark">🟡 جزئي أو بقيود</span></header>
+          <p class="artifact mono">docs/access-policy/README.md · P1</p>
+          <p class="gap">مصفوفة صلاحيات كاملة؛ ولا خريطة تربط الحواجز ببعضها (موافقة ← عزل ← تحقق).</p>
+        </article>
+        <article class="card miss">
+          <header><h3>Infrastructure Topology</h3><span class="mark">🔴 غير منفّذ</span></header>
+          <p class="artifact mono">لا يوجد أثر بعد · P1</p>
+          <p class="gap">لا رسم يبيّن GitHub وCloudflare وD1 وRender وحالة كل خدمة.</p>
+        </article>
+        <article class="card miss">
+          <header><h3>Visual Command Center</h3><span class="mark">🔴 غير منفّذ</span></header>
+          <p class="artifact mono">لا يوجد أثر بعد · P1</p>
+          <p class="gap">لا لوحة واحدة تجمع الحالة والوكلاء والأدلة والنشر؛ الموجود صفحات منفصلة.</p>
         </article>
   </div>
 

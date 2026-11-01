@@ -86,6 +86,10 @@ jobs:
       # can never promise a permission the resolver does not enforce.
       - name: Access policy matrix matches the enforced policy (GOV-002)
         run: npm run access:policy:check
+      # VFE-003: the living map is computed from the import graph on every build. A module renamed
+      # without regenerating it (or a node typed by hand) fails here.
+      - name: Living architecture map matches the source (VFE-003)
+        run: npm run arch:map:check
       # VFE-001: the board is generated from the visual registry, and every handoff in this range
       # either links an artifact that exists or says «لا يوجد تغيير بصري» and why. Silence fails.
       - name: Visual-First board and handoff evidence (VFE-001)
