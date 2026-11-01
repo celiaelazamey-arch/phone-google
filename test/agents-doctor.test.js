@@ -122,7 +122,9 @@ test('AD-04: --env-file changes the verdicts and never echoes a value', () => {
     const planner = report.checks.find((entry) => entry.id === 'planner-llm');
     assert.equal(google.evidence.oauthConfigured, true, 'the real preflight sees the credentials');
     assert.deepEqual(google.evidence.blockingChecks, []);
-    assert.equal(planner.status, 'works', 'a present key builds the provider');
+    assert.equal(planner.status, 'partial', 'a present key is not live verification');
+    assert.equal(planner.evidence.configured, true);
+    assert.equal(planner.evidence.liveVerified, false);
     assert.equal(report.checks.some((entry) => entry.status === 'broken'), false);
     const combined = `${child.stdout}${child.stderr}`;
     assert.equal(combined.includes(secret), false, 'the client secret never reaches stdout/stderr');
@@ -166,4 +168,51 @@ test('AD-05: --write-baseline/--baseline compares runs and --fail-on-regression 
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+
+test('AD-06: removed checks are regressions in JSON, text, and strict exit status', () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'agents-doctor-removed-'));
+  const baseline = path.join(directory, 'baseline.json');
+  try {
+    writeFileSync(baseline, JSON.stringify({ version: 'agents-doctor-v1',
+      generatedAt: '2026-11-01T00:00:00Z', checks: [{ id: 'retired-check', status: 'works' }] }));
+    const child = runDoctor(['--json', '--baseline', baseline, '--fail-on-regression']);
+    assert.equal(child.status, 1);
+    const { comparison } = parseJson(child);
+    assert.deepEqual(comparison.removed, [{ id: 'retired-check', was: 'works', now: null,
+      direction: 'regressed', reason: 'check_removed' }]);
+    assert.deepEqual(comparison.regressed, comparison.removed);
+    assert.equal(comparison.appeared.length, REQUIRED.length);
+    const advisory = runDoctor(['--baseline', baseline]);
+    assert.equal(advisory.status, 0);
+    assert.match(advisory.stdout, /retired-check: works → محذوف \(check_removed\)/);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('AD-07: malformed baselines fail closed before probes without echoing input', () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'agents-doctor-invalid-'));
+  const baseline = path.join(directory, 'baseline.json');
+  const valid = { version: 'agents-doctor-v1', generatedAt: '2026-11-01T00:00:00Z',
+    checks: [{ id: 'runtime-loop', status: 'works' }] };
+  const invalid = [null, {}, { ...valid, version: 'future-version' },
+    { ...valid, generatedAt: 'invalid' }, { ...valid, checks: [] },
+    { ...valid, checks: {} }, { ...valid, checks: [null] },
+    { ...valid, checks: [{ id: '', status: 'works' }] },
+    { ...valid, checks: [{ id: 'x', status: 'untrusted-marker' }] },
+    { ...valid, checks: [{ id: 'x', status: 'toString' }] },
+    { ...valid, checks: [{ id: 'x', status: ['works'] }] },
+    { ...valid, checks: [valid.checks[0], valid.checks[0]] }];
+  try {
+    for (const value of [...invalid.map(JSON.stringify), '{untrusted-marker']) {
+      writeFileSync(baseline, value);
+      const child = runDoctor(['--baseline', baseline, '--json', '--fail-on-regression']);
+      assert.equal(child.status, 2);
+      assert.equal(child.stdout, '');
+      assert.match(child.stderr, /خط الأساس غير صالح/);
+      assert.equal(child.stderr.includes('untrusted-marker'), false);
+    }
+    const missing = runDoctor(['--baseline', path.join(directory, 'missing.json')]);
+    assert.equal(missing.status, 2);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
 });

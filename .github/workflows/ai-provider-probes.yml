@@ -1,0 +1,62 @@
+name: Isolated AI provider probes
+
+# Explicit manual full-provider probe: do not re-bill/reprobe Gemini or DeepSeek on diagnostic edits.
+# Targeted provider diagnostics remains separate. No production workflow subscribes to this name.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: isolated-ai-probes-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    if: github.ref == 'refs/heads/arena/987903b1-phone-google'
+    runs-on: ubuntu-24.04
+    environment: integration-probes
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Test probe contract without credentials
+        id: contract
+        run: node --test test/ai-provider-probes.test.js test/probe-report.test.js test/public-deployment-probes.test.js
+      - name: Passive public deployment checks (no credentials or D1 writes)
+        id: public
+        run: node scripts/public-deployment-probes.mjs
+      - name: One synthetic request per enabled configured AI provider
+        id: ai
+        if: ${{ !cancelled() && steps.contract.outcome == 'success' }}
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          AGENTROUTER_API_KEY: ${{ secrets.AGENTROUTER_API_KEY || secrets.AGENETROUTERAPI_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+          AI_GATEWAY_MODEL: ${{ vars.AI_GATEWAY_MODEL }}
+          DEEPSEEK_MODEL: ${{ vars.DEEPSEEK_MODEL }}
+          AGENTROUTER_MODEL: ${{ vars.AGENTROUTER_MODEL }}
+          CELIA_DISABLE_GEMINI: ${{ vars.CELIA_DISABLE_GEMINI }}
+          CELIA_DISABLE_AI_GATEWAY: ${{ vars.CELIA_DISABLE_AI_GATEWAY }}
+          CELIA_DISABLE_DEEPSEEK: ${{ vars.CELIA_DISABLE_DEEPSEEK }}
+          CELIA_DISABLE_AGENTROUTER: ${{ vars.CELIA_DISABLE_AGENTROUTER }}
+        run: node scripts/ai-provider-probes.mjs
+      - name: Retain sanitized result only
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: isolated-ai-probes-${{ github.sha }}
+          path: |
+            .validation-artifacts/ai-provider-probes.json
+            .validation-artifacts/public-deployment-probes.json
+          if-no-files-found: warn
+          retention-days: 7

@@ -36,3 +36,25 @@ test('a normal completion still returns trimmed text', async () => {
     assert.equal(await call(), 'أهلاً بك');
   });
 });
+
+test('malformed 200 responses carry safe machine-readable diagnostics, never the HTML body', async () => {
+  await withFetch(async () => new Response('<html>private-marker</html>', { status: 200 }), async () => {
+    const error = await call().catch((e) => e);
+    assert.equal(error.upstreamStatus, 200);
+    assert.equal(error.diagnosticCode, 'NON_JSON_RESPONSE');
+    assert.doesNotMatch(JSON.stringify({ ...error, message: error.message }), /private-marker/);
+  });
+  for (const [body, code] of [
+    [{ error: { message: 'private-marker' }, choices: [{ message: { content: 'OK' } }] }, 'PROVIDER_ERROR_ENVELOPE'],
+    [{}, 'MISSING_CHOICES'],
+    [{ choices: [{ message: { content: '', reasoning_content: 'thinking' } }] }, 'REASONING_ONLY'],
+    [{ choices: [{ finish_reason: 'length', message: {} }] }, 'OUTPUT_TOKEN_LIMIT'],
+    [{ choices: [{ message: {} }] }, 'EMPTY_REPLY']
+  ]) {
+    await withFetch(async () => json(200, body), async () => {
+      const error = await call().catch((e) => e);
+      assert.equal(error.upstreamStatus, 200);
+      assert.equal(error.diagnosticCode, code);
+    });
+  }
+});
