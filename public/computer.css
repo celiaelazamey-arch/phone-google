@@ -10,23 +10,23 @@ body {
 }
 
 .cu-page {
-  --cu-bg: #0b1030;
-  --cu-bg2: #121a4a;
-  --cu-card: #161f55;
-  --cu-line: #2e3a8c;
-  --cu-txt: #eaf0ff;
-  --cu-mut: #a9b6e8;
-  --cu-vio: #8b5cf6;
-  --cu-cy: #22d3ee;
-  --cu-ok: #34d399;
-  --cu-bad: #f87171;
-  --cu-term: #070b24;
-  --cu-warn: #fbbf24;
+  --cu-bg: var(--t-cu-bg);
+  --cu-bg2: var(--t-cu-bg-2);
+  --cu-card: var(--t-cu-card);
+  --cu-line: var(--t-cu-line);
+  --cu-txt: var(--t-cu-text);
+  --cu-mut: var(--t-cu-muted);
+  --cu-vio: var(--t-cu-violet);
+  --cu-cy: var(--t-cu-cyan);
+  --cu-ok: var(--t-cu-ok);
+  --cu-bad: var(--t-cu-bad);
+  --cu-term: var(--t-cu-term);
+  --cu-warn: var(--t-cu-warn);
 
   margin: 0;
   background: var(--cu-bg);
   color: var(--cu-txt);
-  font-family: "IBM Plex Sans Arabic", system-ui, "Segoe UI", Tahoma, sans-serif;
+  font-family: var(--t-font-body);
   line-height: 1.7;
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -39,11 +39,11 @@ body {
   pointer-events: none;
   z-index: 0;
   background-image:
-    linear-gradient(#ffffff0a 1px, transparent 1px),
-    linear-gradient(90deg, #ffffff0a 1px, transparent 1px);
+    linear-gradient(color-mix(in srgb, var(--t-sheen) 4%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--t-sheen) 4%, transparent) 1px, transparent 1px);
   background-size: 44px 44px;
-  -webkit-mask-image: radial-gradient(circle at 50% 15%, #000, transparent 75%);
-  mask-image: radial-gradient(circle at 50% 15%, #000, transparent 75%);
+  -webkit-mask-image: radial-gradient(circle at 50% 15%, color-mix(in srgb, var(--t-mask) 100%, transparent), transparent 75%);
+  mask-image: radial-gradient(circle at 50% 15%, color-mix(in srgb, var(--t-mask) 100%, transparent), transparent 75%);
 }
 
 .cu-wrap {
@@ -61,7 +61,7 @@ body {
   opacity: 0;
   pointer-events: none;
   background: var(--cu-cy);
-  color: #06102c;
+  color: var(--t-cu-skip-ink);
   padding: 8px 14px;
   border-radius: 8px;
   font-weight: 700;
@@ -81,7 +81,7 @@ body {
   border: 1px solid var(--cu-line);
   border-radius: 14px;
   padding: 10px 14px;
-  background: #ffffff08;
+  background: color-mix(in srgb, var(--t-sheen) 3%, transparent);
 }
 .cu-brand {
   display: flex;
@@ -112,7 +112,7 @@ body {
 .cu-nav a:focus-visible {
   color: var(--cu-txt);
   border-color: var(--cu-line);
-  background: #ffffff0a;
+  background: color-mix(in srgb, var(--t-sheen) 4%, transparent);
 }
 .cu-nav a[aria-current="page"] {
   color: var(--cu-cy);
@@ -166,7 +166,7 @@ body {
 }
 .cu-badge {
   border: 1px solid var(--cu-line);
-  background: #ffffff0a;
+  background: color-mix(in srgb, var(--t-sheen) 4%, transparent);
   border-radius: 999px;
   padding: 4px 14px;
   font-size: 13px;
@@ -189,18 +189,18 @@ body {
 }
 @keyframes cu-ping {
   0% {
-    box-shadow: 0 0 0 0 #34d39999;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--t-cu-ok) 60%, transparent);
   }
   100% {
-    box-shadow: 0 0 0 10px #34d39900;
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--t-cu-ok) 0%, transparent);
   }
 }
 
 /* لوحة الصدق: الحالة الحقيقية قبل أي رسم. */
 .cu-truth {
   margin: 18px 0 4px;
-  border: 1px solid #fbbf2477;
-  background: #fbbf2414;
+  border: 1px solid color-mix(in srgb, var(--t-cu-warn) 47%, transparent);
+  background: color-mix(in srgb, var(--t-cu-warn) 8%, transparent);
   border-radius: 14px;
   padding: 12px 14px;
   display: flex;
@@ -258,7 +258,7 @@ body {
   padding: 16px;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  box-shadow: 0 10px 30px #0005, inset 0 1px 0 #ffffff14;
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--t-mask) 33%, transparent), inset 0 1px 0 color-mix(in srgb, var(--t-sheen) 8%, transparent);
   transition: transform 0.25s, border-color 0.25s;
 }
 .cu-card:hover {
@@ -318,7 +318,7 @@ body {
   counter-increment: cu-s;
   content: counter(cu-s);
   background: var(--cu-vio);
-  color: #140b2e;
+  color: var(--t-cu-violet-ink);
   border-radius: 50%;
   width: 20px;
   height: 20px;
@@ -359,8 +359,8 @@ body {
 }
 .cu-verify {
   margin-top: 12px;
-  border: 1px solid #34d39988;
-  background: #34d3991f;
+  border: 1px solid color-mix(in srgb, var(--t-cu-ok) 53%, transparent);
+  background: color-mix(in srgb, var(--t-cu-ok) 12%, transparent);
   border-radius: 12px;
   padding: 10px;
   font-weight: 700;
@@ -403,7 +403,7 @@ body {
   }
 }
 .cu-mono {
-  font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  font-family: var(--t-font-mono);
   font-size: 12px;
   direction: ltr;
   text-align: left;
@@ -428,7 +428,7 @@ body {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #ffffff33;
+  background: color-mix(in srgb, var(--t-sheen) 20%, transparent);
 }
 .cu-trace-head .cu-live {
   margin-inline-start: auto;
@@ -441,7 +441,7 @@ body {
   gap: 10px;
   align-items: center;
   padding: 6px 0;
-  border-bottom: 1px dashed #2e3a8c66;
+  border-bottom: 1px dashed color-mix(in srgb, var(--t-cu-line) 40%, transparent);
   animation: cu-in 0.6s both;
 }
 .cu-tr:nth-child(3) {
@@ -474,7 +474,7 @@ body {
 .cu-tr b {
   color: var(--cu-cy);
   font-weight: 700;
-  font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  font-family: var(--t-font-mono);
   font-size: 12.5px;
 }
 .cu-tr em {
@@ -484,15 +484,15 @@ body {
   padding: 0 10px;
 }
 .cu-tr .s {
-  background: #34d39933;
+  background: color-mix(in srgb, var(--t-cu-ok) 20%, transparent);
   color: var(--cu-ok);
 }
 .cu-tr .x {
-  background: #f8717133;
+  background: color-mix(in srgb, var(--t-cu-bad) 20%, transparent);
   color: var(--cu-bad);
 }
 .cu-tr .d {
-  background: #fbbf2433;
+  background: color-mix(in srgb, var(--t-cu-warn) 20%, transparent);
   color: var(--cu-warn);
 }
 
@@ -507,7 +507,7 @@ body {
   border-radius: 14px;
   padding: 12px;
   text-align: center;
-  background: #ffffff0a;
+  background: color-mix(in srgb, var(--t-sheen) 4%, transparent);
 }
 .cu-kpi b {
   display: block;
@@ -561,7 +561,7 @@ body {
   border-radius: 12px;
   padding: 8px 6px;
   font-size: 13px;
-  background: #ffffff0a;
+  background: color-mix(in srgb, var(--t-sheen) 4%, transparent);
 }
 .cu-principles svg {
   width: 24px;
