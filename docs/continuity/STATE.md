@@ -27,6 +27,13 @@
 - **عيب جانبي مسجّل:** `docs/celiaos-architecture-map.html` ما زالت تصنّف `model_router` «مقترحًا (A4)» وهو منفّذ ومختبر — لم تُعدَّل هنا.
 - **الحدود:** توثيق فقط؛ لا تغيير في وقت التشغيل ولا في الصور (خارج المستودع). لا PR ولا نشر.
 
+## 1 نوفمبر 2026 — REL-002 / DEC-083 (تجميد الإصدارات)
+
+- **العلة:** بعد تفعيل تجميد الإصدارات صار `v0.2.1` `immutable=true`، وخطوة نشر الإصدار تُنفّذ `--clobber` فيفشل `Publish verified release` في كل دفعة إلى `main` بينما بقية السير خضراء.
+- **الإصلاح:** قراءة `.immutable` من الـAPI أولًا، وعند `true` تحذير صريح بأن الحزمة لم تُنشر والحاجة إلى ترقية إصدار، ثم خروج بـ`0`. المسار غير المجمّد بقي حرفيًا.
+- **التحقق:** `npm test` 943/927/0 · `check` · `workflows-static` 2/2 · `check:continuity` مع عقدة `main`.
+- **السجل:** [release-immutability](sessions/2026-11-01-release-immutability.md) · **القرار:** `DEC-083`.
+
 ## الجلسة الحالية — 31 أكتوبر 2026 — DOC-003 / DEC-082 (النسخة المصححة)
 
 - **المخرَج:** [runtime-verified-architecture.html](../design/runtime-verified-architecture.html) + [PNG 2880×4828](../design/runtime-verified-architecture.png) — استبدال لا تلويين، استنادًا إلى §8 من [التقرير](../agent-cognitive-architecture-audit.md).
