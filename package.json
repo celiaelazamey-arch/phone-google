@@ -78,7 +78,8 @@
     "publish:status:json": "node scripts/publish-gate.mjs --json",
     "publish:ledger:verify": "node scripts/publish-gate.mjs --verify-ledger",
     "kb:conflicts": "node scripts/kb-conflicts.mjs",
-    "memory:consolidate": "node scripts/memory-consolidate.mjs"
+    "memory:consolidate": "node scripts/memory-consolidate.mjs",
+    "attention": "node scripts/attention.mjs"
   },
   "dependencies": {
     "dotenv": "^18.0.9",

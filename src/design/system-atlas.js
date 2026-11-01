@@ -72,7 +72,7 @@ export const DOMAINS = Object.freeze([
       { id: 'arabic_rtl', ar: 'واجهة عربية RTL', anchors: ['public/system.html', 'e2e/system.spec.js'] },
       { id: 'conversations', ar: 'المحادثات والملفات', anchors: ['public/agent.html', 'src/agent-routes.js'] },
       { id: 'voice', ar: 'الأوامر الصوتية والنصية', anchors: ['public/agent.js'] },
-      { id: 'notifications', ar: 'الإشعارات والتنبيهات', anchors: [] },
+      { id: 'notifications', ar: 'الإشعارات والتنبيهات', anchors: ['src/agent/attention.js', 'scripts/attention.mjs'] },
       { id: 'settings', ar: 'إعدادات المستخدم والتخصيص', anchors: ['public/system.html'] }
     ]
   }),

@@ -1,12 +1,12 @@
 {
-  "fingerprint": "a2086d2d03",
+  "fingerprint": "76d32bc23e",
   "version": "celiaos-system-atlas-v1",
   "totals": {
     "domains": 12,
     "capabilities": 54,
-    "verified": 41,
+    "verified": 42,
     "unverified": 9,
-    "missing": 4
+    "missing": 3
   },
   "phases": [
     {
@@ -101,7 +101,7 @@
       "en": "User Experience",
       "priority": "P0",
       "status": "partial",
-      "coverage": 40,
+      "coverage": 60,
       "capabilities": [
         {
           "id": "arabic_rtl",
@@ -121,7 +121,7 @@
         {
           "id": "notifications",
           "ar": "الإشعارات والتنبيهات",
-          "status": "not_implemented"
+          "status": "implemented_verified"
         },
         {
           "id": "settings",
@@ -129,9 +129,7 @@
           "status": "implemented_unverified"
         }
       ],
-      "missing": [
-        "الإشعارات والتنبيهات"
-      ]
+      "missing": []
     },
     {
       "id": "multi_agent",
