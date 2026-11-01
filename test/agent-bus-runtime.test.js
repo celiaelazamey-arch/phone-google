@@ -4,7 +4,6 @@ import assert from 'node:assert/strict';
 import { createTempStore, createRecordingTools, threeReadsThenFinish } from './support/agent-fixtures.js';
 import { createAgentRuntime } from '../src/agent/runtime.js';
 import { createScriptedPlanner } from '../src/agent/planner.js';
-import { RUN_STATUS } from '../src/agent/store.js';
 import { BUS_KIND } from '../src/agent/collaboration-bus.js';
 
 /**
