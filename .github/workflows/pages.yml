@@ -24,7 +24,7 @@ jobs:
   build:
     if: github.ref == 'refs/heads/main'
     name: Build or restore verified static site
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 12
     outputs:
       pages_ready: ${{ steps.configure.outcome == 'success' && steps.upload.outcome == 'success' }}
@@ -103,7 +103,7 @@ jobs:
     name: Deploy exact static artifact
     needs: build
     if: needs.build.outputs.pages_ready == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

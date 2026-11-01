@@ -452,7 +452,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
   const [workerModules, migrationFiles] = await Promise.all([
     collectWorkerModules(), loadMigrationFiles()
   ]);
-  const commit = String(env.GITHUB_SHA || 'main').trim();
+  const commit = String(env.CELIA_EXPECT_COMMIT || env.GITHUB_SHA || 'main').trim();
 
   let d1 = { ok: false, reason: 'dry_run' };
   let database = null;
