@@ -20,11 +20,12 @@
  *
  * لا يكتب داخل المستودع: كل حالة تُبنى في دليل مؤقت وتُحذف بعده. لا يطبع أي سر.
  */
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { config as loadEnv } from 'dotenv';
 
 import { createSqliteDriver } from '../src/agent/drivers.js';
 import { createAgentStore, RUN_STATUS } from '../src/agent/store.js';
@@ -47,12 +48,31 @@ import {
   createContactsReadConnector
 } from '../src/agent/google-read.js';
 import { createGmailReadConnector } from '../src/agent/gmail.js';
+import { preflightGoogleConfig } from '../src/google-preflight.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const asJson = args.includes('--json');
+const setupOnly = args.includes('--setup');
+const failOnRegression = args.includes('--fail-on-regression');
 const urlIndex = args.indexOf('--url');
 const webTarget = urlIndex >= 0 ? args[urlIndex + 1] : 'https://github.com/';
+const flagValue = (name) => {
+  const index = args.indexOf(name);
+  return index >= 0 ? args[index + 1] : null;
+};
+
+// الأسماء فقط تُطبع لاحقًا؛ القيم لا تخرج من هذه العملية أبدًا.
+const envFile = flagValue('--env-file') || (existsSync(path.join(root, '.env')) ? path.join(root, '.env') : null);
+if (envFile) {
+  if (!existsSync(envFile)) {
+    process.stderr.write(`ملف البيئة غير موجود: ${envFile}\n`);
+    process.exit(2);
+  }
+  loadEnv({ path: envFile, quiet: true });
+}
+const baselinePath = flagValue('--baseline');
+const writeBaselinePath = flagValue('--write-baseline');
 
 const statuses = {
   works: { icon: '🟢', ar: 'يعمل' },
@@ -76,6 +96,76 @@ function unwrap(error) {
 
 const checks = [];
 const check = (id, ar, run) => checks.push({ id, ar, run });
+
+// ── خطة التوصيل: مشتقة من بوابة Google الحقيقية ومن إعدادات المستودع، لا من وثيقة ──
+const GOOGLE_ENV_BY_CHECK = {
+  client_id: ['GOOGLE_CLIENT_ID'],
+  client_secret: ['GOOGLE_CLIENT_SECRET'],
+  redirect_uri: ['GOOGLE_REDIRECT_URI'],
+  public_base_url: ['APP_BASE_URL'],
+  encryption_key: ['TOKEN_ENCRYPTION_KEY'],
+  api_token: ['APP_API_TOKEN'],
+  owner_email: ['APP_OWNER_EMAIL'],
+  feature_switch: ['CELIA_DISABLE_GOOGLE']
+};
+const AI_PROVIDER_ENV_NAMES = ['GEMINI_API_KEY', 'AI_GATEWAY_API_KEY', 'DEEPSEEK_API_KEY', 'AGENETROUTERAPI_KEY', 'AGENTROUTER_API_KEY'];
+
+function buildSetup() {
+  const report = preflightGoogleConfig(process.env);
+  const blocking = report.checks.filter((entry) => entry.status === 'fail');
+  const neededEnv = [...new Set(blocking.flatMap((entry) => GOOGLE_ENV_BY_CHECK[entry.id] || []))];
+  return {
+    version: 'agents-doctor-setup-v1',
+    derivedFrom: ['src/google-preflight.js', 'src/config.js'],
+    google: {
+      ready: report.ok,
+      blockingChecks: blocking.map((entry) => entry.id),
+      failingFixes: blocking.map((entry) => ({ check: entry.id, fix: entry.fix })),
+      envNames: neededEnv,
+      redirectUri: report.redirectUri,
+      consentPath: '/auth/google',
+      verifyCommand: 'npm run google:doctor',
+      consentLinkCommand: 'curl -s -H "Authorization: Bearer $APP_API_TOKEN" "$APP_BASE_URL/api/google/consent-link"',
+      note: 'النطاقات يحددها الخادم في src/google.js؛ لا تُكرَّر هنا حتى لا تنحرف عن الكود.'
+    },
+    ai: {
+      envNames: ['GEMINI_API_KEY'],
+      defaultModel: String(process.env.GEMINI_MODEL || 'gemini-2.5-flash').trim(),
+      alternatives: AI_PROVIDER_ENV_NAMES.filter((name) => String(process.env[name] || '').trim())
+    },
+    recheckCommand: 'npm run agents:doctor -- --json'
+  };
+}
+
+function formatSetup(setup) {
+  const lines = [];
+  lines.push('خطة التوصيل — مشتقة من الكود نفسه، بلا قيم أسرار:');
+  lines.push('');
+  lines.push('1) Google OAuth');
+  lines.push(`   · الفحوص الحاجزة الآن: ${setup.google.blockingChecks.length ? setup.google.blockingChecks.join(', ') : 'لا شيء'}`);
+  if (setup.google.envNames.length) lines.push(`   · أسماء المتغيرات الناقصة: ${setup.google.envNames.join(', ')}`);
+  lines.push(`   · Authorized redirect URI في Google Cloud = ${setup.google.redirectUri}`);
+  lines.push(`   · ثم: ${setup.google.verifyCommand}   (يجب أن يخرج بـ 0)`);
+  lines.push(`   · ثم موافقة المالك: افتح ${setup.google.consentPath} بحسابك، أو ${setup.google.consentLinkCommand}`);
+  lines.push('   · ثم أعد القياس ليتحول الوكيل من 🟡 إلى 🟢.');
+  lines.push('');
+  lines.push('2) مخطط النموذج');
+  lines.push(`   · ${setup.ai.envNames.join(' أو ')} — الموديل الافتراضي ${setup.ai.defaultModel}`);
+  lines.push(`   · بدائل معلنة في المستودع: ${AI_PROVIDER_ENV_NAMES.slice(1).join(', ')} (الاسم فقط)`);
+  lines.push('');
+  lines.push('3) القياس والمقارنة');
+  lines.push(`   · ${setup.recheckCommand} --write-baseline /tmp/agents-baseline.json`);
+  lines.push(`   · ${setup.recheckCommand} --baseline /tmp/agents-baseline.json`);
+  lines.push('');
+  lines.push('لا يُكتب أي سر في هذا المخرج، ولا يُفعَّل شيء تلقائيًا: كل خطوة قرار صريح للمالك.');
+  return lines.join('\n');
+}
+
+if (setupOnly) {
+  const setup = buildSetup();
+  process.stdout.write(asJson ? `${JSON.stringify(setup, null, 2)}\n` : `${formatSetup(setup)}\n`);
+  process.exit(0);
+}
 
 // ── 1. الحلقة الكاملة: تخطيط → تنفيذ → مراقبة → تحقق → تسليم ──────────────
 check('runtime-loop', 'حلقة الوكيل الكاملة (Planner → Act → Observe → Verify → Deliver)', async (self) => {
@@ -228,14 +318,21 @@ check('google-read', 'وكلاء القراءة من Google (Drive · Calendar �
   ];
   const counts = [driveOut.count, calendarOut.count, contactsOut.count, gmailOut.count];
   const ok = leaks.every((leak) => leak === false) && counts.every((count) => count === 1);
-  const live = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+  // ما تقوله بوابة Google الحقيقية في هذا الكود نفسه، لا تخمين: أسماء الفحوص الفاشلة بلا قيم.
+  const preflight = preflightGoogleConfig(process.env);
+  const blocking = preflight.checks.filter((entry) => entry.status === 'fail').map((entry) => entry.id);
+  const warnings = preflight.checks.filter((entry) => entry.status === 'warn').map((entry) => entry.id);
+  const configured = blocking.length === 0;
+  const reason = configured
+    ? 'الاعتماد مهيّأ كاملًا؛ تبقّى خطوة موافقة المالك على /auth/google ليُقرأ حساب حقيقي — هذا الفحص لا يقرأ حسابًا نيابةً عنه'
+    : `ولا اعتماد OAuth بعد: الفحوص الحاجزة (${blocking.join(', ')}) — شغّل npm run google:doctor لخطوات الإصلاح`;
   finish(
     self,
-    ok ? (live ? 'works' : 'partial') : 'broken',
+    ok ? 'partial' : 'broken',
     ok
-      ? `الأربعة قرأوا سجلًا واحدًا لكل منهم وقلّصوا الحقول (لا بريد مخاطبين ولا وصف ولا نص خام)${live ? '؛ واعتماد OAuth موجود في البيئة' : '؛ ولا اعتماد OAuth في هذه البيئة فالحساب الحقيقي لم يُقرأ'}`
+      ? `الأربعة قرأوا سجلًا واحدًا لكل منهم وقلّصوا الحقول (لا بريد مخاطبين ولا وصف ولا نص خام)؛ ${reason}`
       : `تسرّب حقل غير مسموح إلى المخرج: ${JSON.stringify(leaks)}`,
-    { counts, minimized: ok, oauthConfigured: live }
+    { counts, minimized: ok, oauthConfigured: configured, blockingChecks: blocking, warnings, googlePreflightOk: preflight.ok }
   );
 });
 
@@ -365,6 +462,8 @@ check('issue-triage', 'وكيل فرز المشكلات (issue-triage) — تص�
 // ── 12. المخطط السحابي (LLM) ──────────────────────────────────────────────
 check('planner-llm', 'المخطط الذكي (Gemini planner) — لا يعمل بمفتاح وهمي أو ناقص', async (self) => {
   const key = String(process.env.GEMINI_API_KEY || '').trim();
+  const alternatives = ['AI_GATEWAY_API_KEY', 'DEEPSEEK_API_KEY', 'AGENETROUTERAPI_KEY', 'AGENTROUTER_API_KEY']
+    .filter((name) => String(process.env[name] || '').trim());
   if (!key) {
     let refused = null;
     try {
@@ -372,9 +471,17 @@ check('planner-llm', 'المخطط الذكي (Gemini planner) — لا يعمل
     } catch (error) {
       refused = error.message;
     }
-    finish(self, 'not_configured', 'لا GEMINI_API_KEY في هذه البيئة؛ البناء يرفض المفتاح الفارغ صراحةً والمخطط الحتمي (demo) هو المستخدم', {
+    if (alternatives.length > 0) {
+      finish(self, 'partial', `لا GEMINI_API_KEY لكن يوجد ${alternatives.join(' / ')} (الاسم فقط)؛ المخطط الحتمي هو المستخدم الآن، ومخطط النموذج يحتاج GEMINI_API_KEY`, {
+        configuredAlternatives: alternatives,
+        fallbackPlanner: 'demo-deterministic'
+      });
+      return;
+    }
+    finish(self, 'not_configured', 'لا GEMINI_API_KEY ولا بديل من مفاتيح المزودين؛ البناء يرفض المفتاح الفارغ صراحةً والمخطط الحتمي (demo) هو المستخدم', {
       refused: Boolean(refused),
-      fallbackPlanner: 'demo-deterministic'
+      fallbackPlanner: 'demo-deterministic',
+      acceptedEnvNames: ['GEMINI_API_KEY', ...alternatives]
     });
     return;
   }
@@ -444,9 +551,44 @@ const summary = Object.keys(statuses).reduce((acc, key) => {
   return acc;
 }, {});
 const broken = results.filter((result) => result.status === 'broken');
+const RANK = { works: 4, partial: 3, blocked: 2, not_configured: 2, broken: 1 };
+
+let comparison = null;
+if (baselinePath) {
+  let baseline = null;
+  try {
+    baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
+  } catch (error) {
+    process.stderr.write(`تعذّر قراءة خط الأساس ${baselinePath}: ${error?.message}\n`);
+    process.exit(2);
+  }
+  const previous = new Map((baseline?.checks || []).map((entry) => [entry.id, entry.status]));
+  const changes = results.map((result) => {
+    const was = previous.get(result.id) ?? null;
+    const direction = was === null ? 'new' : was === result.status ? 'same' : RANK[result.status] > RANK[was] ? 'improved' : 'regressed';
+    return { id: result.id, was, now: result.status, direction };
+  });
+  comparison = {
+    baselinePath,
+    baselineGeneratedAt: baseline?.generatedAt ?? null,
+    unchanged: changes.filter((change) => change.direction === 'same').length,
+    improved: changes.filter((change) => change.direction === 'improved'),
+    regressed: changes.filter((change) => change.direction === 'regressed'),
+    appeared: changes.filter((change) => change.direction === 'new'),
+    changes
+  };
+}
+if (writeBaselinePath) {
+  const payload = { version: 'agents-doctor-v1', generatedAt: new Date().toISOString(), summary, checks: results };
+  const absolute = path.resolve(writeBaselinePath);
+  writeFileSync(absolute, `${JSON.stringify(payload, null, 2)}\n`);
+  if (absolute.startsWith(root + path.sep) && !absolute.includes(`${path.sep}.data${path.sep}`)) {
+    process.stderr.write(`تنبيه: خط الأساس داخل المستودع (${path.relative(root, absolute)})؛ لا تضفه إلى Git.\n`);
+  }
+}
 
 if (asJson) {
-  process.stdout.write(`${JSON.stringify({ version: 'agents-doctor-v1', generatedAt: new Date().toISOString(), summary, checks: results }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ version: 'agents-doctor-v1', generatedAt: new Date().toISOString(), summary, checks: results, ...(comparison ? { comparison } : {}) }, null, 2)}\n`);
 } else {
   const header = 'الحالة | الوكيل | النتيجة';
   process.stdout.write(`فحص وكلاء المستودع — ${results.length} وكيلًا\n\n${header}\n--- | --- | ---\n`);
@@ -454,6 +596,12 @@ if (asJson) {
     process.stdout.write(`${statuses[result.status].icon} ${statuses[result.status].ar} | ${result.ar} | ${result.detail}\n`);
   }
   process.stdout.write(`\nالإجمالي: ${summary.works} يعمل · ${summary.partial} جزئي · ${summary.not_configured} غير مفعّل · ${summary.blocked} متعطّل خارجيًا · ${summary.broken} معطوب\n`);
+  if (comparison) {
+    process.stdout.write(`\nمقارنة بخط الأساس ${comparison.baselinePath}: ${comparison.unchanged} بلا تغيير · ${comparison.improved.length} تحسّن · ${comparison.regressed.length} تراجع · ${comparison.appeared.length} جديد\n`);
+    for (const change of comparison.improved) process.stdout.write(`  ↑ ${change.id}: ${change.was} → ${change.now}\n`);
+    for (const change of comparison.regressed) process.stdout.write(`  ↓ ${change.id}: ${change.was} → ${change.now}\n`);
+    for (const change of comparison.appeared) process.stdout.write(`  + ${change.id}: ${change.now}\n`);
+  }
 }
 
-process.exitCode = broken.length === 0 ? 0 : 1;
+process.exitCode = broken.length === 0 && !(failOnRegression && comparison?.regressed.length) ? 0 : 1;
