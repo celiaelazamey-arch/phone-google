@@ -62,5 +62,32 @@
       "checksAtMerge": "8 pass · 2 skipping"
     },
     "entryHash": "cc0406c598418c48b0917356676e9c514922e1924b339007fc6a677bfc5fc3b4"
+  },
+  {
+    "seq": 3,
+    "prevHash": "cc0406c598418c48b0917356676e9c514922e1924b339007fc6a677bfc5fc3b4",
+    "at": "2026-11-01T08:58:23Z",
+    "actor": "celiaelazamey-arch",
+    "action": "merge",
+    "channel": "main",
+    "version": "0.2.1",
+    "commit": "dc318c2",
+    "requestFingerprint": "pub:c8b64733226e743f",
+    "outcome": "merged",
+    "evidence": {
+      "pullRequest": 121,
+      "method": "squash",
+      "mergedCommit": "dc318c2",
+      "bypass": "RepositoryRole 5 (admin) · ruleset 26270171 · base branch policy blocked the merge",
+      "bypassBecause": "the owner said «Please merge the pull request» after being told the pull request was MERGEABLE/BLOCKED by his own rules; the required approval cannot be given by the account that authored the push",
+      "checksAtMerge": "8 pass · 2 skipping",
+      "production": {
+        "url": "https://celia-phone-google.celiaelazamey.workers.dev/health",
+        "deployedCommit": "dc318c23a9a489c800177d4ace4b6cca5ebf3d92",
+        "observedAt": "2026-11-01T08:58:16.469Z",
+        "version": "0.2.1"
+      }
+    },
+    "entryHash": "9eed698af9e6064ee3d729f6686388750191c17fb26b6a34d90a27ada50805de"
   }
 ]
