@@ -58,7 +58,7 @@ test('PD-04: no secret forwarded on redirect or unapproved endpoint; failures co
 test('PD-05: bounded body and transport failures reveal only static categories', async () => {
   await assert.rejects(readBounded(new Response('x'.repeat(65537))), /response_too_large/);
   assert.equal(await readBounded(new Response(null)), '');
-  for (const fetchImpl of [async () => new Response('x'.repeat(65537)),
+  for (const fetchImpl of [async () => new Response('x'.repeat(1048577)),
     async () => { throw Object.assign(new Error('private-marker'), { cause: { code: 'ENOTFOUND' } }); }]) {
     const report = await diagnoseProviders({ config, fetchImpl });
     assert.equal(report.ok, false);

@@ -7,7 +7,7 @@ const TARGETS = [
   ['agentrouter', 'agentrouter', 'https://agentrouter.org/v1']
 ];
 const LIMIT = 65536;
-export async function readBounded(response) {
+export async function readBounded(response, limit = LIMIT) {
   if (!response.body) return '';
   const reader = response.body.getReader();
   const chunks = [];
@@ -17,7 +17,7 @@ export async function readBounded(response) {
       const { done, value } = await reader.read();
       if (done) break;
       size += value.byteLength;
-      if (size > LIMIT) { await reader.cancel(); throw new Error('response_too_large'); }
+      if (size > limit) { await reader.cancel(); throw new Error('response_too_large'); }
       chunks.push(value);
     }
   } finally { reader.releaseLock(); }
@@ -30,15 +30,16 @@ export function responseDiagnosis(status, text, kind, model) {
   try { json = JSON.parse(text); } catch { /* report shape only */ }
   const html = /^\s*(?:<!doctype html|<html)/i.test(text);
   const shape = html ? 'html' : json !== undefined ? 'json' : 'non_json';
-  const errorText = json?.error?.message ?? json?.error ?? json?.message ?? json?.msg ?? '';
-  const message = typeof errorText === 'string' ? errorText.toLowerCase() : JSON.stringify(errorText).toLowerCase();
+  const message = JSON.stringify([json?.error, json?.message, json?.msg, json?.detail, json?.reason]).toLowerCase();
   const hints = [
     ['credential_hint', /invalid.{0,25}(key|token)|incorrect.{0,25}(key|token)|unauthorized/],
     ['balance_hint', /insufficient.{0,25}(balance|credit|fund)|payment|billing|余额|额度不足/],
     ['permission_hint', /permission|not authorized|access denied|forbidden/],
     ['region_hint', /country|region|location/],
     ['model_hint', /model.{0,40}(not found|not supported|unavailable|not allowed)/],
-    ['verification_hint', /verif(y|ication)|identity/]
+    ['verification_hint', /verif(y|ication)|identity/],
+    ['request_blocked_hint', /blocked|restricted|suspended|disabled|not permitted/],
+    ['project_scope_hint', /project|team|organization|oidc/]
   ].filter(([, regex]) => regex.test(message)).map(([id]) => id);
   const base = { httpStatus: status, responseShape: shape, providerHints: hints };
   if (status < 200 || status >= 300) return { ...base, status: 'failed',
@@ -88,7 +89,7 @@ export async function diagnoseProviders({ config, fetchImpl = fetch }) {
           checks.push({ id: `${id}_${kind}`, status: 'failed', reason: 'redirect_refused', httpStatus: response.status });
           continue;
         }
-        const text = await readBounded(response);
+        const text = await readBounded(response, kind === 'models' ? 1048576 : LIMIT);
         checks.push({ id: `${id}_${kind}`, ...responseDiagnosis(response.status, text, kind, cfg.model) });
       } catch (error) {
         checks.push({ id: `${id}_${kind}`, status: 'failed', ...(error?.message === 'response_too_large'
