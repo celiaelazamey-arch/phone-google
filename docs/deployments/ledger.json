@@ -19,5 +19,26 @@
       "checksAtMerge": "8 pass · 2 skipping"
     },
     "entryHash": "cef172e11e5adec483e8356a01182f20dd3e64d14f70ee82b379c5b16c094464"
+  },
+  {
+    "seq": 1,
+    "prevHash": "cef172e11e5adec483e8356a01182f20dd3e64d14f70ee82b379c5b16c094464",
+    "at": "2026-11-01T07:27:36Z",
+    "actor": "celiaelazamey-arch",
+    "action": "merge",
+    "channel": "main",
+    "version": "0.2.1",
+    "commit": "5ef33b2",
+    "requestFingerprint": "pub:7466108b208c2515",
+    "outcome": "merged",
+    "evidence": {
+      "pullRequest": 119,
+      "method": "squash",
+      "mergedCommit": "5ef33b2",
+      "bypass": "RepositoryRole 5 (admin) · bypass_mode always · ruleset 26270171",
+      "bypassBecause": "owner ordered the merge; same route as #118, recorded rather than assumed",
+      "checksAtMerge": "8 pass · 2 skipping"
+    },
+    "entryHash": "11e254fa946c2d700360d86ee7cf5cf0b5707f38649811cd485e16129008acb0"
   }
 ]
