@@ -53,7 +53,9 @@ test('AIP-04: local fallback, degraded response and empty content cannot count a
 
 test('AIP-05: workflow is branch-scoped, read-only and contains no OAuth or deployment credentials', () => {
   const yaml = readFileSync(new URL('../.github/workflows/ai-provider-probes.yml', import.meta.url), 'utf8');
-  assert.match(yaml, /branches: \[arena\/987903b1-phone-google\]/);
+  assert.match(yaml, /github.ref == 'refs\/heads\/arena\/987903b1-phone-google'/);
+  assert.match(yaml, /workflow_dispatch:/);
+  assert.doesNotMatch(yaml, /^  push:/m);
   assert.match(yaml, /contents: read/);
   assert.match(yaml, /persist-credentials: false/);
   assert.match(yaml, /environment: integration-probes/);

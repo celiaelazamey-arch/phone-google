@@ -72,3 +72,13 @@ test('PD-06: workflow does not inject unrelated credentials or trigger productio
   assert.doesNotMatch(workflow, /secrets\.(DEEPSEEK|GEMINI|GOOGLE|RENDER|CLOUDFLARE)|workflow_run:|contents: write/);
   assert.match(workflow, /branches: \[arena\/987903b1-phone-google\]/);
 });
+
+test('PD-07: provider and HTML hints are enumerated, do not execute challenges or echo account values', () => {
+  const html = responseDiagnosis(200, '<html><script>private-marker; acw_sc__v2</script></html>', 'chat');
+  assert.equal(html.reason, 'unexpected_html_response_browser_challenge');
+  assert.doesNotMatch(JSON.stringify(html), /private-marker|acw_sc/);
+  const json = responseDiagnosis(403, JSON.stringify({ error: { message: 'Verify your team private-marker with a credit card' } }), 'chat');
+  assert.ok(json.providerHints.includes('payment_method_verification_hint'));
+  assert.ok(json.providerHints.includes('team_verification_hint'));
+  assert.doesNotMatch(JSON.stringify(json), /private-marker/);
+});

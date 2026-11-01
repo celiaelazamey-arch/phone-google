@@ -54,3 +54,13 @@ test('PRP-03: report, summary and outputs persist only sanitized result fields s
     assert.equal(JSON.parse(readFileSync(path.join(dir, '.validation-artifacts/test.json'))).ok, false);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('PRP-04: 200 malformed adapter responses retain diagnostics without losing real HTTP rejection', () => {
+  assert.deepEqual(classifyProbeError({ upstreamStatus: 200, diagnosticCode: 'NON_JSON_RESPONSE' }),
+    { httpStatus: 200, reason: 'unexpected_non_json_response' });
+  assert.deepEqual(classifyProbeError({ upstreamStatus: 403, diagnosticCode: 'NON_JSON_RESPONSE' }),
+    { httpStatus: 403, reason: 'forbidden' });
+  for (const code of ['PROVIDER_ERROR_ENVELOPE', 'MISSING_CHOICES', 'REASONING_ONLY', 'OUTPUT_TOKEN_LIMIT', 'EMPTY_REPLY']) {
+    assert.notEqual(classifyProbeError({ upstreamStatus: 200, diagnosticCode: code }).reason, 'http_error');
+  }
+});

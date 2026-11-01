@@ -39,12 +39,26 @@ export function responseDiagnosis(status, text, kind, model) {
     ['model_hint', /model.{0,40}(not found|not supported|unavailable|not allowed)/],
     ['verification_hint', /verif(y|ication)|identity/],
     ['request_blocked_hint', /blocked|restricted|suspended|disabled|not permitted/],
-    ['project_scope_hint', /project|team|organization|oidc/]
+    ['project_scope_hint', /project|team|organization|oidc/],
+    ['payment_method_verification_hint', /credit.card|debit.card|payment.method/],
+    ['account_verification_hint', /account.{0,40}verif|verif.{0,40}account/],
+    ['team_verification_hint', /team.{0,40}verif|verif.{0,40}team/],
+    ['phone_verification_hint', /phone.{0,40}verif|verif.{0,40}phone/],
+    ['routing_policy_hint', /routing.rule|policy|rule.id/]
   ].filter(([, regex]) => regex.test(message)).map(([id]) => id);
   const base = { httpStatus: status, responseShape: shape, providerHints: hints };
   if (status < 200 || status >= 300) return { ...base, status: 'failed',
     reason: `${classifyProbeError({ status }).reason}_${shape}${hints.length ? `_${hints.join('_')}` : ''}` };
-  if (shape !== 'json') return { ...base, status: 'failed', reason: `unexpected_${shape}_response` };
+  if (shape !== 'json') {
+    // Inspect signatures only; never execute a challenge or persist HTML/cookies.
+    const markers = html ? [
+      ['browser_challenge', /acw_sc__v2|aliyun_waf|cf-chl-|challenge-platform|just a moment|captcha/i],
+      ['login_page', /type=["']password["']|sign in to|log in to/i],
+      ['frontend_shell', /<div[^>]+id=["'](?:root|app)["']|__NEXT_DATA__/i]
+    ].filter(([, pattern]) => pattern.test(text)).map(([id]) => id) : [];
+    return { ...base, status: 'failed', htmlMarkers: markers,
+      reason: `unexpected_${shape}_response${markers.length ? `_${markers.join('_')}` : ''}` };
+  }
   if (kind === 'models') {
     const models = Array.isArray(json?.data) ? json.data : null;
     return { ...base, status: models ? 'verified' : 'failed',

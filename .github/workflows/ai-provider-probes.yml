@@ -1,14 +1,8 @@
 name: Isolated AI provider probes
 
-# Owner-authorized branch-only probe. No production workflow subscribes to this name.
+# Explicit manual full-provider probe: do not re-bill/reprobe Gemini or DeepSeek on diagnostic edits.
+# Targeted provider diagnostics remains separate. No production workflow subscribes to this name.
 on:
-  push:
-    branches: [arena/987903b1-phone-google]
-    paths:
-      - .github/workflows/ai-provider-probes.yml
-      - scripts/ai-provider-probes.mjs
-      - scripts/probe-report.mjs
-      - scripts/public-deployment-probes.mjs
   workflow_dispatch:
 
 permissions:

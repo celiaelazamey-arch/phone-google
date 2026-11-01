@@ -4,6 +4,13 @@ import { appendFile, mkdir, writeFile } from 'node:fs/promises';
 export function classifyProbeError(error) {
   const raw = error?.upstreamStatus ?? error?.status;
   const httpStatus = Number.isInteger(raw) && raw >= 100 && raw <= 599 ? raw : null;
+  const responseErrors = { NON_JSON_RESPONSE: 'unexpected_non_json_response',
+    PROVIDER_ERROR_ENVELOPE: 'provider_error_envelope', MISSING_CHOICES: 'missing_choices',
+    REASONING_ONLY: 'reasoning_only_response', OUTPUT_TOKEN_LIMIT: 'empty_reply_token_limit', EMPTY_REPLY: 'empty_reply' };
+  // A real HTTP rejection keeps its HTTP category; a 2xx malformed payload is not a success.
+  if (httpStatus >= 200 && httpStatus < 300 && Object.hasOwn(responseErrors, error?.diagnosticCode)) {
+    return { httpStatus, reason: responseErrors[error.diagnosticCode] };
+  }
   const http = { 401: 'authentication_rejected', 402: 'payment_required',
     403: 'forbidden', 404: 'endpoint_or_model_not_found', 429: 'rate_limit_or_quota' };
   if (httpStatus) return { httpStatus, reason: http[httpStatus] ?? (httpStatus >= 500 ? 'upstream_server_error' : 'http_error') };

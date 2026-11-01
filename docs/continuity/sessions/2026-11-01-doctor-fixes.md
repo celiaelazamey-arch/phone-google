@@ -80,3 +80,12 @@ baseline → تحقق البنية ─ غير صالح → exit 2 (قبل probes
 - CI كشف SP-04: Actions مثبّتة ببصمة لكن تعليقات الإصدارات غائبة. أُضيفت التعليقات؛ لا تغيير للبصمات أو تخفيف البوابة.
 - الحد المنقّح: قائمة النماذج 1 MiB، المحادثة 64 KiB، مع إلغاء القراءة عند التجاوز؛ إشارات النص تبقى فئات محددة مسبقًا ولا تُطبع القيمة الأصلية.
 - بعد التصحيح: 21 اختبارًا مستهدفًا (PD/PRP/security-posture) ناجحًا. إعادة القياس تحتاج run جديدًا؛ لا يُعاد DeepSeek ولا Gemini.
+
+## معالجة طلب «حل كل المشاكل» — حدود التنفيذ
+- لا يمكن اعتبار 403 سببًا جذريًا محددًا من إشارتين نصيتين. مرجع Vercel الرسمي يميز 403 (رفض سياسة) عن 401 (مصادقة): `https://github.com/vercel/ai/blob/main/packages/gateway/src/errors/gateway-forbidden-error.ts` و`gateway-authentication-error.ts`؛ لا تدوير للمفتاح أو تغيير endpoint تخمينًا.
+- `src/ai-providers.js`: الاستجابة غير JSON تحمل `NON_JSON_RESPONSE` وHTTP الحقيقي؛ error envelope في 200 لا يُقبل كنجاح؛ الرموز MISSING_CHOICES/REASONING_ONLY/OUTPUT_TOKEN_LIMIT/EMPTY_REPLY تحافظ على سبب الرد غير القابل للاستخدام. لا تغير للرد الصحيح أو endpoints/models.
+- `probe-report.mjs`: يترجم الرموز إلى أسباب ثابتة، مع الاحتفاظ بأولوية رمز الرفض الحقيقي (403 مثلًا)، بلا نص خطأ خام.
+- التشخيص المستهدف يميز توقيعات HTML: browser challenge / login page / frontend shell؛ لا ينفذ JavaScript أو challenge ولا يحفظ cookies أو HTML. إشارات تحقق account/team/phone/payment method/routing policy محددة مسبقًا فقط.
+- الفحص الشامل للمزوّدين أصبح workflow_dispatch فقط على الفرع الحالي؛ منع إعادة استدعاء DeepSeek/Gemini عند تحرير مشترك. لا continue-on-error ولا تغيير لعتبة النجاح. اختبارات CI مستقلة وتبقى تلقائية.
+- لا دمج أو نشر أو OAuth أو دفع أو تغيير صلاحيات/أسرار. إذا ظهرت بوابة تحقق أو حماية لدى المزوّد فمعالجتها عبر المالك/الدعم لا تجاوزها.
+- التدفق البصري: رد HTTP → JSON صالح بلا error + نص → نجاح؛ غير ذلك → رمز ثابت + HTTP → تقرير فشل. هذا تعديل CLI/موصّل لا تغيير واجهة؛ arch:map:check ناجح.
