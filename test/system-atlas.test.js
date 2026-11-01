@@ -100,7 +100,13 @@ test('the audit admits what the system does not have — no domain is painted co
   assert.notEqual(multi.status, TRUTH.verified, 'one agent is not a multi-agent system');
   assert.ok(multi.tally[TRUTH.missing] >= 3, 'delegation, collaboration and conflict resolution are absent');
   const cognitive = atlas.domains.find((domain) => domain.id === 'cognitive_knowledge');
-  assert.ok(cognitive.tally[TRUTH.missing] >= 1, 'conflict detection is absent');
+  const conflict = cognitive.capabilities.find((capability) => capability.id === 'conflict_detection');
+  assert.equal(conflict.status, TRUTH.verified, 'conflict detection is implemented and a test names its file');
+  assert.notEqual(cognitive.status, TRUTH.verified, 'one untested capability still keeps the domain out of green');
+  const memory = atlas.domains.find((domain) => domain.id === 'memory_context');
+  const consolidation = memory.capabilities.find((capability) => capability.id === 'consolidation');
+  assert.equal(consolidation.status, TRUTH.verified, 'consolidation is implemented and a test names its file');
+  assert.equal(memory.status, TRUTH.verified, 'every memory capability is now backed and tested');
 });
 
 test('the seven states are reused, not reinvented', () => {

@@ -45,7 +45,7 @@ export const DOMAINS = Object.freeze([
       { id: 'source_trust', ar: 'تحليل موثوقية المصادر', anchors: ['src/knowledge/governance.js', 'src/knowledge/validate.js'] },
       { id: 'citations', ar: 'الاستشهاد بالمراجع داخل الإجابات', anchors: ['src/knowledge/schema.js', 'src/kb-routes.js'] },
       { id: 'web_discovery', ar: 'البحث الخارجي واكتشاف المصادر', anchors: ['src/agent/web-fetch.js', 'src/agent/spider-reader.js'] },
-      { id: 'conflict_detection', ar: 'اكتشاف المعلومات المتضاربة', anchors: [] }
+      { id: 'conflict_detection', ar: 'اكتشاف المعلومات المتضاربة', anchors: ['src/knowledge/conflict.js', 'src/knowledge/index.js', 'scripts/kb-conflicts.mjs'] }
     ]
   }),
   Object.freeze({
@@ -59,7 +59,7 @@ export const DOMAINS = Object.freeze([
       { id: 'long_term', ar: 'ذاكرة طويلة المدى دائمة', anchors: ['src/agent/store.js'] },
       { id: 'context_window', ar: 'إدارة حجم السياق واختياره', anchors: ['src/context-policy.js'] },
       { id: 'provenance', ar: 'تتبّع مصدر كل معلومة محفوظة', anchors: ['src/agent/evidence.js'] },
-      { id: 'consolidation', ar: 'إزالة التكرار وتحديث المعلومات', anchors: [] }
+      { id: 'consolidation', ar: 'إزالة التكرار وتحديث المعلومات', anchors: ['src/agent/consolidation.js', 'src/knowledge/index.js', 'scripts/memory-consolidate.mjs'] }
     ]
   }),
   Object.freeze({

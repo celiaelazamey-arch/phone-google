@@ -76,7 +76,9 @@
     "atlas:dashboard:check": "node scripts/render-atlas-dashboard.mjs --check",
     "publish:status": "node scripts/publish-gate.mjs",
     "publish:status:json": "node scripts/publish-gate.mjs --json",
-    "publish:ledger:verify": "node scripts/publish-gate.mjs --verify-ledger"
+    "publish:ledger:verify": "node scripts/publish-gate.mjs --verify-ledger",
+    "kb:conflicts": "node scripts/kb-conflicts.mjs",
+    "memory:consolidate": "node scripts/memory-consolidate.mjs"
   },
   "dependencies": {
     "dotenv": "^18.0.9",
