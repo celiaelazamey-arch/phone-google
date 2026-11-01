@@ -2,7 +2,7 @@
 
 > **حفظ التاريخ بلا حذف (`DEC-052` / `CONT-004`):** هذه نافذة الاستئناف النشطة؛ السجل التراكمي الكامل حتى ما بعد PR #84 (`main@738d832` / `9f6f8b2` — 983 سطرًا / 142,150 بايت) محفوظ حرفيًا في **[STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md)** وبصمته محروسة بـ`R0-02`. القراءة السريعة المشتقة: **[NOW.md](NOW.md)** (`npm run now`).
 
-**آخر مراجعة:** 31 أكتوبر 2026 · **نوع الجلسة الحالية:** DOC-003 / `DEC-081` — تدقيق ادعاءات إنفوجرافيك «البنية الإدراكية 2026» بمسبار تشغيل · **السجل:** [cognitive-infographic-audit](sessions/2026-10-31-cognitive-infographic-audit.md)
+**آخر مراجعة:** 31 أكتوبر 2026 · **نوع الجلسة الحالية:** DOC-003 / `DEC-082` — نسخة «Runtime-Verified Architecture» تُنشأ من §8 الحرفي وتستبدل الإنفوجرافيك · **السجل:** [runtime-verified-infographic](sessions/2026-10-31-runtime-verified-infographic.md)
 **الفرع:** `arena/9dceca86-phone-google` من `main@ec7da14` (بعد PR #113). **لا PR ولا نشر في هذه الجلسة.**
 
 ## الجلسة الحالية — 31 أكتوبر 2026 — DSN-002/‏3 (هجرة الألوان)
@@ -26,6 +26,14 @@
 - **قيود مقيسة:** `sandbox_executor.isolatedContainerAvailable=false` و`CELIA_AGENT_SANDBOX=off` افتراضيًا؛ `CELIA_AGENT_RUNTIME=off` افتراضيًا ولا إعداد في المستودع يفعّله؛ `CELIA_AGENT_CONNECTORS=none`؛ WhatsApp في الإنتاج `configured=false` (`DEC-073`).
 - **عيب جانبي مسجّل:** `docs/celiaos-architecture-map.html` ما زالت تصنّف `model_router` «مقترحًا (A4)» وهو منفّذ ومختبر — لم تُعدَّل هنا.
 - **الحدود:** توثيق فقط؛ لا تغيير في وقت التشغيل ولا في الصور (خارج المستودع). لا PR ولا نشر.
+
+## الجلسة الحالية — 31 أكتوبر 2026 — DOC-003 / DEC-082 (النسخة المصححة)
+
+- **المخرَج:** [runtime-verified-architecture.html](../design/runtime-verified-architecture.html) + [PNG 2880×4828](../design/runtime-verified-architecture.png) — استبدال لا تلويين، استنادًا إلى §8 من [التقرير](../agent-cognitive-architecture-audit.md).
+- **الأسماء حرفية:** `Goal` · `Plan` · `Select Tool` · `Policy Check` · `Approval` · `Sandbox Execute` · `Observe` · `Independently Verify` · `Persist Evidence` · `Update State` من `HARNESS_LIFECYCLE_STAGES` (`src/agent/harness.js:20`)، والعربي ترجمة تحتها لا اسم بديل.
+- **سبعة أقسام:** الحزام العشري بتمييز المراحل الثلاث المضافة وفصل `Policy Check` عن `Approval` · المكونات العشرة مع `isolatedContainerAvailable=false` · **القيود التشغيلية المقيسة** (`RUNTIME=off` · `SANDBOX=off` · `CONNECTORS=none` · `SPIDER=off` · WhatsApp `configured=false`) · التصحيح الجوهري للإدراك (لا Browser، Playwright للاختبارات، MCP اتجاهه معكوس، `web.fetch` مقيّد و`web.search` مؤجّلة) · الوظائف السبع بالحكم · التصحيحات الستة · ما ثبت بالكود (DENY، بصمة الموافقة، سلسلة الأدلة، المتحقق المستقل).
+- **عيبا عرض أُصلحا بالقياس:** الإيموجي رسم ▯ ⇒ وسوم نصية وأيقونات SVG؛ خلط الاتجاه ⇒ `unicode-bidi: plaintext` ليبقى رقم المرحلة على اليمين.
+- **الخطوط محلية** من `public/fonts/`؛ صفر طلب خارجي، والملف يُفتح بلا شبكة.
 
 ## جلسات سابقة (ملخّصات، التفاصيل في `sessions/`)
 

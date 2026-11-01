@@ -114,17 +114,41 @@ independent_verifier  evidence_observability  recovery_idempotency  evaluation_r
 
 ---
 
-## 8. التصحيحات الجاهزة للإنفوجرافيك
+## 8. المراحل العشر — أسماء وترتيب حرفيان
 
-1. **العنوان الفرعي:** «9 مراحل» ← **«10 مراحل و10 مكونات»**، وأضف المراحل الثلاث الناقصة: `Observe` · `Persist Evidence` · `Update State`.
-2. **افصل `Policy` عن `Approval`** بدل دمجهما في بطاقة واحدة.
-3. **صندوق المصدر الخارجي:** استبدل «Browser / Playwright / MCP» بـ **«فهرس معرفي محلي + `web.fetch` محكوم (اختياري) — ولا متصفح ولا بحث»**، واحذف علامات ✔ الأربع أو استبدلها بـ: `web.search: مؤجّل` · `المتصفح: للاختبارات فقط` · `MCP: يُصدَّر لا يُستهلَك` · `تحديث المعرفة: يدوي`.
-4. **بطاقة Sandbox:** أضف وسمًا صريحًا **«مبني ومختبر — غير مفعّل افتراضيًا»**.
-5. **بطاقة التعلم:** غيّر «يطور نفسه مع الوقت» إلى **«يُقيَّم ويُدقَّق؛ لا يعدّل نفسه»**.
-6. **JavaScript:** يمكن إضافة الرقم الفعلي (79.7 ألف سطر JS مقابل 8.9 ألف HTML/CSS) لأنه قابل للتحقق.
-7. **الحالة الحالية:** «الموجود الآن» ← **«الموجود بالكود — والمفعّل يشترط إعدادًا»**، لأن `CELIA_AGENT_RUNTIME=off` افتراضيًا.
+منقولة حرفيًا من `HARNESS_LIFECYCLE_STAGES` في `src/agent/harness.js:20-31`، ولا تُترجم ولا تُعاد تسميتها عند النقل. العربي **ترجمة توضيحية** تحتها، والاسم الرسمي هو الإنجليزي.
 
-## 9. ما لا يُقاس
+| # | الاسم الحرفي (رسمي) | ترجمة توضيحية | ملاحظة النقل |
+|---|---|---|---|
+| 1 | `Goal` | الهدف | — |
+| 2 | `Plan` | الخطة | — |
+| 3 | `Select Tool` | اختيار الأداة | — |
+| 4 | `Policy Check` | فحص السياسة | **لا تُدمج مع 5** |
+| 5 | `Approval` | الموافقة | **لا تُدمج مع 4** |
+| 6 | `Sandbox Execute` | التنفيذ المعزول | مبني ومختبر؛ `isolatedContainerAvailable=false` |
+| 7 | `Observe` | الرصد | **غائبة من النسخة السابقة** |
+| 8 | `Independently Verify` | التحقق المستقل | — |
+| 9 | `Persist Evidence` | تثبيت الأدلة | **غائبة من النسخة السابقة** |
+| 10 | `Update State` | تحديث الحالة | **غائبة من النسخة السابقة** |
+
+**المكونات العشرة أيضًا حرفية** (`HARNESS_COMPONENT_IDS`): `agent_runtime` · `model_router` · `tool_registry` · `context_memory` · `policy_approval_gate` · `sandbox_executor` · `independent_verifier` · `evidence_observability` · `recovery_idempotency` · `evaluation_regression`.
+
+**النسخة المصححة المنفّذة:** [runtime-verified-architecture.html](design/runtime-verified-architecture.html) مع [لقطة PNG بالحجم الكامل](design/runtime-verified-architecture.png) (2880×4828). المصدر واحد: نفس أسماء هذه الجداول، والحكم على كل بطاقة مأخوذ من §2–§6.
+
+## 9. التصحيحات الستة المطبَّقة في النسخة الجديدة
+
+| # | التصحيح | أين ظهر في [runtime-verified-architecture](design/runtime-verified-architecture.html) |
+|---|---|---|
+| 1 | فصل `Policy Check` عن `Approval` | بطاقتان مستقلتان بلون تمييز (4 و5) وتنبيه صريح بالدمج السابق |
+| 2 | إظهار `Observe` · `Persist Evidence` · `Update State` | ثلاث بطاقات بحدّ سماوي ووسم «أُضيفت» |
+| 3 | Playwright ليست قدرة تشغيل كمبيوتر | بطاقة `Playwright` بوسم «للاختبارات» ودليل `devDependencies` |
+| 4 | MCP ليس اتصالًا واردًا | بطاقة `MCP` بوسم «اتجاه معكوس» |
+| 5 | `web.fetch` مقيّدة و`web.search` مؤجّلة | بطاقة `web.fetch` بوسم «مقيّد» + صف في جدول القيود (C2-b) |
+| 6 | لا تعلّم ذاتي: تقييم + مراجعة + معرفة يدوية | بطاقة «تعلم» بوسم «غير مثبت» ودليل التقييم بلا تعديل سياسة |
+
+**وأُضيف فوقها لتوضيح الفرق بين الوجود والتفعيل:** قسم «القيود التشغيلية المقيسة» (`CELIA_AGENT_RUNTIME=off`، `CELIA_AGENT_SANDBOX=off`، `isolatedContainerAvailable=false`، `CELIA_AGENT_CONNECTORS=none`، `CELIA_AGENT_SPIDER=off`، WhatsApp `configured=false`)، وقسم «ما ثبت بالكود والاختبار» للأربعة المؤكدة.
+
+## 10. ما لا يُقاس
 
 - تشبيهات «العينان والأذنان = البحث، العقل = الذاكرة، الإرادة = القرار…» **بلاغية لا هندسية**؛ لا تُقدَّم كحكم على الكود.
 - عبارة «إنسان كامل» تصوّر للمنتج لا ادعاء قابل للتحقق؛ الإنفوجرافيك نفسه يضع «الذكاء العام الشامل» في خانة **الفجوات غير المثبتة**، وهذا هو الحكم الصحيح.

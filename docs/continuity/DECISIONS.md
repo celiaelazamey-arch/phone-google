@@ -1460,3 +1460,14 @@
 - **ما ثبت:** `NETWORK=DENY` مفروض (`sandbox_network_must_default_deny`)، الموافقة البشرية مربوطة ببصمة الحمولة، سلسلة أدلة SHA-256، مُتحقِّق مستقل بثلاثة أحكام، والملاحظات الأربع في الإنفوجرافيك صحيحة.
 - **الميزان:** 36 ادعاءً: **18 ✅ · 9 🟡 · 9 ❌**، والتصحيحات النصية الجاهزة في §8 من [التقرير](../agent-cognitive-architecture-audit.md).
 - **الحدود:** لم تُعدَّل الصور (خارج المستودع)، ولم تُحدَّث خريطة `docs/celiaos-architecture-map.html` رغم تقادمها في `model_router`؛ تسجَّل كعمل لاحق.
+
+## DEC-082 — DOC-003: نسخة «Runtime-Verified Architecture» تستبدل الإنفوجرافيك السابق
+
+- **التاريخ:** 31 أكتوبر 2026 · **المهمة:** DOC-003 · **يعتمد على:** DEC-081 · **الحالة:** منفّذ محليًا؛ لا نشر ولا PR.
+- **لماذا استبدال لا تلويين:** الإنفوجرافيك السابق كان يخفي ثلاث مراحل ويجمع مرحلتين ويصف Browser/Playwright/MCP كإدراك — عيوب بنية لا عيوب عرض. النسخة الجديدة مبنية على جداول §8 الحرفية من التقرير لا على ذاكرة الصورة.
+- **المصدر الوحيد للأسماء:** `HARNESS_LIFECYCLE_STAGES` و`HARNESS_COMPONENT_IDS` من `src/agent/harness.js`، منقولان حرفيًا؛ العربي ترجمة توضيحية تحته لا اسم بديل. المراحل: `Goal` · `Plan` · `Select Tool` · `Policy Check` · `Approval` · `Sandbox Execute` · `Observe` · `Independently Verify` · `Persist Evidence` · `Update State`.
+- **البنية:** سبعة أقسام مرقّمة — الحزام العشري (بتمييز المراحل المضافة)، المكونات العشرة مع `isolatedContainerAvailable=false`، القيود التشغيلية المقيسة، التصحيح الجوهري للإدراك الخارجي، الوظائف السبع بالحكم لا بالشعار، التصحيحات الستة، وما ثبت بالكود.
+- **«موجود ≠ مفعّل» صار قسمًا مستقلًا:** `CELIA_AGENT_RUNTIME=off` · `CELIA_AGENT_SANDBOX=off` · `isolatedContainerAvailable=false` · `CELIA_AGENT_CONNECTORS=none` · `CELIA_AGENT_SPIDER=off` · WhatsApp `configured=false` (`DEC-073`).
+- **الخطوط محلية:** `public/fonts/*.woff2` بنفس تكديس الصفحات؛ لا طلب خارجي واحد، والملف يُعرض بلا شبكة.
+- **الملفات:** [runtime-verified-architecture.html](../design/runtime-verified-architecture.html) (المصدر القابل للتعديل) و[runtime-verified-architecture.png](../design/runtime-verified-architecture.png) (2880×4828، 620KB) — مناسبة للعرض والطباعة، والصورتان القديمتان تسقطان.
+- **الحدود:** لا تغيير في وقت التشغيل؛ الصور الملحقة من المستخدم خارج المستودع ولم تُعدَّل؛ `docs/celiaos-architecture-map.html` ما زالت متقادمة في `model_router` (مسجّل، لم يُلمس).
