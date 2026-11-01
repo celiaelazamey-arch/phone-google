@@ -54,6 +54,10 @@
 | بوابات `release:check`، `access:policy:check`، `visual:first:check`، `arch:map:check`، `atlas:check` | محلي | PASS |
 | `CELIA_MCP_DISABLE_MYSQL=true CELIA_DISABLE_OLLAMA=true npm run celia:mcp:verify` | محلي | `selfTest: passed` · 12 أداة · مزوّد `local` |
 | `npm run build:pages` | محلي | 13 صفحة · 12 أداة · 61.8KB |
+| `node --test test/agents-doctor.test.js` | محلي، بعد الإضافة | AD-01..05 · 5/5 |
+| `npm test` بعد الإضافة | محلي | 1160 اختبارًا · 1143 ناجح · 0 فشل · 17 متخطّى |
+| `check-test-skips` على TAP | محلي | 17 بوابة بيئية · 0 غير متوقع |
+| **CI على [PR #128](https://github.com/celiaelazamey-arch/phone-google/pull/128)** | GitHub، `2c0c9e8`، تشغيلة `41302607663` | **10 ناجحة · 2 متخطّاة (بيئية) · 0 فاشلة** · `mergeable: CLEAN` |
 
 ## الدليل البصري
 
@@ -61,7 +65,7 @@
 
 ## الحفظ والتسليم
 
-- يُحفظ على فرع الجلسة `arena/7cc454c9-phone-google` وحده. لا دمج ولا نشر بغير كلمة المالك.
+- يُحفظ على فرع الجلسة `arena/7cc454c9-phone-google` وحده، والـPR [#128](https://github.com/celiaelazamey-arch/phone-google/pull/128) مفتوح عليه. لا دمج ولا نشر بغير كلمة المالك.
 - لم تُنفَّذ أي عملية إنتاج: لا ترحيل، لا نشر، لا لمس قاعدة، ولا قراءة أسرار.
 
 ## الاستئناف
