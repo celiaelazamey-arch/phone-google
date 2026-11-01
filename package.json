@@ -45,6 +45,8 @@
     "computer:permissions:check": "node scripts/render-computer-permissions.mjs --check",
     "access:policy": "node scripts/render-access-policy.mjs",
     "access:policy:check": "node scripts/render-access-policy.mjs --check",
+    "visual:first": "node scripts/render-visual-first.mjs",
+    "visual:first:check": "node scripts/check-visual-first.mjs",
     "test:mysql": "node --test integration/mysql.integration.mjs",
     "eval:ai": "node scripts/eval-ai.mjs",
     "eval:templates": "node scripts/eval-templates.mjs",

@@ -86,6 +86,13 @@ jobs:
       # can never promise a permission the resolver does not enforce.
       - name: Access policy matrix matches the enforced policy (GOV-002)
         run: npm run access:policy:check
+      # VFE-001: the board is generated from the visual registry, and every handoff in this range
+      # either links an artifact that exists or says «لا يوجد تغيير بصري» and why. Silence fails.
+      - name: Visual-First board and handoff evidence (VFE-001)
+        if: github.event_name == 'pull_request'
+        env:
+          CELIA_CONTINUITY_BASE: ${{ github.event.pull_request.base.sha }}
+        run: npm run visual:first:check
       - name: Require handoff for implementation changes
         if: github.event_name == 'pull_request'
         env:
