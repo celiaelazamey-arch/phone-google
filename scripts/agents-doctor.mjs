@@ -82,6 +82,29 @@ const statuses = {
   broken: { icon: '🔴', ar: 'معطوب' }
 };
 
+// Reject malformed baselines before running probes; never echo input values.
+let baseline = null;
+if (baselinePath) {
+  try {
+    baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
+    const ids = new Set();
+    if (baseline?.version !== 'agents-doctor-v1'
+      || typeof baseline.generatedAt !== 'string'
+      || !Number.isFinite(Date.parse(baseline.generatedAt))
+      || !Array.isArray(baseline.checks) || baseline.checks.length === 0
+      || !baseline.checks.every((entry) => {
+        if (!entry || typeof entry.id !== 'string' || !entry.id.trim()
+          || typeof entry.status !== 'string'
+          || !Object.hasOwn(statuses, entry.status) || ids.has(entry.id)) return false;
+        ids.add(entry.id);
+        return true;
+      })) throw new Error('invalid_baseline');
+  } catch {
+    process.stderr.write('خط الأساس غير صالح: يلزم agents-doctor-v1 وتاريخ صالح وفحوص غير فارغة بمعرّفات فريدة وحالات معروفة.\n');
+    process.exit(2);
+  }
+}
+
 const results = [];
 const temp = mkdtempSync(path.join(os.tmpdir(), 'celia-agents-doctor-'));
 const tempPath = (name) => path.join(temp, name);
@@ -486,7 +509,7 @@ check('planner-llm', 'المخطط الذكي (Gemini planner) — لا يعمل
     return;
   }
   const provider = createGeminiPlannerProvider({ apiKey: key });
-  finish(self, 'works', `مزود ${provider.model} بُني بمفتاح موجود (لم يُستدعَ النموذج في هذا الفحص)`, { model: provider.model });
+  finish(self, 'partial', `مزود ${provider.model} مهيّأ لكن غير متحقق: لم يُستدعَ النموذج ولم تُختبر صلاحية المفتاح`, { model: provider.model, configured: true, liveVerified: false });
 });
 
 // ── 13. موجّه النماذج والتكلفة ────────────────────────────────────────────
@@ -555,20 +578,18 @@ const RANK = { works: 4, partial: 3, blocked: 2, not_configured: 2, broken: 1 };
 
 let comparison = null;
 if (baselinePath) {
-  let baseline = null;
-  try {
-    baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
-  } catch (error) {
-    process.stderr.write(`تعذّر قراءة خط الأساس ${baselinePath}: ${error?.message}\n`);
-    process.exit(2);
-  }
-  const previous = new Map((baseline?.checks || []).map((entry) => [entry.id, entry.status]));
+  const previous = new Map(baseline.checks.map((entry) => [entry.id, entry.status]));
   const changes = results.map((result) => {
     const was = previous.get(result.id) ?? null;
     const direction = was === null ? 'new' : was === result.status ? 'same' : RANK[result.status] > RANK[was] ? 'improved' : 'regressed';
     return { id: result.id, was, now: result.status, direction };
   });
+  const currentIds = new Set(results.map((result) => result.id));
+  const removed = baseline.checks.filter((entry) => !currentIds.has(entry.id))
+    .map((entry) => ({ id: entry.id, was: entry.status, now: null, direction: 'regressed', reason: 'check_removed' }));
+  changes.push(...removed);
   comparison = {
+    removed,
     baselinePath,
     baselineGeneratedAt: baseline?.generatedAt ?? null,
     unchanged: changes.filter((change) => change.direction === 'same').length,
@@ -599,7 +620,7 @@ if (asJson) {
   if (comparison) {
     process.stdout.write(`\nمقارنة بخط الأساس ${comparison.baselinePath}: ${comparison.unchanged} بلا تغيير · ${comparison.improved.length} تحسّن · ${comparison.regressed.length} تراجع · ${comparison.appeared.length} جديد\n`);
     for (const change of comparison.improved) process.stdout.write(`  ↑ ${change.id}: ${change.was} → ${change.now}\n`);
-    for (const change of comparison.regressed) process.stdout.write(`  ↓ ${change.id}: ${change.was} → ${change.now}\n`);
+    for (const change of comparison.regressed) process.stdout.write(`  ↓ ${change.id}: ${change.was} → ${change.now ?? 'محذوف (check_removed)'}\n`);
     for (const change of comparison.appeared) process.stdout.write(`  + ${change.id}: ${change.now}\n`);
   }
 }
