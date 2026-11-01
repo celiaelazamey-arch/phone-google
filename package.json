@@ -24,6 +24,7 @@
     "test:ci": "node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./scripts/test-reporter-gha.mjs --test-reporter-destination=stdout",
     "test:coverage:ci": "npm run test:coverage -- --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./scripts/test-reporter-gha.mjs --test-reporter-destination=stdout",
     "check": "node scripts/check.mjs",
+    "agents:doctor": "node scripts/agents-doctor.mjs",
     "build:pages": "node scripts/build-pages.mjs",
     "design:audit": "node vendor/hallmark/scripts/sloplint.mjs",
     "skill:draft": "node scripts/derive-skill-draft.mjs",
