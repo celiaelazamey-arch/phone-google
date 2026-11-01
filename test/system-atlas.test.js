@@ -20,9 +20,10 @@ import {
   phasesOf
 } from '../src/design/system-atlas.js';
 import { PAGE_PATH, buildHtml } from '../scripts/render-system-atlas.mjs';
-import { POSTER_PATH, buildHtml as buildPoster, domainVerdict } from '../scripts/render-atlas-poster.mjs';
+import { FACTS_PATH, POSTER_PATH, buildFacts, buildHtml as buildPoster, domainVerdict } from '../scripts/render-atlas-poster.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
+const OFFICIAL = new Set(Object.values(TRUTH));
 const atlas = buildAtlas({ root });
 
 test('twelve domains, in the owner\'s order, each with a priority he chose', () => {
@@ -166,4 +167,34 @@ test('the roadmap counts on the poster equal the domains it partitions', () => {
     assert.ok(poster.includes(`${phase.domains.length} مجالات`), `${phase.priority} count is printed`);
     assert.equal(phase.domains.length, atlas.domains.filter((domain) => domain.priority === phase.priority).length);
   }
+});
+
+test('the facts file is the only allowed source for outside renderings', () => {
+  const facts = JSON.parse(readFileSync(FACTS_PATH, 'utf8'));
+  assert.equal(readFileSync(FACTS_PATH, 'utf8'), buildFacts(), 'the facts are stale — run `npm run atlas:facts`');
+  assert.equal(facts.fingerprint, fingerprintOf(atlas));
+  assert.deepEqual(facts.domains.map((domain) => domain.coverage), atlas.domains.map((domain) => domain.coverage));
+  assert.deepEqual(facts.totals, {
+    domains: 12,
+    capabilities: 54,
+    verified: atlas.capabilityCounts[TRUTH.verified],
+    unverified: atlas.capabilityCounts[TRUTH.unverified],
+    missing: atlas.capabilityCounts[TRUTH.missing]
+  });
+  assert.deepEqual(facts.phases, phasesOf(atlas).map((phase) => ({ priority: phase.priority, domains: phase.domains.length })));
+  for (const domain of facts.domains) {
+    assert.ok(domain.missing.length === 0 || domain.coverage < 100, `${domain.id} has gaps and must stay under 100%`);
+    for (const capability of domain.capabilities) assert.ok(OFFICIAL.has(capability.status), `${capability.id} has an unofficial state`);
+  }
+});
+
+test('the facts file cannot drift from the fingerprint it prints', () => {
+  const facts = JSON.parse(readFileSync(FACTS_PATH, 'utf8'));
+  const recomputed = fingerprintOf({
+    domains: facts.domains.map((domain) => ({
+      ...domain,
+      capabilities: domain.capabilities.map((capability) => ({ ...capability }))
+    }))
+  });
+  assert.equal(recomputed, facts.fingerprint, 'any number edited outside the audit breaks the fingerprint');
 });

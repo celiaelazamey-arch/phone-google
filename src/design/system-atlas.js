@@ -298,6 +298,36 @@ export function fingerprintOf(atlas) {
   return createHash('sha256').update(canonical).digest('hex').slice(0, 10);
 }
 
+/**
+ * The facts an outside renderer is allowed to draw. A poster drawn in another tool cannot be checked
+ * against prose, so the audit also publishes these numbers as data: same fingerprint, same coverage,
+ * same missing capabilities. Anything not in this object has no business on a picture.
+ */
+export function factsOf(atlas) {
+  return {
+    version: atlas.version,
+    fingerprint: fingerprintOf(atlas),
+    totals: {
+      domains: atlas.stats.domains,
+      capabilities: atlas.stats.capabilities,
+      verified: atlas.capabilityCounts[TRUTH.verified],
+      unverified: atlas.capabilityCounts[TRUTH.unverified],
+      missing: atlas.capabilityCounts[TRUTH.missing]
+    },
+    phases: atlas.stats.byPriority.map((bucket) => ({ priority: bucket.priority, domains: bucket.domains.length })),
+    domains: atlas.domains.map((domain) => ({
+      id: domain.id,
+      ar: domain.ar,
+      en: domain.en,
+      priority: domain.priority,
+      status: domain.status,
+      coverage: domain.coverage,
+      capabilities: domain.capabilities.map((capability) => ({ id: capability.id, ar: capability.ar, status: capability.status })),
+      missing: domain.capabilities.filter((capability) => capability.status === TRUTH.missing).map((capability) => capability.ar)
+    }))
+  };
+}
+
 /** The phases the owner asked for: audit → coverage map → staged construction. Never all twelve at once. */
 export function phasesOf(atlas) {
   return atlas.stats.byPriority.map((bucket) => ({

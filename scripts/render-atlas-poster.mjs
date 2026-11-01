@@ -21,6 +21,7 @@ import {
   TRUTH_LABEL,
   TRUTH_MARK,
   buildAtlas,
+  factsOf,
   fingerprintOf,
   phasesOf
 } from '../src/design/system-atlas.js';
@@ -28,6 +29,12 @@ import {
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 export const POSTER_PATH = path.join(ROOT, 'docs', 'design', 'system-atlas-poster.html');
+export const FACTS_PATH = path.join(ROOT, 'docs', 'design', 'system-atlas-facts.json');
+
+/** Deterministic JSON: two runs of the same audit produce the same bytes. */
+export function buildFacts() {
+  return `${JSON.stringify(factsOf(buildAtlas({ root: ROOT })), null, 2)}\n`;
+}
 
 const esc = (value) =>
   String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -198,7 +205,23 @@ export function buildHtml() {
 `;
 }
 
-export async function run({ check = false } = {}) {
+export async function run({ check = false, facts = false } = {}) {
+  if (facts) {
+    const body = buildFacts();
+    if (check) {
+      const current = await readFile(FACTS_PATH, 'utf8').catch(() => null);
+      if (current !== body) {
+        console.error(`stale: ${path.relative(ROOT, FACTS_PATH)} — run \`npm run atlas:facts\``);
+        return 1;
+      }
+      console.log(`atlas facts verified: ${JSON.parse(body).fingerprint}`);
+      return 0;
+    }
+    await mkdir(path.dirname(FACTS_PATH), { recursive: true });
+    await writeFile(FACTS_PATH, body, 'utf8');
+    console.log(`wrote ${path.relative(ROOT, FACTS_PATH)}`);
+    return 0;
+  }
   const wanted = buildHtml();
   if (check) {
     let current = null;
@@ -212,6 +235,11 @@ export async function run({ check = false } = {}) {
       console.error(`stale: ${path.relative(ROOT, POSTER_PATH)} — run \`npm run atlas:poster\``);
       return 1;
     }
+    const factsMismatch = (await readFile(FACTS_PATH, 'utf8').catch(() => null)) !== buildFacts();
+    if (factsMismatch) {
+      console.error(`stale: ${path.relative(ROOT, FACTS_PATH)} — run \`npm run atlas:facts\``);
+      return 1;
+    }
     const atlas = buildAtlas({ root: ROOT });
     console.log(`atlas poster verified: fingerprint ${fingerprintOf(atlas)} matches the audit`);
     return 0;
@@ -223,5 +251,8 @@ export async function run({ check = false } = {}) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  process.exitCode = await run({ check: process.argv.includes('--check') });
+  process.exitCode = await run({
+    check: process.argv.includes('--check'),
+    facts: process.argv.includes('--facts')
+  });
 }
