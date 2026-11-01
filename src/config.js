@@ -3,6 +3,7 @@ import { loadMysqlConfig } from './mysql-config.js';
 import { normalizeOllamaBaseUrl } from './ollama.js';
 import { loadFeatures, loadResilienceConfig } from './resilience.js';
 import { parseEncryptionKeyring } from './security.js';
+import { loadRateLimitConfig } from './rate-limit.js';
 export const DEFAULT_EDGE_ORIGIN = 'https://celia-phone-google.celiaelazamey.workers.dev';
 
 /**
@@ -54,6 +55,7 @@ export function loadConfig(env = process.env) {
     nodeEnv: env.NODE_ENV || 'development',
     features: loadFeatures(env),
     resilience: loadResilienceConfig(env),
+    rateLimit: loadRateLimitConfig(env),
     ...extended,
     port,
     baseUrl: env.APP_BASE_URL || `http://localhost:${port}`,
