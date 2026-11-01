@@ -47,6 +47,7 @@
 - **تقدّم مقيس (2026-11-01):** بعد تفعيل **Allow squash merging** سقط عائقان من ثلاثة. وأُضيف `.github/workflows/codeql.yml` (JS/TS، security-and-quality، مثبّت على SHA) لأن قاعدة `code_scanning` كانت تطلب نتائج تحليل غير موجود أصلًا — فصار الشرط قابلًا للاستيفاء: تشغيل CodeQL **ناجح** على `6a1ec71`، وبقية الفحوص خضراء.
 - **العائق الأخير وحده:** `New changes require approval from someone other than the last pusher` (`require_last_push_approval: true`). لا يُستوفى بحساب واحد: `gh pr review --approve` يرد **«Can not approve your own pull request»**، و`--admin` يرد **«Cannot update this protected ref»** لأن `bypass_actors` فارغة.
 - **الفتح:** إزالة هذا الشرط من الـruleset، أو إضافة bypass للمدير، أو مراجعة من حساب ثانٍ.
+- **الحالة النهائية المقيسة (2026-11-01):** شُغِّل CodeQL بنجاح على `4fab9c2`، وسقط عائق Code Scanning من رسالة الرفض؛ ولم يبقَ إلا `New changes require approval from someone other than the last pusher`. كل طلب دمج في هذا المستودع سيصطدم بهذا الشرط ما دام `require_last_push_approval: true` و`bypass_actors` فارغة، لأن المؤلف والمدافع واحد.
 ### إصلاح مسار المعاينة (2026-11-01، `a53e0fc`)
 - **العلة:** `.github/workflows/agent-branch-pages.yml` كان مربوطًا بفرع ميت بالاسم، وأخطر منه أنه ينشر إلى **نفس** موقع Pages الذي ينشر إليه `main` — أي أن معاينة فرع كانت ستمحو الإنتاج.
 - **الإصلاح:** الفرع صار مدخلًا لا نصًّا محفورًا؛ الافتراضي مخرَج قابل للتنزيل (7 أيام) بلا أثر؛ والنشر إلى Pages يشترط اختيارًا صريحًا **و**`vars.PREVIEW_PAGES=true` مع تحذير في السجل، وكل لقطة تسجل فرعها وبصمتها وحجم `theme.css`.
