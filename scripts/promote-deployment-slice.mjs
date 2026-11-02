@@ -4,10 +4,13 @@
 // Runs AFTER scripts/verify-live.mjs in the deploy workflow. A successful upload is not
 // health (DEC-073: production deployed fine while linking was unconfigured), so the slice
 // ledger starts every row at acceptance=pending. Only a passing live acceptance report for
-// the same commit may promote it, and that promoted row is what a rollback points at.
+// the same commit may promote it, and the post-update D1 read-back is the proof that the
+// rollback target actually changed.
 //
-// Fails closed: a missing report, a non-pass verdict, or a commit mismatch promotes nothing.
-import { readFile } from 'node:fs/promises';
+// Fails closed: a missing report, a non-pass verdict, a commit mismatch, or a failed D1
+// read-back promotes nothing. Bookkeeping errors are recorded as evidence without undoing
+// an otherwise healthy deployment.
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -36,12 +39,14 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
     return index >= 0 ? argv[index + 1] : null;
   };
   const reportPath = arg('report') || '.validation-artifacts/edge-live-acceptance.json';
+  const outputPath = arg('out');
   const expectedCommit = arg('expect-commit') || env.GITHUB_SHA || null;
   const accountId = env.CLOUDFLARE_ACCOUNT_ID;
   const apiToken = env.CLOUDFLARE_API_TOKEN;
   // The deploy step already resolved the database id and wrote it next to the report, so the
   // operator never has to add a GitHub variable for it.
-  const sliceContext = await readFile(path.resolve(root, '.validation-artifacts/deployment-slice.json'), 'utf8')
+  const sliceContextPath = arg('slice-context') || '.validation-artifacts/deployment-slice.json';
+  const sliceContext = await readFile(path.resolve(root, sliceContextPath), 'utf8')
     .then((text) => JSON.parse(text))
     .catch(() => null);
   const databaseId = arg('database-id') || sliceContext?.databaseId || env.CELIA_D1_DATABASE_ID || null;
@@ -55,13 +60,66 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
     || (manifestText ? `sha256:${createHash('sha256').update(manifestText).digest('hex')}` : null);
 
   const decision = decidePromotion({ report, expectedCommit, manifestDigest });
+  const finish = async (result) => {
+    const evidence = {
+      evidence: 'deployment-slice-promotion/v1',
+      stage: 'post-live-acceptance',
+      recordedAt: new Date().toISOString(),
+      status: result.knownGood ? 'known-good-verified' : 'pending',
+      promoted: result.promoted === true,
+      knownGood: result.knownGood === true,
+      acceptance: result.acceptance || (report?.verdict === 'pass' ? 'passed' : report?.verdict === 'fail' ? 'failed' : 'not-proven'),
+      d1ReadBack: result.d1ReadBack || 'not-verified',
+      reason: result.reason,
+      ...(result.commit ? { commit: result.commit } : {}),
+      ...(result.manifestDigest ? { manifestDigest: result.manifestDigest } : {}),
+      ...(result.acceptedAt ? { acceptedAt: result.acceptedAt } : {}),
+      ...(result.readBack ? { readBack: result.readBack } : {})
+    };
+    if (outputPath) {
+      try {
+        const absoluteOutput = path.resolve(root, outputPath);
+        await mkdir(path.dirname(absoluteOutput), { recursive: true });
+        await writeFile(absoluteOutput, `${JSON.stringify(evidence, null, 2)}\n`, 'utf8');
+      } catch {
+        log('::warning title=Deployment Slice::post-acceptance artifact could not be written');
+      }
+    }
+    if (env.GITHUB_STEP_SUMMARY) {
+      try {
+        await appendFile(env.GITHUB_STEP_SUMMARY, [
+          '### Deployment Slice — post-live-acceptance',
+          `- Result: **${evidence.status}**`,
+          `- Live acceptance: **${evidence.acceptance}**`,
+          `- D1 read-back: **${evidence.d1ReadBack}**`,
+          `- known_good: **${evidence.knownGood}**`,
+          evidence.commit ? `- Commit: \`${evidence.commit}\`` : null,
+          `- Reason: \`${evidence.reason}\``,
+          ''
+        ].filter(Boolean).join('\n'), 'utf8');
+      } catch {
+        log('::warning title=Deployment Slice::post-acceptance summary could not be written');
+      }
+    }
+    log(JSON.stringify(evidence));
+    return evidence;
+  };
+
   if (!decision.promote) {
     log(`::notice title=Deployment Slice::not promoted (${decision.reason})`);
-    return { promoted: false, reason: decision.reason };
+    return finish({ promoted: false, knownGood: false, reason: decision.reason });
   }
   if (!accountId || !apiToken || !databaseId) {
     log('::warning title=Deployment Slice::proof accepted but Cloudflare/D1 settings absent; slice stays pending');
-    return { promoted: false, reason: 'cloudflare_settings_missing' };
+    return finish({
+      promoted: false,
+      knownGood: false,
+      acceptance: 'passed',
+      d1ReadBack: 'not-attempted',
+      reason: 'cloudflare_settings_missing',
+      commit: decision.commit,
+      manifestDigest: decision.manifestDigest
+    });
   }
 
   const execD1 = async (sql, params = []) => {
@@ -75,14 +133,50 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
     return { rows: Array.isArray(first?.results) ? first.results : [] };
   };
 
-  await markSliceAccepted(execD1, {
-    commit: decision.commit,
-    manifestDigest: decision.manifestDigest,
-    acceptedAt: new Date().toISOString(),
-    acceptancePassed: true
-  });
-  log(`::notice title=Deployment Slice::known_good granted to ${decision.commit.slice(0, 7)} after passing live acceptance`);
-  return { promoted: true, commit: decision.commit };
+  const acceptedAt = new Date().toISOString();
+  try {
+    const stored = await markSliceAccepted(execD1, {
+      commit: decision.commit,
+      manifestDigest: decision.manifestDigest,
+      acceptedAt,
+      acceptancePassed: true
+    });
+    const readBack = {
+      commit: stored.commit_sha,
+      manifestDigest: stored.manifest_digest,
+      acceptance: stored.acceptance,
+      knownGood: Number(stored.known_good) === 1,
+      acceptedAt: stored.accepted_at
+    };
+    if (!readBack.knownGood) throw new Error('slice_acceptance_readback_mismatch');
+    log(`::notice title=Deployment Slice::D1 read-back verified known_good for ${decision.commit.slice(0, 7)}`);
+    return finish({
+      promoted: true,
+      knownGood: true,
+      acceptance: 'passed',
+      d1ReadBack: 'pass',
+      reason: 'accepted_and_read_back',
+      commit: decision.commit,
+      manifestDigest: decision.manifestDigest,
+      acceptedAt: stored.accepted_at,
+      readBack
+    });
+  } catch (error) {
+    const reason = /^slice_acceptance_readback_/.test(String(error?.message || ''))
+      ? String(error.message)
+      : 'slice_promotion_failed';
+    const readBackFailed = /^slice_acceptance_readback_/.test(reason);
+    log(`::warning title=Deployment Slice::promotion not verified after live acceptance (${reason})`);
+    return finish({
+      promoted: false,
+      knownGood: false,
+      acceptance: 'passed',
+      d1ReadBack: readBackFailed ? 'failed' : 'not-verified',
+      reason,
+      commit: decision.commit,
+      manifestDigest: decision.manifestDigest
+    });
+  }
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

@@ -111,14 +111,26 @@ test('FFP-07 the plan rides the workflows that actually deploy, and quotes their
   const deploy = read('.github/workflows/cloudflare-deploy.yml');
   assert.match(deploy, /branches:\s*\[\s*'main'\s*\]|branches: \[main\]|branches: \['main'\]/, 'the edge deploy must run on main');
   assert.match(deploy, /Verify live card-free Edge/, 'the live acceptance step is the gate the plan quotes');
+  assert.match(deploy, /workflow_dispatch/, 'the workflow permits an explicit manual dispatch');
   assert.match(read('.github/workflows/pages.yml'), /deploy|pages/i);
 
   const pkg = JSON.parse(read('package.json'));
   assert.match(pkg.scripts['verify:edge'], /verify-live\.mjs --mode edge/);
   assert.ok(pkg.scripts['verify:edge'].includes(profile.publication.edgeUrl), 'verify:edge must target the documented URL');
 
-  assert.match(plan, /10\/10/, 'the plan quotes the last deploy step count');
-  assert.match(plan, /41317732008/, 'the plan names the run it measured, not a memory of one');
+  assert.match(plan, /10\/10/, 'the plan quotes the current deploy step count');
+  assert.match(plan, /workflow_dispatch/, 'the plan documents the supported owner-triggered path');
+  assert.doesNotMatch(plan, /لا نشر يدوي/, 'the plan no longer denies the manual dispatch path');
+  assert.match(plan, /whatsapp-onboarding configured=false/, 'the plan does not treat WhatsApp onboarding as connected');
+  assert.match(plan, /SECRET_KEYS/, 'the plan defines the scope of the 18/18 binding count');
+  assert.match(plan, /F5[\s\S]*?0\/2/, 'the current channel gate remains incomplete');
+  assert.match(plan, /قبل القبول والترقية/, 'the initial pending slice snapshot is distinguished from post-acceptance state');
+  assert.match(plan, /read-back مستقل/, 'the plan calls for verifying the promoted D1 row instead of assuming it');
+  assert.match(plan, /41332109821/, 'the plan names the latest owner-dispatched Edge attempt');
+  assert.match(plan, /attempt 2/, 'the plan records the latest rerun attempt number');
+  assert.match(plan, /41332266884/, 'the plan preserves the earlier successful dispatch run');
+  assert.match(plan, /41327476448/, 'the plan names the current Pages deployment run');
+  assert.match(plan, /41327476455/, 'the plan names the frozen-release no-op rather than implying a new release');
 });
 
 test('FFP-08 the plan cannot claim parity it does not have', () => {

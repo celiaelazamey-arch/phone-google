@@ -6,6 +6,7 @@ import { readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { createApp } from '../src/app.js';
+import { RELEASE } from '../src/version.js';
 import { createAgentHost } from '../src/agent/index.js';
 import { verifyLive, runCli, MANUAL_CHECKS, describeTarget } from '../scripts/verify-live.mjs';
 
@@ -37,7 +38,7 @@ test('verify:live — the real app on an explicit memory demo with the agent off
   const agentHost = createAgentHost({
     config,
     env: { CELIA_AGENT_SQLITE_PATH: path.join(directory, 'agent.sqlite3') },
-    statusProvider: () => ({ version: '0.2.1' }),
+    statusProvider: () => ({ version: RELEASE.version }),
     logger: { error() {} }
   });
   const server = createApp({ pool, config, agentHost }).listen(0, '127.0.0.1');
@@ -47,7 +48,7 @@ test('verify:live — the real app on an explicit memory demo with the agent off
     rmSync(directory, { recursive: true, force: true });
   });
 
-  const report = await verifyLive({ url: baseUrl, token: TOKEN, allowHttp: true, samples: 2, expectVersion: '0.2.1' });
+  const report = await verifyLive({ url: baseUrl, token: TOKEN, allowHttp: true, samples: 2, expectVersion: RELEASE.version });
   const byId = Object.fromEntries(report.checks.map((check) => [check.id, check]));
   assert.equal(report.verdict, 'fail');
   assert.equal(byId.reachable.status, 'pass');

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, writeFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseUnreleased, unreleasedProgress, UNRELEASED_LIMITS } from "../src/progress.js";
@@ -90,11 +91,15 @@ test("PRG-06: missing or oversized files degrade to parsed=false with a named re
   assert.equal(oversized.items, 0);
 });
 
-test("PRG-07: the real CHANGELOG.md is the progress signal the page renders", () => {
+test("PRG-07: the real CHANGELOG separates the released 0.3.0 work from an empty Unreleased section", () => {
   const real = unreleasedProgress({ fresh: true });
   assert.equal(real.parsed, true, "the shipped CHANGELOG must be readable");
-  assert.ok(real.items > 0, "the repository carries undocumented-in-release work");
+  assert.equal(real.items, 0, "all recorded changes were assigned to the approved release");
   const summed = Object.values(real.sections).reduce((a, b) => a + b, 0);
-  assert.ok(summed <= real.items);
-  assert.ok(Number.isInteger(real.unknownSections) && real.unknownSections >= 0);
+  assert.equal(summed, 0);
+  assert.equal(real.unknownSections, 0);
+  const changelog = readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf8');
+  const releaseBlock = changelog.split(/^## 0\.3\.0 — Celia Edge & Governance — 2026-11-02$/m)[1]?.split(/^## 0\.2\.1\b/m)[0] || '';
+  assert.match(releaseBlock, /PLAN-003/);
+  assert.match(releaseBlock, /^[-*] /m);
 });

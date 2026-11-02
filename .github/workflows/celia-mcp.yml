@@ -123,6 +123,7 @@ jobs:
         if: github.event_name == 'pull_request'
         env:
           CELIA_CONTINUITY_BASE: ${{ github.event.pull_request.base.sha }}
+          CELIA_PULL_REQUEST_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: npm run check:continuity
       - run: npm audit --omit=dev --audit-level=moderate
       - name: Knowledge registries are verified (manifest, licences, risk policy)
