@@ -25,7 +25,7 @@ import {
   resolveGoogleRedirectUri,
   EDGE_MAX_OUTPUT_TOKENS
 } from './runtime.js';
-import { createGoogleAccountAuthUrl, probeGoogleRedirectUri, renderGoogleRedirectSetupPage } from './google-account.js';
+import { createGoogleAccountAuthUrl, googleRedirectDiagnostics, probeGoogleRedirectUri, renderGoogleRedirectSetupPage } from './google-account.js';
 import { summarizeReplyMetrics, REPLY_CHAR_CAP } from './reply-metrics.js';
 import { createWhatsAppLink, consumeWhatsAppTicket, handleWhatsAppSession, requireWhatsAppSession, assertWhatsAppMutation } from './whatsapp-onboarding.js';
 import { whatsappOnboardingConfig } from './whatsapp-store.js';
@@ -599,6 +599,19 @@ export default {
           });
         }
         return jsonResponse(result.body, result.status, baseHeaders);
+      } catch (err) {
+        return runtimeErrorResponse(err, baseHeaders);
+      }
+    }
+
+    // WA-010: the same read-only probe as JSON, so the owner can tell "Google still refuses"
+    // apart from "the browser showed a cached page" without devtools. No secrets, no state.
+    if (pathname === '/auth/google/diagnostics') {
+      if (request.method !== 'GET') return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
+      try {
+        const redirectUri = resolveGoogleRedirectUri(env, url.origin);
+        const body = await googleRedirectDiagnostics({ env, redirectUri, fetchImpl });
+        return jsonResponse(body, 200, { ...baseHeaders, 'cache-control': 'no-store' });
       } catch (err) {
         return runtimeErrorResponse(err, baseHeaders);
       }
