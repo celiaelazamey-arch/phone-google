@@ -14,8 +14,8 @@
 - `/healthz`: `whatsappOnboarding configured=false` وتنقص قيم Meta app/config/app secret ومفتاح التشفير. `googleOAuth configured=true`، لكن حالة ربط/consent لم تُتحقق مباشرة. لم تُقرأ أسرار GitHub؛ API أعاد 403 والمتصفح انتهى بمهلة.
 - محليًا `npm test` و`npm run check:secrets` لم يكتملَا بسبب غياب الاعتماد `dotenv` في `node_modules`; لم يُشغّل `npm ci`. خمس المهارات ما زالت `draft`؛ لا تفعيل دون مراجعة المالك وتشغيل مستقل وبوابات DEC-112. Render غير مهيأ وفق مسار «بلا بطاقة»؛ لا خدمة أو كلفة أُنشئت.
 - مؤشرات خطة الاكتمال ما تزال `B2=2.5/6`, `L5=0/17`, `F5=0/2`; DES-002 شريحة جزئية وليست اكتمال النظام.
-- `npm run now:check`, `npm run plan:check` (59 مهمة؛ continuity `141/437/123`) و`npm run visual:first:check` ناجحة. استدعاء `check:continuity` قبل commit الوثائق طلب إدراج STATE والسجل ضمن نطاق commit؛ يعاد بعد commit.
-- التالي: commit وثائق الحالة والسجل والخطة، إعادة بوابة الاستمرارية، ثم دفع الفرع المعيّن والتحقق من CodeQL وCI الجديدين. لا دمج قبل صفر فحوص معلّقة/فاشلة وكلمة مالك صريحة بالدمج.
+- `npm run now:check`, `npm run plan:check` (59 مهمة؛ continuity `141/437/123`), `npm run visual:first:check` و`check:continuity` بعد commit التوثيق ناجحة؛ الأخيرة تحققت من 141 وثيقة و437 رابطًا و123 مهمة بلا دورات اعتماد.
+- التالي: دفع الفرع المعيّن فقط، ثم التحقق من CodeQL وCI الجديدين وتسجيل أرقام التشغيل. لا دمج قبل صفر فحوص معلّقة/فاشلة وكلمة مالك صريحة بالدمج.
 
 ## 2 نوفمبر 2026 — REL-003 — نتيجة النشر الحي
 
