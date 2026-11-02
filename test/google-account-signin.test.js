@@ -230,11 +230,14 @@ test('WA-009 an unregistered redirect URI shows an Arabic setup page instead of 
   assert.match(response.headers.get('content-type'), /text\/html/);
   const html = await response.text();
   const expectedUri = `${ORIGIN}/auth/google/callback`;
-  assert.ok(html.includes(expectedUri), 'the exact URI is shown for copy/paste');
-  assert.ok(html.includes(CLIENT_ID), 'the public client id is shown so the right OAuth client is edited');
-  assert.ok(html.includes('Authorized redirect URIs'));
-  assert.ok(html.includes('أعد المحاولة الآن'));
-  assert.ok(!html.includes(CLIENT_SECRET), 'the OAuth secret never reaches the browser');
+  // Exact equality against the rendered <code> blocks (not a URL substring check), so the
+  // assertion cannot be satisfied by a look-alike host embedded elsewhere in the page.
+  const codeBlocks = [...html.matchAll(/<code[^>]*>([\s\S]*?)<\/code>/g)].map((match) => match[1].trim());
+  assert.equal(codeBlocks.filter((value) => value === expectedUri).length, 1, 'the exact URI is shown for copy/paste');
+  assert.equal(codeBlocks.filter((value) => value === CLIENT_ID).length, 1, 'the public client id is shown so the right OAuth client is edited');
+  assert.match(html, /Authorized redirect URIs/);
+  assert.match(html, /أعد المحاولة الآن/);
+  assert.equal(codeBlocks.filter((value) => value === CLIENT_SECRET).length, 0, 'the OAuth secret never reaches the browser');
   assert.equal(response.headers.get('set-cookie'), null, 'no OAuth state is created for a refused flow');
   assert.equal(f.sqlite.prepare('SELECT COUNT(*) AS n FROM oauth_states').get().n, 0);
 });
