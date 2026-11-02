@@ -41,7 +41,7 @@ test('twelve cards, in the owner\'s order, with the measured coverage — ready 
   const cards = cardsOf(html);
   assert.equal(cards.length, 12);
   assert.deepEqual(cards.map((card) => card.id), facts.domains.map((domain) => domain.id));
-  assert.deepEqual(cards.map((card) => card.coverage), [80, 100, 60, 75, 80, 100, 100, 75, 25, 100, 75, 100]);
+  assert.deepEqual(cards.map((card) => card.coverage), [100, 100, 60, 75, 80, 100, 100, 75, 25, 100, 75, 100]);
   assert.deepEqual(cards.map((card) => card.priority), ['P0', 'P0', 'P0', 'P1', 'P0', 'P1', 'P1', 'P1', 'P2', 'P2', 'P2', 'P0']);
   for (const [index, card] of cards.entries()) {
     assert.equal(card.coverage, facts.domains[index].coverage);
@@ -75,13 +75,13 @@ test('the summary is the audit, not a retyped summary', () => {
   assert.deepEqual(facts.totals, {
     domains: 12,
     capabilities: 54,
-    verified: 44,
-    unverified: 9,
+    verified: 45,
+    unverified: 8,
     missing: 1
   });
-  for (const value of [44, 9, 1, 54]) assert.ok(html.includes(`<b>${value}</b>`), `missing total ${value}`);
-  assert.equal(averageCoverage(facts), 81, 'the mean of 80,100,60,75,80,100,100,75,25,100,75,100 is 80.83, published as 81');
-  assert.ok(html.includes('<b>81%</b>'));
+  for (const value of [45, 8, 1, 54]) assert.ok(html.includes(`<b>${value}</b>`), `missing total ${value}`);
+  assert.equal(averageCoverage(facts), 83, 'the mean of 100,100,60,75,80,100,100,75,25,100,75,100 is 82.5, published as 83');
+  assert.ok(html.includes('<b>83%</b>'));
   assert.ok(html.includes('<b>71.67%</b>') === false, 'no unrounded average may leak into the page');
   const phases = html.match(/<strong>(\d+)<\/strong>/g) ?? [];
   assert.deepEqual(phases.map((value) => Number(value.replace(/\D/g, ''))).slice(0, 3), facts.phases.map((phase) => phase.domains));
