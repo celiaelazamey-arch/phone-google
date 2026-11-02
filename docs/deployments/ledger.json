@@ -178,5 +178,146 @@
       "note": "The release approval still does not prove deployment. Existing v0.2.1 remains immutable."
     },
     "entryHash": "195553a25e7f5bdd9dac26f3fb902ddd94e60ca031ec0a552c782f24aac1d397"
+  },
+  {
+    "seq": 6,
+    "prevHash": "195553a25e7f5bdd9dac26f3fb902ddd94e60ca031ec0a552c782f24aac1d397",
+    "at": "2026-11-02T06:26:46Z",
+    "actor": "celiaelazamey-arch",
+    "action": "merge",
+    "channel": "main",
+    "version": "0.3.0",
+    "commit": "7596c27e3d34e7eb452a9f5accf41415bd30c714",
+    "requestFingerprint": "pub:b4c30d501da7658b",
+    "outcome": "merged",
+    "evidence": {
+      "recordType": "post-hoc-merge-reconciliation",
+      "pullRequest": 136,
+      "method": "squash",
+      "mergedAt": "2026-11-02T06:26:46Z",
+      "mergedCommit": "7596c27e3d34e7eb452a9f5accf41415bd30c714",
+      "mergedBy": "celiaelazamey-arch",
+      "candidateHead": "faadfbd8571411a89df39feda8a25b5c764ffbb4",
+      "treeEquality": {
+        "candidate": "8cb80df0e574978cec1cd2b81cacf2eb4bd45f63",
+        "merged": "8cb80df0e574978cec1cd2b81cacf2eb4bd45f63"
+      },
+      "fingerprintInputs": {
+        "channel": "main",
+        "version": "0.3.0",
+        "commit": "faadfbd8571411a89df39feda8a25b5c764ffbb4",
+        "artifacts": []
+      },
+      "checksAtMerge": "gh pr checks 136 --watch: required PR checks passed; post-merge release/deploy checks are recorded in seq 7."
+    },
+    "entryHash": "d9a318b75eba98ac8a66518e4a22e18faa0ee232b8f8aeae9d09752fb2774e5f"
+  },
+  {
+    "seq": 7,
+    "prevHash": "d9a318b75eba98ac8a66518e4a22e18faa0ee232b8f8aeae9d09752fb2774e5f",
+    "at": "2026-11-02T06:28:10Z",
+    "actor": "celiaelazamey-arch",
+    "action": "publish",
+    "channel": "production",
+    "version": "0.3.0",
+    "commit": "7596c27e3d34e7eb452a9f5accf41415bd30c714",
+    "requestFingerprint": "pub:0e8586c41d7d5bce",
+    "outcome": "published",
+    "evidence": {
+      "recordType": "immutable-release-and-live-acceptance",
+      "pullRequest": 136,
+      "tag": "v0.3.0",
+      "immutable": true,
+      "publishedAt": "2026-11-02T06:28:10Z",
+      "releaseWorkflowRun": 41399947570,
+      "artifacts": [
+        {
+          "name": "celia-v0.3.0-site.tar.gz",
+          "sha256": "6f48e6f6c4324226a5ce55bf26d7cc5294e0071c4aeb77c779a1d3e941294e04"
+        },
+        {
+          "name": "celia-v0.3.0-source.tar.gz",
+          "sha256": "e41466e5584f8bef80812aec9644e9085208d86034a017effdc64f1b5a7289ad"
+        },
+        {
+          "name": "release.json",
+          "sha256": "44ab92fd39375fc7d471dd309220a187a45a347ccb2e532cf1e97bd9d0412345"
+        },
+        {
+          "name": "sbom.cdx.json",
+          "sha256": "c12ccf369c271d128ef991c81fec910df049eeeb04d05e6a26f355ce8cbdedb0"
+        },
+        {
+          "name": "SHA256SUMS",
+          "sha256": "39142e143a8ed70451a5412caa6c905c585876bfefaa26fe95ae07ba401ac6bc"
+        }
+      ],
+      "fingerprintInputs": {
+        "channel": "production",
+        "version": "0.3.0",
+        "commit": "7596c27e3d34e7eb452a9f5accf41415bd30c714",
+        "artifacts": [
+          {
+            "name": "celia-v0.3.0-site.tar.gz",
+            "sha256": "6f48e6f6c4324226a5ce55bf26d7cc5294e0071c4aeb77c779a1d3e941294e04"
+          },
+          {
+            "name": "celia-v0.3.0-source.tar.gz",
+            "sha256": "e41466e5584f8bef80812aec9644e9085208d86034a017effdc64f1b5a7289ad"
+          },
+          {
+            "name": "release.json",
+            "sha256": "44ab92fd39375fc7d471dd309220a187a45a347ccb2e532cf1e97bd9d0412345"
+          },
+          {
+            "name": "sbom.cdx.json",
+            "sha256": "c12ccf369c271d128ef991c81fec910df049eeeb04d05e6a26f355ce8cbdedb0"
+          },
+          {
+            "name": "SHA256SUMS",
+            "sha256": "39142e143a8ed70451a5412caa6c905c585876bfefaa26fe95ae07ba401ac6bc"
+          }
+        ]
+      },
+      "pages": {
+        "run": 41399947941,
+        "result": "success",
+        "url": "https://celiaelazamey-arch.github.io/phone-google",
+        "routesHttp200": "13/13",
+        "expectedCommit": "7596c27e3d34e7eb452a9f5accf41415bd30c714",
+        "versionJsonLiveBodyAsserted": false
+      },
+      "cloudflareEdge": {
+        "run": 41400115739,
+        "result": "success",
+        "workerUrl": "https://celia-phone-google.celiaelazamey.workers.dev",
+        "version": "0.3.0",
+        "commit": "7596c27e3d34e7eb452a9f5accf41415bd30c714",
+        "liveReady": true,
+        "storage": {
+          "mode": "d1",
+          "durable": true
+        },
+        "d1ReadBack": "pass",
+        "knownGood": true
+      },
+      "render": {
+        "run": 41400115801,
+        "result": "success",
+        "status": "not-configured",
+        "liveUrl": null
+      },
+      "serviceRealityAudit": {
+        "run": 41399947513,
+        "result": "skipped"
+      },
+      "integrations": {
+        "google": "unconnected",
+        "whatsapp": "configured=false; missing Meta app, Embedded Signup configuration, Meta app secret, encryption key"
+      },
+      "releaseAssetsAttestedWithOidc": true,
+      "note": "Pages routes were live-verified; the workflow did not parse version.json response content. This record does not claim Render, Google, WhatsApp, or the broader PLAN-002 §1 criterion is complete."
+    },
+    "entryHash": "18b1e67930781f44a922bfb772d7142cb10468b957961dd6271cc5c413049a7d"
   }
 ]
