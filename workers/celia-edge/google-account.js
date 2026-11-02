@@ -164,23 +164,74 @@ export async function probeGoogleRedirectUri({ env = {}, redirectUri = '', fetch
   return { ok: response.ok !== false, reason: response.ok === false ? 'google_probe_rejected' : null };
 }
 
+/**
+ * WA-010 — machine-readable version of the same read-only probe, for the owner (and for
+ * automated checks) to answer one question without reading HTML: "does Google accept our
+ * redirect URI for this client right now?".
+ *
+ * It exposes only public facts (`client_id`, the exact `redirect_uri`, the Console URL to
+ * edit) and never the client secret, a state row, a session, or a cached verdict: the probe
+ * runs on every request so the answer changes the moment the owner saves the Console page.
+ */
+export async function googleRedirectDiagnostics({ env = {}, redirectUri = '', fetchImpl = globalThis.fetch } = {}) {
+  const clientId = String(env?.GOOGLE_CLIENT_ID || '').trim();
+  const uri = String(redirectUri || '').trim();
+  const probe = await probeGoogleRedirectUri({ env, redirectUri: uri, fetchImpl });
+  const accepted = probe.ok === true;
+  return {
+    ok: accepted,
+    clientId,
+    redirectUri: uri,
+    redirectUriProblem: uri.includes('://localhost') || uri.includes('://127.0.0.1')
+      ? 'points_at_localhost'
+      : (env?.GOOGLE_REDIRECT_URI ? 'explicit_env_override' : 'derived_from_request_origin'),
+    google: { accepted, reason: probe.reason ?? null },
+    consoleUrl: 'https://console.cloud.google.com/apis/credentials',
+    nextStep: accepted
+      ? null
+      : (probe.reason === 'probe_unavailable'
+        ? 'google_probe_unreachable_retry'
+        : 'register_redirect_uri_in_google_console'),
+    instructions: accepted
+      ? ['Google accepts this redirect URI for this client; open /auth/google/signin to continue.']
+      : [
+        `Open https://console.cloud.google.com/apis/credentials and edit the OAuth Web application client whose id is ${clientId || '(GOOGLE_CLIENT_ID is not set)'}.`,
+        `Add exactly this value under Authorized redirect URIs: ${uri || '(no redirect URI resolved)'}`,
+        'Press Save, then retry; no redeploy is needed because this probe is never cached.'
+      ],
+    secretExposed: false
+  };
+}
+
 /** Static, script-free Arabic setup page. Client ID is public; the secret never is. */
 export function renderGoogleRedirectSetupPage({ env = {}, redirectUri = '' } = {}) {
   const clientId = String(env?.GOOGLE_CLIENT_ID || '').trim();
   const uri = String(redirectUri || '').trim();
   const esc = (value) => String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  // WA-010: when the owner has already saved the URI once, the page must stop pointing only at
+  // step 2 and name the four other reasons Google can still refuse — same words the owner uses.
+  const extra = `
+<h2>إن بقي الرفض بعد الحفظ</h2>
+<ol>
+<li><strong>عميل آخر:</strong> إن أنشأت عميلًا جديدًا بدل تعديل القديم، فالإضافة على معرّف مختلف. المعرّف أعلاه هو الوحيد الذي يرسله الخادم.</li>
+<li><strong>مشروع آخر:</strong> افتح العميل من مشروع <strong>my-cela</strong> نفسه وتأكد أن معرّفه يطابق ما فوق حرفًا بحرف.</li>
+<li><strong>الحرفية:</strong> لا مسافة قبل القيمة أو بعدها، ولا شرطة مائلة أخيرة، ولا <span dir="ltr">http</span> بدل <span dir="ltr">https</span>، و<strong>Save</strong> مضغوط فعلًا (التعديل غير المحفوظ لا يُرسَل إلى Google).</li>
+<li><strong>الانتشار:</strong> تأخير من جهة Google وحدها. أعد المحاولة بعد 5–10 دقائق، ثم بعد ساعة، بلا أي تغيير من جهتنا.</li>
+</ol>
+<p>للفصل بين «Google ما زال يرفض» و«المتصفح عرض صفحة قديمة»، افتح <a dir="ltr" href="/auth/google/diagnostics">/auth/google/diagnostics</a>: يعيد JSON بحقل <span dir="ltr">google.accepted</span> وقيمة <span dir="ltr">redirect_uri</span> الفعلية، بلا أي سر.</p>`;
   return `<!doctype html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex"><title>إعداد مطلوب — الدخول بحساب Google | سيليا</title>
-<style>body{margin:0;background:#0b1020;color:#e8ecff;font-family:Tahoma,Arial,sans-serif;line-height:1.9}main{max-width:44rem;margin:2rem auto;padding:1.25rem}.card{background:#151d38;border:1px solid #273154;border-radius:1rem;padding:1.4rem}h1{font-size:1.4rem;margin:0 0 .6rem}p{margin:.6rem 0}code{display:block;direction:ltr;text-align:left;background:#0e1530;border:1px solid #66739e;border-radius:.6rem;padding:.8rem;margin:.5rem 0;overflow-wrap:anywhere;font-size:.9rem;color:#e8ecff}a,.btn{color:#7c9cff}.btn{display:inline-block;background:#3ddc97;color:#0b1020;font-weight:700;text-decoration:none;border-radius:.65rem;padding:.7rem 1.1rem;margin-top:1rem}small{color:#9aa5c9}</style></head>
+<style>body{margin:0;background:#0b1020;color:#e8ecff;font-family:Tahoma,Arial,sans-serif;line-height:1.9}main{max-width:44rem;margin:2rem auto;padding:1.25rem}.card{background:#151d38;border:1px solid #273154;border-radius:1rem;padding:1.4rem}h1{font-size:1.4rem;margin:0 0 .6rem}p{margin:.6rem 0}h2{font-size:1.05rem;margin:1.4rem 0 .4rem}ol{padding-inline-start:1.2rem;margin:.4rem 0}li{margin:.45rem 0}code{display:block;direction:ltr;text-align:left;background:#0e1530;border:1px solid #66739e;border-radius:.6rem;padding:.8rem;margin:.5rem 0;overflow-wrap:anywhere;font-size:.9rem;color:#e8ecff}a,.btn{color:#7c9cff}.btn{display:inline-block;background:#3ddc97;color:#0b1020;font-weight:700;text-decoration:none;border-radius:.65rem;padding:.7rem 1.1rem;margin-top:1rem}small{color:#9aa5c9}</style></head>
 <body><main><div class="card"><h1>خطوة واحدة متبقية لتفعيل «الدخول بحساب Google»</h1>
 <p>تطبيق OAuth في Google Cloud Console لم يسجّل بعد عنوان العودة الذي تستخدمه سيليا؛ لذلك ترفض Google الطلب بـ <code dir="ltr">redirect_uri_mismatch</code> قبل أن يعود المتصفح إلينا. هذا إعداد بيد مالك التطبيق، ولا يمكن للخادم تغييره.</p>
 <p><strong>1.</strong> افتح <a href="https://console.cloud.google.com/apis/credentials">صفحة Credentials</a>، واختر عميل OAuth من نوع <strong>Web application</strong> الذي معرّفه:</p>
 <code>${esc(clientId)}</code>
 <p><strong>2.</strong> في <strong>Authorized redirect URIs</strong> أضف هذه القيمة حرفيًا (بلا مسافات ولا شرطة مائلة أخيرة)، ثم احفظ:</p>
 <code>${esc(uri)}</code>
-<p><strong>3.</strong> بعد الحفظ بدقيقة أو دقيقتين اضغط الزر أدناه؛ سيدخل النظام مباشرة دون إعادة نشر.</p>
+<p><strong>3.</strong> اضغط <strong>Save</strong> فعلًا، ثم أعد المحاولة. لا يحتاج الأمر إعادة نشر: الفحص يُنفَّذ في كل ضغطة ولا يُحفظ في كاش. قد تتأخر استجابة Google من دقائق إلى ساعات، فالصبر هنا ليس عيبًا في النظام.</p>
 <a class="btn" href="/auth/google/signin">أعد المحاولة الآن</a>
-<p><small>إن كانت شاشة الموافقة في وضع Testing، أضف بريدك في Test users. هذه الصفحة لا تحوي أي سر ولا ترسل أي رمز.</small></p>
+${extra}
+<p><small>إن كانت شاشة الموافقة في وضع Testing، أضف بريدك في <strong>Test users</strong>، وإلا سيظهر خطأ آخر بعد إصلاح هذا. هذه الصفحة لا تحوي أي سر ولا ترسل أي رمز.</small></p>
 </div></main></body></html>`;
 }

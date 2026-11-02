@@ -252,6 +252,48 @@ test('WA-009 the probe is re-run on every click, so registering the URI needs no
   assert.equal(fixed.calls.filter((c) => c.url.pathname === '/o/oauth2/v2/auth').length, 1);
 });
 
+test('WA-010 /auth/google/diagnostics answers in JSON whether Google accepts the redirect URI', async () => {
+  const broken = await fixture({ googleProbeMismatch: true });
+  const refused = await broken.call('/auth/google/diagnostics');
+  assert.equal(refused.status, 200);
+  assert.equal(refused.headers.get('cache-control'), 'no-store', 'the verdict is never cached');
+  const refusedBody = await refused.json();
+  assert.equal(refusedBody.ok, false);
+  assert.equal(refusedBody.google.accepted, false);
+  assert.equal(refusedBody.google.reason, 'redirect_uri_mismatch');
+  assert.equal(refusedBody.redirectUri, `${ORIGIN}/auth/google/callback`);
+  assert.equal(refusedBody.clientId, CLIENT_ID);
+  assert.equal(refusedBody.nextStep, 'register_redirect_uri_in_google_console');
+  assert.ok(refusedBody.instructions.some((line) => line.includes(`${ORIGIN}/auth/google/callback`)));
+  // Public facts only: the secret, the client secret's env name and any token never appear.
+  const raw = JSON.stringify(refusedBody);
+  assert.equal(raw.includes(CLIENT_SECRET), false, 'the OAuth secret never reaches the browser');
+  assert.equal(refusedBody.secretExposed, false);
+  // Read-only: no OAuth state row, no cookie, no session.
+  assert.equal(broken.sqlite.prepare('SELECT COUNT(*) AS n FROM oauth_states').get().n, 0);
+  assert.equal(refused.headers.get('set-cookie'), null);
+
+  const fixed = await fixture({ googleProbeMismatch: false });
+  const acceptedBody = await (await fixed.call('/auth/google/diagnostics')).json();
+  assert.equal(acceptedBody.ok, true);
+  assert.equal(acceptedBody.google.accepted, true);
+  assert.equal(acceptedBody.nextStep, null);
+  assert.equal((await fixed.call('/auth/google/diagnostics', { method: 'POST' })).status, 405);
+});
+
+test('WA-010 the setup page names the four remaining causes and links the JSON diagnostics', async () => {
+  const f = await fixture({ googleProbeMismatch: true });
+  const html = await (await f.call('/auth/google/signin')).text();
+  assert.match(html, /إن بقي الرفض بعد الحفظ/);
+  assert.match(html, /عميل آخر/);
+  assert.match(html, /مشروع آخر/);
+  assert.match(html, /الحرفية/);
+  assert.match(html, /الانتشار/);
+  assert.match(html, /Test users/);
+  assert.match(html, /href="\/auth\/google\/diagnostics"/);
+  assert.equal(html.includes(CLIENT_SECRET), false);
+});
+
 test('WA-008 the WhatsApp account panel ships the Google icon wired to the sign-in route', async () => {
   const [html, js] = await Promise.all([
     readFile(new URL('../public/whatsapp.html', import.meta.url), 'utf8'),

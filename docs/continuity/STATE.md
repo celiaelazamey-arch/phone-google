@@ -3,8 +3,14 @@
 > **حفظ التاريخ بلا حذف (`DEC-052` / `CONT-004`):** هذه نافذة الاستئناف النشطة؛ السجل التراكمي الكامل حتى ما بعد PR #84 (`main@738d832` / `9f6f8b2` — 983 سطرًا / 142,150 بايت) محفوظ حرفيًا في **[STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md)** وبصمته محروسة بـ`R0-02`، وأقسام 31 أكتوبر–1 نوفمبر المنقولة عند `6b4bb2d` و`a1d3f7b` في **[STATE-ARCHIVE-2026-11.md](STATE-ARCHIVE-2026-11.md)**. القراءة السريعة المشتقة: **[NOW.md](NOW.md)** (`npm run now`).
 
 **آخر مراجعة:** 2 نوفمبر 2026
-**نوع الجلسة الحالية:** WA-005 / WA-007 — تثبيت دليل `configured=true` من تشغيلة الحافة `41456011988` (`main@2b47d62`) وإغلاق شق التهيئة التقنية مع إبقاء قبول الرقم والرسائل مفتوحًا.
-**السجل:** [WhatsApp Edge verified 41456011988](sessions/2026-11-02-whatsapp-edge-verified-41456011988.md) · **الفرع:** `arena/07ae2211-phone-google` · **الأساس:** `main@2b47d62`. `v0.3.0` ما زال الإصدار الحي المعلن.
+**نوع الجلسة الحالية:** WA-010 — تشخيص حالة قبول عنوان العودة بعد الحفظ: حكم Google يُنشر كبيانات لا كصفحة.
+**السجل:** [Google redirect diagnostics](sessions/2026-11-02-google-redirect-diagnostics.md) · **الفرع:** `arena/ee55f8c5-phone-google` · **الأساس:** `main@10fdfad`. `v0.3.0` ما زال الإصدار الحي المعلن.
+
+## 2 نوفمبر 2026 — WA-010: «هل قَبِل Google الإعداد؟» يُجاب ببيانات لا بتخمين
+
+- **الفحص الحي (19:23Z، `main@10fdfad`):** `/healthz` سليم (`ok`, `googleOAuth.configured=true`, D1, `18/18` سرًا)، لكن `GET /auth/google/signin` أعاد صفحة الإعداد العربية، وطلبًا مباشرًا إلى `accounts.google.com/o/oauth2/v2/auth` بنفس `client_id` ونفس `redirect_uri` أعاد **`Error 400: redirect_uri_mismatch`**، وعنوانَي `localhost:3000` و`…onrender.com` رُفضا أيضًا. أي أن **العميل لا يحمل أي عنوان عودة مسجّل**: لا كاش، لا كود، لا نشر. `GET /auth/google/diagnostics` = `not_found` (لم يُنشر بعد).
+- **ما نُفّذ:** `googleRedirectDiagnostics()` ومسار `GET /auth/google/diagnostics` (JSON، `no-store`، `405` لغير GET) يعيد `google.accepted`/`google.reason` و`redirectUri` الفعلية و`redirectUriProblem` وخطوة تالية وتعليمات، بلا سر ولا جلسة ولا صف `oauth_states`؛ والصفحة العربية صارت تسمّي الأسباب الأربعة الباقية بعد الحفظ وتذكر **Test users**. اختباران جديدان (14/14 للملف، و`npm test` 1243 ناجح / 0 فشل / 17 متخطى، `check` 261، والحزمة `sha256:f8c21e2ba77f…`).
+- **الحدّ الصريح:** الحكم على Google لا يعني قبول مستخدم ولا ينشئ جلسة؛ الدخول ما زال متوقفًا على حفظ المالك في Console ثم `302` ثم `/api/account/me` = 200. لا يُرفع أي مؤشر اكتمال (B1/B2/F4/F5)، وخطآ Meta بلا دليل إصلاح.
 
 ## 2 نوفمبر 2026 — WA-009: تشخيص حيّ لمانع `redirect_uri_mismatch` (بعد دمج #144)
 
