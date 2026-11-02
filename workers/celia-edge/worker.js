@@ -25,7 +25,7 @@ import {
   resolveGoogleRedirectUri,
   EDGE_MAX_OUTPUT_TOKENS
 } from './runtime.js';
-import { createGoogleAccountAuthUrl } from './google-account.js';
+import { createGoogleAccountAuthUrl, probeGoogleRedirectUri, renderGoogleRedirectSetupPage } from './google-account.js';
 import { summarizeReplyMetrics, REPLY_CHAR_CAP } from './reply-metrics.js';
 import { createWhatsAppLink, consumeWhatsAppTicket, handleWhatsAppSession, requireWhatsAppSession, assertWhatsAppMutation } from './whatsapp-onboarding.js';
 import { whatsappOnboardingConfig } from './whatsapp-store.js';
@@ -610,11 +610,17 @@ export default {
     if (pathname === '/auth/google/signin') {
       if (request.method !== 'GET') return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
       try {
-        const consent = await createGoogleAccountAuthUrl({
-          env,
-          redirectUri: resolveGoogleRedirectUri(env, url.origin),
-          now
-        });
+        const redirectUri = resolveGoogleRedirectUri(env, url.origin);
+        // WA-009: detect the owner-only Console step before Google shows its English 400.
+        // No result is cached, so registering the URI fixes the next click with no redeploy.
+        const probe = await probeGoogleRedirectUri({ env, redirectUri, fetchImpl });
+        if (!probe.ok && probe.reason === 'redirect_uri_mismatch') {
+          return new Response(renderGoogleRedirectSetupPage({ env, redirectUri }), {
+            status: 200,
+            headers: { ...baseHeaders, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' }
+          });
+        }
+        const consent = await createGoogleAccountAuthUrl({ env, redirectUri, now });
         return new Response(null, {
           status: 302,
           headers: {
