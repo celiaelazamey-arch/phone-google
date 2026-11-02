@@ -77,15 +77,15 @@
 
   <h2 class="section">ما قيس الآن</h2>
   <div class="stats">
-    <div class="stat"><b>121</b><small>وحدة برمجية</small></div>
-    <div class="stat"><b>261</b><small>اعتمادية داخلية</small></div>
+    <div class="stat"><b>124</b><small>وحدة برمجية</small></div>
+    <div class="stat"><b>262</b><small>اعتمادية داخلية</small></div>
     <div class="stat"><b>16</b><small>مكوّنًا</small></div>
-    <div class="stat"><b style="color:var(--ok)">13</b><small>متحقق</small></div>
-    <div class="stat"><b style="color:var(--part)">3</b><small>جزئي</small></div>
+    <div class="stat"><b style="color:var(--ok)">14</b><small>متحقق</small></div>
+    <div class="stat"><b style="color:var(--part)">2</b><small>جزئي</small></div>
   </div>
 
   <h2 class="section">الخريطة — اضغط أي مكوّن لعرض علاقاته</h2>
-  <div class="chips" id="chips"><button type="button" class="chip ok" data-filter="implemented_verified">🟢 منفّذ ومتحقق <b>13</b></button><button type="button" class="chip unv" data-filter="implemented_unverified">🟠 منفّذ وغير متحقق <b>0</b></button><button type="button" class="chip part" data-filter="partial">🟡 جزئي <b>3</b></button><button type="button" class="chip prop" data-filter="proposed">🔵 مقترح <b>0</b></button><button type="button" class="chip miss" data-filter="not_implemented">🔴 غير منفّذ <b>0</b></button><button type="button" class="chip off" data-filter="disabled">⚪ موجود ومعطّل <b>0</b></button><button type="button" class="chip blocked" data-filter="blocked">⛔ محجوب <b>0</b></button><button type="button" class="chip" id="reset">إظهار الكل</button></div>
+  <div class="chips" id="chips"><button type="button" class="chip ok" data-filter="implemented_verified">🟢 منفّذ ومتحقق <b>14</b></button><button type="button" class="chip unv" data-filter="implemented_unverified">🟠 منفّذ وغير متحقق <b>0</b></button><button type="button" class="chip part" data-filter="partial">🟡 جزئي <b>2</b></button><button type="button" class="chip prop" data-filter="proposed">🔵 مقترح <b>0</b></button><button type="button" class="chip miss" data-filter="not_implemented">🔴 غير منفّذ <b>0</b></button><button type="button" class="chip off" data-filter="disabled">⚪ موجود ومعطّل <b>0</b></button><button type="button" class="chip blocked" data-filter="blocked">⛔ محجوب <b>0</b></button><button type="button" class="chip" id="reset">إظهار الكل</button></div>
   <div class="canvas" style="margin-top:10px"><svg viewBox="0 0 1334 526" width="1334" height="526" role="img" aria-label="خريطة معمارية حية لمكونات CeliaOS">
       <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#3b4b8f" /></marker></defs>
       <text class="band" x="16" y="72">التشغيل</text>
@@ -135,9 +135,9 @@
         <text class="n-title" x="14" y="26">Tool Registry</text>
         <text class="n-sub" x="14" y="44">2 ملف · موصول بالمدخل</text>
       </g>
-      <g class="node part" data-id="workflow_engine" data-status="partial" transform="translate(24 330)" tabindex="0" role="button" aria-label="Workflow Engine — جزئي">
+      <g class="node ok" data-id="workflow_engine" data-status="implemented_verified" transform="translate(24 330)" tabindex="0" role="button" aria-label="Workflow Engine — منفّذ ومتحقق">
         <rect width="208" height="56" rx="12" />
-        <text class="n-mark" x="194" y="22" text-anchor="end">🟡</text>
+        <text class="n-mark" x="194" y="22" text-anchor="end">🟢</text>
         <text class="n-title" x="14" y="26">Workflow Engine</text>
         <text class="n-sub" x="14" y="44">2 ملف · موصول بالمدخل</text>
       </g>
@@ -237,10 +237,10 @@
         <ul class="files"><li class="mono">src/agent/tools.js</li><li class="mono">src/knowledge/tool-policy.js</li></ul>
         <p class="meta">اختبارات تطال هذه الوحدات: 2/2 · موصول من مدخل تنفيذي</p>
       </article>
-      <article class="card part" data-id="workflow_engine" data-status="partial">
-        <header><h3>Workflow Engine</h3><span class="badge">🟡 جزئي</span></header>
+      <article class="card ok" data-id="workflow_engine" data-status="implemented_verified">
+        <header><h3>Workflow Engine</h3><span class="badge">🟢 منفّذ ومتحقق</span></header>
         <ul class="files"><li class="mono">src/agent/automation/index.js</li><li class="mono">src/agent/automation/schema.js</li></ul>
-        <p class="meta">اختبارات تطال هذه الوحدات: 1/2 · موصول من مدخل تنفيذي</p>
+        <p class="meta">اختبارات تطال هذه الوحدات: 2/2 · موصول من مدخل تنفيذي</p>
       </article>
       <article class="card ok" data-id="agent_runtime" data-status="implemented_verified">
         <header><h3>Agent Runtime</h3><span class="badge">🟢 منفّذ ومتحقق</span></header>
@@ -306,7 +306,7 @@
 
   <footer>
     <div>مُولَّد من <b class="mono">src/design/architecture-map.js</b> — لا يُحرَّر يدويًا؛ <span class="mono">npm run arch:map</span>.</div>
-    <div>13 متحقق · 0 غير متحقق · 3 جزئي · 0 غائب</div>
+    <div>14 متحقق · 0 غير متحقق · 2 جزئي · 0 غائب</div>
   </footer>
 
 <script>

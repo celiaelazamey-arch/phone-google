@@ -116,7 +116,7 @@ test('the audit admits what the system does not have — no domain is painted co
   const cognitive = atlas.domains.find((domain) => domain.id === 'cognitive_knowledge');
   const conflict = cognitive.capabilities.find((capability) => capability.id === 'conflict_detection');
   assert.equal(conflict.status, TRUTH.verified, 'conflict detection is implemented and a test names its file');
-  assert.notEqual(cognitive.status, TRUTH.verified, 'one untested capability still keeps the domain out of green');
+  assert.equal(cognitive.status, TRUTH.verified, 'with the skills registry verified, cognitive_knowledge is now fully backed and may read green');
   const memory = atlas.domains.find((domain) => domain.id === 'memory_context');
   const consolidation = memory.capabilities.find((capability) => capability.id === 'consolidation');
   assert.equal(consolidation.status, TRUTH.verified, 'consolidation is implemented and a test names its file');
@@ -231,7 +231,7 @@ test('an edited coverage is caught by the states, not just by the seal', () => {
 
 test('an edited total or phase is caught by derivation, even when the forger recomputes the seal', () => {
   const totals = clone(publishedFacts);
-  totals.totals.verified = 45;
+  totals.totals.verified = 46;
   totals.fingerprint = fingerprintOfFacts(totals);
   const problems = verifyFacts(totals);
   assert.ok(problems.some((problem) => problem.startsWith('totals.verified')));

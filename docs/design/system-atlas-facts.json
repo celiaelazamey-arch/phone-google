@@ -1,11 +1,11 @@
 {
-  "fingerprint": "6a16a90bb0",
+  "fingerprint": "20e19d8fa5",
   "version": "celiaos-system-atlas-v1",
   "totals": {
     "domains": 12,
     "capabilities": 54,
-    "verified": 44,
-    "unverified": 9,
+    "verified": 45,
+    "unverified": 8,
     "missing": 1
   },
   "phases": [
@@ -28,8 +28,8 @@
       "ar": "الإدراك والمعرفة والبحث",
       "en": "Cognitive & Knowledge",
       "priority": "P0",
-      "status": "partial",
-      "coverage": 80,
+      "status": "implemented_verified",
+      "coverage": 100,
       "capabilities": [
         {
           "id": "kb_search",
@@ -44,7 +44,7 @@
         {
           "id": "citations",
           "ar": "الاستشهاد بالمراجع داخل الإجابات",
-          "status": "implemented_unverified"
+          "status": "implemented_verified"
         },
         {
           "id": "web_discovery",
