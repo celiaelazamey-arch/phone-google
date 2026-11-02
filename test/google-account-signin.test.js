@@ -17,7 +17,8 @@ async function fixture({
   ownerEmail = '',
   profile = { sub: SUB, email: EMAIL, email_verified: true },
   tokenStatus = 200,
-  infoStatus = 200
+  infoStatus = 200,
+  googleProbeMismatch = false
 } = {}) {
   const sqlite = new DatabaseSync(':memory:');
   for (const sql of splitSqlStatements(await loadAllMigrationsSql())) sqlite.exec(sql);
@@ -51,6 +52,14 @@ async function fixture({
     if (url.hostname === 'openidconnect.googleapis.com' && url.pathname === '/v1/userinfo') {
       return infoStatus === 200 ? json(profile) : json({}, infoStatus);
     }
+    // WA-009: the read-only authorize probe (no D1 state, no session) decides whether
+    // Google would accept the redirect URI before the user is sent there.
+    if (url.hostname === 'accounts.google.com' && url.pathname === '/o/oauth2/v2/auth') {
+      return new Response(googleProbeMismatch ? 'Error 400: redirect_uri_mismatch' : '<html>Sign in with Google</html>', {
+        status: 200,
+        headers: { 'content-type': 'text/html' }
+      });
+    }
     throw new Error(`unexpected_fetch:${url.href}`);
   };
   const call = (path, { method = 'GET', cookie, body, headers = {} } = {}) => worker.fetch(
@@ -71,6 +80,9 @@ async function fixture({
     : [response.headers.get('set-cookie')].filter(Boolean));
   return { env, sqlite, calls, call, cookiesOf };
 }
+
+// The WA-009 authorize probe is a read-only preflight, not a token/identity exchange.
+const googleApiCalls = (f) => f.calls.filter((c) => c.url.pathname !== '/o/oauth2/v2/auth');
 
 async function startSignIn(f) {
   const response = await f.call('/auth/google/signin');
@@ -134,10 +146,10 @@ test('WA-008 a verified Google identity opens a real account session without sto
   assert.equal(f.sqlite.prepare('SELECT user_id FROM account_google_identities WHERE google_sub = ?').get(SUB).user_id, user.user.id);
   assert.equal(f.sqlite.prepare('SELECT COUNT(*) AS n FROM google_credentials').get().n, 0, 'no Google token is persisted');
   assert.equal(f.sqlite.prepare('SELECT COUNT(*) AS n FROM app_users').get().n, 0, 'the owner Workspace tables stay untouched');
-  assert.equal(f.calls.length, 2, 'exactly token exchange + userinfo');
-  assert.equal(f.calls[0].url.pathname, '/token');
-  assert.equal(f.calls[1].url.pathname, '/v1/userinfo');
-  assert.ok(!String(f.calls[0].init.body).includes('refresh_token'));
+  assert.equal(googleApiCalls(f).length, 2, 'exactly token exchange + userinfo');
+  assert.equal(googleApiCalls(f)[0].url.pathname, '/token');
+  assert.equal(googleApiCalls(f)[1].url.pathname, '/v1/userinfo');
+  assert.ok(!String(googleApiCalls(f)[0].init.body).includes('refresh_token'));
 });
 
 test('WA-008 the one-use state cannot be replayed into a second account or token exchange', async () => {
@@ -147,7 +159,7 @@ test('WA-008 the one-use state cannot be replayed into a second account or token
   const replay = await callback(f, started);
   assert.equal(replay.status, 400);
   assert.equal((await replay.json()).error, 'invalid_or_expired_oauth_state');
-  assert.equal(f.calls.length, 2, 'the replayed callback never reaches Google');
+  assert.equal(googleApiCalls(f).length, 2, 'the replayed callback never reaches Google');
   assert.equal(f.sqlite.prepare('SELECT COUNT(*) AS n FROM app_accounts').get().n, 1);
 });
 
@@ -157,7 +169,7 @@ test('WA-008 a mismatched state cookie is rejected before the code is exchanged'
   const response = await callback(f, { state: started.state, cookie: 'celia_oauth_state=signin:wrong' });
   assert.equal(response.status, 400);
   assert.equal((await response.json()).error, 'oauth_state_cookie_mismatch');
-  assert.equal(f.calls.length, 0);
+  assert.equal(googleApiCalls(f).length, 0);
   assert.equal(f.sqlite.prepare('SELECT COUNT(*) AS n FROM app_accounts').get().n, 0);
 });
 
@@ -209,6 +221,32 @@ test('WA-008 APP_OWNER_EMAIL does not gate ordinary Google accounts', async () =
   assert.equal(response.status, 302);
   assert.equal(response.headers.get('location'), '/whatsapp');
   assert.equal(f.sqlite.prepare('SELECT COUNT(*) AS n FROM app_accounts').get().n, 1);
+});
+
+test('WA-009 an unregistered redirect URI shows an Arabic setup page instead of Google\'s 400', async () => {
+  const f = await fixture({ googleProbeMismatch: true });
+  const response = await f.call('/auth/google/signin');
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('content-type'), /text\/html/);
+  const html = await response.text();
+  const expectedUri = `${ORIGIN}/auth/google/callback`;
+  assert.ok(html.includes(expectedUri), 'the exact URI is shown for copy/paste');
+  assert.ok(html.includes(CLIENT_ID), 'the public client id is shown so the right OAuth client is edited');
+  assert.ok(html.includes('Authorized redirect URIs'));
+  assert.ok(html.includes('أعد المحاولة الآن'));
+  assert.ok(!html.includes(CLIENT_SECRET), 'the OAuth secret never reaches the browser');
+  assert.equal(response.headers.get('set-cookie'), null, 'no OAuth state is created for a refused flow');
+  assert.equal(f.sqlite.prepare('SELECT COUNT(*) AS n FROM oauth_states').get().n, 0);
+});
+
+test('WA-009 the probe is re-run on every click, so registering the URI needs no redeploy', async () => {
+  const broken = await fixture({ googleProbeMismatch: true });
+  assert.equal((await broken.call('/auth/google/signin')).status, 200);
+  const fixed = await fixture({ googleProbeMismatch: false });
+  const ok = await fixed.call('/auth/google/signin');
+  assert.equal(ok.status, 302);
+  assert.match(new URL(ok.headers.get('location')).searchParams.get('state'), /^signin:[0-9a-f]{64}$/);
+  assert.equal(fixed.calls.filter((c) => c.url.pathname === '/o/oauth2/v2/auth').length, 1);
 });
 
 test('WA-008 the WhatsApp account panel ships the Google icon wired to the sign-in route', async () => {
