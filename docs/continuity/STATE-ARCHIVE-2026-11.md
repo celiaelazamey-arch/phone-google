@@ -35,7 +35,7 @@
 > الأساس `a1d3f7b` بعد أن كبرت النافذة الحيّة فوق حدّ العشرين كيلوبايت (بايت ببايت، لا تنقيح).
 > الطريقة: استبعد وسمَي النقل، صِلْ الأسطر بـ`\n` وأضف `\n` أخيرًا ⇒ يجب أن يساوي الناتج البايتات والبصمة أدناه.
 
-<!-- state-archive-block: source=docs/continuity/STATE.md baseline=100e4c4 sha256=2a6be223ef75ccb123443131d6638cb0178d975dc40815733484543c631a97bd bytes=5154 lines=39 -->
+<!-- state-archive-block: source=docs/continuity/STATE.md baseline=167fcb7 sha256=af08fbe9ffa65d6dd1ee792c391309dfd463e6bd95a25f909a322cf5bcfaff92 bytes=21108 lines=152 -->
 
 <!-- BEGIN MOVED STATE SECTIONS B -->
 ## 31 أكتوبر 2026 — DOC-003 / DEC-081 (تدقيق البنية الإدراكية) — ملخّص
