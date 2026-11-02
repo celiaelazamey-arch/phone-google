@@ -11,13 +11,9 @@
  * - أي عقد غير صالح يرفض السجل كله بكود محدد، لا يتجاهل المهارة.
  */
 
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { closeSync, constants, fstatSync, openSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseSkillMarkdown, PLANNER_VISIBLE_STATUS, SKILL_SCHEMA_VERSION } from './schema.js';
-
-function coded(code, details = {}) {
-  return { ok: false, code, details };
-}
 
 /**
  * يبني سجل مهارات من مسار.
@@ -44,15 +40,23 @@ export function createSkillRegistry({ dir, toolRegistry, grantIds }) {
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     const file = join(dir, entry.name, 'SKILL.md');
-    let stat;
+    let descriptor;
+    let source;
     try {
-      stat = statSync(file);
-    } catch {
-      continue; // مجلد بلا SKILL.md ليس مهارة — يُتجاهل
+      descriptor = openSync(file, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+      if (!fstatSync(descriptor).isFile()) continue;
+      source = readFileSync(descriptor, 'utf8');
+    } catch (error) {
+      if (error.code === 'ENOENT') continue; // مجلد بلا SKILL.md ليس مهارة — يُتجاهل
+      throw Object.assign(new Error('skill_file_unreadable'), {
+        code: 'skill_file_unreadable',
+        skill: entry.name
+      });
+    } finally {
+      if (descriptor !== undefined) closeSync(descriptor);
     }
-    if (!stat.isFile()) continue;
 
-    const parsed = parseSkillMarkdown(readFileSync(file, 'utf8'));
+    const parsed = parseSkillMarkdown(source);
     if (!parsed.ok) {
       throw Object.assign(new Error('skill_contract_invalid'), {
         code: 'skill_contract_invalid',

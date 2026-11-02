@@ -12,7 +12,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { constants, mkdtempSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import {
   parseSkillMarkdown,
@@ -153,6 +153,25 @@ test('REG-05: draft skills are invisible to the planner; registry is frozen', ()
   assert.throws(() => { registry.count = 99; }, TypeError);
   assert.equal(registry.get('product-strategist').department, 'product');
   assert.equal(registry.get('nope'), null);
+});
+
+test('REG-07: refuses a SKILL.md symlink outside the skills directory', (t) => {
+  if (typeof constants.O_NOFOLLOW !== 'number') {
+    t.skip('O_NOFOLLOW is unavailable on this platform');
+    return;
+  }
+  const dir = mkdtempSync(join(tmpdir(), 'skills-'));
+  const outside = mkdtempSync(join(tmpdir(), 'outside-skill-'));
+  const outsideFile = join(outside, 'SKILL.md');
+  mkdirSync(join(dir, 'linked-skill'));
+  writeFileSync(outsideFile,
+    `---\nname: outside-skill\nversion: 0.1.0\ndepartment: test\nstatus: draft\nallowed_tools: [kb.search]\npermissions: [security.audit.read]\ninputs: i\noutputs: o\nverification: v\nevidence_required: e\n---\n\n${BODY}`);
+  symlinkSync(outsideFile, join(dir, 'linked-skill', 'SKILL.md'));
+
+  assert.throws(
+    () => createSkillRegistry({ dir, toolRegistry: mockToolRegistry, grantIds: GRANT_IDS }),
+    (err) => err.code === 'skill_file_unreadable'
+  );
 });
 
 test('REG-06: requires dir, tool registry and grant ids', () => {
