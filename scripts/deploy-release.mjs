@@ -48,7 +48,7 @@ export async function main(argv = process.argv.slice(2)) {
   const [command, ...args] = argv;
   if (!["status", "switch", "rollback", "recover"].includes(command))
     throw new Error(
-      "Usage: npm run deploy:release -- status|switch --image ghcr.io/owner/repo@sha256:… --version 0.2.0|rollback|recover [--allow-memory]",
+      "Usage: npm run deploy:release -- status|rollback|recover; or npm run deploy:release -- switch --image ghcr.io/owner/repo@sha256:… --version <semver> [--allow-memory]",
     );
   const options = {};
   for (let i = 0; i < args.length; i++) {

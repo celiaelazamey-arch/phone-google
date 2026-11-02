@@ -149,5 +149,34 @@
       "checksAtMerge": "11 pass · 1 skipping · mergeable CLEAN"
     },
     "entryHash": "f4308d22edfb5b8b2f4d4ec0a6ccbe136d899e5e5ee1011f88ad0e23668e3a62"
+  },
+  {
+    "seq": 5,
+    "prevHash": "f4308d22edfb5b8b2f4d4ec0a6ccbe136d899e5e5ee1011f88ad0e23668e3a62",
+    "at": "2026-11-02T06:03:24.938Z",
+    "actor": "celiaelazamey-arch",
+    "action": "reconcile",
+    "channel": "main",
+    "version": "0.2.1",
+    "commit": "c5fe0a8",
+    "requestFingerprint": "pub:7e2e7a88e09a45ef",
+    "outcome": "merged",
+    "evidence": {
+      "recordType": "post-hoc-merge-reconciliation",
+      "pullRequest": 123,
+      "method": "squash",
+      "mergedAt": "2026-11-01T11:14:03Z",
+      "mergedCommit": "c5fe0a854801aafc8f302bda2c516417502fdcdd",
+      "candidateHead": "8586c805227b80a52edcbfe9947080f70c55f15f",
+      "fingerprintInputs": {
+        "channel": "main",
+        "version": "0.2.1",
+        "commit": "8586c805227b80a52edcbfe9947080f70c55f15f",
+        "artifacts": []
+      },
+      "source": "GitHub PR #123 API; appended after the merge record was found missing, without rewriting earlier entries.",
+      "note": "The release approval still does not prove deployment. Existing v0.2.1 remains immutable."
+    },
+    "entryHash": "195553a25e7f5bdd9dac26f3fb902ddd94e60ca031ec0a552c782f24aac1d397"
   }
 ]

@@ -100,6 +100,15 @@ test('SP-06 Dependabot watches npm, GitHub Actions and Docker', () => {
     assert.match(config, new RegExp(`package-ecosystem:\\s*["']?${ecosystem}["']?`), `dependabot covers ${ecosystem}`);
   }
   assert.match(config, /interval:\s*["']?(?:daily|weekly)["']?/, 'at least one ecosystem is checked weekly or faster');
+  assert.match(config, /codeql-actions:[\s\S]*?patterns:[\s\S]*?github\/codeql-action\/\*/, 'CodeQL init/analyze updates are grouped to avoid incompatible partial upgrades');
+});
+
+test('SP-06a CodeQL init and analyze remain pinned to the same release', () => {
+  const codeql = read('.github/workflows/codeql.yml');
+  const refs = [...codeql.matchAll(/uses:\s*github\/codeql-action\/(?:init|analyze)@([a-f0-9]{40})\s+#\s*(v[\d.]+)/g)];
+  assert.equal(refs.length, 2, 'both CodeQL action steps are present and pinned');
+  assert.equal(refs[0][1], refs[1][1], 'init and analyze use the same immutable commit');
+  assert.equal(refs[0][2], refs[1][2], 'init and analyze have the same release comment');
 });
 
 // ---------------------------------------------------------------------------------------------------------

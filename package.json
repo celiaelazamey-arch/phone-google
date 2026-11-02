@@ -1,6 +1,6 @@
 {
   "name": "phone-google-assistant",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": false,
   "description": "Celia assistant with isolated integrations, health-gated releases and safe rollback",
   "type": "module",
@@ -66,6 +66,7 @@
     "now:check": "node scripts/generate-now.mjs --check",
     "check:continuity": "node scripts/check-continuity.mjs",
     "plan:check": "node scripts/check-plan-coverage.mjs",
+    "measure": "node scripts/measure-completion.mjs",
     "check:secrets": "node scripts/check-secrets-wiring.mjs",
     "verify:live": "node scripts/verify-live.mjs",
     "verify:edge": "node scripts/verify-live.mjs --mode edge --url https://celia-phone-google.celiaelazamey.workers.dev",

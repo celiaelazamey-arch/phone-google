@@ -15,7 +15,7 @@ import { saveState } from "../scripts/deploy-release.mjs";
 import { checkRelease, verifyBundle } from "../scripts/release.mjs";
 
 const old = {
-  version: "0.2.0",
+  version: "0.2.1",
   image: `ghcr.io/owner/celia@sha256:${"a".repeat(64)}`,
   databaseSchema: 1,
   storageMode: "mysql",
@@ -78,8 +78,8 @@ function adapter(overrides = {}) {
 
 test("release manifest, lockfile and history use a single compatible release identity", async () => {
   assert.deepEqual(await checkRelease(), {
-    version: "0.2.1",
-    previousVersion: "0.2.0",
+    version: "0.3.0",
+    previousVersion: "0.2.1",
     databaseSchema: 1,
   });
 });
@@ -88,7 +88,7 @@ test("only immutable GHCR digest images and strict versions are accepted", () =>
   validateTarget(next);
   for (const image of [
     "ghcr.io/owner/celia:latest",
-    "ghcr.io/owner/celia:0.2.0",
+    "ghcr.io/owner/celia:0.2.1",
     `ghcr.io/owner/celia@sha256:${"g".repeat(64)}`,
     "--privileged",
     "http://unsafe/image",

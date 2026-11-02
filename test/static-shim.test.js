@@ -4,6 +4,7 @@ import { access, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { build, DIST_DIR } from '../scripts/build-pages.mjs';
+import { RELEASE } from '../src/version.js';
 
 const buildResult = await build();
 const shimPath = path.join(DIST_DIR, 'celia-static-shim.js');
@@ -354,7 +355,7 @@ test('مركز النظام الثابت يعلن أنه معاينة ولا ي�
   assert.equal(system.status, 200);
   assert.equal(system.payload.scope, 'browser-demo');
   assert.equal(system.payload.storage.durable, false);
-  assert.equal(system.payload.release.version, '0.2.1');
+  assert.equal(system.payload.release.version, RELEASE.version);
   assert.deepEqual(system.payload.circuits, []);
   const catalogue = await CeliaStatic.handleRest('GET', '/api/releases');
   assert.equal(catalogue.payload.publication, 'catalog-only');
