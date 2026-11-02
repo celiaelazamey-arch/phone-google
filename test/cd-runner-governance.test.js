@@ -90,10 +90,21 @@ test('CDR-05: release.yml checks GitHub Release immutability inside identity res
   assert.ok(immutableAt < dockerPushAt, 'immutable check runs before docker/build-push-action can overwrite GHCR :vX.Y.Z');
 });
 
-test('CDR-06: the 0.3.0 release decision proposal is prepared while package.json stays at 0.2.1 pending owner decision (REL-003)', () => {
+test('CDR-06: owner-approved 0.3.0 is synchronized across release files and Worker metadata while immutable 0.2.1 remains in history (REL-003)', async () => {
   assert.ok(existsSync(path.join(root, 'docs', 'release-0.3.0-proposal.md')));
   const pkg = JSON.parse(read('package.json'));
+  const lock = JSON.parse(read('package-lock.json'));
   const current = JSON.parse(read('releases/current.json'));
-  assert.equal(pkg.version, '0.2.1', 'no automatic version bump without explicit owner approval');
-  assert.equal(current.version, '0.2.1');
+  const history = JSON.parse(read('releases/history.json'));
+  assert.equal(pkg.version, '0.3.0');
+  assert.equal(lock.version, '0.3.0');
+  assert.equal(lock.packages[''].version, '0.3.0');
+  assert.equal(current.version, '0.3.0');
+  assert.equal(current.previousVersion, '0.2.1');
+  assert.equal(history[0].version, '0.3.0');
+  assert.equal(history[1].version, '0.2.1', 'the prior release remains preserved');
+  assert.match(read('CHANGELOG.md'), /^## 0\.3\.0 — Celia Edge & Governance — 2026-11-02$/m);
+  assert.match(read('docs/release-0.3.0-proposal.md'), /اعتماد المالك.*0\.3\.0/);
+  const { buildWorkerMetadata } = await import('../scripts/deploy-cloudflare-edge.mjs');
+  assert.equal(buildWorkerMetadata({ env: {} }).bindings.find((binding) => binding.name === 'CELIA_VERSION')?.text, '0.3.0');
 });

@@ -5,6 +5,7 @@ import { buildSliceRecord, recordSlice, schemaVersionFrom } from './deployment-s
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { applyRetirementsToEnv, flagNameFor, loadServiceRetirements, RETIRABLE_FEATURES } from '../src/service-retirements.js';
+import { RELEASE } from '../src/version.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const workerDir = path.join(root, 'workers/celia-edge');
@@ -178,7 +179,7 @@ export async function applyMigrations({ accountId, apiToken, databaseId, sql, fe
   return { statements: applied };
 }
 
-export function buildWorkerMetadata({ env = process.env, version = '0.2.1', commit = 'main', d1DatabaseId = null, retirements = loadServiceRetirements(), uiAssets = {} } = {}) {
+export function buildWorkerMetadata({ env = process.env, version = RELEASE.version, commit = 'main', d1DatabaseId = null, retirements = loadServiceRetirements(), uiAssets = {} } = {}) {
   // Retired services (DEC-030) travel to the edge as plain_text flags so /api/secrets/status tells the same truth as Git.
   const effectiveEnv = applyRetirementsToEnv(env, retirements);
   // VER-07: Cloudflare rejects any text binding over 5.1 kB (error 10054). Fail here with a

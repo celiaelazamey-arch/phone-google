@@ -1,6 +1,6 @@
 {
   "name": "phone-google-assistant",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": false,
   "description": "Celia assistant with isolated integrations, health-gated releases and safe rollback",
   "type": "module",
