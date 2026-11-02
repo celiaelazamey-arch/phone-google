@@ -3,8 +3,14 @@
 > **حفظ التاريخ بلا حذف (`DEC-052` / `CONT-004`):** هذه نافذة الاستئناف النشطة؛ السجل التراكمي الكامل حتى ما بعد PR #84 (`main@738d832` / `9f6f8b2` — 983 سطرًا / 142,150 بايت) محفوظ حرفيًا في **[STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md)** وبصمته محروسة بـ`R0-02`، وأقسام 31 أكتوبر–1 نوفمبر المنقولة عند `6b4bb2d` و`a1d3f7b` في **[STATE-ARCHIVE-2026-11.md](STATE-ARCHIVE-2026-11.md)**. القراءة السريعة المشتقة: **[NOW.md](NOW.md)** (`npm run now`).
 
 **آخر مراجعة:** 2 نوفمبر 2026
-**نوع الجلسة الحالية:** DES-002 — إصلاح تنبيه CodeQL واستكمال handoff لطلب المراجعة #138.
-**السجل:** [DES-002 CodeQL repair](sessions/2026-11-02-des002-codeql-repair.md) · **الفرع:** `arena/ebefe92a-phone-google` · **PR #138:** مسودة؛ غير مدمج. `v0.3.0` ما زال الإصدار الحي المعلن.
+**نوع الجلسة الحالية:** WA-005 / DES-002 — توثيق دمج #138 و#140 ودفع `main` لإعادة نشر الحافة بعد إضافة `TOKEN_ENCRYPTION_KEY` ومعرّفات Meta.
+**السجل:** [WhatsApp onboarding Edge redeploy](sessions/2026-11-02-whatsapp-onboarding-edge-redeploy.md) · **الفرع:** `arena/c7eebc67-phone-google` · **الأساس:** `main@b5d3f3c`. `v0.3.0` ما زال الإصدار الحي المعلن.
+
+## 2 نوفمبر 2026 — WA-005 / DES-002 — توثيق دمج #138 و#140 وإعادة نشر الحافة بعد إضافة الأسرار
+
+- دُمج PR #138 (`main@167fcb7`) ثم PR #140 (`main@b5d3f3c`) لإصلاح بصمة الكتلة ب في `STATE-ARCHIVE-2026-11.md` (`SA-01`)؛ نجحت على `b5d3f3c` تشغيلات `Celia quality & resilience` (`41445712732`) و`Deploy (GitHub Pages)` (`41445712744`) و`Publish verified release` (`41445712767`) و`CodeQL` (`41445712752`) و`Deploy (Cloudflare Edge)` (`41445911518`).
+- تشغيلة الحافة `41445911518` (`2026-11-02T12:35:13Z` على `b5d3f3c`) أثبتت `status=deployed` و`liveReady=true` و`storage.mode=d1` و`durable=true` و`coreSecretBindings=18/18` و`optionalSecretBindings=1` (`WHATSAPP_APP_SECRET`) وترقية الشريحة إلى `known_good`، لكنها أخرجت `whatsapp-onboarding: configured=false — missing: Meta app, Embedded Signup configuration, encryption key` لأنها سبقت إضافة المالك لـ`TOKEN_ENCRYPTION_KEY` ومعرّفات Meta.
+- أفاد المالك بإضافة `TOKEN_ENCRYPTION_KEY` ومعرّفات Meta وطلب دفعًا جديدًا إلى `main` لتشغيل `Deploy (Cloudflare Edge)` وربط الإعدادات الجديدة وتحديث `whatsappOnboarding.configured`. التفاصيل في [سجل الجلسة](sessions/2026-11-02-whatsapp-onboarding-edge-redeploy.md).
 
 ## 2 نوفمبر 2026 — DES-002 — إصلاح CodeQL وتجهيز handoff
 
