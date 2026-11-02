@@ -100,3 +100,49 @@ export async function handleAccountRequest({ request, env, pathname }) {
   }
   throw problem('not_found', 404);
 }
+
+/**
+ * WA-008 — open a self-service account session from a Google identity that the server
+ * verified through the OAuth token + userinfo exchange. No owner token and no provider
+ * token enters this function; it only receives Google's stable `sub` and verified email.
+ *
+ * A Google login NEVER attaches itself to an existing password account with the same
+ * address (silent takeover). Such a user must sign in with their password first. The
+ * Google-only account gets an unguessable random password so no password-login path
+ * exists for it. Identity rows live in their own additive table (migration 0009).
+ */
+export async function signInWithGoogleIdentity(env, { sub = '', email = '', emailVerified = false, now = () => new Date() } = {}) {
+  const googleSub = String(sub || '').trim();
+  const normalized = normalizeEmail(email);
+  if (emailVerified !== true || !googleSub || googleSub.length > 255) throw problem('google_identity_not_verified', 403);
+  const store = db(env);
+  const at = now().toISOString();
+  const identity = await store.prepare('SELECT user_id FROM account_google_identities WHERE google_sub = ?').bind(googleSub).first();
+  let userId;
+  if (identity) {
+    const account = await store.prepare('SELECT id FROM app_accounts WHERE id = ? AND status = ?').bind(identity.user_id, 'active').first();
+    if (!account) throw problem('account_session_expired', 403);
+    userId = identity.user_id;
+  } else {
+    const existing = await store.prepare('SELECT id FROM app_accounts WHERE email = ?').bind(normalized).first();
+    if (existing) throw problem('google_email_already_registered', 409);
+    userId = `user_${randomHex(16)}`;
+    const salt = toBase64(crypto.getRandomValues(new Uint8Array(16)));
+    const randomPassword = toBase64(crypto.getRandomValues(new Uint8Array(32)));
+    const hash = await hashPassword(randomPassword, salt);
+    try {
+      await store.prepare('INSERT INTO account_google_identities (google_sub, user_id, email, created_at) VALUES (?, ?, ?, ?)')
+        .bind(googleSub, userId, normalized, at).run();
+      await store.prepare('INSERT INTO app_accounts (id, email, password_hash, password_salt, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
+        .bind(userId, normalized, hash, salt, at, at).run();
+    } catch {
+      // Compensate a partially created pair; a later attempt must not be blocked forever.
+      try { await store.prepare('DELETE FROM account_google_identities WHERE google_sub = ?').bind(googleSub).run(); } catch {}
+      try { await store.prepare('DELETE FROM app_accounts WHERE id = ?').bind(userId).run(); } catch {}
+      throw problem('google_signin_conflict', 409);
+    }
+    await appendAudit(env, { key: `account.${userId}`, action: 'account_registered_google', valueHash: await sha256Hex(googleSub), at });
+  }
+  await appendAudit(env, { key: `account.${userId}`, action: 'account_login_google', valueHash: await sha256Hex(googleSub), at });
+  return { user: { id: userId, email: normalized }, cookie: await createSession(env, userId) };
+}

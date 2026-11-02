@@ -14,6 +14,11 @@ test('صفحة ربط واتساب الثابتة لا تدّعي اتصالًا
     await expect(page.locator('#connected-panel')).toBeHidden();
     await expect(page.locator('#status')).toContainText('نسخة معاينة');
     await expect(page.locator('#link-panel')).toBeHidden();
+    // WA-008: the Google icon is present but honestly disabled in the static preview.
+    await page.locator('#account-panel').evaluate((element) => { element.hidden = false; });
+    await expect(page.locator('#google-signin')).toBeDisabled();
+    await expect(page.locator('#google-signin')).toContainText('Google');
+    await expect(page.locator('#google-signin svg.google-icon')).toHaveCount(1);
     await expect(page.locator('a[href$="/whatsapp"]')).toHaveCount(1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
     const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();

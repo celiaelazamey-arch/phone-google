@@ -145,6 +145,10 @@
       {
         "digest": "sha256:89ab07c79d180eb5947320f33bddb06f0921304e2caa23a42d63586e517fd7c0",
         "version": "0008_deployment_slices.sql"
+      },
+      {
+        "digest": "sha256:7e91f39075c8cf8d11777c9000c7b181cbab07155392df896d05eb940c1cf3d4",
+        "version": "0009_google_account_identities.sql"
       }
     ],
     "policy": "additive-expand-contract",
@@ -152,7 +156,7 @@
   },
   "targets": {
     "edge": {
-      "bundleDigest": "sha256:0230b6f65fbed779150160feb7816b28cab4012971be76a97a4330a81069d3a3",
+      "bundleDigest": "sha256:79463d9a8120ef89e824a8016a4099028599d788586ca3312104cd481ea018aa",
       "compatibilityDate": "2025-01-01",
       "entry": "worker.js",
       "modules": [
@@ -161,10 +165,11 @@
         "reply-metrics.js",
         "crypto.js",
         "whatsapp-store.js",
-        "runtime.js",
         "whatsapp-onboarding.js",
-        "capabilities.js",
         "accounts.js",
+        "google-account.js",
+        "runtime.js",
+        "capabilities.js",
         "cron.js",
         "worker.js"
       ],

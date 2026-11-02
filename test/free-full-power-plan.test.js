@@ -89,7 +89,7 @@ test('FFP-06 the measured edge surface matches the numbers the plan prints', () 
   assert.match(plan, /\*\*12\*\*/);
 
   const migrations = readdirSync(path.join(root, 'workers/celia-edge/migrations')).filter((name) => name.endsWith('.sql'));
-  assert.equal(migrations.length, 8, 'the D1 migration count changed — update §2 and the plan');
+  assert.equal(migrations.length, 9, 'the D1 migration count changed — update §2 and the plan');
 
   const worker = read('workers/celia-edge/worker.js');
   const paths = new Set([...worker.matchAll(/url\.pathname\s*===\s*'([^']+)'|pathname\.startsWith\('([^']+)'\)/g)].map((match) => match[1] || match[2]));

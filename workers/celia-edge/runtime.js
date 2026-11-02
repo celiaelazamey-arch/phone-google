@@ -24,6 +24,7 @@ import {
   verifyEdgeConsentTicket,
   verifyWhatsAppSignatureWeb
 } from './crypto.js';
+import { completeGoogleAccountSignIn } from './google-account.js';
 
 export const MCP_PROTOCOL_VERSION = '2024-11-05';
 export const SUPPORTED_MCP_VERSIONS = Object.freeze(['2024-11-05', '2025-03-26']);
@@ -425,7 +426,9 @@ export async function getEdgeGoogleStatus(env, { userId = 'owner' } = {}) {
   }
 }
 
-const OAUTH_STATE_PATTERN = /^(browser|link):[0-9a-f]{64}$/;
+// `signin:` is the WA-008 account-login flow; it must never be interchangeable with
+// the owner Workspace `browser:`/`link:` flows.
+const OAUTH_STATE_PATTERN = /^(browser|link|signin):[0-9a-f]{64}$/;
 
 function decodeVerifiedTicketExpMs(ticket, fallbackMs) {
   try {
@@ -552,7 +555,7 @@ export async function handleGoogleOAuthCallback({
   }
 
   const cookieState = parseCookieHeader(request.headers.get('cookie'), 'celia_oauth_state');
-  if (state.startsWith('browser:')) {
+  if (state.startsWith('browser:') || state.startsWith('signin:')) {
     if (!cookieState || !(await constantTimeEqualAsync(cookieState, state))) {
       return { status: 400, body: { error: 'oauth_state_cookie_mismatch' } };
     }
@@ -581,6 +584,11 @@ export async function handleGoogleOAuthCallback({
   }
 
   const redirectUri = resolveGoogleRedirectUri(env, url.origin);
+  // WA-008: the account-login state was just consumed single-use. It never reaches the
+  // owner Workspace path below: no app_users row, no owner-email gate, no stored token.
+  if (state.startsWith('signin:')) {
+    return completeGoogleAccountSignIn({ env, code, redirectUri, fetchImpl, now });
+  }
   const tokenRes = await fetchImpl('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
