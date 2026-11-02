@@ -32,7 +32,7 @@
 | 4 | الخدمات الحية | ⚠️ | Service reality audit `41399947513` على SHA الحالي = `skipped`؛ Render `41400115801` أعلن `not-configured` ولا live URL، فلا يُحسب نشرًا كاملًا | تدقيق ناجح على SHA الحالي مع تقرير قابل للفحص (`QA-005`/`OPS-005`) |
 | 5 | الإصدار والحافة الدائمة | ⚠️ | PR #136 مدمج في `7596c27`; `v0.3.0` منشور immutable (`41399947570`). Edge `41400115739` أعلن حيًا `0.3.0@7596c27`, D1 durable و`known_good`; Pages `41399947941` أثبت 13/13 route على SHA نفسه. لم يقرأ probe جسم `version.json`؛ الإثبات المباشر لمحتواه باقٍ. `v0.2.1` محفوظ | فحص `version.json` الحي نصيًا على Pages مقابل `0.3.0` وSHA نفسه؛ ثم تسجيل الدليل، دون الخلط باكتمال النظام |
 | 6 | الخادم الخلفي الكامل (Express + MySQL) | ❌ | Render workflow (`41400115801`) نجح كفحص لكنه أفاد `not-configured`، بلا خدمة وبلا live URL؛ الحافة وحدها منشورة، فلا يُحسب ذلك نشرًا حيًا | `HOST-003` 🔑🌐 |
-| 7 | القنوات (Google / WhatsApp) | ❌ | Google غير مربوط؛ Edge `41400115739` يؤكد `whatsapp-onboarding configured=false` مع نقص Meta app/config/secret/encryption key | `GOOG-004/005` · `WA-005/007` 🔑🌐 |
+| 7 | القنوات (Google / WhatsApp) | ❌ | تهيئة WhatsApp التقنية على الحافة متحققة حيًا (`41456011988` على `main@2b47d62`: `whatsapp-onboarding configured=true`، `optionalSecretBindings=3`، `totalSecretBindings=21`)؛ ربط الرقم الفعلي وإرسال/استقبال الرسائل وربط Google لم تُنفَّذ بعد | `GOOG-004/005` · `WA-005/007` 🔑🌐 |
 | 8 | الحماية والاستعادة | ⚠️ | سلسلة أدلة مُختبَرة. **حماية `main` مفعّلة جزئيًا**: ruleset `26270171` نشِط (منع الحذف · منع الكتابة بالقوة · تاريخ خطي · CodeQL errors/high) لكن `required_status_checks` فارغة ولا مراجعة بشرية — ونسخة MySQL غير مقيسة | `GOV-001` (الجزء الباقي) · `DATA-001` 🔑 |
 
 **`B1` = 5.5 / 8.** لا يُعلن «100%» حتى تُغلق 6 و7 و8 بدليل خارجي (تشغيلة + تقرير)، لا بوصف.
@@ -79,14 +79,14 @@
 | `deps` | الاعتماديات | 5 prod · 2 dev | `package.json` | 🔗 |
 | `coverage_floor` | أرضية CI للتغطية | 89 / 71 / 82 | `test:coverage` | 🔗 |
 | `syntax_files` | الملفات المفحوصة نحويًا | 260 | نطاق `scripts/check.mjs` نفسه | 🔗 |
-| `continuity` | وثائق الاستمرارية / الروابط / المهام | 142 / 438 / 123 | `npm run check:continuity` | 🔗 |
+| `continuity` | وثائق الاستمرارية / الروابط / المهام | 143 / 439 / 123 | `npm run check:continuity` | 🔗 |
 | `sandbox` | العزل | off | `CELIA_AGENT_SANDBOX` في `src/agent/index.js` | 🔗 |
 | `egress` | الخروج | off | `CELIA_AGENT_EGRESS` في `src/agent/index.js` | 🔗 |
 | `tests` | اختبارات | 1245 · **1228 pass** · 0 fail · 17 skip | `npm run test:coverage` (2026-11-01، بعد CI/MAN-007 وMEAS/PSC/FFP) | 📅 |
 | `coverage` | التغطية | أسطر **92.48** · فروع **77.66** · دوال **87.77** | `npm run test:coverage` (2026-11-01، كل أرضيات CI ناجحة) | 📅 |
 | `tenants` | تعدّد المستأجرين | 0 (`tenantId` غير موجود؛ 30 جدولًا) | `grep -rl tenantId src/` (2026-11-01) | 📅 |
 | `skills` | المهارات بعقود | 0 / 17 | [خطة الشركة](design/ai-company-executive-plan.md) §2 (2026-11-01) | 📅 |
-| `deploy` | النشر | PR #136 مدمج إلى `7596c27`; GitHub Release `v0.3.0` immutable (`41399947570`, 5 أصول)؛ Edge `41400115739` = `0.3.0@7596c27`, D1 durable/read-back/`known_good`; Pages `41399947941` = 13/13 route من SHA نفسه، لكن جسم `version.json` غير مقروء مباشرة في الفحص؛ Render `41400115801` `not-configured`; service audit `41399947513` `skipped` | روابط التشغيل في سجل `REL-003` و`docs/deployments/ledger.json` (2026-11-02) | 📅 |
+| `deploy` | النشر | PR #136 مدمج إلى `7596c27`; GitHub Release `v0.3.0` immutable (`41399947570`, 5 أصول)؛ Edge `41400115739` (`7596c27`) ثم `41456011988` (`main@2b47d62`) = `0.3.0`, D1 durable/read-back/`known_good` و`whatsapp-onboarding: configured=true` (`21` ربطًا)؛ Pages `41399947941` و`41455784652` = 13/13 route، لكن جسم `version.json` غير مقروء مباشرة في الفحص؛ Render `41456011877` `not-configured`; service audit `41455784774` `skipped` | روابط التشغيل في سجل `REL-003` و`docs/deployments/ledger.json` (2026-11-02) | 📅 |
 
 > **حدّ صريح:** قبول Edge الحيّ مثبت من annotations في GitHub Actions (`41400115739`) ويحتوي `/version` على `0.3.0` وSHA الكامل؛ Pages أثبت 13/13 route في `41399947941`، لكن هذا الـprobe لم يحلل جسم `/version.json`/`version.json`. لذلك تبقى مطابقة محتوى JSON مباشرةً غير محسومة، ولا تُرفع إلى دليل بمجرد كون artifact مبنيًا من SHA المتوقع.
 

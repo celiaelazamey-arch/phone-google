@@ -3,8 +3,15 @@
 > **حفظ التاريخ بلا حذف (`DEC-052` / `CONT-004`):** هذه نافذة الاستئناف النشطة؛ السجل التراكمي الكامل حتى ما بعد PR #84 (`main@738d832` / `9f6f8b2` — 983 سطرًا / 142,150 بايت) محفوظ حرفيًا في **[STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md)** وبصمته محروسة بـ`R0-02`، وأقسام 31 أكتوبر–1 نوفمبر المنقولة عند `6b4bb2d` و`a1d3f7b` في **[STATE-ARCHIVE-2026-11.md](STATE-ARCHIVE-2026-11.md)**. القراءة السريعة المشتقة: **[NOW.md](NOW.md)** (`npm run now`).
 
 **آخر مراجعة:** 2 نوفمبر 2026
-**نوع الجلسة الحالية:** WA-005 / DES-002 — توثيق دمج #138 و#140 ودفع `main` لإعادة نشر الحافة بعد إضافة `TOKEN_ENCRYPTION_KEY` ومعرّفات Meta.
-**السجل:** [WhatsApp onboarding Edge redeploy](sessions/2026-11-02-whatsapp-onboarding-edge-redeploy.md) · **الفرع:** `arena/c7eebc67-phone-google` · **الأساس:** `main@b5d3f3c`. `v0.3.0` ما زال الإصدار الحي المعلن.
+**نوع الجلسة الحالية:** WA-005 / WA-007 — تثبيت دليل `configured=true` من تشغيلة الحافة `41456011988` (`main@2b47d62`) وإغلاق شق التهيئة التقنية مع إبقاء قبول الرقم والرسائل مفتوحًا.
+**السجل:** [WhatsApp Edge verified 41456011988](sessions/2026-11-02-whatsapp-edge-verified-41456011988.md) · **الفرع:** `arena/07ae2211-phone-google` · **الأساس:** `main@2b47d62`. `v0.3.0` ما زال الإصدار الحي المعلن.
+
+## 2 نوفمبر 2026 — WA-005 / WA-007 — تثبيت `configured=true` على الحافة الحيّة (`41456011988` على `main@2b47d62`)
+
+- دُمج PR #141 في `main@2b47d62479248bc613e055f59a0e72e791de8b0b`؛ نجحت تشغيلات `Celia quality & resilience` (`41455784604`) و`Deploy (GitHub Pages)` (`41455784652` — 13/13 مسارًا) و`Publish verified release` (`41455784637`) و`CodeQL` (`41455784653`) و`Deploy (Cloudflare Edge)` (`41456011988` · الوظيفة `125312744775`).
+- أثبتت تشغيلة الحافة `41456011988` حيًا: `whatsapp-onboarding: configured=true` (بلا إعدادات ناقصة)، و`coreSecretBindings=18/18`، و`optionalSecretBindings=3` (`WHATSAPP_APP_SECRET` و`WHATSAPP_APP_ID` و`TOKEN_ENCRYPTION_KEY` مع ربط `WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID` نصيًا)، و`totalSecretBindings=21`، و`storage.mode=d1` مع `durable=true` (`latencyMs=107`)، و`Edge Provenance` (11 وحدة، `sha256:0230b6f65fbe…`)، وترقية الشريحة إلى `known_good` لـ`2b47d62`.
+- **تمييز حاسم:** إغلاق شق **التهيئة التقنية والنشر** في `WA-005` و`WA-007` فقط؛ أما ربط رقم مملوك عبر نافذة Meta Embedded Signup من `/whatsapp`، وإرسال رسالة اختبار عبر Graph API، واستقبال رسالة واردة بـWebhook موقّع وإيصال تسليم، واختبار عزل الرسائل بين حسابي مستخدمين عاديين، فتبقى مفتوحة للقبول الحي.
+- مؤشرات الاكتمال الرسمية تبقى دون ترفيع تلقائي: `B1 = 5.5/8`، `B2 = 2.5/6`، المهارات النشطة `L5 = 0/17`، المهام المفتوحة `59` (`22 P0`). التفاصيل في [سجل الجلسة](sessions/2026-11-02-whatsapp-edge-verified-41456011988.md).
 
 ## 2 نوفمبر 2026 — WA-005 / DES-002 — توثيق دمج #138 و#140 وإعادة نشر الحافة بعد إضافة الأسرار
 
