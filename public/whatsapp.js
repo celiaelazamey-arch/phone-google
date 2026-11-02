@@ -26,6 +26,17 @@
     outside_24h_customer_window: 'أرسل رسالة من رقم المستلم إلى رقم العمل أولًا، ثم جرّب رسالة الاختبار خلال 24 ساعة.',
     csrf_origin_or_header_mismatch: 'رُفض الطلب لحماية الجلسة. حدّث الصفحة وحاول مجددًا.'
   };
+  // WA-008: only stable, server-defined reason codes are shown; never raw OAuth errors.
+  const googleErrors = {
+    google_oauth_not_configured: 'الدخول بحساب Google غير مهيأ على الخادم بعد.',
+    d1_not_bound: 'الخدمة غير جاهزة مؤقتًا. حاول بعد قليل.',
+    google_identity_not_verified: 'لم تؤكد Google هذا البريد. اختر حسابًا موثّقًا.',
+    google_email_already_registered: 'هذا البريد مسجّل بكلمة مرور. سجّل الدخول بكلمة المرور أولًا.',
+    google_token_exchange_failed: 'تعذر إكمال الدخول عبر Google. حاول مجددًا.',
+    google_userinfo_verification_failed: 'تعذر التحقق من هوية Google. حاول مجددًا.',
+    google_signin_conflict: 'تعذر إنشاء الحساب. حاول مجددًا.',
+    google_signin_failed: 'تعذر الدخول بحساب Google. حاول مجددًا.'
+  };
   function describe(error) { return messages[error?.message] || 'تعذر إكمال الطلب. حاول مجددًا أو راجع حالة النظام.'; }
   function status(text, kind = '') { $('status').textContent = text; $('status').className = `status ${kind}`.trim(); }
   function setBusy(value) { state.busy = value; $('connect').disabled = value || !state.sdkReady; }
@@ -125,6 +136,21 @@
     $('account-password').autocomplete = mode === 'register' ? 'new-password' : 'current-password';
     $('account-status').textContent = '';
   }
+  function reportGoogleError() {
+    const params = new URLSearchParams(window.location.search);
+    const reason = params.get('google_error');
+    if (!reason) return;
+    $('account-status').textContent = googleErrors[reason] || googleErrors.google_signin_failed;
+    params.delete('google_error');
+    const query = params.toString();
+    window.history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`);
+  }
+  function startGoogleSignIn() {
+    if (!onEdge) return;
+    $('google-signin').disabled = true;
+    $('account-status').textContent = '';
+    window.location.assign('/auth/google/signin');
+  }
   async function submitAccount(event) {
     event.preventDefault();
     $('account-submit').disabled = true;
@@ -164,7 +190,11 @@
     $('show-login').addEventListener('click', () => accountMode('login'));
     $('account-form').addEventListener('submit', submitAccount);
     $('account-logout').addEventListener('click', logout);
+    $('google-signin').addEventListener('click', startGoogleSignIn);
+    reportGoogleError();
     if (!onEdge) {
+      $('google-signin').disabled = true;
+      $('google-signin').title = 'الدخول بحساب Google يعمل على خدمة سيليا المنشورة';
       $('account-panel').hidden = true;
       status('هذه نسخة معاينة. الربط الحقيقي يعمل على خدمة سيليا المنشورة.', 'warn');
       const link = document.createElement('a');

@@ -22,8 +22,10 @@ import {
   handleWhatsAppWebhookPost,
   searchEdgeSkills,
   recordEdgeReplyMetric,
+  resolveGoogleRedirectUri,
   EDGE_MAX_OUTPUT_TOKENS
 } from './runtime.js';
+import { createGoogleAccountAuthUrl } from './google-account.js';
 import { summarizeReplyMetrics, REPLY_CHAR_CAP } from './reply-metrics.js';
 import { createWhatsAppLink, consumeWhatsAppTicket, handleWhatsAppSession, requireWhatsAppSession, assertWhatsAppMutation } from './whatsapp-onboarding.js';
 import { whatsappOnboardingConfig } from './whatsapp-store.js';
@@ -578,6 +580,14 @@ export default {
       }
       try {
         const result = await handleGoogleOAuthCallback({ request, url, env, fetchImpl, now });
+        // WA-008: account sign-in ends in a 302 back to /whatsapp with the account session
+        // cookie plus the cleared one-use OAuth state cookie (both are HttpOnly).
+        if (result.location) {
+          const redirectHeaders = new Headers(baseHeaders);
+          redirectHeaders.set('location', result.location);
+          for (const cookie of result.cookies || []) redirectHeaders.append('set-cookie', cookie);
+          return new Response(null, { status: result.status || 302, headers: redirectHeaders });
+        }
         if (result.html) {
           return new Response(result.html, {
             status: result.status,
@@ -589,6 +599,30 @@ export default {
           });
         }
         return jsonResponse(result.body, result.status, baseHeaders);
+      } catch (err) {
+        return runtimeErrorResponse(err, baseHeaders);
+      }
+    }
+
+    // WA-008: Google sign-in for ordinary self-service accounts. It reuses the already
+    // registered owner redirect URI, but starts a distinct single-use `signin:` state
+    // and asks only for openid/email/profile. No Bearer owner token is needed here.
+    if (pathname === '/auth/google/signin') {
+      if (request.method !== 'GET') return methodNotAllowedResponse(['GET', 'OPTIONS'], baseHeaders);
+      try {
+        const consent = await createGoogleAccountAuthUrl({
+          env,
+          redirectUri: resolveGoogleRedirectUri(env, url.origin),
+          now
+        });
+        return new Response(null, {
+          status: 302,
+          headers: {
+            ...baseHeaders,
+            location: consent.url,
+            'set-cookie': `celia_oauth_state=${encodeURIComponent(consent.state)}; Max-Age=600; Path=/auth/google; HttpOnly; Secure; SameSite=Lax`
+          }
+        });
       } catch (err) {
         return runtimeErrorResponse(err, baseHeaders);
       }

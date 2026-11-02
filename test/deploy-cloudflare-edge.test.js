@@ -208,7 +208,7 @@ test('edge deploy: a failing /readyz probe keeps liveReady false instead of thro
   assert.equal(report.liveReady, false);
 });
 
-test('edge deploy: full D1 migration applies all 39 statements (0001..0008) on real SQLite D1 and records _migrations ledger', async () => {
+test('edge deploy: full D1 migration applies all 40 statements (0001..0009) on real SQLite D1 and records _migrations ledger', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'celia-edge-ok-'));
   const summaryPath = path.join(directory, 'summary.md');
   const lines = [];
@@ -256,14 +256,14 @@ test('edge deploy: full D1 migration applies all 39 statements (0001..0008) on r
   assert.equal(report.status, 'deployed');
   assert.equal(report.d1.ok, true);
   assert.equal(report.d1.id, 'db-live-1');
-  assert.equal(report.d1.migrations.statements, 39);
-  assert.equal(report.d1.migrations.appliedFiles, 8);
+  assert.equal(report.d1.migrations.statements, 40);
+  assert.equal(report.d1.migrations.appliedFiles, 9);
   assert.equal(queriedStatements.filter((stmt) => stmt.includes('edge_cron_outbox')).length, 2, 'the cron outbox table and its index ship with the deploy');
   assert.equal(queriedStatements.some((stmt) => stmt.includes('every statement is')), false);
   const cols = sqlite.prepare('PRAGMA table_info(edge_idempotency)').all().map((c) => c.name);
   assert.ok(cols.includes('status') && cols.includes('dispatched_at'), '0005 columns exist on real SQLite');
   const recordedVersions = sqlite.prepare('SELECT version FROM _migrations ORDER BY version ASC').all().map((r) => r.version);
-  assert.equal(recordedVersions.length, 8);
+  assert.equal(recordedVersions.length, 9);
   assert.equal(report.liveReady, true);
   assert.equal(report.storage?.durable, true);
   assert.equal(report.storage?.mode, 'd1');
@@ -407,7 +407,7 @@ test('edge deploy: fail-closed when newly created D1 database migration fails â€
   assert.ok(lines.some((line) => line.startsWith('::error title=Celia D1::')));
 });
 
-test('edge deploy: running main() twice back-to-back on pre-0005 live D1 state marks 0001..0004 pre-applied, runs 0005..0008 once, backfills legacy rows, and skips all on second deploy', async () => {
+test('edge deploy: running main() twice back-to-back on pre-0005 live D1 state marks 0001..0004 pre-applied, runs 0005..0009 once, backfills legacy rows, and skips all on second deploy', async () => {
   const sqlite = new DatabaseSync(':memory:');
   const pre0005Names = (await readdir(migrationsDir)).filter((n) => n.endsWith('.sql') && n < '0005_').sort();
   for (const name of pre0005Names) {
@@ -441,13 +441,13 @@ test('edge deploy: running main() twice back-to-back on pre-0005 live D1 state m
     return res;
   };
 
-  // Deploy #1: pre-marks 0001..0004 without re-executing them, applies 0005..0008
+  // Deploy #1: pre-marks 0001..0004 without re-executing them, applies 0005..0009
   const first = await runDeploy();
   assert.equal(first.status, 'deployed');
   assert.equal(first.d1.ok, true);
   assert.equal(first.d1.migrations.preAppliedFiles, 4);
-  assert.equal(first.d1.migrations.appliedFiles, 4);
-  assert.equal(first.d1.migrations.statements, 23);
+  assert.equal(first.d1.migrations.appliedFiles, 5);
+  assert.equal(first.d1.migrations.statements, 24);
 
   const upgradedRow = sqlite
     .prepare('SELECT status, dispatched_at, response_json FROM edge_idempotency WHERE scope_key = ?')
@@ -455,11 +455,11 @@ test('edge deploy: running main() twice back-to-back on pre-0005 live D1 state m
   assert.equal(upgradedRow.status, 'completed');
   assert.equal(upgradedRow.dispatched_at, Date.parse('2026-10-30T17:15:00.000Z'));
 
-  // Deploy #2 back-to-back: skips all 7 recorded migrations with zero ALTER TABLE re-runs
+  // Deploy #2 back-to-back: skips all 9 recorded migrations with zero ALTER TABLE re-runs
   const second = await runDeploy();
   assert.equal(second.status, 'deployed');
   assert.equal(second.d1.ok, true);
   assert.equal(second.d1.migrations.appliedFiles, 0);
-  assert.equal(second.d1.migrations.skippedFiles, 8);
+  assert.equal(second.d1.migrations.skippedFiles, 9);
   assert.equal(second.d1.migrations.statements, 0);
 });

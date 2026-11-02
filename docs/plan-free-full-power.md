@@ -66,7 +66,7 @@
 | خطوات قبول الحافة | **نجحت** في run `41400115739`: live Edge version/commit، D1 durability/read-back، `known_good`، ومسارات التشغيل الأساسية | [Cloudflare Edge run](https://github.com/celiaelazamey-arch/phone-google/actions/runs/41400115739) |
 | أدوات MCP على الحافة | **12** | `MCP_TOOLS` في `src/celia-mcp.js` |
 | مسارات الحافة | **13** مجموعة مسار | `workers/celia-edge/worker.js` |
-| هجرات D1 | **8** | `workers/celia-edge/migrations/` |
+| هجرات D1 | **9** | `workers/celia-edge/migrations/` |
 | نقاط Express | **≈100** منها **24** لمسار الوكيل | `src/*.js` · `src/agent-routes.js` |
 | حماية `main` | ruleset **`26270171`** نشِط: منع الحذف · منع الكتابة بالقوة · تاريخ خطي · CodeQL (errors/high) — **بلا required checks وبلا مراجعة بشرية** | `gh api repos/…/rules/branches/main` |
 | بوابة النشر `PUB-001` | `blocked` · بصمة `pub:7fb0803b09106632` · 5 موانع · السجل سليم (5 قيود) | `npm run publish:status` |
