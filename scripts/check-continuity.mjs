@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { syncNowFile } from './generate-now.mjs';
+import { isDependabotActionPinOnly } from './continuity-change-policy.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const directory = 'docs/continuity';
@@ -69,11 +70,17 @@ const base = process.env.CELIA_CONTINUITY_BASE;
 if (base) {
   if (!/^[a-f0-9]{40}$/i.test(base)) errors.push('Continuity base must be an immutable commit SHA');
   else {
-    const changed = execFileSync('git', ['diff', '--name-only', base, 'HEAD'], { cwd: root, encoding: 'utf8' }).trim().split('\n');
+    const changed = execFileSync('git', ['diff', '--name-only', base, 'HEAD'], { cwd: root, encoding: 'utf8' }).trim().split('\n').filter(Boolean);
     const implementationChanged = changed.some((name) => /^(src|public|scripts|sql|integration|test|e2e)\//.test(name) || /^(package(?:-lock)?\.json|Dockerfile.*|render.*\.yaml)$/.test(name) || name.startsWith('.github/workflows/'));
-    if (implementationChanged && (!changed.includes(`${directory}/STATE.md`) || !changed.some((name) => name.startsWith(`${directory}/sessions/`) && name.endsWith('.md')))) {
+    const actionPinOnly = implementationChanged && isDependabotActionPinOnly({
+      author: process.env.CELIA_PULL_REQUEST_AUTHOR,
+      paths: changed,
+      diff: execFileSync('git', ['diff', '--no-ext-diff', '--unified=0', base, 'HEAD'], { cwd: root, encoding: 'utf8' })
+    });
+    if (implementationChanged && !actionPinOnly && (!changed.includes(`${directory}/STATE.md`) || !changed.some((name) => name.startsWith(`${directory}/sessions/`) && name.endsWith('.md')))) {
       errors.push('Implementation changes require an updated STATE and a session handoff in the same PR/commit range');
     }
+    if (actionPinOnly) console.log('Handoff gate narrowly waived for a Dependabot-only, SHA-pinned GitHub Actions version update.');
   }
 }
 if (errors.length) {

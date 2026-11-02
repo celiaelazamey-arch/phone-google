@@ -37,6 +37,12 @@ const jsonResponse = (status, body) => ({
   text: async () => JSON.stringify(body)
 });
 
+test('edge deploy label does not equate a binding count with full channel readiness', async () => {
+  const workflow = await readFile(new URL('../.github/workflows/cloudflare-deploy.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /Deploy Celia Edge Worker & tracked runtime bindings/);
+  assert.doesNotMatch(workflow, /18 Secrets Binding/);
+});
+
 test('edge deploy: without credentials it prepares the bindings and stops at dry-run', async () => {
   const lines = [];
   await main({ argv: [], env: {}, log: (line) => lines.push(line) });
@@ -44,15 +50,23 @@ test('edge deploy: without credentials it prepares the bindings and stops at dry
   assert.equal(report.status, 'dry-run');
   assert.equal(report.reason, 'missing_cloudflare_credentials');
   assert.equal(report.scriptName, 'celia-phone-google');
-  assert.ok(report.totalSecretsTracked >= 18);
-  assert.equal(report.secretBindingsPrepared, 0);
+  assert.equal(report.totalCoreSecretsTracked, 18);
+  assert.equal(report.coreSecretBindings, 0);
+  assert.equal(report.optionalSecretBindings, 0);
+  assert.equal(report.totalSecretBindings, 0);
 });
 
 test('edge deploy: an explicit --dry-run with credentials still publishes nothing', async () => {
   const lines = [];
   await main({
     argv: ['--dry-run'],
-    env: { CLOUDFLARE_ACCOUNT_ID: 'acc-1', CLOUDFLARE_API_TOKEN: 'token-1', CELIA_VOICE_ID: 'voice-1' },
+    env: {
+      CLOUDFLARE_ACCOUNT_ID: 'acc-1',
+      CLOUDFLARE_API_TOKEN: 'token-1',
+      CELIA_VOICE_ID: 'voice-1',
+      WHATSAPP_ACCESS_TOKEN: 'wa-token-test',
+      WHATSAPP_PHONE_NUMBER_ID: 'wa-phone-test'
+    },
     fetchImpl: async () => {
       throw new Error('network must not be touched in dry-run');
     },
@@ -61,8 +75,13 @@ test('edge deploy: an explicit --dry-run with credentials still publishes nothin
   const report = JSON.parse(lines[0]);
   assert.equal(report.status, 'dry-run');
   assert.equal(report.reason, 'explicit_dry_run');
-  // CELIA_VOICE_ID plus the two Cloudflare keys are all secrets the Worker receives.
-  assert.equal(report.secretBindingsPrepared, 3);
+  // The core list and optional WhatsApp bindings are counted separately; counts are not onboarding proof.
+  assert.equal(report.coreSecretBindings, 3);
+  assert.equal(report.totalCoreSecretsTracked, 18);
+  assert.equal(report.optionalSecretBindings, 2);
+  assert.equal(report.totalSecretBindings, 5);
+  assert.match(report.secretBindingScope, /do not establish Google OAuth or WhatsApp onboarding readiness/);
+  assert.doesNotMatch(lines.join('\n'), /wa-token-test|token-1/);
 });
 
 test('edge deploy: a rejected upload reports the provider code, never the token', async () => {
@@ -203,6 +222,7 @@ test('edge deploy: full D1 migration applies all 39 statements (0001..0008) on r
     env: {
       CLOUDFLARE_ACCOUNT_ID: 'acc-1',
       CLOUDFLARE_API_TOKEN: 'token-1',
+      GITHUB_SHA: 'a'.repeat(40),
       GITHUB_STEP_SUMMARY: summaryPath
     },
     fetchImpl: async (url, init = {}) => {
@@ -247,6 +267,18 @@ test('edge deploy: full D1 migration applies all 39 statements (0001..0008) on r
   assert.equal(report.liveReady, true);
   assert.equal(report.storage?.durable, true);
   assert.equal(report.storage?.mode, 'd1');
+  assert.equal(report.coreSecretBindings, 2);
+  assert.equal(report.totalCoreSecretsTracked, 18);
+  assert.equal(report.slice.stage, 'post-upload-pre-live-acceptance');
+  assert.equal(report.slice.acceptance, 'pending');
+  assert.equal(report.slice.knownGood, false);
+  assert.equal(report.slice.d1ReadBack, 'pass');
+  const preAcceptanceText = await readFile(new URL('../.validation-artifacts/deployment-slice.json', import.meta.url), 'utf8');
+  const preAcceptanceEvidence = JSON.parse(preAcceptanceText);
+  assert.doesNotMatch(preAcceptanceText, /token-1/);
+  assert.equal(preAcceptanceEvidence.stage, 'post-upload-pre-live-acceptance');
+  assert.equal(preAcceptanceEvidence.d1ReadBack, 'pass');
+  assert.equal(preAcceptanceEvidence.knownGood, false);
 
   // The upload carries every module of the Worker's import graph — a missing one is rejected by Cloudflare
   // (10021 "No such module") while the previous version keeps running, which is how 2026-10-29's deploy failed.
@@ -260,6 +292,8 @@ test('edge deploy: full D1 migration applies all 39 statements (0001..0008) on r
   assert.match(summary, /durable=true/);
   assert.match(summary, /db-live-1/);
   assert.match(summary, /Modules uploaded: .*`cron\.js`/);
+  assert.match(summary, /Core tracked secret bindings: \*\*2 \/ 18\*\*/);
+  assert.match(summary, /post-upload \/ pre-live-acceptance.*D1 read-back: \*\*PASS\*\*/);
 });
 
 test('edge deploy: the upload module list is derived from the import graph and covers every module the Worker imports', async () => {

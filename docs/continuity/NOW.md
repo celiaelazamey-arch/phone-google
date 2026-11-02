@@ -12,9 +12,9 @@
 ## 2. التركيز النشط وسجل الحالة ([STATE.md](STATE.md))
 
 - **آخر مراجعة مسجّلة:** 1 نوفمبر 2026
-- **الجلسة النشطة:** DES-001 — إنفوجرافيك Integration كوثيقة قابلة للمراجعة
-- **آخر سجل جلسة مؤرَّخ:** [integration-infographic](sessions/2026-11-01-integration-infographic.md)
-- **حجم [STATE.md](STATE.md) النشط:** 148 سطرًا (19319 بايت)
+- **الجلسة النشطة:** PLAN-002/W0.2 — قياس محلي حتمي لخطة الاكتمال
+- **آخر سجل جلسة مؤرَّخ:** [plan002-measure](sessions/2026-11-01-plan002-measure.md)
+- **حجم [STATE.md](STATE.md) النشط:** 155 سطرًا (19951 بايت)
 - **الأرشيف التاريخي المحفوظ بلا حذف:**
 - [STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md) — الأساس `9f6f8b2` · **983 سطرًا** محفوظًا حرفيًا (بصمة `f2674637e82e…`)
 - [STATE-ARCHIVE-2026-11.md](STATE-ARCHIVE-2026-11.md) — الأساس `6b4bb2d` · **16 سطرًا** محفوظًا حرفيًا (بصمة `503e4ef77c5b…`)
@@ -90,7 +90,7 @@
 | MAN-001 | P1 | جارٍ — ✓ نُفّذ: scripts/build-manifest.mjs يولّد system.manifest.json من package.json وwrangler.toml ورسم است… |
 | MAN-002 | P0 | جارٍ — ✓ نُفّذ: scripts/verify-edge-provenance.mjs يرفض الرفع إن لمطابق الحزمة للعقد المُراجَع (بصمة الحزمة +… |
 | MAN-003 | P1 | جارٍ — ✓ نُفّذ: workers/celia-edge/capabilities.js مصدر إعلان واحد يشترك فيه العامل والمولّد؛ /readyz و/api/s… |
-| MAN-007 | P1 | جارٍ — ✓ نُفّذ: ترحيل 0008_deployment_slices.sql + scripts/deployment-slices.mjs (مُلحَق فقط، UNIQUE(commit,m… |
+| MAN-007 | P1 | جارٍ — ✓ نُفّذ محليًا: ترحيل 0008_deployment_slices.sql + scripts/deployment-slices.mjs (مُلحَق فقط، UNIQUE(c… |
 | DSN-002 | P2 | جارٍ — ✓ الدفعتان: الفحص الساكن 386 ⇒ 283 ⇒ 43 FAIL (وبوابة الرموز 48 وحدها 254 ⇒ 244 ⇒ 0، ولا لون حرفي خارج… |
 
 ### ب. المهام الموقوفة على قرار أو إجراء مالك (`بانتظار` — 8)

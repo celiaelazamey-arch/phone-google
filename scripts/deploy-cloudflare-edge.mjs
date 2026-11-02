@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { appendFile, readdir, readFile } from 'node:fs/promises';
+import { appendFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { buildSliceRecord, recordSlice, schemaVersionFrom } from './deployment-slices.mjs';
 import path from 'node:path';
@@ -11,6 +11,8 @@ const workerDir = path.join(root, 'workers/celia-edge');
 export const WORKER_ENTRY_MODULE = 'worker.js';
 const migrationsDir = path.join(workerDir, 'migrations');
 const pkgPath = path.join(root, 'package.json');
+
+const SECRET_BINDING_SCOPE = 'Counts describe Worker secret bindings, not end-to-end readiness. The core count is the deploy script SECRET_KEYS list; optional secret bindings are separate. These counts do not establish Google OAuth or WhatsApp onboarding readiness.';
 
 const SECRET_KEYS = [
   'AGENETROUTERAPI_KEY',
@@ -512,7 +514,16 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
     commit,
     d1DatabaseId: d1BindingId
   });
-  const secretBindingsCount = metadata.bindings.filter((b) => b.type === 'secret_text' && SECRET_KEYS.includes(b.name)).length;
+  const secretBindings = metadata.bindings.filter((binding) => binding.type === 'secret_text');
+  const coreSecretBindingsCount = secretBindings.filter((binding) => SECRET_KEYS.includes(binding.name)).length;
+  const optionalSecretBindingsCount = secretBindings.length - coreSecretBindingsCount;
+  const secretBindingReport = {
+    coreSecretBindings: coreSecretBindingsCount,
+    totalCoreSecretsTracked: SECRET_KEYS.length,
+    optionalSecretBindings: optionalSecretBindingsCount,
+    totalSecretBindings: secretBindings.length,
+    secretBindingScope: SECRET_BINDING_SCOPE
+  };
 
   if (dryRun) {
     const report = {
@@ -521,8 +532,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
       version: pkg.version,
       commit,
       modules: workerModules.map((module) => module.name),
-      secretBindingsPrepared: secretBindingsCount,
-      totalSecretsTracked: SECRET_KEYS.length,
+      ...secretBindingReport,
       reason: !accountId || !apiToken ? 'missing_cloudflare_credentials' : 'explicit_dry_run'
     };
     log(JSON.stringify(report, null, 2));
@@ -590,14 +600,21 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
       errorCode: code,
       errorMessage: message,
       scriptName,
-      secretBindingsPrepared: secretBindingsCount,
-      totalSecretsTracked: SECRET_KEYS.length,
+      ...secretBindingReport,
       note: 'Ensure CLOUDFLARE_API_TOKEN has Account -> Workers Scripts -> Edit permission.'
     };
     if (env.GITHUB_STEP_SUMMARY) {
       await appendFile(
         env.GITHUB_STEP_SUMMARY,
-        `### Cloudflare Worker Edge Deployment\n- Status: \`api-rejected\` (HTTP ${uploadRes.status}, code \`${code}\`, message: \`${message}\`)\n- Secrets prepared: **${secretBindingsCount} / ${SECRET_KEYS.length}**\n`,
+        [
+          '### Cloudflare Worker Edge Deployment',
+          `- Status: **api-rejected** (HTTP ${uploadRes.status}, code \`${code}\`, message: \`${message}\`)`,
+          `- Core tracked secret bindings prepared: **${coreSecretBindingsCount} / ${SECRET_KEYS.length}**`,
+          `- Optional secret bindings prepared (outside the core count): **${optionalSecretBindingsCount}**`,
+          `- Total Worker secret bindings: **${secretBindings.length}**`,
+          `- Scope: ${SECRET_BINDING_SCOPE}`,
+          ''
+        ].join('\n'),
         'utf8'
       );
     }
@@ -673,14 +690,24 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
         const first = Array.isArray(payload?.result) ? payload.result[0] : null;
         return { rows: Array.isArray(first?.results) ? first.results : [] };
       };
-      await recordSlice(execSliceD1, slice);
-      // Hand the promotion step exactly what it needs, so no operator has to create a new
-      // GitHub variable for the database id (the deploy already discovered/created it).
-      const { mkdir, writeFile } = await import('node:fs/promises');
+      slice = await recordSlice(execSliceD1, slice);
+      // Hand the promotion step the exact D1-read-back state, so no operator needs to add
+      // a database-id variable and the pre-acceptance artifact never guesses at ledger state.
       await mkdir(new URL('../.validation-artifacts/', import.meta.url), { recursive: true });
       await writeFile(
         new URL('../.validation-artifacts/deployment-slice.json', import.meta.url),
-        `${JSON.stringify({ commit: slice.commit_sha, manifestDigest: slice.manifest_digest, databaseId: d1BindingId, schemaVersion: slice.schema_version }, null, 2)}\n`,
+        `${JSON.stringify({
+          stage: 'post-upload-pre-live-acceptance',
+          commit: slice.commit_sha,
+          manifestDigest: slice.manifest_digest,
+          databaseId: d1BindingId,
+          schemaVersion: slice.schema_version,
+          deployedAt: slice.deployed_at,
+          acceptance: slice.acceptance,
+          knownGood: Number(slice.known_good) === 1,
+          acceptedAt: slice.accepted_at,
+          d1ReadBack: 'pass'
+        }, null, 2)}\n`,
         'utf8'
       );
     } catch (error) {
@@ -699,10 +726,18 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
     version: pkg.version,
     commit,
     modules: workerModules.map((module) => module.name),
-    secretBindingsInjected: secretBindingsCount,
-    totalSecretsTracked: SECRET_KEYS.length,
-    // MAN-007: recorded slice, acceptance pending until live verification proves it.
-    slice: slice ? { commit: slice.commit_sha, manifestDigest: slice.manifest_digest, schemaVersion: slice.schema_version, acceptance: slice.acceptance, knownGood: false } : null,
+    ...secretBindingReport,
+    // MAN-007: this is the post-upload, pre-live-acceptance snapshot. Promotion writes a separate post-proof artifact.
+    slice: slice ? {
+      stage: 'post-upload-pre-live-acceptance',
+      commit: slice.commit_sha,
+      manifestDigest: slice.manifest_digest,
+      schemaVersion: slice.schema_version,
+      acceptance: slice.acceptance,
+      knownGood: Number(slice.known_good) === 1,
+      acceptedAt: slice.accepted_at,
+      d1ReadBack: 'pass'
+    } : null,
     d1
   };
 
@@ -715,7 +750,13 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
         `- Worker Name: \`${scriptName}\``,
         `- Modules uploaded: ${workerModules.map((module) => `\`${module.name}\``).join(', ')}`,
         workerUrl ? `- Live Edge URL: ${workerUrl}` : '- Live Edge URL: subdomain not enabled yet',
-        `- Secrets Injected: **${secretBindingsCount} / ${SECRET_KEYS.length}**`,
+        `- Core tracked secret bindings: **${coreSecretBindingsCount} / ${SECRET_KEYS.length}**`,
+        `- Optional secret bindings outside the core count: **${optionalSecretBindingsCount}**`,
+        `- Total Worker secret bindings in this upload: **${secretBindings.length}**`,
+        `- Binding-count scope: ${SECRET_BINDING_SCOPE}`,
+        slice
+          ? `- Deployment slice snapshot: **post-upload / pre-live-acceptance** · D1 read-back: **PASS** · acceptance: **${slice.acceptance}** · known_good: **${Number(slice.known_good) === 1}**`
+          : '- Deployment slice snapshot: **not recorded** (D1 write/read-back unavailable)',
         `- Live \`/readyz\` check: **${liveReady ? 'PASS' : 'pending propagation'}**`,
         ...(liveStorage
           ? [`- Live \`/readyz\` storage: \`durable=${Boolean(liveStorage.durable)}\` (\`mode=${liveStorage.mode || 'unknown'}\`${liveStorage.reason ? `, \`reason=${liveStorage.reason}\`` : ''})`]

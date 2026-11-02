@@ -60,6 +60,7 @@ npm run release:check
 npm run now:check
 npm run check:continuity
 npm run plan:check
+npm run measure
 npm run access:policy:check
 npm run visual:first:check
 npm run arch:map:check

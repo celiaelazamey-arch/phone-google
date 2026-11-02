@@ -61,9 +61,29 @@ export function insertSliceParams(record) {
 }
 
 /** Append a slice. A retry of the same commit+manifest is a replay, not a second row. */
+export const SELECT_SLICE_SQL =
+  'SELECT commit_sha, app_version, manifest_digest, bundle_digest, schema_version, worker_version_id, deployed_at, acceptance, known_good, accepted_at, note ' +
+  'FROM edge_deployment_slices WHERE commit_sha = ? AND manifest_digest = ? LIMIT 1';
+
+function sameStoredSlice(row, record) {
+  return row.commit_sha === record.commit_sha &&
+    row.app_version === record.app_version &&
+    row.manifest_digest === record.manifest_digest &&
+    row.bundle_digest === record.bundle_digest &&
+    row.schema_version === record.schema_version;
+}
+
+/** Append and read back the exact slice. A replay returns the already-stored row, not an optimistic local copy. */
 export async function recordSlice(execD1, record) {
   await execD1(INSERT_SLICE_SQL, insertSliceParams(record));
-  return record;
+  const { rows } = await execD1(SELECT_SLICE_SQL, [record.commit_sha, record.manifest_digest]);
+  const stored = rows?.[0];
+  if (!stored) throw new Error('slice_record_readback_missing');
+  if (!sameStoredSlice(stored, record)) throw new Error('slice_record_readback_mismatch');
+  if (!['pending', 'passed'].includes(stored.acceptance) || ![0, 1].includes(Number(stored.known_good))) {
+    throw new Error('slice_record_readback_invalid_status');
+  }
+  return stored;
 }
 
 export const MARK_ACCEPTED_SQL =
@@ -78,6 +98,14 @@ export async function markSliceAccepted(execD1, { commit, manifestDigest, accept
   if (acceptancePassed !== true) throw new Error('slice_acceptance_not_passed');
   if (!commit || !manifestDigest || !acceptedAt) throw new Error('slice_acceptance_fields_required');
   await execD1(MARK_ACCEPTED_SQL, [String(acceptedAt), String(commit), String(manifestDigest)]);
+  const { rows } = await execD1(SELECT_SLICE_SQL, [String(commit), String(manifestDigest)]);
+  const stored = rows?.[0];
+  if (!stored) throw new Error('slice_acceptance_readback_missing');
+  if (stored.commit_sha !== String(commit) || stored.manifest_digest !== String(manifestDigest) ||
+      stored.acceptance !== 'passed' || Number(stored.known_good) !== 1 || stored.accepted_at !== String(acceptedAt)) {
+    throw new Error('slice_acceptance_readback_mismatch');
+  }
+  return stored;
 }
 
 export const SELECT_ROLLBACK_TARGET_SQL =
