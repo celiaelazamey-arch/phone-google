@@ -38,6 +38,7 @@ import { createWebAccess, webToolDefinitions } from '../src/agent/web-tools.js';
 import { createSandboxExecutor } from '../src/agent/sandbox.js';
 import { createKnowledgeHost } from '../src/knowledge/index.js';
 import { planDelegation, checkDelegation } from '../src/agent/delegation.js';
+import { createDiagnosisReport, TEST_OUTCOMES } from '../src/agent/self-diagnosis.js';
 import { buildAttention, checkQueue } from '../src/agent/attention.js';
 import { consolidate, checkReport } from '../src/agent/consolidation.js';
 import { classifyIssue } from '../src/agent/issue-triage/classify.js';
@@ -298,11 +299,38 @@ check('web-fetch', 'وكيل الويب (web.fetch) — جلب حقيقي عبر
       const hint = fetchError === 'web_tls_failed'
         ? '؛ شبكة هذه البيئة تعترض TLS فتفشل ثقة Node بينما curl ينجح — الحل تشغيل الفحص مع NODE_EXTRA_CA_CERTS لشهادة البيئة، وهو قرار ثقة صريح لا يُفعّل تلقائيًا'
         : '';
-      finish(self, 'blocked', `المنع خارج قائمة السماح يعمل (${blocked})، لكن الجلب الحقيقي فشل: ${fetchError}${hint}`, {
+      // SI-5/D3: التشخيص الحقيقي يُبنی أيضًا بالبنية الثابتة — بلا اختراع نتائج: اختبار
+      // التمييز بين فرضيتي TLS لم يُجرَ هنا فيبقى `untested` والحالة فرضية لا تأكيدًا.
+      const diagnosis = fetchError === 'web_tls_failed'
+        ? createDiagnosisReport({
+          symptom: `الجلب الحقيقي عبر web.fetch فشل: ${fetchError}`,
+          evidence: [
+            `web.fetch أعد ${fetchError} على ${webTarget}`,
+            `المنع خارج قائمة السماح يعمل قبل أي اتصال (${blocked})`
+          ],
+          hypotheses: [
+            { id: 'H1', statement: 'شبكة البيئة تعترض TLS فتفشل ثقة Node في شهادة البيئة' },
+            { id: 'H2', statement: 'شهادة الهدف نفسه غير صالحة أو غير موثوقة' }
+          ],
+          discriminatingTests: [
+            {
+              id: 'T1',
+              hypothesis: 'H1',
+              distinguishes: 'نفس الهدف ينجح من عميل بثقة البيئة (curl) ويفشل من Node ⇒ H1، وينجح الاثنان أو يفشلان معًا ⇒ H2',
+              outcome: TEST_OUTCOMES.untested
+            }
+          ],
+          recommendedAction: 'أعد الفحص مع NODE_EXTRA_CA_CERTS لشهادة البيئة ثم سجّل نتيجة اختبار التمييز',
+          limit: 'قرار ثقة صريح لا يُفعّل تلقائيًا'
+        })
+        : null;
+      const evidence = {
         url: webTarget,
         fetchError,
         outOfAllowlist: blocked
-      });
+      };
+      if (diagnosis) evidence.diagnosis = diagnosis;
+      finish(self, 'blocked', `المنع خارج قائمة السماح يعمل (${blocked})، لكن الجلب الحقيقي فشل: ${fetchError}${hint}`, evidence);
       return;
     }
     finish(self, 'broken', `خلل في قائمة السماح: ${blocked}`, { url: webTarget, fetchError, outOfAllowlist: blocked });
