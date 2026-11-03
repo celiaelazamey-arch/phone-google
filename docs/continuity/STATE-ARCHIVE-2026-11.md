@@ -191,3 +191,21 @@
 - **MANUS-GAP-PLAN:** 19 فجوة وخطة S1..S8 في [agent-web-gaps.md](../agent-web-gaps.md).
 
 <!-- END MOVED STATE SECTIONS B -->
+
+## الدفعة الثالثة (ج) — نقل من الأساس `0dff3bd`
+
+> نفس القاعدة: **بلا حذف**. القسم التالي نُقل حرفيًا من `docs/continuity/STATE.md` عند الأساس `0dff3bd`
+> بعد أن صار هامش النافذة الحيّة 158 بايتًا فقط تحت حدّ العشرين كيلوبايت (بايت ببايت، لا تنقيح).
+> الطريقة: استبعد وسمَي النقل، صِلْ الأسطر بـ`\n` وأضف `\n` أخيرًا ⇒ يجب أن يساوي الناتج البايتات والبصمة أدناه.
+
+<!-- state-archive-block: source=docs/continuity/STATE.md baseline=0dff3bd sha256=e489e6c2e8569f361c516353c650036a996951967dcd495635fd2b8e21781804 bytes=2949 lines=7 -->
+
+<!-- BEGIN MOVED STATE SECTIONS C -->
+## 2 نوفمبر 2026 — WA-009: تشخيص حيّ لمانع `redirect_uri_mismatch` (بعد دمج #144)
+
+- **ما كشفه الفحص الحي:** دُمج PR #144 في `main@60448ffb3aea6055825bdee47160e4c9365674f5` (16:42Z) ونجحت تشغيلة `Deploy (Cloudflare Edge)` `41484401285` (16:45Z)؛ `/healthz` و`/api/system` على نفس الالتزام يُظهران `coreReady=true` وD1 durable و`whatsapp-onboarding: configured=true` والهجرة `0009` مُطبّقة. لكن `GET /auth/google/signin` أعاد فعليًا من Google **`Error 400: redirect_uri_mismatch`**، أي أن عنوان العودة غير مسجّل في تطبيق OAuth `838328720268-n12j5cbjib1irdj5b8qc7e4jh1inbj3g.apps.googleusercontent.com`. **تصحيح لما سُجّل في WA-008:** عبارة «لا يحتاج إعداد Google Console جديد» كانت افتراضًا خاطئًا؛ الإعداد مطلوب منذ `2026-10-28` (`docs/deployment-profile.json` وسجل `2026-10-28-live-edge-publication.md`) ولم ينفّذه المالك. لا خلل في الكود ولا في النشر.
+- **استقصاء الأدوات:** جُرّبت خمسة عناوين عودة مرشحة (الجذر، المسار بشرطة، `localhost:3000`، نطاق Pages، والمسار الحالي) فرفضها Google كلها؛ وفُحصت موصلات Drive / Vercel / Supabase / Notion فلم يمنح أي منها صلاحية تعديل إعدادات OAuth، و`gh api .../actions/variables` أعاد 403، ومشروع Vercel فارغ ومشروع Supabase الوحيد `INACTIVE`. **لا يوجد حل برمجي يتجاوز Google Cloud Console**؛ GIS/One Tap يحتاج بدوره إضافة الأصل كـ Authorized JavaScript origin، وهو الإعداد نفسه.
+- **ما نُفّذ اليوم:** مسبار قراءة فقط `probeGoogleRedirectUri` في `google-account.js` يفحص قبول Google لعنوان العودة **قبل** تحويل المستخدم، فإن رُفض عُرضت صفحة عربية ثابتة بلا سكربت (`renderGoogleRedirectSetupPage`) تحمل معرّف العميل والURI الجاهز للنسخ وزر «أعد المحاولة». النتيجة لا تُخزَّن مؤقتًا: لحظة إضافة الإعداد في Console يذهب الضغط التالي مباشرة إلى Google **دون إعادة نشر**. لا تُقرأ قيمة سرية ولا تُنشأ حالة OAuth عند الرفض. اختباران جديدان في `test/google-account-signin.test.js`.
+- **الحدّ الصريح:** الدخول نفسه ما زال متوقفًا على فعل المالك في Google Cloud Console، وكذلك ربط Workspace للمالك؛ وخطآ Meta (Login with JavaScript SDK + App Domains) ما زالا بلا دليل إصلاح. لا يُرفع أي مؤشر اكتمال. [سجل الجلسة](sessions/2026-11-02-google-account-signin.md).
+
+<!-- END MOVED STATE SECTIONS C -->
