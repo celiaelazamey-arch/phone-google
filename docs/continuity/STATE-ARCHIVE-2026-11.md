@@ -227,3 +227,20 @@
 - **الحدّ الصريح:** لم يُنشر على الحافة الحية؛ الدخول الحقيقي يبدأ بعد دمج PR إلى `main` وتشغيلة `Deploy (Cloudflare Edge)` جديدة. موافقة Google من متصفح المالك لم تُختبر، ولا يُرفع أي مؤشر اكتمال (B1/B2/F4/F5) بهذه الشريحة.
 
 <!-- END MOVED STATE SECTIONS D -->
+
+## الدفعة الخامسة (هـ) — نقل من الأساس `cff7b71`
+
+> نفس القاعدة: **بلا حذف**. القسم التالي نُقل حرفيًا من `docs/continuity/STATE.md` عند الأساس `cff7b71`
+> لإفساح الهامش لقسم جلسة `SI-1/A4` (بايت ببايت، لا تنقيح). الطريقة: استبعد وسمَي النقل،
+> صِلْ الأسطر بـ`\n` وأضف `\n` أخيرًا ⇒ يجب أن يساوي الناتج البايتات والبصمة أدناه.
+
+<!-- state-archive-block: source=docs/continuity/STATE.md baseline=cff7b71 sha256=912bd153651ef734bbd24a9f3f3b615dec86a1e2796dd8fcc0f36760e13311df bytes=1753 lines=6 -->
+
+<!-- BEGIN MOVED STATE SECTIONS E -->
+## 2 نوفمبر 2026 — WA-010: «هل قَبِل Google الإعداد؟» يُجاب ببيانات لا بتخمين
+
+- **الفحص الحي (19:23Z، `main@10fdfad`):** `/healthz` سليم (`ok`, `googleOAuth.configured=true`, D1, `18/18` سرًا)، لكن `GET /auth/google/signin` أعاد صفحة الإعداد العربية، وطلبًا مباشرًا إلى `accounts.google.com/o/oauth2/v2/auth` بنفس `client_id` ونفس `redirect_uri` أعاد **`Error 400: redirect_uri_mismatch`**، وعنوانَي `localhost:3000` و`…onrender.com` رُفضا أيضًا. أي أن **العميل لا يحمل أي عنوان عودة مسجّل**: لا كاش، لا كود، لا نشر. `GET /auth/google/diagnostics` = `not_found` (لم يُنشر بعد).
+- **ما نُفّذ:** `googleRedirectDiagnostics()` ومسار `GET /auth/google/diagnostics` (JSON، `no-store`، `405` لغير GET) يعيد `google.accepted`/`google.reason` و`redirectUri` الفعلية و`redirectUriProblem` وخطوة تالية وتعليمات، بلا سر ولا جلسة ولا صف `oauth_states`؛ والصفحة العربية صارت تسمّي الأسباب الأربعة الباقية بعد الحفظ وتذكر **Test users**. اختباران جديدان (14/14 للملف، و`npm test` 1243 ناجح / 0 فشل / 17 متخطى، `check` 261، والحزمة `sha256:f8c21e2ba77f…`).
+- **الحدّ الصريح:** الحكم على Google لا يعني قبول مستخدم ولا ينشئ جلسة؛ الدخول ما زال متوقفًا على حفظ المالك في Console ثم `302` ثم `/api/account/me` = 200. لا يُرفع أي مؤشر اكتمال (B1/B2/F4/F5)، وخطآ Meta بلا دليل إصلاح.
+
+<!-- END MOVED STATE SECTIONS E -->

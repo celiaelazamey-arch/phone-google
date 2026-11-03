@@ -25,6 +25,7 @@ import { gmailToolDefinitions } from './gmail.js';
 import { googleReadToolDefinitions } from './google-read.js';
 import { webToolDefinitions } from './web-tools.js';
 import path from 'node:path';
+import { readFileSync } from 'node:fs';
 import { buildArchitectureMap, impactOf, scanModules } from '../design/architecture-map.js';
 import { buildAtlas, factsOf } from '../design/system-atlas.js';
 
@@ -345,7 +346,7 @@ function driveExportToolDefinition(artifacts = null) {
  * اشتقاق الناتج من الشجرة لحظتها — بلا مخزن ولا مصدر حقيقة ثانٍ ولا مسار تنفيذ موازٍ. القراءة
  * فقط وحتمية، والمخرَج يعلن ما لم يُرسَم (unmapped) بدل ادعاء اكتمال النطاق.
  */
-export function selfIntelligenceToolDefinitions({ root = path.resolve(import.meta.dirname, '../..') } = {}) {
+export function selfIntelligenceToolDefinitions({ root = path.resolve(import.meta.dirname, '../..'), statusProvider } = {}) {
   return [
     {
       name: 'celia.system_map',
@@ -411,6 +412,66 @@ export function selfIntelligenceToolDefinitions({ root = path.resolve(import.met
       arguments: {},
       async execute() {
         return factsOf(buildAtlas({ root }));
+      }
+    },
+    {
+      name: 'celia.system_snapshot',
+      description: 'اللقطة المركّبة الواحدة (SI-1/A4): repo + runtime + policy + components + capabilities في كائن واحد يُشتق لحظة النداء — بلا مخزن ولا مصدر حقيقة ثانٍ',
+      risk: RISK.read,
+      deterministic: true,
+      replayArgs: () => ({}),
+      timeoutMs: 10_000,
+      arguments: {},
+      async execute() {
+        const status = typeof statusProvider === 'function' ? await statusProvider() : {};
+        // SP-09: runtime code never spawns processes — the repo slice reads .git directly
+        // (HEAD -> ref -> sha, packed-refs fallback) instead of invoking the git binary.
+        let repo;
+        try {
+          const gitFile = (relative) => readFileSync(path.join(root, relative), 'utf8').trim();
+          const head = gitFile('.git/HEAD');
+          if (head.startsWith('ref:')) {
+            const ref = head.slice(4).trim();
+            let sha = null;
+            try {
+              sha = gitFile(path.join('.git', ref));
+            } catch {
+              const packed = gitFile('.git/packed-refs');
+              const line = packed.split('\n').find((entry) => entry.endsWith(` ${ref}`));
+              sha = line ? line.split(' ')[0] : null;
+            }
+            repo = sha
+              ? { available: true, head: sha, branch: ref.replace('refs/heads/', '') }
+              : { available: false, reason: 'git_unavailable:unresolved_ref' };
+          } else {
+            repo = { available: true, head, branch: null };
+          }
+        } catch (error) {
+          repo = { available: false, reason: `git_unavailable:${error?.code || 'error'}` };
+        }
+        const map = buildArchitectureMap({ root });
+        const policy = map.components
+          .filter((component) => component.activation?.state && component.activation.state !== 'on')
+          .map((component) => ({ id: component.id, state: component.activation.state, evidence: component.activation.evidence }));
+        return {
+          runtime: {
+            enabled: status.enabled ?? null,
+            dialect: status.dialect ?? null,
+            durable: status.durable ?? null,
+            planner: status.planner ?? null,
+            verifier: status.verifier ?? null,
+            approvalGate: status.approvalGate ?? null,
+            evidenceLedger: status.evidenceLedger ?? null,
+            outbox: status.outbox ?? null,
+            toolsCount: Array.isArray(status.tools) ? status.tools.length : null,
+            tools: Array.isArray(status.tools) ? status.tools.map((tool) => ({ name: tool.name, risk: tool.risk })) : [],
+            omitted: ['limits', 'connectors', 'ownerId', 'note']
+          },
+          repo,
+          policy,
+          map,
+          capabilities: factsOf(buildAtlas({ root }))
+        };
       }
     }
   ];
@@ -490,7 +551,7 @@ export function defaultToolDefinitions({
         return outline(args.goal);
       }
     },
-    ...selfIntelligenceToolDefinitions(),
+    ...selfIntelligenceToolDefinitions({ statusProvider }),
     ...gmailToolDefinitions({ gmail }),
     ...webToolDefinitions({ web }),
     ...googleReadToolDefinitions(googleReaders),
