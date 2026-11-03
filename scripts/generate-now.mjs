@@ -122,7 +122,10 @@ export function parseExecutionPlan(markdown) {
 export function parseStateSummary(markdown) {
   const reviewMatch = /\*\*آخر مراجعة:\*\*\s*([^·\n]+)/.exec(markdown);
   const focusMatch = /\*\*نوع الجلسة الحالية:\*\*\s*(.+?)(?:\s*·\s*$|\n)/.exec(markdown);
-  const sessionMatch = /\[([^\]]+)\]\((sessions\/[^)\s]+\.md)\)/.exec(markdown);
+  // حقل الجلسة النشطة هو ترويسة STATE (قبل أول قسم `## `) — الروابط داخل الأقسام المؤرّخة
+  // تاريخية ولا تجوز أن تُعرض «آخر سجل جلسة» (قرار مراجعة المالك على PR #158).
+  const headerBlock = markdown.split(/\n## /)[0];
+  const sessionMatch = /\[([^\]]+)\]\((sessions\/[^)\s]+\.md)\)/.exec(headerBlock);
   return {
     lastReviewed: reviewMatch ? reviewMatch[1].trim() : 'غير محدد',
     currentFocus: focusMatch ? focusMatch[1].replace(/\*\*/g, '').replace(/\s*·\s*$/, '').trim() : 'راجع STATE.md',

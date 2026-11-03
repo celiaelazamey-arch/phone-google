@@ -164,6 +164,25 @@ test('R0-05 generate-now.mjs is deterministic, matches committed NOW.md, and fai
   assert.equal(minimalState.currentFocus, 'راجع STATE.md');
   assert.equal(minimalState.latestSessionHref, null);
 
+  // مراجعة #158: روابط الأقسام المؤرّخة لا تُعرض «آخر سجل جلسة» — الحقل النشط ترويسة STATE فقط
+  const historicalState = parseStateSummary(
+    '# الحالة\n\n' +
+    '**آخر مراجعة:** 3 نوفمبر 2026\n' +
+    '**السجل:** لا مرجع جلسة نشط — القرارات في DECISIONS.md\n\n' +
+    '## قسم قديم\n\n' +
+    '[سجل تاريخي](sessions/2026-01-01-old-era.md) — رابط تاريخي لا يُختار.\n'
+  );
+  assert.equal(historicalState.latestSessionHref, null, 'روابط الأقسام التاريخية لا تُختار عند غياب المرجع النشط');
+  assert.equal(historicalState.latestSessionLabel, null);
+  const activeState = parseStateSummary(
+    '# الحالة\n\n' +
+    '**السجل:** [الجلسة النشطة](sessions/2026-11-03-active-era.md) · باقي الحقل\n\n' +
+    '## قسم قديم\n\n' +
+    '[سجل أقدم](sessions/2026-01-01-older.md)\n'
+  );
+  assert.equal(activeState.latestSessionHref, 'sessions/2026-11-03-active-era.md', 'حقل الترويسة النشط هو المعتمد');
+  assert.equal(activeState.latestSessionLabel, 'الجلسة النشطة');
+
   // Temp workspace end-to-end test of CLI write / idempotent re-run / --check / --stdout
   const tmp = await mkdtemp(path.join(os.tmpdir(), 'celia-r0-now-'));
   try {
