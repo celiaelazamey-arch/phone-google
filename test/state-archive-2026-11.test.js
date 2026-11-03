@@ -17,13 +17,14 @@ const statePath = path.join(root, 'docs/continuity/STATE.md');
 const archive = readFileSync(archivePath, 'utf8');
 const state = readFileSync(statePath, 'utf8');
 
-/** رأسا الكتلتين بالشكل نفسه: source ثم baseline ثم sha256 ثم bytes ثم lines. */
+/** رؤوس الكتل بالشكل نفسه: source ثم baseline ثم sha256 ثم bytes ثم lines. */
 const HEADER = (prefix) =>
   new RegExp(`^<!--\\s*${prefix}:\\s*source=(\\S+)\\s+baseline=(\\S+)\\s+sha256=([a-f0-9]{64})\\s+bytes=(\\d+)\\s+lines=(\\d+)\\s*-->`, 'm');
 
 const BLOCKS = [
   { label: 'أ', begin: '<!-- BEGIN MOVED STATE SECTIONS -->', end: '<!-- END MOVED STATE SECTIONS -->', header: HEADER('state-archive') },
-  { label: 'ب', begin: '<!-- BEGIN MOVED STATE SECTIONS B -->', end: '<!-- END MOVED STATE SECTIONS B -->', header: HEADER('state-archive-block') }
+  { label: 'ب', begin: '<!-- BEGIN MOVED STATE SECTIONS B -->', end: '<!-- END MOVED STATE SECTIONS B -->', header: HEADER('state-archive-block') },
+  { label: 'ج', begin: '<!-- BEGIN MOVED STATE SECTIONS C -->', end: '<!-- END MOVED STATE SECTIONS C -->', header: HEADER('state-archive-block') }
 ];
 
 /** الأسطر بين وسمَي النقل، بلا الوسمين، موصولة بـ\n مع \n أخير — نفس صيغة الرأس. */
@@ -35,9 +36,17 @@ function readBlock({ begin, end }) {
   return `${lines.slice(start + 1, stop).join('\n')}\n`;
 }
 
+/** رأس الكتلة = أقرب وسم قبل وسم بدايتها؛ فالبادئة state-archive-block مشتركة بين كتلتين فأكثر، وأول تطابق عام يكذب. */
+function findHeader(block) {
+  const beginIdx = archive.indexOf(block.begin);
+  const before = [...archive.matchAll(new RegExp(block.header.source, 'gm'))]
+    .filter((m) => m.index < beginIdx);
+  return before[before.length - 1] ?? null;
+}
+
 test('SA-01: كل كتلة منقولة تطابق بصمتها وبايتاتها وأسطرها المعلنة', () => {
   for (const block of BLOCKS) {
-    const header = block.header.exec(archive);
+    const header = findHeader(block);
     assert.ok(header, `رأس الكتلة ${block.label} موجود`);
     const [, source, baseline, sha256, bytes, lines] = header;
     assert.equal(source, 'docs/continuity/STATE.md');
@@ -70,5 +79,5 @@ test('SA-03: القسم المنقول مؤرشف لا مكرَّر، ولا ن�
       assert.ok(!state.includes(heading), `«${heading}» في الأرشيف فقط، لا في STATE.md الحيّ`);
     }
   }
-  assert.equal((archive.match(/BEGIN MOVED STATE SECTIONS/g) || []).length, 2, 'كتلتان معلنتان');
+  assert.equal((archive.match(/BEGIN MOVED STATE SECTIONS/g) || []).length, 3, 'ثلاث كتل معلنة');
 });

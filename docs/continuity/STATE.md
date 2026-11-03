@@ -1,10 +1,16 @@
 # الحالة الحالية — ابدأ من هنا
 
-> **حفظ التاريخ بلا حذف (`DEC-052` / `CONT-004`):** هذه نافذة الاستئناف النشطة؛ السجل التراكمي الكامل حتى ما بعد PR #84 (`main@738d832` / `9f6f8b2` — 983 سطرًا / 142,150 بايت) محفوظ حرفيًا في **[STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md)** وبصمته محروسة بـ`R0-02`، وأقسام 31 أكتوبر–1 نوفمبر المنقولة عند `6b4bb2d` و`a1d3f7b` في **[STATE-ARCHIVE-2026-11.md](STATE-ARCHIVE-2026-11.md)**. القراءة السريعة المشتقة: **[NOW.md](NOW.md)** (`npm run now`).
+> **حفظ التاريخ بلا حذف (`DEC-052` / `CONT-004`):** هذه نافذة الاستئناف النشطة؛ السجل التراكمي الكامل حتى ما بعد PR #84 (`main@738d832` / `9f6f8b2` — 983 سطرًا / 142,150 بايت) محفوظ حرفيًا في **[STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md)** وبصمته محروسة بـ`R0-02`، وأقسام 31 أكتوبر–2 نوفمبر المنقولة عند `6b4bb2d` و`a1d3f7b` و`0dff3bd` في **[STATE-ARCHIVE-2026-11.md](STATE-ARCHIVE-2026-11.md)**. القراءة السريعة المشتقة: **[NOW.md](NOW.md)** (`npm run now`).
 
 **آخر مراجعة:** 3 نوفمبر 2026
-**نوع الجلسة الحالية:** ASSUR-005 (DEC-117) · DOC-004 (تدقيق `SI-0`) · DIFF-001 (معمارية التميّز) — الثلاثة توثيق، صفر شيفرة تشغيلية.
-**السجل:** [تدقيق `SI-0`](sessions/2026-11-03-doc-004-si0-self-intelligence-audit.md) · [معمارية التميّز](sessions/2026-11-03-diff-001-differentiation-architecture.md) · **الفرع:** `arena/342e1174-phone-google` · **الأساس:** `main@20c6ab8`. `v0.3.0` ما زال الإصدار الحي المعلن.
+**نوع الجلسة الحالية:** GOV-001 (DEC-118) — توثيق حوكمة بحكم مالك، صفر شيفرة تشغيلية.
+**السجل:** [الفجوة وحماية main](sessions/2026-11-03-gov-001-dec-118-push-reaches-main.md) · [تدقيق `SI-0`](sessions/2026-11-03-doc-004-si0-self-intelligence-audit.md) · [معمارية التميّز](sessions/2026-11-03-diff-001-differentiation-architecture.md) · **الفرع:** `arena/81504291-phone-google` · **الأساس:** `main@0dff3bd`. `v0.3.0` ما زال الإصدار الحي المعلن.
+
+## 3 نوفمبر 2026 — GOV-001 / DEC-118: الدفع وحده وصل `main` — الفجوة موثّقة بحكم المالك
+
+- **الواقعة المقيسة (PR #147):** دفعُ فرع الجلسة أنشأ طلب سحب آليًا (03:19:15Z) وبقي `reviewDecision` **فارغًا — صفر مراجعة بشرية** — ثم **دُمج تلقائيًا** (squash `0dff3bd`، 03:22:35Z) بمجرد اخضرار الفحوص، وأطلق نشرًا كاملًا على `main` (Pages · Cloudflare · Render · Publish بلا إصدار جديد · Quality · CodeQL · Notify — كلها success). فالدفع إلى فرع الجلسة صار **ممرًّا كاملًا إلى الإنتاج** لا حدَّ تفويض.
+- **قرار المالك:** `DEC-118` يوثّق تغيّر نموذج التهديد ويصف حماية `main` المطلوبة في ruleset `26270171` (مراجعة بشرية مطلوبة ≥1 + فحوص مطلوبة + تعطيل الدمج التلقائي بلا مراجعة) — **التفعيل فعلُ مالك على إعدادات GitHub لا كودًا**، وحتى تفعيلها كلُّ دفعٍ يُعامل كنشرٍ مقصود بمعرفة المالك.
+- **الحدّ الصريح:** مهارة `governed-pr-merge` حُفظت حرفًا (لا `gh pr create/merge` من الوكيل)؛ والفجوة في إعدادات المستودع. وقسم WA-009 أُرشف حرفيًا (دفعة «ج») لتوفير الهامش. [سجل الجلسة](sessions/2026-11-03-gov-001-dec-118-push-reaches-main.md).
 
 ## 3 نوفمبر 2026 — ASSUR-005 / DEC-117: سطح التدقيق يشتقّ `wired` ولا يؤكّده
 
@@ -19,13 +25,6 @@
 - **الفحص الحي (19:23Z، `main@10fdfad`):** `/healthz` سليم (`ok`, `googleOAuth.configured=true`, D1, `18/18` سرًا)، لكن `GET /auth/google/signin` أعاد صفحة الإعداد العربية، وطلبًا مباشرًا إلى `accounts.google.com/o/oauth2/v2/auth` بنفس `client_id` ونفس `redirect_uri` أعاد **`Error 400: redirect_uri_mismatch`**، وعنوانَي `localhost:3000` و`…onrender.com` رُفضا أيضًا. أي أن **العميل لا يحمل أي عنوان عودة مسجّل**: لا كاش، لا كود، لا نشر. `GET /auth/google/diagnostics` = `not_found` (لم يُنشر بعد).
 - **ما نُفّذ:** `googleRedirectDiagnostics()` ومسار `GET /auth/google/diagnostics` (JSON، `no-store`، `405` لغير GET) يعيد `google.accepted`/`google.reason` و`redirectUri` الفعلية و`redirectUriProblem` وخطوة تالية وتعليمات، بلا سر ولا جلسة ولا صف `oauth_states`؛ والصفحة العربية صارت تسمّي الأسباب الأربعة الباقية بعد الحفظ وتذكر **Test users**. اختباران جديدان (14/14 للملف، و`npm test` 1243 ناجح / 0 فشل / 17 متخطى، `check` 261، والحزمة `sha256:f8c21e2ba77f…`).
 - **الحدّ الصريح:** الحكم على Google لا يعني قبول مستخدم ولا ينشئ جلسة؛ الدخول ما زال متوقفًا على حفظ المالك في Console ثم `302` ثم `/api/account/me` = 200. لا يُرفع أي مؤشر اكتمال (B1/B2/F4/F5)، وخطآ Meta بلا دليل إصلاح.
-
-## 2 نوفمبر 2026 — WA-009: تشخيص حيّ لمانع `redirect_uri_mismatch` (بعد دمج #144)
-
-- **ما كشفه الفحص الحي:** دُمج PR #144 في `main@60448ffb3aea6055825bdee47160e4c9365674f5` (16:42Z) ونجحت تشغيلة `Deploy (Cloudflare Edge)` `41484401285` (16:45Z)؛ `/healthz` و`/api/system` على نفس الالتزام يُظهران `coreReady=true` وD1 durable و`whatsapp-onboarding: configured=true` والهجرة `0009` مُطبّقة. لكن `GET /auth/google/signin` أعاد فعليًا من Google **`Error 400: redirect_uri_mismatch`**، أي أن عنوان العودة غير مسجّل في تطبيق OAuth `838328720268-n12j5cbjib1irdj5b8qc7e4jh1inbj3g.apps.googleusercontent.com`. **تصحيح لما سُجّل في WA-008:** عبارة «لا يحتاج إعداد Google Console جديد» كانت افتراضًا خاطئًا؛ الإعداد مطلوب منذ `2026-10-28` (`docs/deployment-profile.json` وسجل `2026-10-28-live-edge-publication.md`) ولم ينفّذه المالك. لا خلل في الكود ولا في النشر.
-- **استقصاء الأدوات:** جُرّبت خمسة عناوين عودة مرشحة (الجذر، المسار بشرطة، `localhost:3000`، نطاق Pages، والمسار الحالي) فرفضها Google كلها؛ وفُحصت موصلات Drive / Vercel / Supabase / Notion فلم يمنح أي منها صلاحية تعديل إعدادات OAuth، و`gh api .../actions/variables` أعاد 403، ومشروع Vercel فارغ ومشروع Supabase الوحيد `INACTIVE`. **لا يوجد حل برمجي يتجاوز Google Cloud Console**؛ GIS/One Tap يحتاج بدوره إضافة الأصل كـ Authorized JavaScript origin، وهو الإعداد نفسه.
-- **ما نُفّذ اليوم:** مسبار قراءة فقط `probeGoogleRedirectUri` في `google-account.js` يفحص قبول Google لعنوان العودة **قبل** تحويل المستخدم، فإن رُفض عُرضت صفحة عربية ثابتة بلا سكربت (`renderGoogleRedirectSetupPage`) تحمل معرّف العميل والURI الجاهز للنسخ وزر «أعد المحاولة». النتيجة لا تُخزَّن مؤقتًا: لحظة إضافة الإعداد في Console يذهب الضغط التالي مباشرة إلى Google **دون إعادة نشر**. لا تُقرأ قيمة سرية ولا تُنشأ حالة OAuth عند الرفض. اختباران جديدان في `test/google-account-signin.test.js`.
-- **الحدّ الصريح:** الدخول نفسه ما زال متوقفًا على فعل المالك في Google Cloud Console، وكذلك ربط Workspace للمالك؛ وخطآ Meta (Login with JavaScript SDK + App Domains) ما زالا بلا دليل إصلاح. لا يُرفع أي مؤشر اكتمال. [سجل الجلسة](sessions/2026-11-02-google-account-signin.md).
 
 ## 2 نوفمبر 2026 — WA-008: أيقونة دخول Google مفعّلة مع حساب سيليا (منفَّذة محليًا، لم تُنشر حيًا بعد)
 
