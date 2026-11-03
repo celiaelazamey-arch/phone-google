@@ -25,7 +25,8 @@ const BLOCKS = [
   { label: 'أ', begin: '<!-- BEGIN MOVED STATE SECTIONS -->', end: '<!-- END MOVED STATE SECTIONS -->', header: HEADER('state-archive') },
   { label: 'ب', begin: '<!-- BEGIN MOVED STATE SECTIONS B -->', end: '<!-- END MOVED STATE SECTIONS B -->', header: HEADER('state-archive-block') },
   { label: 'ج', begin: '<!-- BEGIN MOVED STATE SECTIONS C -->', end: '<!-- END MOVED STATE SECTIONS C -->', header: HEADER('state-archive-block') },
-  { label: 'د', begin: '<!-- BEGIN MOVED STATE SECTIONS D -->', end: '<!-- END MOVED STATE SECTIONS D -->', header: HEADER('state-archive-block') }
+  { label: 'د', begin: '<!-- BEGIN MOVED STATE SECTIONS D -->', end: '<!-- END MOVED STATE SECTIONS D -->', header: HEADER('state-archive-block') },
+  { label: 'هـ', begin: '<!-- BEGIN MOVED STATE SECTIONS E -->', end: '<!-- END MOVED STATE SECTIONS E -->', header: HEADER('state-archive-block') }
 ];
 
 /** الأسطر بين وسمَي النقل، بلا الوسمين، موصولة بـ\n مع \n أخير — نفس صيغة الرأس. */
@@ -80,5 +81,5 @@ test('SA-03: القسم المنقول مؤرشف لا مكرَّر، ولا ن�
       assert.ok(!state.includes(heading), `«${heading}» في الأرشيف فقط، لا في STATE.md الحيّ`);
     }
   }
-  assert.equal((archive.match(/BEGIN MOVED STATE SECTIONS/g) || []).length, 4, 'أربع كتل معلنة');
+  assert.equal((archive.match(/BEGIN MOVED STATE SECTIONS/g) || []).length, 5, 'خمس كتل معلنة');
 });
