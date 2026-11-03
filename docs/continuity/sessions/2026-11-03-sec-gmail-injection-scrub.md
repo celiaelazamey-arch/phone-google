@@ -87,3 +87,10 @@
   ثم Failure Memory.
 - **ما زال معلّقًا على المالك:** تفعيل قاعدة `pull_request` + مراجعة ≥1 + فحوص مطلوبة في
   ruleset `26270171` — التحقق الحالي يؤكد أنها لم تُفعَّل بعد.
+
+## الدليل البصري
+
+التغيير البصري الوحيد مولَّد لا يدوي: [architecture-map.html](../../design/architecture-map.html)
+أُعيد توليده لأن تعديل `gmail.js` أضاف حافة اعتمادية (`gmail.js ← issue-triage/injection.js`)
+اكتشفتها بوابة `arch:map:check`، وPASS على الناتج. لا مساس بلوحة Visual-First أو System Atlas
+أو الملصق أو أي مُصوَّر آخر — و`visual:first:check` PASS بلا إعادة توليد لهذه.
