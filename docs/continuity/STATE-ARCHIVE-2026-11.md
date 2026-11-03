@@ -244,3 +244,20 @@
 - **الحدّ الصريح:** الحكم على Google لا يعني قبول مستخدم ولا ينشئ جلسة؛ الدخول ما زال متوقفًا على حفظ المالك في Console ثم `302` ثم `/api/account/me` = 200. لا يُرفع أي مؤشر اكتمال (B1/B2/F4/F5)، وخطآ Meta بلا دليل إصلاح.
 
 <!-- END MOVED STATE SECTIONS E -->
+
+## الدفعة السادسة (و) — نقل من الأساس `bc9ad60`
+
+> نفس القاعدة: **بلا حذف**. القسم التالي نُقل حرفيًا من `docs/continuity/STATE.md` عند الأساس `bc9ad60`
+> لإعادة النافذة الحيّة تحت حدّ العشرين كيلوبايت بعد قسمَي `DEC-123/124` (بايت ببايت، لا تنقيح).
+> الطريقة: استبعد وسمَي النقل، صِلْ الأسطر بـ`\n` وأضف `\n` أخيرًا ⇒ يساوي الناتج البايتات والبصمة أدناه.
+
+<!-- state-archive-block: source=docs/continuity/STATE.md baseline=bc9ad60 sha256=b08dcaafa4d76ad46138c9a90293cc3443bcd04edcfa1cbc1cfc64724e77d7b5 bytes=1427 lines=6 -->
+
+<!-- BEGIN MOVED STATE SECTIONS F -->
+## 2 نوفمبر 2026 — WA-005 / DES-002 — توثيق دمج #138 و#140 وإعادة نشر الحافة بعد إضافة الأسرار
+
+- دُمج PR #138 (`main@167fcb7`) ثم PR #140 (`main@b5d3f3c`) لإصلاح بصمة الكتلة ب في `STATE-ARCHIVE-2026-11.md` (`SA-01`)؛ نجحت على `b5d3f3c` تشغيلات `Celia quality & resilience` (`41445712732`) و`Deploy (GitHub Pages)` (`41445712744`) و`Publish verified release` (`41445712767`) و`CodeQL` (`41445712752`) و`Deploy (Cloudflare Edge)` (`41445911518`).
+- تشغيلة الحافة `41445911518` (`2026-11-02T12:35:13Z` على `b5d3f3c`) أثبتت `status=deployed` و`liveReady=true` و`storage.mode=d1` و`durable=true` و`coreSecretBindings=18/18` و`optionalSecretBindings=1` (`WHATSAPP_APP_SECRET`) وترقية الشريحة إلى `known_good`، لكنها أخرجت `whatsapp-onboarding: configured=false — missing: Meta app, Embedded Signup configuration, encryption key` لأنها سبقت إضافة المالك لـ`TOKEN_ENCRYPTION_KEY` ومعرّفات Meta.
+- أفاد المالك بإضافة `TOKEN_ENCRYPTION_KEY` ومعرّفات Meta وطلب دفعًا جديدًا إلى `main` لتشغيل `Deploy (Cloudflare Edge)` وربط الإعدادات الجديدة وتحديث `whatsappOnboarding.configured`. التفاصيل في [سجل الجلسة](sessions/2026-11-02-whatsapp-onboarding-edge-redeploy.md).
+
+<!-- END MOVED STATE SECTIONS F -->

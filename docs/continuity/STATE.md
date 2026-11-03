@@ -3,9 +3,14 @@
 > **حفظ التاريخ بلا حذف (`DEC-052` / `CONT-004`):** هذه نافذة الاستئناف النشطة؛ السجل التراكمي الكامل حتى ما بعد PR #84 (`main@738d832` / `9f6f8b2` — 983 سطرًا / 142,150 بايت) محفوظ حرفيًا في **[STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md)** وبصمته محروسة بـ`R0-02`، وأقسام 31 أكتوبر–3 نوفمبر المنقولة عند `6b4bb2d` و`a1d3f7b` و`0dff3bd` و`7051fd0` في **[STATE-ARCHIVE-2026-11.md](STATE-ARCHIVE-2026-11.md)**. القراءة السريعة المشتقة: **[NOW.md](NOW.md)** (`npm run now`).
 
 **آخر مراجعة:** 3 نوفمبر 2026
-**نوع الجلسة الحالية:** SIE-001 (DEC-122) بنية التشخيص الذاتي (`SI-5/D3`) — بنية بيانات بلا عمليات ولا مخزن، قراءة فقط.
-**السجل:** [بنية التشخيص](sessions/2026-11-03-sie-001-si5d3-diagnosis-structure.md) · [اللقطة المركّبة](sessions/2026-11-03-sie-001-si1a4-system-snapshot.md) · [سطح القرار](sessions/2026-11-03-sie-001-si2e4-decision-surface.md) · **الفرع:** `arena/823204af-phone-google` · **الأساس:** `main@bc9ad60`. `v0.3.0` ما زال الإصدار الحي المعلن.
+**نوع الجلسة الحالية:** SIE-001 (DEC-123 توجيه المالك · DEC-124) كائن المقترح (`SI-6/E3`) — بيانات لا تنفيذ، `PROPOSED` لا تتغير في الكود.
+**السجل:** [كائن المقترح](sessions/2026-11-03-sie-001-si6e3-change-proposal.md) · [بنية التشخيص](sessions/2026-11-03-sie-001-si5d3-diagnosis-structure.md) · [اللقطة المركّبة](sessions/2026-11-03-sie-001-si1a4-system-snapshot.md) · **الفرع:** `arena/823204af-phone-google` · **الأساس:** `main@bc9ad60`. `v0.3.0` ما زال الإصدار الحي المعلن.
 
+## 3 نوفمبر 2026 — SIE-001 / DEC-123+124: توجيه المالك ثم كائن المقترح (`SI-6/E3`)
+
+- **توجيه المالك (`DEC-123`):** «الذكاء يُضاف تدريجيًا خلف أعلام صريحة — يقترح ولا ينفّذ» بسبع نقاط حاكم؛ مطابقتها للمقيس مُثبتة بمسابير، وتمكين المزود الحي يبقى قرارَ مالك (`SI-7`). والرسالة وصلت مقطوعة عند «عدم كس…» فسُجّل الواصل.
+- **الشريحة (`DEC-124`):** `src/agent/change-proposal.js` — كائن الاقتراح بـ`rollbackPlan` و`requiredApprovals` **إلزاميين** ففشلٌ مغلق (اقتراح بلا تراجع يُرفض)، ومسارات نسبية بلا traversal حدّها 20، و`status=PROPOSED` **بلا واجهة تقلبه** و`executable:false` — الاعتماد فعل بشري بالمسار القائم (BACKLOG + DECISIONS + سجل جلسة). لا أداة ولا مخزن (الأدوات 18 وMCP 12 عمدًا).
+- **الدليل:** 4/4 (البنية والتجميد · الفشل المغلق · `PROPOSED` الوحيدة · مقترح حقيقي الشكل). `SI-6` ✅ والطابور: `SI-3/C2` ← `SI-7`. [سجل الجلسة](sessions/2026-11-03-sie-001-si6e3-change-proposal.md).
 ## 3 نوفمبر 2026 — SIE-001 / DEC-122: بنية التشخيص الذاتي (`SI-5/D3`) — الحالة تُحسب لا تُعلن
 
 - **الفجوة (صفّ D3):** التشخيص الحقيقي في `agents:doctor` بلا `Hypotheses` ولا `Discriminating Tests` ولا تمييز `ROOT_CAUSE_HYPOTHESIS` من `_CONFIRMED`.
@@ -48,12 +53,6 @@
 - أثبتت تشغيلة الحافة `41456011988` حيًا: `whatsapp-onboarding: configured=true` (بلا إعدادات ناقصة)، و`coreSecretBindings=18/18`، و`optionalSecretBindings=3` (`WHATSAPP_APP_SECRET` و`WHATSAPP_APP_ID` و`TOKEN_ENCRYPTION_KEY` مع ربط `WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID` نصيًا)، و`totalSecretBindings=21`، و`storage.mode=d1` مع `durable=true` (`latencyMs=107`)، و`Edge Provenance` (11 وحدة، `sha256:0230b6f65fbe…`)، وترقية الشريحة إلى `known_good` لـ`2b47d62`.
 - **تمييز حاسم:** إغلاق شق **التهيئة التقنية والنشر** في `WA-005` و`WA-007` فقط؛ أما ربط رقم مملوك عبر نافذة Meta Embedded Signup من `/whatsapp`، وإرسال رسالة اختبار عبر Graph API، واستقبال رسالة واردة بـWebhook موقّع وإيصال تسليم، واختبار عزل الرسائل بين حسابي مستخدمين عاديين، فتبقى مفتوحة للقبول الحي.
 - مؤشرات الاكتمال الرسمية تبقى دون ترفيع تلقائي: `B1 = 5.5/8`، `B2 = 2.5/6`، المهارات النشطة `L5 = 0/17`، المهام المفتوحة `59` (`22 P0`). التفاصيل في [سجل الجلسة](sessions/2026-11-02-whatsapp-edge-verified-41456011988.md).
-
-## 2 نوفمبر 2026 — WA-005 / DES-002 — توثيق دمج #138 و#140 وإعادة نشر الحافة بعد إضافة الأسرار
-
-- دُمج PR #138 (`main@167fcb7`) ثم PR #140 (`main@b5d3f3c`) لإصلاح بصمة الكتلة ب في `STATE-ARCHIVE-2026-11.md` (`SA-01`)؛ نجحت على `b5d3f3c` تشغيلات `Celia quality & resilience` (`41445712732`) و`Deploy (GitHub Pages)` (`41445712744`) و`Publish verified release` (`41445712767`) و`CodeQL` (`41445712752`) و`Deploy (Cloudflare Edge)` (`41445911518`).
-- تشغيلة الحافة `41445911518` (`2026-11-02T12:35:13Z` على `b5d3f3c`) أثبتت `status=deployed` و`liveReady=true` و`storage.mode=d1` و`durable=true` و`coreSecretBindings=18/18` و`optionalSecretBindings=1` (`WHATSAPP_APP_SECRET`) وترقية الشريحة إلى `known_good`، لكنها أخرجت `whatsapp-onboarding: configured=false — missing: Meta app, Embedded Signup configuration, encryption key` لأنها سبقت إضافة المالك لـ`TOKEN_ENCRYPTION_KEY` ومعرّفات Meta.
-- أفاد المالك بإضافة `TOKEN_ENCRYPTION_KEY` ومعرّفات Meta وطلب دفعًا جديدًا إلى `main` لتشغيل `Deploy (Cloudflare Edge)` وربط الإعدادات الجديدة وتحديث `whatsappOnboarding.configured`. التفاصيل في [سجل الجلسة](sessions/2026-11-02-whatsapp-onboarding-edge-redeploy.md).
 
 ## 2 نوفمبر 2026 — DES-002 — إصلاح CodeQL وتجهيز handoff
 
