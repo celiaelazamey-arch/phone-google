@@ -3,8 +3,14 @@
 > **حفظ التاريخ بلا حذف (`DEC-052` / `CONT-004`):** هذه نافذة الاستئناف النشطة؛ السجل التراكمي الكامل حتى ما بعد PR #84 (`main@738d832` / `9f6f8b2` — 983 سطرًا / 142,150 بايت) محفوظ حرفيًا في **[STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md)** وبصمته محروسة بـ`R0-02`، وأقسام 31 أكتوبر–2 نوفمبر المنقولة عند `6b4bb2d` و`a1d3f7b` و`0dff3bd` في **[STATE-ARCHIVE-2026-11.md](STATE-ARCHIVE-2026-11.md)**. القراءة السريعة المشتقة: **[NOW.md](NOW.md)** (`npm run now`).
 
 **آخر مراجعة:** 3 نوفمبر 2026
-**نوع الجلسة الحالية:** GOOG-004 (DEC-119) تنقية حقن قارئ Gmail — تحصين أمني لمسار قراءة قائم، بلا توسيع قدرة.
-**السجل:** [تنقية Gmail](sessions/2026-11-03-sec-gmail-injection-scrub.md) · [الفجوة وحماية main](sessions/2026-11-03-gov-001-dec-118-push-reaches-main.md) · [تدقيق `SI-0`](sessions/2026-11-03-doc-004-si0-self-intelligence-audit.md) · [معمارية التميّز](sessions/2026-11-03-diff-001-differentiation-architecture.md) · **الفرع:** `arena/81504291-phone-google` · **الأساس:** `main@0dff3bd`. `v0.3.0` ما زال الإصدار الحي المعلن.
+**نوع الجلسة الحالية:** SIE-001 (DEC-120) سطح قرار المشتقّات (`SI-2/E4`) — لفّ لاشتقاق موجود، قراءة فقط، بلا مصدر حقيقة ثانٍ.
+**السجل:** [سطح القرار](sessions/2026-11-03-sie-001-si2e4-decision-surface.md) · [تنقية Gmail](sessions/2026-11-03-sec-gmail-injection-scrub.md) · [الفجوة وحماية main](sessions/2026-11-03-gov-001-dec-118-push-reaches-main.md) · **الفرع:** `arena/832ce3e0-phone-google` · **الأساس:** `main@7051fd0`. `v0.3.0` ما زال الإصدار الحي المعلن.
+
+## 3 نوفمبر 2026 — SIE-001 / DEC-120: سطح قرار المشتقّات (`SI-2/E4`) — المعرفة المشتقّة وصلت الوكيل
+
+- **الفجوة (تدقيق `SI-0`):** المشتقّات المحكومة (الخريطة · الأطلس · القياس) CLI لا يصلها الوكيل، وأداة الاستبطان الوحيدة `celia.system_status`. **التنفيذ بأمر المالك:** `celia.system_map` · `celia.system_impact` (محرك العواقب) · `celia.system_facts` — أدوات `risk:read` في `createDefaultTools` تلفّ `buildArchitectureMap`/`impactOf`/`factsOf(buildAtlas)`، تُشتق لحظة النداء **بلا مخزن ولا مصدر حقيقة ثانٍ ولا مسار موازٍ**، و`unmapped` معلن لا مُهمَل.
+- **الدليل:** 4 اختبارات (مساواة المخرَج بالاشتقاق المباشر · وسائط مغلقة آمنة · تشغيل حقيقي بفيّر يعيد التنفيذ PASS)؛ الأدوات 14←**17** (5 بموافقة كما هي) وMCP 12 بلا تغيير عمدًا.
+- **الحدود:** قراءة فقط؛ `propose_change`/`get_snapshot` بلا قرار بعد. [سجل الجلسة](sessions/2026-11-03-sie-001-si2e4-decision-surface.md).
 
 ## 3 نوفمبر 2026 — GOOG-004 / DEC-119: تنقية الحقن في قارئ Gmail (البند ②)
 
@@ -31,13 +37,6 @@
 - **الفحص الحي (19:23Z، `main@10fdfad`):** `/healthz` سليم (`ok`, `googleOAuth.configured=true`, D1, `18/18` سرًا)، لكن `GET /auth/google/signin` أعاد صفحة الإعداد العربية، وطلبًا مباشرًا إلى `accounts.google.com/o/oauth2/v2/auth` بنفس `client_id` ونفس `redirect_uri` أعاد **`Error 400: redirect_uri_mismatch`**، وعنوانَي `localhost:3000` و`…onrender.com` رُفضا أيضًا. أي أن **العميل لا يحمل أي عنوان عودة مسجّل**: لا كاش، لا كود، لا نشر. `GET /auth/google/diagnostics` = `not_found` (لم يُنشر بعد).
 - **ما نُفّذ:** `googleRedirectDiagnostics()` ومسار `GET /auth/google/diagnostics` (JSON، `no-store`، `405` لغير GET) يعيد `google.accepted`/`google.reason` و`redirectUri` الفعلية و`redirectUriProblem` وخطوة تالية وتعليمات، بلا سر ولا جلسة ولا صف `oauth_states`؛ والصفحة العربية صارت تسمّي الأسباب الأربعة الباقية بعد الحفظ وتذكر **Test users**. اختباران جديدان (14/14 للملف، و`npm test` 1243 ناجح / 0 فشل / 17 متخطى، `check` 261، والحزمة `sha256:f8c21e2ba77f…`).
 - **الحدّ الصريح:** الحكم على Google لا يعني قبول مستخدم ولا ينشئ جلسة؛ الدخول ما زال متوقفًا على حفظ المالك في Console ثم `302` ثم `/api/account/me` = 200. لا يُرفع أي مؤشر اكتمال (B1/B2/F4/F5)، وخطآ Meta بلا دليل إصلاح.
-
-## 2 نوفمبر 2026 — WA-008: أيقونة دخول Google مفعّلة مع حساب سيليا (منفَّذة محليًا، لم تُنشر حيًا بعد)
-
-- طلب المالك: إضافة أيقونة «الدخول بحساب Google» إلى شاشة حساب سيليا في `/whatsapp`، على أن تكون **مفعّلة مع النظام لا شكلية**. اختار صراحةً «دخول حقيقي بحساب Google» بدل اختصار ربط Workspace الخاص بالمالك (`DEC-114`).
-- **ما نُفّذ:** زر بأيقونة Google الرسمية في `public/whatsapp.html` وتنسيق يتبع رموز السمة، يبدأ `GET /auth/google/signin`. التدفق يعيد استخدام Redirect URI المسجّل `/auth/google/callback` بحالة `signin:` وحيدة الاستخدام، ويطلب `openid email profile` فقط، ويتحقق خادميًا من `sub` و`email_verified` عبر userinfo، ثم يفتح جلسة `app_accounts` عبر `signInWithGoogleIdentity`. الهوية في جدول إضافي `0009_google_account_identities.sql`. لا ربط صامت بحساب بريد مسجّل بكلمة مرور، ولا تخزين رموز Google، ولا اعتماد على `APP_OWNER_EMAIL`، ولا تغيير في CSP أو إعداد Google Console.
-- **الدليل المحلي:** `test/google-account-signin.test.js` (10 اختبارات) تغطي بدء التدفق، الجلسة الحقيقية، منع إعادة التشغيل، منع الاستيلاء على البريد، الهوية غير الموثّقة، فشل التبادل، وعدم تأثر تدفق المالك. `build:edge-ui` · `build:manifest` · `arch:map` · `verify:edge-provenance` ناجحة؛ الحزمة صارت **12 وحدة** و**40 عبارة / 9 ملفات هجرة**، وحدِّثت عدادات الاختبارات والخطتين تبعًا لذلك. [سجل الجلسة](sessions/2026-11-02-google-account-signin.md).
-- **الحدّ الصريح:** لم يُنشر على الحافة الحية؛ الدخول الحقيقي يبدأ بعد دمج PR إلى `main` وتشغيلة `Deploy (Cloudflare Edge)` جديدة. موافقة Google من متصفح المالك لم تُختبر، ولا يُرفع أي مؤشر اكتمال (B1/B2/F4/F5) بهذه الشريحة.
 
 ## 2 نوفمبر 2026 — WA-005 / WA-007 — تثبيت `configured=true` على الحافة الحيّة (`41456011988` على `main@2b47d62`)
 

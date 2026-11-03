@@ -115,7 +115,7 @@ test('PSC-06 every live baseline row is recomputed, and a stale number is named'
   const facts = await liveFacts();
   const cases = [
     ['grants', '67 (`GRANT_IDS`)', '66 (`GRANT_IDS`)', /baseline "grants" says 66 but access-policy\.js has 67/],
-    ['agent_tools', '14 (5 بموافقة)', '17 (5 بموافقة)', /baseline "agent_tools" says 17\/5 but createDefaultTools\(\) has 14\/5/],
+    ['agent_tools', '17 (5 بموافقة)', '18 (5 بموافقة)', /baseline "agent_tools" says 18\/5 but createDefaultTools\(\) has 17\/5/],
     ['mcp_tools', '12 مُعلنة', '13 مُعلنة', /baseline "mcp_tools" says 13 but MCP_TOOLS has 12/],
     ['deps', '5 prod · 2 dev', '6 prod · 2 dev', /baseline "deps" says 6 prod \/ 2 dev but package\.json has 5\/2/],
     ['open_tasks', '**62** (22 P0 · 30 P1 · 10 P2)', '**61** (22 P0 · 30 P1 · 9 P2)', /baseline "open_tasks" says 61 \/ 22 \/ 30 \/ 9 but BACKLOG has 62 \/ 22 \/ 30 \/ 10/],

@@ -73,13 +73,13 @@
 |---|---|---|---|---|
 | `open_tasks` | مهام مفتوحة | **62** (22 P0 · 30 P1 · 10 P2) | عدّ `BACKLOG` نفسه | 🔗 |
 | `grants` | الصلاحيات | 67 (`GRANT_IDS`) | `src/agent/access-policy.js` | 🔗 |
-| `agent_tools` | أدوات الوكيل | 14 (5 بموافقة) · صفر متصفح | `createDefaultTools()` | 🔗 |
+| `agent_tools` | أدوات الوكيل | 17 (5 بموافقة) · صفر متصفح | `createDefaultTools()` | 🔗 |
 | `mcp_tools` | أدوات MCP | 12 مُعلنة | `MCP_TOOLS` في `src/celia-mcp.js` | 🔗 |
 | `version` | الإصدار | 0.3.0 (منشور immutable؛ tag `v0.3.0` يستهدف `7596c27e`) | `src/version.js` + `package.json` + GitHub Release API | 🔗/📅 |
 | `deps` | الاعتماديات | 5 prod · 2 dev | `package.json` | 🔗 |
 | `coverage_floor` | أرضية CI للتغطية | 89 / 71 / 82 | `test:coverage` | 🔗 |
-| `syntax_files` | الملفات المفحوصة نحويًا | 262 | نطاق `scripts/check.mjs` نفسه | 🔗 |
-| `continuity` | وثائق الاستمرارية / الروابط / المهام | 150 / 472 / 131 | `npm run check:continuity` | 🔗 |
+| `syntax_files` | الملفات المفحوصة نحويًا | 263 | نطاق `scripts/check.mjs` نفسه | 🔗 |
+| `continuity` | وثائق الاستمرارية / الروابط / المهام | 151 / 479 / 131 | `npm run check:continuity` | 🔗 |
 | `sandbox` | العزل | off | `CELIA_AGENT_SANDBOX` في `src/agent/index.js` | 🔗 |
 | `egress` | الخروج | off | `CELIA_AGENT_EGRESS` في `src/agent/index.js` | 🔗 |
 | `tests` | اختبارات | 1245 · **1228 pass** · 0 fail · 17 skip | `npm run test:coverage` (2026-11-01، بعد CI/MAN-007 وMEAS/PSC/FFP) | 📅 |

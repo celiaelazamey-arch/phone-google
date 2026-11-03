@@ -121,6 +121,7 @@ Experience Intelligence (§4 من المقترح).
 
 1. **`SI-2/E4`** — أدوات `risk:read` تلفّ `buildArchitectureMap`/`factsOf`/`impactOf`. هذا **يُسلّم
    01 و02 و03 و12 دفعة واحدة** بوصلة واحدة، بلا مكوّن جديد.
+   **2026-11-03:** نُفِّذ — `DEC-120` وسجل الجلسة [`si2e4-decision-surface`](continuity/sessions/2026-11-03-sie-001-si2e4-decision-surface.md).
 2. **البند ② المعلّق** (`scanForInjection` في `gmail.js#sanitizeMessage`) — فجوة أمنية **مثبتة**، وأولى
    من أي توسيع، تطبيقًا لـ§15.13: إغلاق فجوات السطح الحالي قبل توسيعه.
 3. **Failure Memory** (05) — الفجوة الحقيقية الوحيدة التي تُكسب `EVOLVE` معناها، وهي ❌ منذ `DOC-003`.

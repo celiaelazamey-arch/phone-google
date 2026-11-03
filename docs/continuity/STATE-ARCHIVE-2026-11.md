@@ -209,3 +209,21 @@
 - **الحدّ الصريح:** الدخول نفسه ما زال متوقفًا على فعل المالك في Google Cloud Console، وكذلك ربط Workspace للمالك؛ وخطآ Meta (Login with JavaScript SDK + App Domains) ما زالا بلا دليل إصلاح. لا يُرفع أي مؤشر اكتمال. [سجل الجلسة](sessions/2026-11-02-google-account-signin.md).
 
 <!-- END MOVED STATE SECTIONS C -->
+
+## الدفعة الرابعة (د) — نقل من الأساس `7051fd0`
+
+> نفس القاعدة: **بلا حذف**. القسم التالي نُقل حرفيًا من `docs/continuity/STATE.md` عند الأساس `7051fd0`
+> لإفساح الهامش لقسم جلسة `SI-2/E4` (بايت ببايت، لا تنقيح). الطريقة: استبعد وسمَي النقل،
+> صِلْ الأسطر بـ`\n` وأضف `\n` أخيرًا ⇒ يجب أن يساوي الناتج البايتات والبصمة أدناه.
+
+<!-- state-archive-block: source=docs/continuity/STATE.md baseline=7051fd0 sha256=f5cf256ad74859cacfc03518c43609fd329146cb6cc7c15b5d052b4ebf1304b7 bytes=2347 lines=7 -->
+
+<!-- BEGIN MOVED STATE SECTIONS D -->
+## 2 نوفمبر 2026 — WA-008: أيقونة دخول Google مفعّلة مع حساب سيليا (منفَّذة محليًا، لم تُنشر حيًا بعد)
+
+- طلب المالك: إضافة أيقونة «الدخول بحساب Google» إلى شاشة حساب سيليا في `/whatsapp`، على أن تكون **مفعّلة مع النظام لا شكلية**. اختار صراحةً «دخول حقيقي بحساب Google» بدل اختصار ربط Workspace الخاص بالمالك (`DEC-114`).
+- **ما نُفّذ:** زر بأيقونة Google الرسمية في `public/whatsapp.html` وتنسيق يتبع رموز السمة، يبدأ `GET /auth/google/signin`. التدفق يعيد استخدام Redirect URI المسجّل `/auth/google/callback` بحالة `signin:` وحيدة الاستخدام، ويطلب `openid email profile` فقط، ويتحقق خادميًا من `sub` و`email_verified` عبر userinfo، ثم يفتح جلسة `app_accounts` عبر `signInWithGoogleIdentity`. الهوية في جدول إضافي `0009_google_account_identities.sql`. لا ربط صامت بحساب بريد مسجّل بكلمة مرور، ولا تخزين رموز Google، ولا اعتماد على `APP_OWNER_EMAIL`، ولا تغيير في CSP أو إعداد Google Console.
+- **الدليل المحلي:** `test/google-account-signin.test.js` (10 اختبارات) تغطي بدء التدفق، الجلسة الحقيقية، منع إعادة التشغيل، منع الاستيلاء على البريد، الهوية غير الموثّقة، فشل التبادل، وعدم تأثر تدفق المالك. `build:edge-ui` · `build:manifest` · `arch:map` · `verify:edge-provenance` ناجحة؛ الحزمة صارت **12 وحدة** و**40 عبارة / 9 ملفات هجرة**، وحدِّثت عدادات الاختبارات والخطتين تبعًا لذلك. [سجل الجلسة](sessions/2026-11-02-google-account-signin.md).
+- **الحدّ الصريح:** لم يُنشر على الحافة الحية؛ الدخول الحقيقي يبدأ بعد دمج PR إلى `main` وتشغيلة `Deploy (Cloudflare Edge)` جديدة. موافقة Google من متصفح المالك لم تُختبر، ولا يُرفع أي مؤشر اكتمال (B1/B2/F4/F5) بهذه الشريحة.
+
+<!-- END MOVED STATE SECTIONS D -->
