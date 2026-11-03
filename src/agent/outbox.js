@@ -30,6 +30,13 @@ export const OUTBOX_STATUS = Object.freeze({
   cancelled: 'cancelled'
 });
 
+/**
+ * Identifier of the dispatch scheme this module implements. Single authority per fact
+ * (AGENTS.md): `runtime.status()` used to hard-code this string in the audit surface
+ * instead of reading it from the module that owns the behaviour. DEC-117.
+ */
+export const OUTBOX_SCHEME = 'transactional-single-dispatch-v1';
+
 const TERMINAL = new Set([
   OUTBOX_STATUS.sent,
   OUTBOX_STATUS.failed,

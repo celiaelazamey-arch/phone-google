@@ -1,6 +1,6 @@
 import { PLAN_LIFECYCLE_STATE, RUN_STATUS, APPROVAL_DECISION } from './store.js';
 import { RISK, validateToolInput } from './tools.js';
-import { hashOf } from './evidence.js';
+import { EVIDENCE_LEDGER, hashOf } from './evidence.js';
 import { OUTBOX_STATUS } from './outbox.js';
 
 export { PLAN_LIFECYCLE_STATE };
@@ -318,6 +318,18 @@ export function verifyApprovedEffectIntegrity({ entry, approval } = {}) {
  * Structured inspection of the 10 Agent Harness components and War Room audit.
  * Every claim is derived from the live runtime objects (`store`, `tools`, `planner`,
  * `verifier`, `connectors`, `limits`), never hard-coded marketing text.
+ *
+ * DEC-117 makes the docblock above true. Five components used to return a literal
+ * `wired: true` while the docblock promised derivation, so this surface — served live
+ * at `GET /api/agent/harness` — asserted capabilities it never checked. Now every
+ * component reports the probes it was derived from (`basis`), names what was absent
+ * (`missing`), and a capability this function structurally cannot observe says so
+ * (`notRuntimeVerifiable`) instead of claiming `true`. This is the rule
+ * `access-policy.js` and `computer-policy.js` already enforce and test
+ * (`assert.equal(grant.wired, false, '… claims to be wired')`).
+ *
+ * `sandbox` and `evaluation` are optional probes: absent means "not observed", which
+ * reports `false` — never a silent `true`.
  */
 export function inspectAgentHarness({
   store,
@@ -326,10 +338,59 @@ export function inspectAgentHarness({
   verifier,
   connectors,
   limits,
-  bootRecovery = null
+  bootRecovery = null,
+  sandbox = null,
+  evaluation = null
 } = {}) {
   const toolList = tools ? tools.list() : [];
   const connectorList = connectors?.list ? connectors.list() : [];
+
+  /** Name the live methods a component depends on; `missing` is empty when it is wired. */
+  function probeStore(methods) {
+    const missing = methods
+      .filter((method) => typeof store?.[method] !== 'function')
+      .map((method) => `store.${method}`);
+    return {
+      ok: missing.length === 0,
+      missing,
+      basis: methods.map((method) => `store.${method}`)
+    };
+  }
+
+  function probeShape(checks) {
+    const missing = checks.filter((check) => !check.ok).map((check) => check.name);
+    return { ok: missing.length === 0, missing, basis: checks.map((check) => check.name) };
+  }
+
+  const approvalGate = probeStore([
+    'requestApproval',
+    'decideApproval',
+    'listApprovals',
+    'enqueueOutbox',
+    'linkOutboxApproval'
+  ]);
+  const evidenceLedger = probeStore(['appendEvidence', 'listEvidence', 'verifyEvidenceChain']);
+  const recovery = probeStore([
+    'startToolRun',
+    'findToolRunByKey',
+    'reconcileToolRun',
+    'findResumableRuns',
+    'getOutboxByKey',
+    'findStaleOutbox'
+  ]);
+  const executableTools = toolList.filter(
+    (tool) => tool.risk === RISK.read || tool.risk === RISK.internalWrite
+  );
+  const executor = probeShape([
+    { name: 'tools.executable', ok: typeof tools?.executable === 'function' },
+    { name: 'tools.validateInput', ok: typeof tools?.validateInput === 'function' },
+    { name: 'tool.risk classification', ok: toolList.every((tool) => Boolean(tool.risk)) }
+  ]);
+  const evaluationProbe = probeShape([
+    { name: 'evaluation.computeAgentMetrics', ok: typeof evaluation?.computeAgentMetrics === 'function' },
+    { name: 'evaluation.CELIA_SEVEN_STAGE_LOOP', ok: Array.isArray(evaluation?.CELIA_SEVEN_STAGE_LOOP) }
+  ]);
+
   return {
     ok: Boolean(store && planner && tools && verifier),
     version: 'agent-harness-v1',
@@ -342,6 +403,12 @@ export function inspectAgentHarness({
         id: 'agent_runtime',
         title: 'Agent Runtime',
         wired: Boolean(store && planner && tools),
+        basis: ['store', 'planner', 'tools'],
+        missing: [
+          store ? null : 'store',
+          planner ? null : 'planner',
+          tools ? null : 'tools'
+        ].filter(Boolean),
         guarantees: [
           'دورة Plan → Act → Observe → Verify → Deliver محكومة بعقد إيجار (lease) ذري',
           'إيقاف الحلقات غير المنتهية عبر سقوف الخطوات والتكلفة والمهلة الزمنية',
@@ -353,6 +420,8 @@ export function inspectAgentHarness({
         id: 'model_router',
         title: 'Model Router & Planner Seam',
         wired: Boolean(planner?.plan),
+        basis: ['planner.plan'],
+        missing: typeof planner?.plan === 'function' ? [] : ['planner.plan'],
         planner: planner?.name || 'unconfigured',
         guarantees: [
           'فصل عقد التخطيط plan(context) عن حلقة التنفيذ؛ لا يفترض أن كل نموذج يدعم نفس الأدوات',
@@ -364,6 +433,8 @@ export function inspectAgentHarness({
         id: 'tool_registry',
         title: 'Tool Registry',
         wired: toolList.length > 0,
+        basis: ['tools.list()'],
+        missing: toolList.length > 0 ? [] : ['tools.list() returned no tool'],
         toolsCount: toolList.length,
         guarantees: [
           'تصنيف مخاطر إلزامي لكل أداة: read / internal_write / external_effect / irreversible',
@@ -375,6 +446,8 @@ export function inspectAgentHarness({
         id: 'context_memory',
         title: 'Context & Memory',
         wired: Boolean(store?.dialect),
+        basis: ['store.dialect'],
+        missing: store?.dialect ? [] : ['store.dialect'],
         dialect: store?.dialect || 'off',
         summaries: true,
         facts: true,
@@ -387,7 +460,9 @@ export function inspectAgentHarness({
       {
         id: 'policy_approval_gate',
         title: 'Policy & Approval Gate',
-        wired: true,
+        wired: approvalGate.ok && executor.ok,
+        basis: [...approvalGate.basis, ...executor.basis],
+        missing: [...approvalGate.missing, ...executor.missing],
         guarantees: [
           'لا تنفيذ لأي أداة external_effect أو irreversible قبل موافقة مالك مسجلة',
           'دعم القرارات الثلاثة: approved (ينفذ الخطة المعتمدة) / edited (يحفظ التعديل ويعيد فحص السياسات ويعرضها للمراجعة) / rejected (يلغي بأمان)',
@@ -397,8 +472,16 @@ export function inspectAgentHarness({
       {
         id: 'sandbox_executor',
         title: 'Sandbox Executor',
-        wired: true,
-        isolatedContainerAvailable: false,
+        wired: executor.ok && executableTools.length > 0,
+        basis: [...executor.basis, 'executable tool count'],
+        missing: [
+          ...executor.missing,
+          executableTools.length > 0 ? null : 'no read/internal_write tool is registered'
+        ].filter(Boolean),
+        executableToolCount: executableTools.length,
+        // Derived, not asserted: container isolation stays unavailable until AGENT-003
+        // ships it, and this function reports what it was told rather than a literal.
+        isolatedContainerAvailable: Boolean(sandbox?.isolatedContainerAvailable),
         guarantees: [
           'الأدوات القابلة للتنفيذ محليًا محصورة في read/internal_write بمهلة زمنية وإشارة إلغاء AbortController',
           'الأدوات المصنفة irreversible (مثل sandbox.exec) مرفوضة صراحةً حتى توفير عزل حاويات AGENT-003'
@@ -408,6 +491,8 @@ export function inspectAgentHarness({
         id: 'independent_verifier',
         title: 'Independent Verifier',
         wired: Boolean(verifier?.verifyRun),
+        basis: ['verifier.verifyRun'],
+        missing: typeof verifier?.verifyRun === 'function' ? [] : ['verifier.verifyRun'],
         verifier: verifier?.name || 'independent-verifier',
         guarantees: [
           'مكوّن مستقل عن المنتِج بلا صلاحية كتابة؛ يصدر أحكام PASS / BLOCK / UNKNOWN فقط',
@@ -417,8 +502,10 @@ export function inspectAgentHarness({
       {
         id: 'evidence_observability',
         title: 'Evidence & Observability',
-        wired: true,
-        ledger: 'sha256-hash-chain-v1',
+        wired: evidenceLedger.ok,
+        basis: evidenceLedger.basis,
+        missing: evidenceLedger.missing,
+        ledger: EVIDENCE_LEDGER,
         guarantees: [
           'سجل أدلة إضافي فقط (agent_evidence) بسلسلة بصمات SHA-256 وجذر genesis لكل تشغيل',
           'كشف أي حذف أو تعديل بالرقم والسبب، وبث الأحداث لحظيًا عبر SSE دون تسريب أسرار'
@@ -427,7 +514,9 @@ export function inspectAgentHarness({
       {
         id: 'recovery_idempotency',
         title: 'Recovery & Idempotency',
-        wired: true,
+        wired: recovery.ok,
+        basis: recovery.basis,
+        missing: recovery.missing,
         bootRecovery,
         connectors: connectorList,
         guarantees: [
@@ -438,7 +527,15 @@ export function inspectAgentHarness({
       {
         id: 'evaluation_regression',
         title: 'Evaluation & Regression',
-        wired: true,
+        // The evaluation half is derivable from the live module; the regression half is
+        // a property of the test suite, which this function cannot observe. Claiming
+        // `wired: true` for both was the defect: it reported CI evidence it never had.
+        wired: evaluationProbe.ok,
+        basis: evaluationProbe.basis,
+        missing: evaluationProbe.missing,
+        regressionSuiteVerified: false,
+        notRuntimeVerifiable:
+          'مجموعة الانحدار تُثبتها نتائج npm test في CI، ولا تستطيع هذه الدالة ملاحظتها؛ لا تُرفع wired بناءً على وجود ملفات اختبار.',
         guarantees: [
           'اختبارات حتمية تقيس انتقالات الحالة (PLAN_READY → WAITING_FOR_APPROVAL → EDITED/APPROVED/REJECTED → EXECUTING)',
           'اختبارات كسر الدورة: تزوير نجاح أداة، تعديل الحمولة بعد الموافقة، تكرار الطلبات، وتجاوز ملكية المالك'

@@ -10,9 +10,9 @@ import { RISK } from './tools.js';
 import { CALL_MANY_LIMITS } from './planner-provider.js';
 import { createNoProgressPolicy, NO_PROGRESS_CODE } from './no-progress.js';
 import { buildGoalContract } from './goal-contract.js';
-import { EVIDENCE_KIND, hashOf } from './evidence.js';
+import { EVIDENCE_KIND, EVIDENCE_LEDGER, hashOf } from './evidence.js';
 import { createVerifier, VERDICT } from './verifier.js';
-import { createOutbox, OUTBOX_STATUS, outboxKey } from './outbox.js';
+import { createOutbox, OUTBOX_SCHEME, OUTBOX_STATUS, outboxKey } from './outbox.js';
 import { createEmptyConnectorRegistry } from './connectors.js';
 import {
   buildPlanSummaryRecord,
@@ -1275,14 +1275,20 @@ export function createAgentRuntime({
         planner: planner.name,
         plannerToolAllowlist: plannerToolSet ? [...plannerToolSet] : null,
         verifier: verifier.name,
-        approvalGate: true,
-        evidenceLedger: 'sha256-hash-chain-v1',
-        outbox: 'transactional-single-dispatch-v1',
+        // DEC-117: derived from the live objects, not asserted. A store that cannot
+        // persist an approval decision or an intent cannot operate the gate, and the
+        // audit surface must say so instead of reporting a literal `true`.
+        approvalGate: ['requestApproval', 'decideApproval', 'enqueueOutbox'].every(
+          (method) => typeof store?.[method] === 'function'
+        ),
+        evidenceLedger: EVIDENCE_LEDGER,
+        outbox: OUTBOX_SCHEME,
         connectors: connectors.list(),
         ownerId,
         limits: config,
         tools: tools.list(),
-        durable: true,
+        // Durable means "not an in-memory map" (AGENTS.md): only a real dialect qualifies.
+        durable: store?.dialect === 'mysql' || store?.dialect === 'sqlite',
         note:
           store.dialect === 'mysql'
             ? 'الحالة في MySQL؛ الاستئناف والإلغاء وبوابة الموافقات وسجل الأدلة تعمل بين العمليات.'
@@ -1696,7 +1702,10 @@ export function createAgentRuntime({
         planner,
         verifier,
         connectors,
-        limits: config
+        limits: config,
+        // DEC-117: the inspection derives `evaluation_regression.wired` from the live
+        // module instead of asserting it. Passing nothing reports `false`, never `true`.
+        evaluation: { computeAgentMetrics, CELIA_SEVEN_STAGE_LOOP }
       });
     },
     /**
