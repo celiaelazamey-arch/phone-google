@@ -78,3 +78,38 @@
   علم صريح (`CELIA_AGENT_PLANNER`) ومراقبة وتراجع، وبوابة `GOV-001` (`ruleset 26270171`) بيد
   المالك أيضًا: قاعدة `pull_request` + مراجعة ≥1 + فحوص مطلوبة.
 - فرع الجلسة المُعيَّن يحمل الشرائح الخمس؛ الوصول إلى `main` بكلمة المالك بعد المراجعة.
+
+## جولة التحقق من الربط (واتساب ويب + خدمات جوجل) بعد التدوير الثالث — 2026-11-03
+
+- البيئة دُوّرت إلى `arena/a07b96d4-phone-google` @ `main@8be10b2` (= دمج #153)؛ سجلات الدورات
+  المحلية السابقة ضاعت مع التدوير ومحتواها مُعاد في أقسام هذا الملف أعلاه.
+- **المثبت حيًّا على `8be10b2` من CI (لا من بيئة المسح):** خطوة «Verify live card-free Edge +
+  D1 full runtime (MCP 12 tools + D1 durability + 401 gate)» في تشغيل الحافة `41626646034`
+  **success** — وهي تشغّل `verify:live --mode edge` الذي يفحص `/readyz`: `ready=true` و
+  `storage=d1/durable` و**`caps.whatsappWebhook=true`** و**`caps.googleOAuth=true`** وجاهزية
+  `whatsappOnboarding` وسلسلة D1 كتابة/قراءة — أي أن **مسارَي ربط واتساب وجوجل على مستوى
+  القدرات حيّان على الكود الجديد**. Render `41626646096` خطوة «run verify:live» success.
+- **الكود المتغير منذ آخر حالة موثقة (2b47d62→8be10b2):** `src/agent/gmail.js` (DEC-119) و
+  `workers/celia-edge/google-account.js` و`migrations/0009_google_account_identities.sql` و
+  `whatsapp-ui.generated.js` — فإعادة التحقق الحي كانت ضرورية وقد تمت بسن الحافة أعلاه.
+- **بيانات غير كافية (محجوبة عن بيئة المسح بالقياس):** `verify-live` من بيئتي = `reachable: fail`
+  (الحافة محجوبة) · سجلات `--log` فارغة (العطل المعروف) · تنزيل أرتيفكت الأدلة
+  (`edge-deployment-evidence-8be10b2…`, id `13226486329`) فشل EOF عبر blob.core.windows.net —
+  فقيمة `google.accepted` الحالية (قبول redirect_uri في Console — WA-010) تحتاج
+  `GET /auth/google/diagnostics` حيًّا من متصفح المالك.
+- **Reality (الأداة القانونية لتدفق الرسائل الفعلي) لم تشتغل مطلوبًا** (push-skips فقط) ومحاولتي
+  إطلاقها بالـAPI صُدمت `HTTP 403: Resource not accessible by integration` — **إطلاقها بيد
+  المالك**: Actions → Service reality audit → Run workflow → `live_only=true` (~دقيقة)، أو
+  جدولتها الاثنينية 06:00 UTC.
+- المعاينة المحلية أعيد إحياؤها بعد التدوير (MCP 3010، storage=memory، agent_runtime_disabled).
+
+## دورة `DEC-129` — حكم الإطلاق (بمعرّفات حقيقية — التزام محلي لا يُدفع)
+
+- فصل السجل المحلي بـ`reset --soft 8be10b2` (درس #151) ثم التزام القرار **`b17eebc`** فوق
+  رأس الفرع المدفوع مباشرة والدفع (`8be10b2..b17eebc`، صفر غير مدفوع).
+- **`Celia quality & resilience` = `41630989890` ← success** على رأس الفرع (تُثبَّت قبل الالتزام).
+- الحكم موثق: لا إطلاق عام، البوابات الخمس في `REL-004` (W3، P0 بالمقيس)، شرطا الإطلاق:
+  OAuth فعلي بالتفريعة الحية + رسالة واتساب ذهابًا وعودة — وكلاهما بيد المالك (Console وMeta).
+- تصحيح تخمينين بالمقيس: أولوية REL-004 (P0 لا P2) وتوزيع العدّ (23 P0 · 14 P2) — أزواج PSC قُلبت.
+- التحقق المستقل: `grep -n "DEC-129\|REL-004" docs/continuity/DECISIONS.md docs/continuity/BACKLOG.md`
+  · `gh run view 41630989890 --repo celiaelazamey-arch/phone-google` · `npm run plan:check`.
