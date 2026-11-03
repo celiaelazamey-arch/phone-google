@@ -12,7 +12,6 @@
  */
 
 import { renderTemplate } from './output-templates.js';
-
 export const RISK = Object.freeze({
   read: 'read',
   internalWrite: 'internal_write',
@@ -25,6 +24,9 @@ import { auditProductCatalog, buildCreativeWorkflowPlan } from './evaluation.js'
 import { gmailToolDefinitions } from './gmail.js';
 import { googleReadToolDefinitions } from './google-read.js';
 import { webToolDefinitions } from './web-tools.js';
+import path from 'node:path';
+import { buildArchitectureMap, impactOf, scanModules } from '../design/architecture-map.js';
+import { buildAtlas, factsOf } from '../design/system-atlas.js';
 
 const EXECUTABLE = new Set([RISK.read, RISK.internalWrite]);
 const FORBIDDEN_SECRET_KEYS = new Set([
@@ -335,6 +337,85 @@ function driveExportToolDefinition(artifacts = null) {
   };
 }
 
+/**
+ * SI-2/E4 — أدوات القراءة الذاتية: سطح قرار المشتقّات المحكومة.
+ *
+ * المعرفة المشتقّة (الخريطة المعمارية الحية · محرك العواقب · حقائق الأطلس) كانت أوامر CLI لا
+ * يصلها الوكيل. هذه الأدوات تلفّ الاشتقاق الموجود في src/design لا تعيد تنفيذَه: كل نداء يعيد
+ * اشتقاق الناتج من الشجرة لحظتها — بلا مخزن ولا مصدر حقيقة ثانٍ ولا مسار تنفيذ موازٍ. القراءة
+ * فقط وحتمية، والمخرَج يعلن ما لم يُرسَم (unmapped) بدل ادعاء اكتمال النطاق.
+ */
+export function selfIntelligenceToolDefinitions({ root = path.resolve(import.meta.dirname, '../..') } = {}) {
+  return [
+    {
+      name: 'celia.system_map',
+      description: 'الخريطة المعمارية الحية: المكوّنات بملفاتها وحالتها المقيسة (مختبَر · موصول · مفعّل) وحواف الاعتمادية — تُشتقّ من الشجرة لحظة النداء لا مخزّنة',
+      risk: RISK.read,
+      deterministic: true,
+      replayArgs: () => ({}),
+      timeoutMs: 10_000,
+      arguments: {},
+      async execute() {
+        return buildArchitectureMap({ root });
+      }
+    },
+    {
+      name: 'celia.system_impact',
+      description: 'محرك العواقب: المكوّنات والوحدات التي يصلها تغيير ملفات مقترحة عبر الوارد، مع إعلان ما لم يُرسَم بدل ادعاء اكتمال النطاق',
+      risk: RISK.read,
+      deterministic: true,
+      // إعادة التنفيذ تستردّ files من المخرَج المسجّل (الذي يردّدها حرفيًا) لأن startToolRun
+      // يخزّن digest الوسائط لا وسائطها؛ وإن غاب فالإعادة تفشل ظاهرًا ولا تُختلق.
+      replayArgs: ({ toolRun } = {}) => {
+        const recorded = toolRun?.parsedOutcome ?? toolRun?.outcome;
+        let files = null;
+        try {
+          files = (typeof recorded === 'string' ? JSON.parse(recorded) : recorded)?.files ?? null;
+        } catch {
+          files = null;
+        }
+        return { files };
+      },
+      timeoutMs: 10_000,
+      arguments: { files: 'object' },
+      validate(args) {
+        const files = args?.files;
+        if (!Array.isArray(files) || files.length < 1 || files.length > 12) {
+          return { ok: false, code: 'invalid_impact_files', message: 'files must be an array of 1..12 repository-relative paths' };
+        }
+        for (const file of files) {
+          if (typeof file !== 'string' || !file.trim() || file.length > 200) {
+            return { ok: false, code: 'invalid_impact_file', message: 'every entry must be a non-empty path of at most 200 characters' };
+          }
+          const normalized = file.trim();
+          if (normalized.startsWith('/') || normalized.split('/').includes('..')) {
+            return { ok: false, code: 'invalid_impact_path', message: 'paths must be repository-relative without traversal' };
+          }
+        }
+        return { ok: true };
+      },
+      async execute(args) {
+        if (!Array.isArray(args?.files)) throw new Error('files is required');
+        const files = args.files.map((file) => String(file).trim());
+        const map = buildArchitectureMap({ root });
+        return impactOf(files, map, scanModules(root));
+      }
+    },
+    {
+      name: 'celia.system_facts',
+      description: 'حقائق الأطلس القابلة للنشر: التغطية المتحققة وحالات القدرات والأولويات، وبصمة تغطي كل حقل — قرار بأرقام مشتقّة لا مخزّنة',
+      risk: RISK.read,
+      deterministic: true,
+      replayArgs: () => ({}),
+      timeoutMs: 10_000,
+      arguments: {},
+      async execute() {
+        return factsOf(buildAtlas({ root }));
+      }
+    }
+  ];
+}
+
 export function defaultToolDefinitions({
   statusProvider,
   kb,
@@ -409,6 +490,7 @@ export function defaultToolDefinitions({
         return outline(args.goal);
       }
     },
+    ...selfIntelligenceToolDefinitions(),
     ...gmailToolDefinitions({ gmail }),
     ...webToolDefinitions({ web }),
     ...googleReadToolDefinitions(googleReaders),
