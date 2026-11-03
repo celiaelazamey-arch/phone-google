@@ -5,6 +5,8 @@
  * has no external effect, no approval-to-write path, and no send() method.
  * Credentials stay behind the injected transport; this module never sees them.
  */
+import { scanForInjection } from './issue-triage/injection.js';
+
 export const GMAIL_CONNECTOR = 'google.gmail';
 export const GMAIL_TOOL = 'google.gmail_read';
 export const GMAIL_MAX_RESULTS = 5;
@@ -24,6 +26,12 @@ function text(value, max) {
   return typeof value === 'string'
     ? value.replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, max)
     : '';
+}
+
+/** Free-text fields are scanned before any cap: flattening control chars without truncating, so a
+ * payload cannot hide behind the slice boundary nor ride inside control characters. */
+function untrusted(value) {
+  return typeof value === 'string' ? value.replace(/[\u0000-\u001f\u007f]/g, ' ') : '';
 }
 
 function limitOf(value) {
@@ -55,14 +63,27 @@ function sanitizeMessage(message) {
   if (!message || typeof message !== 'object') return null;
   const id = text(message.id, MAX_ID);
   if (!id) return null;
-  return {
+  // Mail text is data, not instructions (doctrine of AGENT-006 / DEC-060): the three free-text
+  // fields are scanned whole, before any truncation. Benign rows stay byte-for-byte as before —
+  // no extra key, no normalization — while tainted fields are replaced by their scrubbed form and
+  // the row carries rule ids only, never the payload.
+  const from = untrusted(message.from);
+  const subject = untrusted(message.subject);
+  const snippet = untrusted(message.snippet);
+  const scan = scanForInjection(from, subject, snippet);
+  const [fromClean, subjectClean, snippetClean] = scan.tainted
+    ? scan.scrubbedParts
+    : [from, subject, snippet];
+  const row = {
     id,
-    from: text(message.from, MAX_HEADER),
-    subject: text(message.subject, MAX_HEADER),
+    from: fromClean.slice(0, MAX_HEADER),
+    subject: subjectClean.slice(0, MAX_HEADER),
     date: text(message.date, 100),
-    snippet: text(message.snippet, MAX_SNIPPET),
+    snippet: snippetClean.slice(0, MAX_SNIPPET),
     unread: message.unread === true
   };
+  if (scan.tainted) row.injectionRuleIds = scan.ruleIds;
+  return row;
 }
 
 export function createGmailReadConnector({ transport } = {}) {
