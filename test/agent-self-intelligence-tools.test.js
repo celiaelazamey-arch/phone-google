@@ -21,7 +21,7 @@ import { createScriptedPlanner } from '../src/agent/planner.js';
 import { RUN_STATUS } from '../src/agent/store.js';
 import { createTempStore } from './support/agent-fixtures.js';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
 
 const root = path.resolve(import.meta.dirname, '..');
@@ -165,7 +165,16 @@ test('SI-1/A4: the snapshot composes the direct derivations — no second source
 
   assert.equal(snap.repo.available, true);
   assert.equal(snap.repo.head, execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim());
-  assert.equal(snap.repo.branch, execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim());
+  // CI checkouts of a pull-request merge ref are detached: HEAD carries a raw sha, the honest
+  // slice reports `branch: null`, and `--abbrev-ref` prints the literal "HEAD" — mirror that
+  // instead of asserting a branch name the checkout does not have.
+  const headFile = readFileSync(path.join(root, '.git/HEAD'), 'utf8').trim();
+  if (headFile.startsWith('ref:')) {
+    const ref = headFile.slice(4).trim();
+    assert.equal(snap.repo.branch, ref.replace('refs/heads/', ''));
+  } else {
+    assert.equal(snap.repo.branch, null, 'detached checkout: the slice reports null, never a fake name');
+  }
 });
 
 test('SI-1/A4: outside a repository with no status provider, unavailability is explicit — never invented', async (t) => {
