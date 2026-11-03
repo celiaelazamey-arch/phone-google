@@ -56,6 +56,13 @@ export const EVIDENCE_KIND = Object.freeze({
 
 export const EVIDENCE_VERSION = 'evidence-v1';
 
+/**
+ * Identifier of the append-only ledger scheme. Single authority per fact (AGENTS.md):
+ * `harness.js` and `runtime.js` used to each hard-code this string, so the two audit
+ * surfaces could drift apart silently. DEC-117.
+ */
+export const EVIDENCE_LEDGER = 'sha256-hash-chain-v1';
+
 const HASH_RE = /^[a-f0-9]{64}$/;
 
 /** Deterministic JSON: object keys sorted recursively; array order is preserved. */

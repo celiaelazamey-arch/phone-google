@@ -26,7 +26,7 @@
 
 | # | الركن | الحالة اليوم | الدليل المقيس (2026-11-01) | المتبقي |
 |---|---|---|---|---|
-| 1 | الشيفرة | ✅ | `check` 261 ملفًا · `arch:map:check` 16/124 · `npm audit` داخل CI | — |
+| 1 | الشيفرة | ✅ | `check` 262 ملفًا · `arch:map:check` 16/124 · `npm audit` داخل CI | — |
 | 2 | الاختبارات والتغطية | ✅ | `npm test` 1245 · 1228 pass · 0 fail · 17 skip · تغطية **92.48 / 77.66 / 87.77** (آخر تشغيل محلي بعد إصلاحات CI وMAN-007) | رفع الفروع > 80 تدريجيًا |
 | 3 | الأنبوب CI/CD | ✅ | جودة `41399947666` وCodeQL `41399947553` نجحا على `main@7596c27`؛ release وPages وEdge workflows اللاحقة نجحت وفق بواباتها | — |
 | 4 | الخدمات الحية | ⚠️ | Service reality audit `41399947513` على SHA الحالي = `skipped`؛ Render `41400115801` أعلن `not-configured` ولا live URL، فلا يُحسب نشرًا كاملًا | تدقيق ناجح على SHA الحالي مع تقرير قابل للفحص (`QA-005`/`OPS-005`) |
@@ -78,8 +78,8 @@
 | `version` | الإصدار | 0.3.0 (منشور immutable؛ tag `v0.3.0` يستهدف `7596c27e`) | `src/version.js` + `package.json` + GitHub Release API | 🔗/📅 |
 | `deps` | الاعتماديات | 5 prod · 2 dev | `package.json` | 🔗 |
 | `coverage_floor` | أرضية CI للتغطية | 89 / 71 / 82 | `test:coverage` | 🔗 |
-| `syntax_files` | الملفات المفحوصة نحويًا | 261 | نطاق `scripts/check.mjs` نفسه | 🔗 |
-| `continuity` | وثائق الاستمرارية / الروابط / المهام | 145 / 443 / 126 | `npm run check:continuity` | 🔗 |
+| `syntax_files` | الملفات المفحوصة نحويًا | 262 | نطاق `scripts/check.mjs` نفسه | 🔗 |
+| `continuity` | وثائق الاستمرارية / الروابط / المهام | 146 / 445 / 127 | `npm run check:continuity` | 🔗 |
 | `sandbox` | العزل | off | `CELIA_AGENT_SANDBOX` في `src/agent/index.js` | 🔗 |
 | `egress` | الخروج | off | `CELIA_AGENT_EGRESS` في `src/agent/index.js` | 🔗 |
 | `tests` | اختبارات | 1245 · **1228 pass** · 0 fail · 17 skip | `npm run test:coverage` (2026-11-01، بعد CI/MAN-007 وMEAS/PSC/FFP) | 📅 |
