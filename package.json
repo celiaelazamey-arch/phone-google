@@ -88,7 +88,9 @@
     "attention": "node scripts/attention.mjs",
     "delegate": "node scripts/delegation.mjs",
     "reconcile:report": "node scripts/reconcile-report.mjs",
-    "backup:verify": "node scripts/backup-verify.mjs"
+    "backup:verify": "node scripts/backup-verify.mjs",
+    "apps-script:sync": "node scripts/apps-script-sync.mjs",
+    "apps-script:check": "node scripts/apps-script-sync.mjs --check"
   },
   "dependencies": {
     "dotenv": "^18.0.9",
