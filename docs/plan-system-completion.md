@@ -79,7 +79,7 @@
 | `version` | الإصدار | 0.3.0 (منشور immutable؛ tag `v0.3.0` يستهدف `7596c27e`) | `src/version.js` + `package.json` + GitHub Release API | 🔗/📅 |
 | `deps` | الاعتماديات | 5 prod · 2 dev | `package.json` | 🔗 |
 | `coverage_floor` | أرضية CI للتغطية | 89 / 71 / 82 | `test:coverage` | 🔗 |
-| `syntax_files` | الملفات المفحوصة نحويًا | 279 | نطاق `scripts/check.mjs` نفسه | 🔗 |
+| `syntax_files` | الملفات المفحوصة نحويًا | 281 | نطاق `scripts/check.mjs` نفسه | 🔗 |
 | `continuity` | وثائق الاستمرارية / الروابط / المهام | 166 / 533 / 138 | `npm run check:continuity` | 🔗 |
 | `sandbox` | العزل | off | `CELIA_AGENT_SANDBOX` في `src/agent/index.js` | 🔗 |
 | `egress` | الخروج | off | `CELIA_AGENT_EGRESS` في `src/agent/index.js` | 🔗 |
