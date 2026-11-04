@@ -2,9 +2,9 @@
 
 > **حفظ التاريخ بلا حذف (`DEC-052` / `CONT-004`):** هذه نافذة الاستئناف النشطة؛ السجل التراكمي الكامل حتى ما بعد PR #84 (`main@738d832` / `9f6f8b2` — 983 سطرًا / 142,150 بايت) محفوظ حرفيًا في **[STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md)** وبصمته محروسة بـ`R0-02`، وأقسام 31 أكتوبر–3 نوفمبر المنقولة عند `6b4bb2d` و`a1d3f7b` و`0dff3bd` و`7051fd0` و`3bd53d6` و`50f2171` و`09c8d4c` (كتلتان: `ي` و`ك`) في **[STATE-ARCHIVE-2026-11.md](STATE-ARCHIVE-2026-11.md)**. القراءة السريعة المشتقة: **[NOW.md](NOW.md)** (`npm run now`).
 
-**آخر مراجعة:** 4 نوفمبر 2026
-**نوع الجلسة الحالية:** GOOG-006 / DEC-142 — `apps-script:sync` مبني ومختبَر (15/15 بخمس طفرات) على الفرع `arena/1c90e07e-phone-google`؛ المزامنة الحية مالك فقط (login/clone لم يُنفذا)؛ `GA-F3` و`GA-F5` و`REL-004` ما زالت مفتوحة؛ الإطلاق **متوقف** (`DEC-129+130`).
-**السجل:** [مزامنة Apps Script](sessions/2026-11-04-goog-006-apps-script-sync.md) · [بوابات Google Auth](sessions/2026-11-03-google-auth-launch-gates.md) · [مزامنة حالة الدمج](sessions/2026-11-04-merge-state-sync.md) · **PR:** [#168](https://github.com/celiaelazamey-arch/phone-google/pull/168) **OPEN** (فتح فقط بطلب المالك، لا دمج؛ يعارضه في المعرفات #167/#166 — قرار المالك) · **الفرع:** `arena/1c90e07e-phone-google` · **الأساس:** `main@99f09f6` · `v0.3.0` حي · لا مراجعة بشرية موثقة، ولا مراقبة 60 دقيقة، ولا إطلاق عام.
+**آخر مراجعة:** 5 نوفمبر 2026
+**نوع الجلسة الحالية:** D1 Backup & Recovery v2.7 — `LOCAL SIMULATED_PASS` (35/35 d1-verify, 1401/0/17) — `EXTERNAL GATE CLOSED` — التصحيحات A/B/C مضمنة — على الفرع `arena/241c4e6f-phone-google` (PR #169 OPEN) — `NETWORK=DENY` حتى موافقة E1 المحددة.
+**السجل:** [D1 LOCAL SIMULATED_PASS](sessions/2026-11-05-d1-local-simulated-pass.md) · [مزامنة Apps Script](sessions/2026-11-04-goog-006-apps-script-sync.md) · [مزامنة حالة الدمج](sessions/2026-11-04-merge-state-sync.md) · **PR:** [#169](https://github.com/celiaelazamey-arch/phone-google/pull/169) **OPEN** (LOCAL ONLY — لا `VERIFIED` قبل E1…E6) · **الفرع:** `arena/241c4e6f-phone-google` · **الأساس:** `f9bfa4e` (=origin/main) · `v0.3.0` حي · `256→281` ملفًا · لا مراجعة بشرية موثقة، ولا مراقبة 60 دقيقة، ولا إطلاق عام.
 
 ## 4 نوفمبر 2026 — `GOOG-006`: `apps-script:sync` مبني ومختبَر (DEC-142)
 
