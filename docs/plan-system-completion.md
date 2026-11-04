@@ -79,8 +79,8 @@
 | `version` | الإصدار | 0.3.0 (منشور immutable؛ tag `v0.3.0` يستهدف `7596c27e`) | `src/version.js` + `package.json` + GitHub Release API | 🔗/📅 |
 | `deps` | الاعتماديات | 5 prod · 2 dev | `package.json` | 🔗 |
 | `coverage_floor` | أرضية CI للتغطية | 89 / 71 / 82 | `test:coverage` | 🔗 |
-| `syntax_files` | الملفات المفحوصة نحويًا | 274 | نطاق `scripts/check.mjs` نفسه | 🔗 |
-| `continuity` | وثائق الاستمرارية / الروابط / المهام | 162 / 519 / 137 | `npm run check:continuity` | 🔗 |
+| `syntax_files` | الملفات المفحوصة نحويًا | 275 | نطاق `scripts/check.mjs` نفسه | 🔗 |
+| `continuity` | وثائق الاستمرارية / الروابط / المهام | 163 / 523 / 137 | `npm run check:continuity` | 🔗 |
 | `sandbox` | العزل | off | `CELIA_AGENT_SANDBOX` في `src/agent/index.js` | 🔗 |
 | `egress` | الخروج | off | `CELIA_AGENT_EGRESS` في `src/agent/index.js` | 🔗 |
 | `tests` | اختبارات | 1305 · **1288 pass** · 0 fail · 17 skip بيئي مصرح | `npm test` + `check-test-skips --allow-env-gates` (2026-11-04؛ المتخطيات ليست نجاحًا) | 📅 |

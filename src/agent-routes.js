@@ -442,6 +442,10 @@ export function createAgentRouter({ agent, authorize, logger = console }) {
       return res.status(400).json({ error: 'invalid_client_message_id' });
     }
     const note = typeof req.body?.note === 'string' ? req.body.note.slice(0, 500) : null;
+    // DATA-002: the revision the caller actually edited. Accepted from the body or an `if-match`
+    // header (the same optimistic-concurrency idea as the signed artifact download); absent means
+    // "revision 1 only", so a stale tab cannot skip the guard by omitting it.
+    const expectedRevision = req.body?.expectedRevision ?? req.get('if-match') ?? null;
     try {
       const result = await current.editPlan(
         req.params.id,
@@ -449,7 +453,8 @@ export function createAgentRouter({ agent, authorize, logger = console }) {
           payload: req.body?.payload ?? null,
           summary: req.body?.summary ?? null,
           note,
-          idempotencyKey
+          idempotencyKey,
+          expectedRevision
         },
         current.status().ownerId
       );
@@ -485,7 +490,9 @@ export function createAgentRouter({ agent, authorize, logger = console }) {
           payload: req.body?.payload ?? null,
           summary: req.body?.summary ?? null,
           note,
-          idempotencyKey
+          idempotencyKey,
+          // An `edited` decision is an edit: it carries the same concurrency precondition.
+          expectedRevision: req.body?.expectedRevision ?? req.get('if-match') ?? null
         },
         current.status().ownerId
       );

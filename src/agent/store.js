@@ -350,8 +350,27 @@ function memoryTable(kind) {
   throw codedError('invalid_memory_kind', 'invalid_memory_kind');
 }
 
+/**
+ * A refusal with a code — and, when the code is a *conflict with current durable state*, the HTTP
+ * status that goes with it.
+ *
+ * DATA-002 found this the hard way: losing an approval race raised `approval_already_decided` with a
+ * code but no status, `fail()` mapped it to 500, and a second browser tab was told the server had
+ * broken when in fact the first tab had simply won. A named conflict must read as a conflict (409);
+ * a 500 invites a retry that cannot help.
+ */
+const CONFLICT_CODES = new Set([
+  'approval_already_decided',
+  // The run moved on from `waiting_approval` between the read and the write.
+  'approval_request_missing',
+  // The intent stopped being an editable draft (approved, dispatched or settled by another tab).
+  'outbox_intent_not_editable'
+]);
+
 function codedError(code, message) {
-  return Object.assign(new Error(message || code), { code });
+  const error = Object.assign(new Error(message || code), { code });
+  if (CONFLICT_CODES.has(code)) error.status = 409;
+  return error;
 }
 
 function memoryText(value, max) {
