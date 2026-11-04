@@ -24,7 +24,7 @@ import {
   verifyEdgeConsentTicket,
   verifyWhatsAppSignatureWeb
 } from './crypto.js';
-import { completeGoogleAccountSignIn } from './google-account.js';
+import { cancelGoogleAccountSignIn, completeGoogleAccountSignIn } from './google-account.js';
 
 export const MCP_PROTOCOL_VERSION = '2024-11-05';
 export const SUPPORTED_MCP_VERSIONS = Object.freeze(['2024-11-05', '2025-03-26']);
@@ -547,7 +547,12 @@ export async function handleGoogleOAuthCallback({
   const db = requireD1(env);
   const code = String(url.searchParams.get('code') || '').trim();
   const state = String(url.searchParams.get('state') || '').trim();
-  if (!code || !state) {
+  const providerError = String(url.searchParams.get('error') || '').trim();
+  // Google returns `error=access_denied&state=signin:…` without a code when the user
+  // declines. Only the account sign-in branch may continue without a code; it still
+  // has to pass the same cookie check and consume the same one-use D1 state below.
+  const signinProviderError = state.startsWith('signin:') && Boolean(providerError);
+  if (!state || (!code && !signinProviderError)) {
     return { status: 400, body: { error: 'missing_oauth_code_or_state' } };
   }
   if (!OAUTH_STATE_PATTERN.test(state)) {
@@ -587,6 +592,9 @@ export async function handleGoogleOAuthCallback({
   // WA-008: the account-login state was just consumed single-use. It never reaches the
   // owner Workspace path below: no app_users row, no owner-email gate, no stored token.
   if (state.startsWith('signin:')) {
+    // A provider denial is a normal user decision, not a server error. The state was
+    // consumed above, so replaying this callback cannot create a session or reach Google.
+    if (providerError) return cancelGoogleAccountSignIn(providerError);
     return completeGoogleAccountSignIn({ env, code, redirectUri, fetchImpl, now });
   }
   const tokenRes = await fetchImpl('https://oauth2.googleapis.com/token', {

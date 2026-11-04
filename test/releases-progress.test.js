@@ -91,12 +91,14 @@ test("PRG-06: missing or oversized files degrade to parsed=false with a named re
   assert.equal(oversized.items, 0);
 });
 
-test("PRG-07: the real CHANGELOG separates the released 0.3.0 work from an empty Unreleased section", () => {
+test("PRG-07: the real CHANGELOG separates released 0.3.0 work from the two GA unreleased items", () => {
   const real = unreleasedProgress({ fresh: true });
   assert.equal(real.parsed, true, "the shipped CHANGELOG must be readable");
-  assert.equal(real.items, 0, "all recorded changes were assigned to the approved release");
+  assert.equal(real.items, 2, "the GA verifier and denial fix remain unreleased, not silently assigned to 0.3.0");
+  assert.equal(real.sections.added, 1);
+  assert.equal(real.sections.fixed, 1);
   const summed = Object.values(real.sections).reduce((a, b) => a + b, 0);
-  assert.equal(summed, 0);
+  assert.equal(summed, 2);
   assert.equal(real.unknownSections, 0);
   const changelog = readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf8');
   const releaseBlock = changelog.split(/^## 0\.3\.0 — Celia Edge & Governance — 2026-11-02$/m)[1]?.split(/^## 0\.2\.1\b/m)[0] || '';

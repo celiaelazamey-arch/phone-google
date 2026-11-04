@@ -26,3 +26,15 @@ test('صفحة ربط واتساب الثابتة لا تدّعي اتصالًا
     expect(diagnostics, diagnostics.join('\n')).toEqual([]);
   } finally { await flush(testInfo); }
 });
+
+test('رفض موافقة Google يعرض سببًا عربيًا ثابتًا ويزيل رمز الخطأ من عنوان الصفحة', async ({ page }, testInfo) => {
+  const { diagnostics, flush } = attachChromiumDiagnostics(page);
+  try {
+    await page.goto(`${STATIC}/whatsapp.html?google_error=google_access_denied`, { waitUntil: 'networkidle' });
+    await page.locator('#account-panel').evaluate((element) => { element.hidden = false; });
+    await expect(page.locator('#account-status')).toHaveText('لم تمنح Google الإذن. لم يتم تسجيل الدخول أو إنشاء حساب.');
+    await expect(page).toHaveURL(`${STATIC}/whatsapp.html`);
+    await expect(page.locator('body')).not.toContainText('access_denied');
+    expect(diagnostics, diagnostics.join('\n')).toEqual([]);
+  } finally { await flush(testInfo); }
+});

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+- WA-010 / GA-F0…GA-F5: `npm run verify:google-auth` now produces token-free live evidence for the exact Google 302 contract, HTTPS, redirect equality, public-bundle secret hygiene, OAuth cookie attributes, CSRF rejection, consent denial and one-use callback replay. The Cloudflare deployment runs it before `known_good` and uploads `google-auth-live.json`; its PASS never marks the external consent/review/60-minute launch gates complete. The runbook is `docs/google-auth-launch-gates.md`.
+
+### Fixed
+- GA-F3 / WA-008: Google `access_denied` no longer falls into a JSON `400 missing_oauth_code_or_state` response. After the same cookie check and atomic one-use state consumption, the user returns to `/whatsapp?google_error=google_access_denied`, sees a stable Arabic explanation, gets no account session, and cannot replay the callback or trigger token exchange.
+
 ## 0.3.0 — Celia Edge & Governance — 2026-11-02
 
 ### Release

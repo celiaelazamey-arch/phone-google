@@ -46,6 +46,15 @@ function signinFailure(reason) {
 }
 
 /**
+ * GA-F3 — a user who declines Google consent gets a stable Arabic UI reason, never a
+ * raw provider error or a JSON 400 page. handleGoogleOAuthCallback() calls this only
+ * after validating the state cookie and atomically consuming the one-use D1 state.
+ */
+export function cancelGoogleAccountSignIn(providerError = '') {
+  return signinFailure(providerError === 'access_denied' ? 'google_access_denied' : 'google_signin_failed');
+}
+
+/**
  * Start the account-login OAuth flow. The state is stored in D1 before the redirect;
  * the callback verifies both the cookie and the single-use row.
  */

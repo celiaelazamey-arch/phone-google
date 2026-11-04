@@ -299,3 +299,17 @@
 - معيار PLAN-002 §1 ما زال مفتوحًا (59 مهمة). التفاصيل في [سجل الجلسة](sessions/2026-11-02-release-0.3.0.md) و[سجل النشر](../deployments/ledger.json).
 
 <!-- END MOVED STATE SECTIONS G -->
+
+## الدفعة الثامنة (ح) — نقل من الأساس `3bd53d6`
+
+> نفس القاعدة: **بلا حذف**. قسم DEC-128 نُقل حرفيًا لإفساح نافذة GA-F0…F5؛ النص بين الوسمين
+> موصول بـ`\n` وله `\n` أخير، وتطابقه البايتات والبصمة أدناه.
+
+<!-- state-archive-block: source=docs/continuity/STATE.md baseline=3bd53d6 sha256=26bac2be9bf505aad3958dfbe5d17c7a1b1550fb7995e0d72a54243078ba30c7 bytes=690 lines=4 -->
+
+<!-- BEGIN MOVED STATE SECTIONS H -->
+## 3 نوفمبر 2026 — DEC-128: GOV-001 أولوية أولى — الفجوة مقيسة لا مُقدَّرة
+
+- المالك راجع GitHub مباشرة (PR #152 · Actions · ruleset `26270171`) واعتمد الترتيب: حوكمة ثم قرار مزوّد ثم RES كدراسات. القياس المباشر: `required_status_checks=[]` و**لا قاعدة `pull_request`** و`bypass_actors=[]`.
+- **فخ الموافقة الذاتية** مسجّل بالقرار: مالك وحيد لا يعتمد PR لنفسه — سياسة الموافقات/التجاوز قرار فرعي قبل أي PATCH. `SI-7` يبقى `demo` حتى مزوّد مجاني موثّق (`DEC-127`).
+<!-- END MOVED STATE SECTIONS H -->

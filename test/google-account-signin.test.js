@@ -133,6 +133,8 @@ test('WA-008 a verified Google identity opens a real account session without sto
   const cookies = f.cookiesOf(response);
   assert.equal(cookies.length, 2, 'session cookie + cleared one-use state cookie');
   assert.ok(cookies.some((entry) => entry.startsWith('celia_oauth_state=;') && entry.includes('Max-Age=0')));
+  const sessionSetCookie = cookies.find((entry) => entry.startsWith('__Host-celia_wa='));
+  assert.match(sessionSetCookie, /Path=\/; Max-Age=\d+; HttpOnly; Secure; SameSite=Lax/, 'GA-F2: the account session is Secure, HttpOnly and SameSite');
   const session = accountCookie(f, response);
 
   const me = await f.call('/api/account/me', { cookie: session });
@@ -169,6 +171,39 @@ test('WA-008 a mismatched state cookie is rejected before the code is exchanged'
   const response = await callback(f, { state: started.state, cookie: 'celia_oauth_state=signin:wrong' });
   assert.equal(response.status, 400);
   assert.equal((await response.json()).error, 'oauth_state_cookie_mismatch');
+  assert.equal(googleApiCalls(f).length, 0);
+  assert.equal(f.sqlite.prepare('SELECT COUNT(*) AS n FROM app_accounts').get().n, 0);
+});
+
+test('GA-F3 a Google consent denial returns to the Arabic UI, consumes state once and never exchanges a code', async () => {
+  const f = await fixture();
+  const started = await startSignIn(f);
+  const deniedPath = `/auth/google/callback?error=access_denied&error_description=private-provider-detail&state=${encodeURIComponent(started.state)}`;
+  const response = await f.call(deniedPath, { cookie: started.cookie });
+  assert.equal(response.status, 302);
+  assert.equal(response.headers.get('location'), '/whatsapp?google_error=google_access_denied');
+  assert.equal(JSON.stringify(response.headers).includes('private-provider-detail'), false, 'raw provider details are never reflected');
+  const cookies = f.cookiesOf(response);
+  assert.ok(cookies.some((entry) => entry.startsWith('celia_oauth_state=;') && entry.includes('Max-Age=0')));
+  assert.equal(cookies.some((entry) => entry.startsWith('__Host-celia_wa=')), false, 'denial never opens an account session');
+  assert.equal(googleApiCalls(f).length, 0, 'no token exchange or userinfo request occurs');
+  assert.equal(f.sqlite.prepare('SELECT COUNT(*) AS n FROM app_accounts').get().n, 0);
+  assert.ok(f.sqlite.prepare('SELECT used_at FROM oauth_states').get().used_at, 'the denial consumes the one-use state');
+
+  const replay = await f.call(deniedPath, { cookie: started.cookie });
+  assert.equal(replay.status, 400);
+  assert.equal((await replay.json()).error, 'invalid_or_expired_oauth_state');
+  assert.equal(googleApiCalls(f).length, 0, 'a replay still cannot reach Google');
+});
+
+test('GA-F2 a consent denial with the wrong state cookie is rejected without burning the pending state', async () => {
+  const f = await fixture();
+  const started = await startSignIn(f);
+  const deniedPath = `/auth/google/callback?error=access_denied&state=${encodeURIComponent(started.state)}`;
+  const response = await f.call(deniedPath, { cookie: 'celia_oauth_state=signin:wrong' });
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error, 'oauth_state_cookie_mismatch');
+  assert.equal(f.sqlite.prepare('SELECT used_at FROM oauth_states').get().used_at, null);
   assert.equal(googleApiCalls(f).length, 0);
   assert.equal(f.sqlite.prepare('SELECT COUNT(*) AS n FROM app_accounts').get().n, 0);
 });
@@ -305,5 +340,6 @@ test('WA-008 the WhatsApp account panel ships the Google icon wired to the sign-
   assert.match(html, /الدخول بحساب Google/);
   assert.match(js, /window\.location\.assign\('\/auth\/google\/signin'\)/);
   assert.match(js, /google_error/);
+  assert.match(js, /google_access_denied: 'لم تمنح Google الإذن\. لم يتم تسجيل الدخول أو إنشاء حساب\.'/);
   assert.match(js, /onEdge[\s\S]*google-signin'\)\.disabled = true/, 'the static preview disables a non-functional button');
 });
