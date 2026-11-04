@@ -144,6 +144,10 @@ CELIA_MCP_HOST=0.0.0.0 CELIA_MCP_PORT=3010 node src/celia-mcp.js
 
 حزمة Python مستقلة في [`celia-google-spider/README.md`](celia-google-spider/README.md) تبني فهرسًا محليًا من ملفات Google Drive (قراءة فقط، نطاق `drive.readonly`) وتقدّمه كست أدوات MCP عبر stdio: `spider_sync_google_drive` و`spider_search_knowledge` و`spider_read_document` و`spider_explore_network` و`spider_list_sources` و`spider_graph_stats` — بحث معجمي عربي/إنجليزي مع مقتطفات، وشبكة مستند↔مصطلح↔مستند، بلا حذف تلقائي للعناصر المحلية الغائبة، ولا embeddings، ولا أي منفذ شبكة. الإصدار 0.1.0 بتاريخ 2026-10-27؛ الاختبارات محلية: `python -m unittest discover -s tests -v` و`pytest -q` (10/10). راجع [README الحزمة](celia-google-spider/README.md) لخطوات الإعداد على Windows وحدودها؛ ملفا `credentials.json` و`token.json` ممنوعان من Git. ليست موصلة داخل ChatGPT (يتطلب ذلك موصلاً بعيداً/خدمة مدفوعة). القرار: [DEC-011](docs/continuity/DECISIONS.md).
 
+## مزامنة Google Apps Script إلى المستودع — معاينة قبل التطبيق
+
+أداة `npm run apps-script:sync -- --pull` تقارن نسخ clasp المحلية (`~/celia-apps`) بمجلد `apps-script/` وتعرض الفرق **دون أن تكتب شيئًا**؛ التطبيق لا يحدث إلا بـ`--pull --accept` بعد مراجعة البشر. سحب فقط، بلا شبكة، وملفات الاعتماد (`.clasprc.json` وغيرها) لا تُنسخ أبدًا، وأي محتوى يشبه سرًا يوقف المزامنة كلها. خطوات المالك الكاملة في [دليل المزامنة](docs/apps-script-sync.md). القرار: [DEC-142](docs/continuity/DECISIONS.md).
+
 ## المتطلبات
 
 Node.js 22+ (24 LTS موصى به)، MySQL 8+، وبيانات اعتماد OAuth من Google وبيانات WhatsApp Cloud API من Meta. مفتاح Gemini مطلوب فقط للردود الذكية الآلية.
