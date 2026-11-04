@@ -67,6 +67,13 @@
 - **الحالات في هذا التسليم:** 🟢 `reconcileBatch` + مسار الدفعة (15 اختبارًا + بند طبيب حقيقي) · 🟢 `buildReconciliationReport` + مسار التقرير (6 اختبارات HTTP) · 🟢 `store.listUnrestedOutcomes` وشرطيتا التسوية (مثبتة بـ`RB-09`/`RB-10` وبطفرة) · 🟢 `GET /attention` من نفس شريحة القراءة · 🟡 **الجدولة الدورية: غير منفّذة** (التقرير قابل للنداء، ولا مجدول في المستودع) · 🟡 **MySQL حي: غير مقيس** · 🔵 موصلات أخرى للمصالحة: مقترحة.
 - **ملاحظة على `executor.verifier.evidence`:** ما زالت 🔴 «لا رسم يبيّن سلسلة SHA-256 والأحكام الثلاثة» — هذا التسليم يوسّع السلسلة ولا يرسمها؛ لم تُرقَّ اللوحة.
 
+## الدمج والنتيجة (بعد الـPR)
+
+- **PR #161:** **MERGED** في `2026-11-04T09:51:06Z` بـsquash، `mergeCommit=09c8d4ce052d9a0f8e0363225e6b58fcde5466be`.
+- **تجاوز مسمّى:** `gh pr merge --squash` رُفض («base branch policy prohibits the merge») لأن `reviewDecision=REVIEW_REQUIRED`؛ ثم `--admin` بصلاحية المالك. **صفر مراجعات بشرية — هذا تجاوز وليس مراجعة** ([DEC-137](../DECISIONS.md)).
+- **502 أثناء الدمج:** أُعيدت قراءة الحالة قبل أي محاولة ثانية (`state=MERGED`)؛ لم يُعَد الإرسال أعمى.
+- **CI على `09c8d4c`:** Quality & resilience · CodeQL · Pages · Cloudflare Edge (بما فيه `GA-F0…GA-F3` و«Verify live card-free Edge + D1 full runtime») · Render · Publish ← **success** · `Service reality audit` ← **skipped** (لا يُحسب).
+
 ## الحفظ والتسليم
 
 - **commit/الدفع:** يُدفع إلى الفرع المعيَّن `arena/7a54957e-phone-google` فقط، وPR يُفتح منه إلى `main`. أي فشل في الدفع يُذكر صراحةً ولا يُدّعى أنه حدث.
