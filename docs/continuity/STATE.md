@@ -6,6 +6,13 @@
 **نوع الجلسة الحالية:** WA-010/REL-004 / DEC-133 — #159 **مدموج ومنشور** على الحافة؛ `GA-F3` و`GA-F5` و`REL-004` ما زالت مفتوحة؛ الإطلاق **متوقف** (`DEC-129+130`).
 **السجل:** [بوابات Google Auth](sessions/2026-11-03-google-auth-launch-gates.md) · [مزامنة حالة الدمج](sessions/2026-11-04-merge-state-sync.md) · **PR:** [#159](https://github.com/celiaelazamey-arch/phone-google/pull/159) **MERGED** في `2026-11-04T07:33:53Z` → `main@50f2171` · **الفرع:** `arena/6635c606-phone-google` · **الأساس:** `main@50f2171` · `v0.3.0` حي · لا مراجعة بشرية موثقة، ولا مراقبة 60 دقيقة، ولا إطلاق عام.
 
+## 4 نوفمبر 2026 — `GOOG-006`: بنية مزامنة Apps Script مبنية offline، والسحب الحقيقي مالك فقط (DEC-142)
+
+- **الطلب وصل بأوامر جاهزة** (`clasp login` · `cp -r deploy/apps-script ~/celia-apps` · `clone <SCRIPT_ID>` · `apps-script:sync -- --pull --accept`) لكن القياس أثبت أن `deploy/apps-script/` والسكربت والـ`SCRIPT_ID` وتسجيل دخول clasp **كلها غائبة** — فاختار المالك «ابنِ البنية offline الأول» و«pull بـaccept بعد مراجعة الفرق»، والغرض مزامنة فقط.
+- **ما بُني:** `deploy/apps-script/` بصفر سلوك خارجي (`oauthScopes: []`) · `npm run apps-script:sync` (فحص جاف ببصمات، `--pull` بلا تطبيق، `--pull --accept` وحده يطبّق بعد نسخة احتياطية خارج Git، `--push` مرفوض، وسرّ مسحوب يوقف القبول) · الدليل [apps-script-sync.md](../apps-script-sync.md) · `AS-01…AS-10`.
+- **دليل هذه الجلسة:** الفحص الجاف الحقيقي `not-configured` (خروج 2) قبل النسخ، ثم نُفّذ `cp -r` فعليًا إلى `~/celia-apps` فصار `identical` (5 ملفات، خروج 0). **صفر اتصال بـGoogle** — لا login ولا clone ولا pull حقيقي، ولم يُدّعَ غير ذلك.
+- **الخطوة التالية — مالك فقط:** `npx @google/clasp login` بحسابه، ثم `clasp clone <SCRIPT_ID>` داخل `~/celia-apps`، ثم `npm run apps-script:sync -- --pull` ومراجعة الفرق قبل أي `--accept`.
+
 ## 4 نوفمبر 2026 — `DATA-001` **مدمجة** في `main@591c8b4` (DEC-141)
 
 - **#164 دُمج بـ`--admin`** بعد رفض البوابة، بطلب المالك. **تجاوز رابع مسجَّل، صفر مراجعات بشرية.**

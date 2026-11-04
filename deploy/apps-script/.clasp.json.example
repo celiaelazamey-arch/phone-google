@@ -1,0 +1,5 @@
+{
+  "//": "انسخ إلى .clasp.json في نسخة العمل فقط (~/celia-apps) — .clasp.json الحقيقي مُهمل في Git لأنه يحمل معرّف مشروع المالك. الأفضل: دَع clasp clone ينشئه.",
+  "scriptId": "<SCRIPT_ID>",
+  "rootDir": "."
+}

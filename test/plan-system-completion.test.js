@@ -58,9 +58,9 @@ function errorsOf(result) {
 test('PSC-01 the real tree passes: every open task sits in exactly one wave', async () => {
   const result = await realRun();
   assert.deepEqual(result.errors, [], errorsOf(result));
-  // DATA-003 closed by DEC-136 and DATA-002 by DEC-139, so the register measures 66 open (P0 21) in this tree. The number is
-  // a measurement of BACKLOG, never a target to keep a test green.
-  assert.equal(result.facts.open, 66, 'the register has exactly 66 open tasks after DATA-002 closed (DEC-139)');
+  // DATA-003 closed by DEC-136 and DATA-002 by DEC-139 (66 open), then GOOG-006 opened by DEC-142, so the register
+  // measures 67 open (P0 21) in this tree. The number is a measurement of BACKLOG, never a target to keep a test green.
+  assert.equal(result.facts.open, 67, 'the register has exactly 67 open tasks after GOOG-006 opened (DEC-142)');
   assert.equal(result.facts.byPriority.P0, 21);
   assert.deepEqual(Object.keys(result.facts.waves).sort(), ['W0', 'W1', 'W2', 'W3', 'W4', 'W5', 'W6']);
   const covered = Object.values(result.facts.waves).reduce((sum, count) => sum + count, 0);
@@ -120,7 +120,7 @@ test('PSC-06 every live baseline row is recomputed, and a stale number is named'
     ['agent_tools', '18 (5 بموافقة)', '19 (5 بموافقة)', /baseline "agent_tools" says 19\/5 but createDefaultTools\(\) has 18\/5/],
     ['mcp_tools', '12 مُعلنة', '13 مُعلنة', /baseline "mcp_tools" says 13 but MCP_TOOLS has 12/],
     ['deps', '5 prod · 2 dev', '6 prod · 2 dev', /baseline "deps" says 6 prod \/ 2 dev but package\.json has 5\/2/],
-    ['open_tasks', '**66** (21 P0 · 31 P1 · 14 P2)', '**65** (21 P0 · 30 P1 · 14 P2)', /baseline "open_tasks" says 65 \/ 21 \/ 30 \/ 14 but BACKLOG has 66 \/ 21 \/ 31 \/ 14/],
+    ['open_tasks', '**67** (21 P0 · 32 P1 · 14 P2)', '**65** (21 P0 · 30 P1 · 14 P2)', /baseline "open_tasks" says 65 \/ 21 \/ 30 \/ 14 but BACKLOG has 67 \/ 21 \/ 32 \/ 14/],
     ['sandbox', '| `sandbox` | العزل | off |', '| `sandbox` | العزل | exec |', /baseline "sandbox" says exec but the runtime default is off/]
   ];
   for (const [key, from, to, expected] of cases) {
@@ -154,13 +154,13 @@ test('PSC-08 a link to a file that is not there is a failure, not a footnote', a
 test('PSC-09 the parsers read the two documents the way the tables are written', () => {
   const tasks = parseBacklogRows(backlog);
   assert.ok(tasks.size >= 120, `expected the full register, saw ${tasks.size}`);
-  assert.equal(openTasksOf(tasks).length, 66);
+  assert.equal(openTasksOf(tasks).length, 67);
   assert.equal(openTasksOf(tasks).filter((task) => task.priority === 'P0').length, 21);
 
   const waves = parseWaves(plan);
   assert.deepEqual(waves.map((wave) => wave.wave), ['W0', 'W1', 'W2', 'W3', 'W4', 'W5', 'W6']);
   assert.equal(waves.find((wave) => wave.wave === 'W0').tasks.length, 0, 'W0 is work on the register, not a backlog id');
-  assert.equal(waves.reduce((sum, wave) => sum + wave.tasks.length, 0), 66);
+  assert.equal(waves.reduce((sum, wave) => sum + wave.tasks.length, 0), 67);
 
   const baseline = parseBaseline(plan);
   assert.equal(new Set(baseline.map((row) => row.key)).size, baseline.length, 'baseline keys are unique');

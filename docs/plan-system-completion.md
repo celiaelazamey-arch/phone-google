@@ -33,7 +33,7 @@
 | 4 | الخدمات الحية | ⚠️ | Service reality audit `41399947513` على SHA الحالي = `skipped`؛ Render `41400115801` أعلن `not-configured` ولا live URL، فلا يُحسب نشرًا كاملًا | تدقيق ناجح على SHA الحالي مع تقرير قابل للفحص (`QA-005`/`OPS-005`) |
 | 5 | الإصدار والحافة الدائمة | ⚠️ | PR #136 مدمج في `7596c27`; `v0.3.0` منشور immutable (`41399947570`). Edge `41400115739` أعلن حيًا `0.3.0@7596c27`, D1 durable و`known_good`; Pages `41399947941` أثبت 13/13 route على SHA نفسه. لم يقرأ probe جسم `version.json`؛ الإثبات المباشر لمحتواه باقٍ. `v0.2.1` محفوظ | فحص `version.json` الحي نصيًا على Pages مقابل `0.3.0` وSHA نفسه؛ ثم تسجيل الدليل، دون الخلط باكتمال النظام |
 | 6 | الخادم الخلفي الكامل (Express + MySQL) | ❌ | Render workflow (`41400115801`) نجح كفحص لكنه أفاد `not-configured`، بلا خدمة وبلا live URL؛ الحافة وحدها منشورة، فلا يُحسب ذلك نشرًا حيًا | `HOST-003` 🔑🌐 |
-| 7 | القنوات (Google / WhatsApp) | ❌ | تهيئة WhatsApp التقنية على الحافة متحققة حيًا (`41456011988` على `main@2b47d62`: `whatsapp-onboarding configured=true`، `optionalSecretBindings=3`، `totalSecretBindings=21`)؛ ربط الرقم الفعلي وإرسال/استقبال الرسائل وربط Google لم تُنفَّذ بعد | `GOOG-004/005` · `WA-005/007` 🔑🌐 |
+| 7 | القنوات (Google / WhatsApp) | ❌ | تهيئة WhatsApp التقنية على الحافة متحققة حيًا (`41456011988` على `main@2b47d62`: `whatsapp-onboarding configured=true`، `optionalSecretBindings=3`، `totalSecretBindings=21`)؛ ربط الرقم الفعلي وإرسال/استقبال الرسائل وربط Google لم تُنفَّذ بعد | `GOOG-004/005/006` · `WA-005/007` 🔑🌐 |
 | 8 | الحماية والاستعادة | ⚠️ | سلسلة أدلة مُختبَرة. **حماية `main` أقوى مما كُتب سابقًا (قياس 2026-11-04، `DEC-134`)**: ruleset `26270171` (حذف · قوة · تاريخ خطي · CodeQL errors/high) **ورقم `26452705` «Main PR Gate» نشِط منذ 3 نوفمبر**: مراجعة واحدة مطلوبة + `required_status_checks=["Celia quality & resilience"]`. الفجوة الباقية: **`bypass_actors` بحساب المالك و`bypass_mode=always`** (وهو مسار دمج #159 بلا مراجعة)، وCodeQL ليس ضمن المطلوب، ونسخة MySQL غير مقيسة | `GOV-001` (تقييد التجاوز + إضافة CodeQL) · `DATA-001` 🔑 |
 
 **`B1` = 5.5 / 8.** لا يُعلن «100%» حتى تُغلق 6 و7 و8 بدليل خارجي (تشغيلة + تقرير)، لا بوصف.
@@ -72,15 +72,15 @@
 
 | المفتاح | المؤشر | القيمة | كيف يُعاد | الربط |
 |---|---|---|---|---|
-| `open_tasks` | مهام مفتوحة | **66** (21 P0 · 31 P1 · 14 P2) | عدّ `BACKLOG` نفسه | 🔗 |
+| `open_tasks` | مهام مفتوحة | **67** (21 P0 · 32 P1 · 14 P2) | عدّ `BACKLOG` نفسه | 🔗 |
 | `grants` | الصلاحيات | 67 (`GRANT_IDS`) | `src/agent/access-policy.js` | 🔗 |
 | `agent_tools` | أدوات الوكيل | 18 (5 بموافقة) · صفر متصفح | `createDefaultTools()` | 🔗 |
 | `mcp_tools` | أدوات MCP | 12 مُعلنة | `MCP_TOOLS` في `src/celia-mcp.js` | 🔗 |
 | `version` | الإصدار | 0.3.0 (منشور immutable؛ tag `v0.3.0` يستهدف `7596c27e`) | `src/version.js` + `package.json` + GitHub Release API | 🔗/📅 |
 | `deps` | الاعتماديات | 5 prod · 2 dev | `package.json` | 🔗 |
 | `coverage_floor` | أرضية CI للتغطية | 89 / 71 / 82 | `test:coverage` | 🔗 |
-| `syntax_files` | الملفات المفحوصة نحويًا | 277 | نطاق `scripts/check.mjs` نفسه | 🔗 |
-| `continuity` | وثائق الاستمرارية / الروابط / المهام | 165 / 529 / 137 | `npm run check:continuity` | 🔗 |
+| `syntax_files` | الملفات المفحوصة نحويًا | 279 | نطاق `scripts/check.mjs` نفسه | 🔗 |
+| `continuity` | وثائق الاستمرارية / الروابط / المهام | 166 / 530 / 138 | `npm run check:continuity` | 🔗 |
 | `sandbox` | العزل | off | `CELIA_AGENT_SANDBOX` في `src/agent/index.js` | 🔗 |
 | `egress` | الخروج | off | `CELIA_AGENT_EGRESS` في `src/agent/index.js` | 🔗 |
 | `tests` | اختبارات | 1305 · **1288 pass** · 0 fail · 17 skip بيئي مصرح | `npm test` + `check-test-skips --allow-env-gates` (2026-11-04؛ المتخطيات ليست نجاحًا) | 📅 |
@@ -100,7 +100,7 @@
 | **W2** قرارات المالك 🔑 | GOV-001 · REL-001 · REL-003 (`0.3.0` منشور؛ إثبات جسم Pages `version.json` المباشر باقٍ) · DATA-004 · MULTI-001 · SIE-001 · DIFF-001 · RES-001 · RES-002 · RES-003 · RES-005 | 11 | S (قرار + إثبات نشر) |
 | **W3** النشر والقنوات | HOST-003 · WA-005 · WA-007 · WA-008 · OPS-005 · OPS-002 · QA-004 · REL-004 | 8 | L |
 | **W4** قدرات الوكيل الكاملة | AGENT-001 · AGENT-002 · AGENT-003 · AGENT-004 · AGENT-005 · AGENT-008 · AGENT-009 · AGENT-010 · KB-001 · KB-002 · KB-003 · KB-004 · LEARN-001 · AI-001 · AI-002 · MCP-001 · MCP-002 | 17 | XL |
-| **W5** التكاملات ونظام الشركة | INT-001 · INT-002 · INT-003 · GOOG-004 · GOOG-005 · WA-006 · DES-002 · SPDR-002 | 8 | XL |
+| **W5** التكاملات ونظام الشركة | INT-001 · INT-002 · INT-003 · GOOG-004 · GOOG-005 · GOOG-006 · WA-006 · DES-002 · SPDR-002 | 9 | XL |
 | **W6** الإدارة والمراقبة والواجهة | OPS-001 · OPS-003 · OPS-004 · UX-002 · UX-003 · QA-002 · QA-003 · VFE-002 · VFE-005 · MAN-001 · MAN-002 · MAN-003 · MAN-004 · MAN-006 · MAN-007 · DSN-002 · PLAN-001 | 17 | L |
 
 **هذا الجدول محروس آليًا** (`npm run plan:check`): كل مهمة مفتوحة في `BACKLOG` تظهر في حزمة واحدة بالضبط،
@@ -200,12 +200,12 @@
 
 ---
 
-### W5 — التكاملات ونظام الشركة · 8 مهام · 15–20 يومًا
+### W5 — التكاملات ونظام الشركة · 9 مهام · 15–20 يومًا
 
 | المسار | البوابة |
 |---|---|
 | INT-001/002/003 | عقد محوّل موحّد؛ كل خدمة جديدة تُضاف بملف واحد + اختبار تكافؤ |
-| GOOG-004/005 | حساب حقيقي مربوط، قراءة مُتحقَّقة، وتصدير يعمل بموافقة |
+| GOOG-004/005/006 | حساب حقيقي مربوط، قراءة مُتحقَّقة، وتصدير يعمل بموافقة |
 | WA-006 | سياق المحادثة يصل للمخطِّط دون تسريب أسرار |
 | DES-002 | ≥5 مهارات `active` بعقود (بوابات `DEC-112`) + مؤشرات مشتقة من الأدلة |
 | SPDR-002 | حزمة Python قابلة للنشر أو إسقاط صريح بقرار |
