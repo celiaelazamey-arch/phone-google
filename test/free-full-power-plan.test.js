@@ -96,15 +96,19 @@ test('FFP-06 the measured edge surface matches the numbers the plan prints', () 
   assert.equal(paths.size, 13, `the edge route groups changed (${[...paths].sort().join(', ')}) — §2 must be re-measured`);
 
   const agentRoutes = (read('src/agent-routes.js').match(/router\.(get|post|put|patch|delete)\(/g) || []).length;
-  assert.equal(agentRoutes, 24, 'the agent route count changed — the capability table must be re-measured');
+  // DATA-003 added three routes: reconcile-batch, reconciliation-report, attention. The number is a
+  // measurement, so it moves only when the route table does.
+  assert.equal(agentRoutes, 27, 'the agent route count changed — the capability table must be re-measured');
 
   const expressEndpoints = ['src'].flatMap((directory) =>
     readdirSync(path.join(root, directory))
       .filter((name) => name.endsWith('.js'))
       .map((name) => (read(path.join(directory, name)).match(/\b(?:router|app)\.(?:get|post|put|patch|delete)\(/g) || []).length)
   ).reduce((sum, count) => sum + count, 0);
-  assert.ok(expressEndpoints >= 90 && expressEndpoints <= 120, `expected ≈100 Express endpoints, measured ${expressEndpoints}`);
-  assert.match(plan, /≈100/);
+  // The band moves with a measured change, never to make a failure disappear: DATA-003 added three
+  // agent routes and the measured total crossed the old ceiling of 120.
+  assert.ok(expressEndpoints >= 100 && expressEndpoints <= 135, `expected ≈120 Express endpoints, measured ${expressEndpoints}`);
+  assert.match(plan, /≈120/);
 });
 
 test('FFP-07 the plan rides the workflows that actually deploy, and quotes their real gate', () => {
@@ -135,7 +139,7 @@ test('FFP-07 the plan rides the workflows that actually deploy, and quotes their
 
 test('FFP-08 the plan cannot claim parity it does not have', () => {
   assert.match(plan, /1\.5 \/ 6|1\.5\/6/, 'the measured edge score is stated');
-  assert.match(plan, /24 مسارًا/, 'the agent routes are named as the gap');
+  assert.match(plan, /27 مسارًا/, 'the agent routes are named as the gap');
   assert.match(plan, /HOST-003/, 'the deferred engine is named, not silently dropped');
   assert.match(plan, /لا يُقال/, 'the plan keeps its explicit "what is not claimed" list');
   assert.doesNotMatch(plan, /الحافة = Express/, 'the plan must not equate the edge with the deferred engine');

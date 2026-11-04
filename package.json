@@ -86,7 +86,8 @@
     "kb:conflicts": "node scripts/kb-conflicts.mjs",
     "memory:consolidate": "node scripts/memory-consolidate.mjs",
     "attention": "node scripts/attention.mjs",
-    "delegate": "node scripts/delegation.mjs"
+    "delegate": "node scripts/delegation.mjs",
+    "reconcile:report": "node scripts/reconcile-report.mjs"
   },
   "dependencies": {
     "dotenv": "^18.0.9",

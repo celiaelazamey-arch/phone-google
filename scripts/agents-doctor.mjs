@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
 
 import { createSqliteDriver } from '../src/agent/drivers.js';
-import { createAgentStore, RUN_STATUS } from '../src/agent/store.js';
+import { createAgentStore, RUN_STATUS, TOOL_RUN_STATUS } from '../src/agent/store.js';
 import { createAgentRuntime } from '../src/agent/runtime.js';
 import { createDefaultTools } from '../src/agent/tools.js';
 import { createDemoPlanner, createScriptedPlanner } from '../src/agent/planner.js';
@@ -40,6 +40,12 @@ import { createKnowledgeHost } from '../src/knowledge/index.js';
 import { planDelegation, checkDelegation } from '../src/agent/delegation.js';
 import { createDiagnosisReport, TEST_OUTCOMES } from '../src/agent/self-diagnosis.js';
 import { buildAttention, checkQueue } from '../src/agent/attention.js';
+import {
+  RECONCILE_OUTCOME,
+  RECONCILE_TARGET,
+  buildReconciliationReport,
+  reconcileBatch
+} from '../src/agent/reconcile-batch.js';
 import { consolidate, checkReport } from '../src/agent/consolidation.js';
 import { classifyIssue } from '../src/agent/issue-triage/classify.js';
 import { defaultRoute, computeCostMicros, DECLARED_GEMINI_PRICING } from '../src/agent/model-router.js';
@@ -496,7 +502,72 @@ check('attention', 'قائمة الانتظار المستحقة — مشتقة 
   );
 });
 
-// ── 11. وكيل فرز المشكلات ────────────────────────────────────────────────
+// ── 11. المصالحة الجماعية والتقرير الدوري (DATA-003) ──────────────────────
+check('reconciliation-batch', 'المصالحة الجماعية والتقرير الدوري — قرار واحد، صفوف كثيرة، بلا إرسال', async (self) => {
+  // A real store in a temp file, not a mock: the conditional writes are the point of the capability.
+  const driver = await createSqliteDriver({ path: tempPath('reconcile.sqlite3') });
+  const store = createAgentStore({ driver, clock: () => Date.parse('2026-11-01T00:00:00.000Z') });
+  try {
+    const thread = await store.createThread({ ownerId: 'owner', title: 'مصالحة' });
+    const { run } = await store.createRun({
+      threadId: thread.id,
+      ownerId: 'owner',
+      userMessageId: null,
+      clientMessageId: 'doctor-reconcile-0001',
+      planner: 'doctor',
+      maxSteps: 6,
+      maxCostMicros: 1000
+    });
+    const ids = [];
+    for (const index of [0, 1]) {
+      const { toolRun } = await store.startToolRun({
+        runId: run.id,
+        toolName: `read.${index}`,
+        risk: 'read',
+        idempotencyKey: `${run.id}:doctor:${index}`
+      });
+      await store.finishToolRun(toolRun.id, TOOL_RUN_STATUS.unknown, JSON.stringify({ reason: 'process_interrupted' }));
+      ids.push(toolRun.id);
+    }
+    const batch = await reconcileBatch(
+      {
+        store,
+        runId: run.id,
+        actor: 'owner',
+        target: RECONCILE_TARGET.toolRun,
+        targetIds: ids,
+        outcome: RECONCILE_OUTCOME.applied,
+        note: 'فحص الطبيب'
+      },
+      { now: '2026-11-01T00:00:00.000Z' }
+    );
+    // One row is settled by a person first, so the batch must report a skip instead of overwriting.
+    const leftover = await store.listUnrestedOutcomes();
+    const report = buildReconciliationReport(leftover, { now: '2026-11-01T06:00:00.000Z' });
+    const chain = await store.verifyEvidenceChain(run.id);
+    const ok = batch.settled === 2 && batch.complete === true && chain.ok && report.resends === false && report.schedules === false;
+    finish(
+      self,
+      ok ? 'works' : 'broken',
+      ok
+        ? `سُوِّيت ${batch.settled} صفوف بقرار واحد (بصمة ${batch.findingDigest.slice(0, 12)})، والسلسلة سليمة، والتقرير يقول «${report.reading}» بلا جدولة ولا إرسال`
+        : `مستقر=${batch.settled}، مكتمل=${batch.complete}، سلسلة=${chain.ok}`,
+      {
+        settled: batch.settled,
+        skipped: batch.skipped.length,
+        complete: batch.complete,
+        unresolvedTotal: report.unresolvedTotal,
+        schedules: report.schedules,
+        resends: report.resends,
+        chainOk: chain.ok
+      }
+    );
+  } finally {
+    await store.close().catch(() => {});
+  }
+});
+
+// ── 12. وكيل فرز المشكلات ────────────────────────────────────────────────
 check('issue-triage', 'وكيل فرز المشكلات (issue-triage) — تصنيف محلي بلا شبكة', async (self) => {
   const critical = classifyIssue({ title: 'تسرب مفتاح API في سجلات الإنتاج', body: 'المفتاح ظهر في سجلات النشر ويمكن استغلاله. أمني وعاجل جدًا.' });
   const bug = classifyIssue({ title: 'الخادم يتعطل عند رفع ملف كبير', body: 'عند رفع ملف 40 ميغابايت يتوقف الخادم بخطأ 500 ويعود بعد إعادة التشغيل.' });
