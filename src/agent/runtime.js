@@ -32,6 +32,8 @@ import { deriveNow, timeSteps } from './timing.js';
 import { buildMemoryFromSteps, normalizeMemoryKind } from './memory.js';
 import { planDelegation } from './delegation.js';
 import { BusRefusal, buildMessage, hashPayload, verifyMessage } from './collaboration-bus.js';
+import { buildReconciliationReport, readAmbiguitySnapshot, reconcileBatch } from './reconcile-batch.js';
+import { buildAttention } from './attention.js';
 
 export { PLAN_LIFECYCLE_STATE };
 
@@ -2221,6 +2223,70 @@ export function createAgentRuntime({
         throw httpError(409, result.reason || 'thread_delete_blocked', result.reason || 'thread_delete_blocked');
       }
       return result;
+    },
+    /**
+     * DATA-003 — many ambiguous records, one stated finding.
+     *
+     * Same guards as `reconcile`: bookkeeping only, no connector, no re-send, one finding per batch,
+     * and a record another process already settled is reported as skipped rather than overwritten.
+     * The work itself lives in `reconcile-batch.js`; this method supplies the store and the owner.
+     */
+    async reconcileMany(runId, { target, targetIds, outcome, externalRef = null, note = null } = {}, requesterId = ownerId) {
+      const reference = typeof externalRef === 'string' ? externalRef.trim().slice(0, 240) || null : null;
+      const memo = typeof note === 'string' ? note.trim().slice(0, 500) || null : null;
+      const report = await reconcileBatch(
+        {
+          store,
+          runId,
+          actor: requesterId,
+          target,
+          targetIds,
+          outcome,
+          externalRef: reference,
+          note: memo
+        },
+        { now: new Date(clock()).toISOString() }
+      );
+      // A batch that settled every requested row and left nothing ambiguous may release the run.
+      // A batch that left anything owed keeps the run parked — the single path's rule, unchanged.
+      const remaining = await runtime.unresolvedFor(runId);
+      const resolvedNothingLeft = remaining.toolRuns.length === 0 && remaining.outbox.length === 0;
+      let resumed = false;
+      const run = await store.getRun(runId);
+      if (resolvedNothingLeft && run.status === RUN_STATUS.needsReconciliation && report.settled > 0) {
+        resumed = await store.requeueRun(runId, { from: [RUN_STATUS.needsReconciliation] });
+        if (resumed) {
+          emit(runId, { type: 'run.reconciled', runId, resumed: true, batch: true });
+          runtime.start(runId).catch((error) => logger.error?.('Batch reconciliation resume failed:', error?.code || 'resume_failed'));
+        }
+      }
+      return { ...report, remaining, resumed, run: await store.getRun(runId) };
+    },
+    /**
+     * DATA-003 — the periodic reconciliation view, derived from durable records.
+     *
+     * Nothing is stored and nothing is scheduled: this answers «what is still unknown, and for how
+     * long?» at the moment it is asked. A workflow that calls it on a timer is a separate approved
+     * decision; the report itself claims no cadence it does not keep.
+     */
+    async reconciliationReport({ thresholdMs = 6 * 60 * 60 * 1000, limit = 200 } = {}) {
+      const at = new Date(clock()).toISOString();
+      const snapshot = await readAmbiguitySnapshot({ store, limit });
+      return buildReconciliationReport(
+        { runs: [], toolRuns: snapshot.toolRuns, outbox: snapshot.outbox },
+        { now: at, thresholdMs }
+      );
+    },
+    /**
+     * DATA-003 — the attention queue, derived from the same durable snapshot as the report.
+     *
+     * One discovery function feeds both views, so the queue cannot say "nothing is owed" while the
+     * report says one intent is still unknown. `sends`/`tracksRead` stay false: this is a read.
+     */
+    async attention({ limit = 200 } = {}) {
+      const now = new Date(clock()).toISOString();
+      const snapshot = await readAmbiguitySnapshot({ store, limit });
+      return buildAttention({ ...snapshot }, { now });
     },
     // M-B/B2: استعراض artifacts تشغيلةٍ ما — خلف ملكية التشغيل نفسها التي تحمي
     // detail()؛ روابط التنزيل تُوقَّع لحظة الطلب وتنتهي صلاحيتها ذاتيًا.

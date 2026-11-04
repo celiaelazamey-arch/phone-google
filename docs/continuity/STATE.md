@@ -6,6 +6,14 @@
 **نوع الجلسة الحالية:** WA-010/REL-004 / DEC-133 — #159 **مدموج ومنشور** على الحافة؛ `GA-F3` و`GA-F5` و`REL-004` ما زالت مفتوحة؛ الإطلاق **متوقف** (`DEC-129+130`).
 **السجل:** [بوابات Google Auth](sessions/2026-11-03-google-auth-launch-gates.md) · [مزامنة حالة الدمج](sessions/2026-11-04-merge-state-sync.md) · **PR:** [#159](https://github.com/celiaelazamey-arch/phone-google/pull/159) **MERGED** في `2026-11-04T07:33:53Z` → `main@50f2171` · **الفرع:** `arena/6635c606-phone-google` · **الأساس:** `main@50f2171` · `v0.3.0` حي · لا مراجعة بشرية موثقة، ولا مراقبة 60 دقيقة، ولا إطلاق عام.
 
+## 4 نوفمبر 2026 — `DATA-003` مغلقة بدليل: مصالحة جماعية وتقرير دوري (DEC-136)
+
+- **الطلب:** «افتح Pull Request» بعد أن أُغلقت مسألة الفرع — فرع هذه الجلسة `arena/7a54957e-phone-google` مبنيٌّ من `a20a1cd` نفسه، فلم تكن هناك شجرة متقادمة. [السجل](sessions/2026-11-04-data-003-bulk-reconciliation.md).
+- **الباقي الحرفي في الصفّ كان:** «مصالحة جماعية/تقارير مصالحة دورية». **نُفّذ:** `src/agent/reconcile-batch.js` — قرار واحد يصحّح صفوفًا كثيرة بتصفية شرطية (`already_settled` · `lost_race` · `not_ambiguous` بدل الكتابة فوق حسم)، وتقرير مشتقّ يقول ما بقي وعمره؛ `POST /runs/:id/reconcile-batch` · `GET /reconciliation-report` · `GET /attention` (كلها من شريحة قراءة واحدة)، و`npm run reconcile:report`، وبند طبيب `reconciliation-batch` على مسار حقيقي.
+- **القواعد المعلنة في الكود:** دفعة فارغة مرفوضة · قرار واحد لا يخلط `applied`/`not_applied` · سقف 50 · عمر غير مقيس = متأخر · `sends:false` · `resends:false` · `schedules:false` · لا موصل ولا إعادة إرسال.
+- **الدليل:** `npm test` **1350 / 1333 ناجح / 0 فشل / 17 skipped**؛ 21 اختبارًا جديدًا مثبتة بثماني طفرات (أول جولة كشفت ثغرتين: `lostRace` وحدّ الـlease ⇒ `RB-08`/`RB-10`). مسارات الوكيل 24→**27** وExpress ≈100→**≈120** وملفات الفحص 271→**274**، وصُحّحت الأرقام في الخطة (قياس لا تجميل) و`plan:check` أخضر.
+- **ما لم يُغلق:** MySQL حي (`test:mysql` لم يُشغَّل هنا) · الجدولة الدورية **لم تُنشأ** (التقرير قابل للنداء؛ إنشاء cron قرار مالك) · `GA-F3` و`GA-F5` و`REL-004` كما هي. الخطوة التالية: `DATA-002` (`node --test test/agent-boot-recovery.test.js`).
+
 ## 4 نوفمبر 2026 — WA-010/REL-004 / DEC-133: #159 دُمج ونُشر، والوثائق سُوِّيت مع GitHub
 
 - **الدمج (من GitHub API لا من سجل):** #159 **MERGED** في `2026-11-04T07:33:53Z` بواسطة المالك، `mergeCommit=50f21714e83e44e0869b053cf50d28a3727f5607`، الرأس `058b43c74b7adefd2f9350ae3d34af24a211cef7`، **26 ملفًا · +1101 · −46**. لكن `reviewDecision=REVIEW_REQUIRED`، والمراجعة الوحيدة `COMMENTED` من `github-advanced-security` (07:10:56Z) وتعليق للمالك (07:21:34Z) — **لا `APPROVED`**، فـ`GA-F4` نصفه فقط.

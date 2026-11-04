@@ -666,6 +666,106 @@ export function createAgentStore({ driver, clock = Date.now, idFactory = crypto.
       const toolRun = mapToolRun(await driver.get('SELECT * FROM agent_tool_runs WHERE id = ?', [toolRunId]));
       return { changed: result.changes > 0, toolRun };
     },
+    /**
+     * DATA-003 — every ambiguous outcome in the database, found by the records themselves.
+     *
+     * The attention queue (UX-004) needs this list, and until now the only way to build it in
+     * production was to guess which threads, runs and rows to read. A person who has to remember
+     * which run went uncertain is a person who will eventually forget one, so the store names them:
+     * a `started`/`unknown` tool run, and an outbox row that is `unknown` or `dispatching` past its
+     * lease (the process that held it is gone).
+     *
+     * Read-only and payload-free: ids, names, statuses and timestamps, never the payload text.
+     * That is what lets the same list cross a process boundary or reach an owner's screen.
+     */
+    async listUnrestedOutcomes({ limit = 200 } = {}) {
+      const at = nowIso(clock);
+      const bounded = Math.min(Math.max(Number(limit) || 200, 1), 500);
+      const toolRows = await driver.all(
+        `SELECT id, run_id, tool_name, idempotency_key, status, created_at
+           FROM agent_tool_runs
+          WHERE status IN (?, ?)
+          ORDER BY created_at ASC LIMIT ?`,
+        [TOOL_RUN_STATUS.started, TOOL_RUN_STATUS.unknown, bounded]
+      );
+      const outboxRows = await driver.all(
+        `SELECT id, run_id, tool_name, idempotency_key, status, attempts, lease_until, created_at
+           FROM agent_outbox
+          WHERE status = ? OR (status = ? AND (lease_until IS NULL OR lease_until < ?))
+          ORDER BY created_at ASC LIMIT ?`,
+        [OUTBOX_STATUS.unknown, OUTBOX_STATUS.dispatching, at, bounded]
+      );
+      return {
+        at,
+        toolRuns: toolRows.map((row) => ({
+          id: row.id,
+          runId: row.run_id,
+          toolName: row.tool_name,
+          idempotencyKey: row.idempotency_key,
+          status: row.status,
+          createdAt: row.created_at
+        })),
+        outbox: outboxRows.map((row) => ({
+          id: row.id,
+          runId: row.run_id,
+          toolName: row.tool_name,
+          idempotencyKey: row.idempotency_key,
+          status: row.status,
+          attempts: Number(row.attempts),
+          leaseUntil: row.lease_until ?? null,
+          createdAt: row.created_at
+        }))
+      };
+    },
+    /**
+     * DATA-003 — the conditional move a bulk reconciliation performs.
+     *
+     * Same guard as `reconcileToolRun`/`reconcileOutboxEntry`, addressed by id, and it reports
+     * `changed:false` instead of throwing: a batch must be able to say "eleven rows moved, one lost a
+     * race" rather than abort eleven decisions because the twelfth was already settled by a person.
+     * The local instant makes the lease comparison explicit, so a test can prove the boundary.
+     */
+    async settleUnrestedToolRun(toolRunId, { status, outcome = null, at = null } = {}) {
+      if (!['succeeded', 'failed'].includes(status)) throw new Error(`Invalid reconciled tool status: ${status}`);
+      const now = nowIso(clock);
+      const result = await driver.run(
+        `UPDATE agent_tool_runs SET status = ?, outcome = ?, updated_at = ?
+          WHERE id = ? AND status IN (?, ?)`,
+        [
+          status,
+          outcome === null ? null : text(typeof outcome === 'string' ? outcome : JSON.stringify(outcome), 4000),
+          now,
+          toolRunId,
+          TOOL_RUN_STATUS.started,
+          TOOL_RUN_STATUS.unknown
+        ]
+      );
+      return { changed: result.changes > 0, toolRun: mapToolRun(await driver.get('SELECT * FROM agent_tool_runs WHERE id = ?', [toolRunId])) };
+    },
+    async settleUnrestedOutboxEntry(outboxId, { status, externalRef = null, result = null, lastError = null, at = null } = {}) {
+      if (!['sent', 'failed', 'cancelled'].includes(status)) throw new Error(`Invalid reconciled outbox status: ${status}`);
+      const now = nowIso(clock);
+      const reference = at ?? now;
+      const changed = await driver.run(
+        `UPDATE agent_outbox
+            SET status = ?, external_ref = COALESCE(?, external_ref), result = COALESCE(?, result),
+                last_error = ?, lease_until = NULL, lease_owner = NULL, settled_at = ?, updated_at = ?
+          WHERE id = ? AND (status = ? OR (status = ? AND (lease_until IS NULL OR lease_until < ?)))`,
+        [
+          text(status, 16),
+          externalRef === null ? null : text(externalRef, 240),
+          result === null ? null : JSON.stringify(result),
+          lastError === null ? null : text(lastError, 120),
+          reference,
+          now,
+          outboxId,
+          OUTBOX_STATUS.unknown,
+          OUTBOX_STATUS.dispatching,
+          reference
+        ]
+      );
+      return { changed: changed.changes > 0, entry: mapOutbox(await driver.get('SELECT * FROM agent_outbox WHERE id = ?', [outboxId])) };
+    },
     /** Runs a previous process left behind: queued, or running with an expired lease. */
     async findResumableRuns({ limit = 10 } = {}) {
       const at = nowIso(clock);

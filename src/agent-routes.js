@@ -344,6 +344,73 @@ export function createAgentRouter({ agent, authorize, logger = console }) {
     }
   });
 
+  /**
+   * DATA-003: many ambiguous records, one stated finding, under the same guards as the single path.
+   * Deliberately a separate route rather than an array branch inside `/reconcile`: an accidentally
+   * plural request must not be able to settle twelve rows because a field was an array.
+   */
+  router.post('/runs/:id/reconcile-batch', json, async (req, res) => {
+    const current = await runtime(res);
+    if (!current) return undefined;
+    const target = String(req.body?.target || '').trim();
+    if (!['tool_run', 'outbox'].includes(target)) {
+      return res.status(400).json({ error: 'invalid_reconcile_target' });
+    }
+    const outcome = String(req.body?.outcome || '').trim().toLowerCase();
+    if (!['applied', 'not_applied'].includes(outcome)) {
+      return res.status(400).json({ error: 'invalid_reconcile_outcome' });
+    }
+    const raw = req.body?.targetIds;
+    const targetIds = Array.isArray(raw) ? raw.filter((id) => typeof id === 'string' && id.trim()) : [];
+    if (!targetIds.length) return res.status(400).json({ error: 'nothing_to_reconcile' });
+    if (targetIds.length > 50) return res.status(400).json({ error: 'batch_too_large' });
+    const note = typeof req.body?.note === 'string' ? req.body.note.slice(0, 500) : null;
+    const externalRef = typeof req.body?.externalRef === 'string' ? req.body.externalRef : null;
+    try {
+      const result = await current.reconcileMany(
+        req.params.id,
+        { target, targetIds, outcome, externalRef, note },
+        current.status().ownerId
+      );
+      return res.json(result);
+    } catch (error) {
+      return fail(res, error);
+    }
+  });
+
+  /**
+   * DATA-003 / UX-004: what is waiting for a person, derived from durable records only.
+   * `sends:false` and `tracksRead:false` are part of the payload, not a promise in prose.
+   */
+  router.get('/attention', async (_req, res) => {
+    const current = await runtime(res);
+    if (!current) return undefined;
+    try {
+      return res.set('Cache-Control', 'no-store').json(await current.attention());
+    } catch (error) {
+      return fail(res, error);
+    }
+  });
+
+  /** DATA-003: the periodic view — what is still ambiguous and for how long. Reads only. */
+  router.get('/reconciliation-report', async (req, res) => {
+    const current = await runtime(res);
+    if (!current) return undefined;
+    const thresholdHours = Number(req.query?.thresholdHours);
+    const thresholdMs =
+      Number.isFinite(thresholdHours) && thresholdHours > 0 && thresholdHours <= 24 * 30
+        ? Math.round(thresholdHours * 3_600_000)
+        : undefined;
+    try {
+      const report = await current.reconciliationReport(
+        thresholdMs === undefined ? {} : { thresholdMs }
+      );
+      return res.set('Cache-Control', 'no-store').json(report);
+    } catch (error) {
+      return fail(res, error);
+    }
+  });
+
   router.get('/runs/:id/approvals', async (req, res) => {
     const current = await runtime(res);
     if (!current) return undefined;

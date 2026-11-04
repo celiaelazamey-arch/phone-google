@@ -19,6 +19,7 @@ const REQUIRED = [
   'delegation',
   'memory-consolidation',
   'attention',
+  'reconciliation-batch',
   'issue-triage',
   'planner-llm',
   'model-router',
