@@ -21,6 +21,14 @@
 | متابعة `GET /auth/google/signin` | الوصول إلى `accounts.google.com` وصفحة **Sign in - Google Accounts** التي تعرض «to continue to celiaelazamey.workers.dev» | Google يفتح شاشة الدخول فعلاً؛ لم تُسجَّل قيمة `state` أو معلمات الاستمرار في الدليل |
 | callback اصطناعي بلا كوكي مطابق | `400 {"error":"oauth_state_cookie_mismatch"}` | رفض CSRF منشور؛ لم يصل الطلب إلى Token Exchange |
 
+### لقطة ثانية — 4 نوفمبر 2026: أثر النشر على الالتزام المدمج
+
+بعد دمج [#159](https://github.com/celiaelazamey-arch/phone-google/pull/159) في `main@50f21714e83e44e0869b053cf50d28a3727f5607` نجحت [تشغيلة الحافة `41793339948`](https://github.com/celiaelazamey-arch/phone-google/actions/runs/41793339948) بخطواتها الأربع عشرة، ومنها بالترتيب: «Verify live card-free Edge + D1 full runtime» ← «Verify live Google OAuth start + security blockers (GA-F0…GA-F3)» ← «Promote deployment slice to known_good (proof required)» ← «Upload token-free Edge deployment evidence».
+
+ما يثبته هذا: أن واجهة Google قبلت زوج `client_id`/`redirect_uri` لحظة قياس الخطوة، وأن موانع `GA-F2` الآمنة ورفض/replay في `GA-F3` اجتازت على الالتزام المنشور نفسه، وأن الأثر رُفع باسم `edge-deployment-evidence-50f21714…` (6401 بايتًا، تنتهي صلاحيته 2026-12-04).
+
+ما لا يثبته: لا `consent` بشري، ولا `/api/account/me=200`، ولا مراقبة 60 دقيقة. وتنزيل الأثر نفسه فشل في جلسة المزامنة بـ`EOF`، والقراءة الحية لـ`/version` و`/auth/google/diagnostics` فشلت بخطأ TLS من بيئة الوكيل — فلم يُدَّع محتواه ولا قراءة حية جديدة، والاعتماد على خطوات التشغيل وبياناتها الوصفية فقط (`DEC-133`).
+
 الوصول إلى شاشة Google **لا يثبت** نجاح الموافقة أو `/api/account/me=200`. والتقرير الآلي الجديد هو الذي سيحفظ استجابة الـ`302` الأولى وترويسات الكوكي حرفياً وبشكل منقّح في تشغيلة النشر؛ لا تُدّعى قراءة ترويسة لم تُقرأ يدوياً.
 
 ## 3. الجدول التنفيذي ومعايير القبول
@@ -30,9 +38,9 @@
 | **GA-F0** | خط أساس التشخيص — مهندس الموثوقية | `/auth/google/diagnostics` يعيد `200` و`google.accepted=true` و`reason=null` و`no-store` و`secretExposed=false`؛ أي `redirect_uri_mismatch` يفشل البوابة | `google-auth-live.json` من `npm run verify:google-auth`، أو قراءة حيّة منقّحة مؤرخة | 🟢 متحقق حيّاً باللقطة أعلاه؛ الفاحص يضيف artifact حتمياً |
 | **GA-F1** | التوجيه الفعلي — Backend | `302` فقط إلى `https://accounts.google.com/o/oauth2/v2/auth`؛ `response_type=code` و`scope=openid email profile` و`state=signin:<64 hex>` و`client_id/redirect_uri` مطابقان للتشخيص. **صفحة HTML محلية بحالة 200 ليست نجاحاً** | الفحص `GA-F1` في التقرير + Network trace منقّح | 🟢 شاشة Google حيّة؛ artifact الآلي يبدأ مع أول نشر يحمل هذا التغيير |
 | **GA-F2** | موانع الأمان الخمسة — Quality/Security | اجتياز البنود الخمسة في §4 كلها، ثم Quality وCodeQL و`npm audit` بلا إنذار حرج على الـcommit نفسه | تقرير `GA-F2-*` + روابط CI وCodeQL + فحص الأسرار | 🟡 محلياً مختبَر وبعضه حيّ؛ ينتظر artifact النشر الجديد ومراجعة المالك |
-| **GA-F3** | التكامل الكامل — QA | نجاح consent حقيقي إلى جلسة ثم `/api/account/me=200`؛ رفض الأذونات برسالة عربية بلا جلسة؛ replay وcookie mismatch مرفوضان؛ عزل حساب ثانٍ | CI + تقرير E2E حيّ منقّح | 🟡 الرفض/replay منفذان ومختبران محلياً؛ **consent الحقيقي لم يُنفّذ هنا** |
-| **GA-F4** | المراجعة والمطابقة — Tech Lead | PR للـcommit نفسه، مراجعة بشرية موثقة، CI أخضر، دمج معتمد، تحديث WA/REL ولا تعارض مع `PUB-001` | رابط PR و`headRefOid`/merge SHA وسجل المراجعة والتشغيلات | 🟡 [PR #159](https://github.com/celiaelazamey-arch/phone-google/pull/159) مفتوح بطلب المالك؛ لا مراجعة/اعتماد أو دمج بعد |
-| **GA-F5** | الإنتاج والمراقبة — DevOps | نشر معتمد ثم **60 دقيقة كاملة**، `attempts>0` و`successful=attempts` وصفر أخطاء حرجة، مع readiness مستقر وتراجع معروف | Dashboard وسجلات إنتاج منقّحة ببداية/نهاية النافذة وأعدادها | ⛔ لا نشر ولا مراقبة 60 دقيقة من هذه الجلسة؛ `REL-004` يبقى مغلقاً |
+| **GA-F3** | التكامل الكامل — QA | نجاح consent حقيقي إلى جلسة ثم `/api/account/me=200`؛ رفض الأذونات برسالة عربية بلا جلسة؛ replay وcookie mismatch مرفوضان؛ عزل حساب ثانٍ | CI + تقرير E2E حيّ منقّح | 🟡 الرفض/replay منفذان ومختبران ومنشوران (خطوة الفحص الحي على `50f2171`)؛ **consent الحقيقي و`/api/account/me=200` وعزل الحساب الثاني لم تُنفّذ** |
+| **GA-F4** | المراجعة والمطابقة — Tech Lead | PR للـcommit نفسه، مراجعة بشرية موثقة، CI أخضر، دمج معتمد، تحديث WA/REL ولا تعارض مع `PUB-001` | رابط PR و`headRefOid`/merge SHA وسجل المراجعة والتشغيلات | 🟡 **نصفه:** [PR #159](https://github.com/celiaelazamey-arch/phone-google/pull/159) **MERGED** في `2026-11-04T07:33:53Z` بـ`mergeCommit=50f21714…` ورأس `058b43c7…`، والتشغيلات على SHA الدمج خضراء. **لكن `reviewDecision=REVIEW_REQUIRED`**: المراجعة الوحيدة `COMMENTED` من `github-advanced-security` + تعليق مالك، **بلا `APPROVED`** ⇒ شرط «مراجعة بشرية موثقة» غير مستوفى (`DEC-133`) |
+| **GA-F5** | الإنتاج والمراقبة — DevOps | نشر معتمد ثم **60 دقيقة كاملة**، `attempts>0` و`successful=attempts` وصفر أخطاء حرجة، مع readiness مستقر وتراجع معروف | Dashboard وسجلات إنتاج منقّحة ببداية/نهاية النافذة وأعدادها | 🟡 **نصفه:** النشر حدث فعلاً (تشغيلة الحافة `41793339948` على `50f2171`، وكل خطواتها `success` ومنها ترقية `known_good`)، و**النافذة صارت قابلة للقياس بأمر واحد** (`npm run verify:launch-window`، `DEC-135`) لكنها **لم تُشغَّل بعد** ⇒ `attempts` ما زال غير معروف؛ `REL-004` يبقى مغلقاً |
 
 > **لا يجوز حساب «صفر محاولات» كنسبة نجاح 100%.** ولا يجوز استبدال نجاح `/diagnostics` أو `/signin` بعداد نجاح دورة المصادقة.
 
@@ -78,8 +86,13 @@ node scripts/verify-google-auth.mjs \
   --url https://celia-phone-google.celiaelazamey.workers.dev \
   --out .validation-artifacts/google-auth-live.json
 
+# نافذة GA-F5: 60 دقيقة، عيّنة كل دقيقة، تقرير بلا أسرار
+CELIA_OWNER_COOKIE='<كوكي جلسة المالك>' npm run verify:launch-window -- \
+  --minutes 60 --interval-ms 60000 --expected-commit <merge-sha>
+# بلا كوكي يبقى الـoutbox «غير مقيس» ولا يُحسب صفرًا؛ والخروج غير صفري حتى تُقاس حركة
+
 # الفحوص المحلية المرتبطة
-node --test test/google-account-signin.test.js test/verify-google-auth.test.js
+node --test test/google-account-signin.test.js test/verify-google-auth.test.js test/verify-launch-window.test.js
 npm audit --omit=dev --audit-level=moderate
 ```
 
@@ -108,7 +121,8 @@ npm audit --omit=dev --audit-level=moderate
 
 ## 7. حدود القرار التالي
 
-- فُتح [PR #159](https://github.com/celiaelazamey-arch/phone-google/pull/159) بطلب صريح من المالك؛ لا دمج أو نشر يدوي أو تعديل Google Cloud Console أو إطلاق عام ضمن هذا الإذن.
+- [PR #159](https://github.com/celiaelazamey-arch/phone-google/pull/159) **دُمج** في `main@50f2171` ونُشر على الحافة في `2026-11-04` (`DEC-133`). لا يُقرأ ذلك إغلاقًا لـ`GA-F3`/`GA-F5`: المراجعة البشرية الموثقة غائبة (`REVIEW_REQUIRED`)، ومراقبة 60 دقيقة لم تُقَس، ولم يُعدّل Google Cloud Console ولم يُفتح إطلاق عام.
+- سجل النشر `docs/deployments/ledger.json` لم يُضف إليه قيد لهذا الدمج أو النشر (آخره `seq=7` في 2026-11-02)؛ يُكتب ببوابة المالك من snapshot لا يدويًا.
 - لا تُرفع `WA-010` إلى «دورة دخول مكتملة»: نجاحها الحالي هو قبول Redirect URI فقط.
 - لا تُرفع `REL-004` قبل GA-F3 الحقيقي ورسالة WhatsApp ذهاباً وعودة ومتطلبات التشغيل والتكلفة والمراجعة المدرجة في `DEC-129/DEC-130`.
 - التراجع عن هذا التغيير هو `git revert` للالتزام بعد المراجعة؛ التراجع عن إنتاج مستقبلي يتبع آخر `known_good` ولا يُوصف بأنه استعادة بيانات.
