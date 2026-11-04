@@ -11,10 +11,10 @@
 
 ## 2. التركيز النشط وسجل الحالة ([STATE.md](STATE.md))
 
-- **آخر مراجعة مسجّلة:** 4 نوفمبر 2026
-- **الجلسة النشطة:** GOOG-006 / DEC-142 — `apps-script:sync` مبني ومختبَر (15/15 بخمس طفرات) على الفرع `arena/1c90e07e-phone-google`؛ المزامنة الحية مالك فقط (login/clone لم يُنفذا)؛ `GA-F3` و`GA-F5` و`REL-004` ما زالت مفتوحة؛ الإطلاق متوقف (`DEC-129+130`).
-- **آخر سجل جلسة مؤرَّخ:** [مزامنة Apps Script](sessions/2026-11-04-goog-006-apps-script-sync.md)
-- **حجم [STATE.md](STATE.md) النشط:** 95 سطرًا (17592 بايت)
+- **آخر مراجعة مسجّلة:** 5 نوفمبر 2026
+- **الجلسة النشطة:** D1 Backup & Recovery v2.7 — `LOCAL SIMULATED_PASS` (35/35 d1-verify, 1401/0/17) — `EXTERNAL GATE CLOSED` — التصحيحات A/B/C مضمنة — على الفرع `arena/241c4e6f-phone-google` (PR #169 OPEN) — `NETWORK=DENY` حتى موافقة E1 المحددة.
+- **آخر سجل جلسة مؤرَّخ:** [D1 LOCAL SIMULATED_PASS](sessions/2026-11-05-d1-local-simulated-pass.md)
+- **حجم [STATE.md](STATE.md) النشط:** 95 سطرًا (17495 بايت)
 - **الأرشيف التاريخي المحفوظ بلا حذف:**
 - [STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md) — الأساس `9f6f8b2` · **983 سطرًا** محفوظًا حرفيًا (بصمة `f2674637e82e…`)
 - [STATE-ARCHIVE-2026-11.md](STATE-ARCHIVE-2026-11.md) — الأساس `6b4bb2d` · **16 سطرًا** محفوظًا حرفيًا (بصمة `503e4ef77c5b…`)
