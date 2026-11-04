@@ -200,7 +200,7 @@ export async function verifyGoogleAuthLive({
   let oauthState = null;
   let stateCookie = null;
   let signinStatus = null;
-  let signinFailureReason = 'signin_not_checked';
+  let signinFailureReason;
   try {
     const result = await request('/auth/google/signin', { headers: { accept: 'text/html' } });
     signinStatus = result.response.status;
