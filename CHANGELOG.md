@@ -4,6 +4,7 @@
 
 ### Added
 - WA-010 / GA-F0…GA-F5: `npm run verify:google-auth` now produces token-free live evidence for the exact Google 302 contract, HTTPS, redirect equality, public-bundle secret hygiene, OAuth cookie attributes, CSRF rejection, consent denial and one-use callback replay. The Cloudflare deployment runs it before `known_good` and uploads `google-auth-live.json`; its PASS never marks the external consent/review/60-minute launch gates complete. The runbook is `docs/google-auth-launch-gates.md`.
+- GA-F5 / REL-004: `npm run verify:launch-window` turns the last unmeasured gate into one run. It samples `/version` and `/readyz` across the window, reads `/api/cron/intents` only when an owner credential is supplied, and writes a token-free `launch-window.json` whose verdict is `pass` only with real traffic (`attempts > 0`), `successful = attempts`, zero failed/unknown intents and no readiness dip. Zero attempts is a reported failed measurement and a missing credential is `unmeasured` — neither becomes 0% or 100% — and `launch.ready` stays false because consent, human review and rollback remain external gates.
 
 ### Fixed
 - GA-F3 / WA-008: Google `access_denied` no longer falls into a JSON `400 missing_oauth_code_or_state` response. After the same cookie check and atomic one-use state consumption, the user returns to `/whatsapp?google_error=google_access_denied`, sees a stable Arabic explanation, gets no account session, and cannot replay the callback or trigger token exchange.

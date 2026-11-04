@@ -40,7 +40,7 @@
 | **GA-F2** | موانع الأمان الخمسة — Quality/Security | اجتياز البنود الخمسة في §4 كلها، ثم Quality وCodeQL و`npm audit` بلا إنذار حرج على الـcommit نفسه | تقرير `GA-F2-*` + روابط CI وCodeQL + فحص الأسرار | 🟡 محلياً مختبَر وبعضه حيّ؛ ينتظر artifact النشر الجديد ومراجعة المالك |
 | **GA-F3** | التكامل الكامل — QA | نجاح consent حقيقي إلى جلسة ثم `/api/account/me=200`؛ رفض الأذونات برسالة عربية بلا جلسة؛ replay وcookie mismatch مرفوضان؛ عزل حساب ثانٍ | CI + تقرير E2E حيّ منقّح | 🟡 الرفض/replay منفذان ومختبران ومنشوران (خطوة الفحص الحي على `50f2171`)؛ **consent الحقيقي و`/api/account/me=200` وعزل الحساب الثاني لم تُنفّذ** |
 | **GA-F4** | المراجعة والمطابقة — Tech Lead | PR للـcommit نفسه، مراجعة بشرية موثقة، CI أخضر، دمج معتمد، تحديث WA/REL ولا تعارض مع `PUB-001` | رابط PR و`headRefOid`/merge SHA وسجل المراجعة والتشغيلات | 🟡 **نصفه:** [PR #159](https://github.com/celiaelazamey-arch/phone-google/pull/159) **MERGED** في `2026-11-04T07:33:53Z` بـ`mergeCommit=50f21714…` ورأس `058b43c7…`، والتشغيلات على SHA الدمج خضراء. **لكن `reviewDecision=REVIEW_REQUIRED`**: المراجعة الوحيدة `COMMENTED` من `github-advanced-security` + تعليق مالك، **بلا `APPROVED`** ⇒ شرط «مراجعة بشرية موثقة» غير مستوفى (`DEC-133`) |
-| **GA-F5** | الإنتاج والمراقبة — DevOps | نشر معتمد ثم **60 دقيقة كاملة**، `attempts>0` و`successful=attempts` وصفر أخطاء حرجة، مع readiness مستقر وتراجع معروف | Dashboard وسجلات إنتاج منقّحة ببداية/نهاية النافذة وأعدادها | 🟡 **نصفه:** النشر حدث فعلاً (تشغيلة الحافة `41793339948` على `50f2171`، وكل خطواتها `success` ومنها ترقية `known_good`)، و**المراقبة 60 دقيقة لم تُقَس** ⇒ `attempts` غير معروف ولا ادعاء `successful=attempts`؛ `REL-004` يبقى مغلقاً (`DEC-133`) |
+| **GA-F5** | الإنتاج والمراقبة — DevOps | نشر معتمد ثم **60 دقيقة كاملة**، `attempts>0` و`successful=attempts` وصفر أخطاء حرجة، مع readiness مستقر وتراجع معروف | Dashboard وسجلات إنتاج منقّحة ببداية/نهاية النافذة وأعدادها | 🟡 **نصفه:** النشر حدث فعلاً (تشغيلة الحافة `41793339948` على `50f2171`، وكل خطواتها `success` ومنها ترقية `known_good`)، و**النافذة صارت قابلة للقياس بأمر واحد** (`npm run verify:launch-window`، `DEC-135`) لكنها **لم تُشغَّل بعد** ⇒ `attempts` ما زال غير معروف؛ `REL-004` يبقى مغلقاً |
 
 > **لا يجوز حساب «صفر محاولات» كنسبة نجاح 100%.** ولا يجوز استبدال نجاح `/diagnostics` أو `/signin` بعداد نجاح دورة المصادقة.
 
@@ -86,8 +86,13 @@ node scripts/verify-google-auth.mjs \
   --url https://celia-phone-google.celiaelazamey.workers.dev \
   --out .validation-artifacts/google-auth-live.json
 
+# نافذة GA-F5: 60 دقيقة، عيّنة كل دقيقة، تقرير بلا أسرار
+CELIA_OWNER_COOKIE='<كوكي جلسة المالك>' npm run verify:launch-window -- \
+  --minutes 60 --interval-ms 60000 --expected-commit <merge-sha>
+# بلا كوكي يبقى الـoutbox «غير مقيس» ولا يُحسب صفرًا؛ والخروج غير صفري حتى تُقاس حركة
+
 # الفحوص المحلية المرتبطة
-node --test test/google-account-signin.test.js test/verify-google-auth.test.js
+node --test test/google-account-signin.test.js test/verify-google-auth.test.js test/verify-launch-window.test.js
 npm audit --omit=dev --audit-level=moderate
 ```
 

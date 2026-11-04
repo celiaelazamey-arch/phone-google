@@ -71,6 +71,7 @@
     "verify:live": "node scripts/verify-live.mjs",
     "verify:edge": "node scripts/verify-live.mjs --mode edge --url https://celia-phone-google.celiaelazamey.workers.dev",
     "verify:google-auth": "node scripts/verify-google-auth.mjs --url https://celia-phone-google.celiaelazamey.workers.dev",
+    "verify:launch-window": "node scripts/verify-launch-window.mjs",
     "test:full": "CELIA_SANDBOX_INTEGRATION=1 node --test",
     "build:edge-ui": "node scripts/build-edge-ui.mjs",
     "build:edge-ui:check": "node scripts/build-edge-ui.mjs --check",

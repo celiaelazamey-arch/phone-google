@@ -90,7 +90,7 @@
 | # | الخطوة | القبول الحرفي | يحتاج |
 |---|---|---|---|
 | E3-1 | **`GA-F3`** consent حقيقي | §6 من [بوابات Google](google-auth-launch-gates.md): موافقة → `/api/account/me=200` → خصائص كوكي الجلسة → رفض الأذونات → replay مرفوض → عزل حساب ثانٍ | حساب في Test users |
-| E3-2 | **`GA-F5`** نافذة 60 دقيقة | بداية/نهاية مسجلتان · `attempts>0` · `successful=attempts` · صفر أخطاء حرجة · `/readyz` مستقر · خطة تراجع | قياس عبر `GET /api/cron/intents?status=` + `/readyz` + سجلات منقّحة |
+| E3-2 | **`GA-F5`** نافذة 60 دقيقة | `npm run verify:launch-window -- --minutes 60 --expected-commit <sha>` يُخرج `launch-window.json` بـ`pass`: `attempts>0` · `successful=attempts` · صفر failed/unknown · readiness بلا انقطاع | كوكي مالك في `CELIA_OWNER_COOKIE` (لا يُطبع)؛ التقرير في `.validation-artifacts/` |
 | E3-3 | `GA-F4` مراجعة | مراجعة بشرية موثقة **أو** تسجيل صريح بعدمها (`DEC-133`) | 🔑 |
 | E3-4 | `WA-005` رسالة حقيقية | Graph API + Webhook موقّع + إيصال وارد على رقم مملوك | 🔑🌐 |
 | E3-5 | `WA-007` عزل المستخدم | تسجيل → ربط رقم → يرى رسائله فقط → لا ربط رقم بحسابين | 🤖 بعد E3-4 |
