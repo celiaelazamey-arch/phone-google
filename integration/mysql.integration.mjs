@@ -14,6 +14,7 @@ import { loadCeliaMcpConfig, createCeliaMcpApp, MCP_TOOLS } from '../src/celia-m
 import { assertBackwardCompatibleMcpTools } from '../src/mcp-contract.js';
 import { createPool, ensureOwner } from '../src/db.js';
 import { encryptJson, decryptJson } from '../src/security.js';
+import { runBackupVerify } from '../scripts/backup-verify.mjs';
 
 const exec = promisify(execFile);
 const root = path.resolve(import.meta.dirname, '..');
@@ -192,7 +193,53 @@ test('real MySQL 8.4 acceptance: installation, persistence, signed webhook, lega
       assert.equal(decryptJson(tokens[0].encrypted_tokens, key).refresh_token, 'synthetic-token-only');
     } finally { await connection.end(); }
   });
-  assert.equal(checks.length, 9, 'No passing evidence file may be written if any acceptance check failed');
+  await check('backup:verify derives a dump, restores it into a different schema and measures RTO/RPO', async () => {
+    // DATA-001: the same command the owner will run against a real database, exercised here on
+    // synthetic data. It must prove the restore by reading the rows back from a separate schema,
+    // refuse to claim a number for RPO it cannot know, and prove the encrypted column still
+    // decrypts with the real key. A "backup" that was never restored is not evidence.
+    const target = `celia_bv_${suffix}`;
+    const report = await runBackupVerify({
+      config: { ...config.mysql, database: undefined },
+      sourceSchema: source,
+      restoreSchema: target,
+      outDir: path.join(root, '.validation-artifacts', `backup-${suffix}`),
+      keyBase64: key,
+      dataThrough: null,
+      log: () => {}
+    });
+    try {
+      assert.equal(report.verdict, 'verified', `expected verified, saw ${report.verdict} ${report.error ?? ''}`);
+      assert.equal(report.tableFingerprints.comparison.ok, true);
+      assert.ok(report.tableFingerprints.restoredRows > 0, 'the restore must have moved real rows');
+      // MySQL's own server-side checksums must match across the two schemas, not a count we computed.
+      assert.ok(report.tableFingerprints.restoredPrints.every((t) => t.checksum !== null), 'CHECKSUM TABLE is the server-computed proof');
+      assert.equal(report.keyProof.status, 'decrypted', 'the restored encrypted token must decrypt with the real key');
+      // RTO is a wall-clock measurement of the steps that actually ran.
+      assert.ok(report.rpoRto.rtoSeconds >= 0 && report.rpoRto.rtoSeconds < 120, `implausible RTO ${report.rpoRto.rtoSeconds}`);
+      // RPO is unknown here on purpose: no coverage claim was declared, so no number may appear.
+      assert.equal(report.rpoRto.rpoMinutes, null);
+      assert.match(report.rpoRto.rpoReason, /غير مقيس/);
+      assert.equal(report.productionTouched, false);
+      const onDisk = JSON.parse(await (await import('node:fs/promises')).readFile(report.reportPath, 'utf8'));
+      assert.equal(onDisk.productionBackupVerified, false, 'CI evidence may never claim a production backup');
+      assert.equal(JSON.stringify(onDisk).includes(password), false, 'the report must not contain the credential');
+      assert.equal(JSON.stringify(onDisk).includes('synthetic-token-only'), false, 'the report must not contain decrypted secrets');
+      // And the guard refuses to restore over its own source.
+      const refused = await runBackupVerify({
+        config: { ...config.mysql, database: undefined },
+        sourceSchema: source,
+        restoreSchema: source,
+        outDir: path.join(root, '.validation-artifacts', `backup-refused-${suffix}`),
+        keyBase64: key,
+        log: () => {}
+      });
+      assert.equal(refused.verdict, 'refused');
+    } finally {
+      await admin.query(`DROP DATABASE IF EXISTS \`${target}\``);
+    }
+  });
+  assert.equal(checks.length, 10, 'No passing evidence file may be written if any acceptance check failed');
   await mkdir(path.join(root, '.validation-artifacts'), { recursive: true });
   const evidence = { scope: 'isolated-ci-synthetic-data-only', engine: version, commit: process.env.GITHUB_SHA || null, baseline, checks, createdAt: new Date().toISOString(), productionDeployed: false, productionBackupVerified: false, externalProviderActions: 'not-tested', secretsOrCustomerDataIncluded: false };
   await writeFile(path.join(root, '.validation-artifacts/mysql-evidence.json'), JSON.stringify(evidence, null, 2) + '\n');
