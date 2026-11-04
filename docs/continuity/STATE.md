@@ -4,7 +4,7 @@
 
 **آخر مراجعة:** 4 نوفمبر 2026
 **نوع الجلسة الحالية:** GOOG-006 / DEC-142 — `apps-script:sync` مبني ومختبَر (15/15 بخمس طفرات) على الفرع `arena/1c90e07e-phone-google`؛ المزامنة الحية مالك فقط (login/clone لم يُنفذا)؛ `GA-F3` و`GA-F5` و`REL-004` ما زالت مفتوحة؛ الإطلاق **متوقف** (`DEC-129+130`).
-**السجل:** [مزامنة Apps Script](sessions/2026-11-04-goog-006-apps-script-sync.md) · [بوابات Google Auth](sessions/2026-11-03-google-auth-launch-gates.md) · [مزامنة حالة الدمج](sessions/2026-11-04-merge-state-sync.md) · **الفرع:** `arena/1c90e07e-phone-google` · **الأساس:** `main@99f09f6` · `v0.3.0` حي · لا مراجعة بشرية موثقة، ولا مراقبة 60 دقيقة، ولا إطلاق عام.
+**السجل:** [مزامنة Apps Script](sessions/2026-11-04-goog-006-apps-script-sync.md) · [بوابات Google Auth](sessions/2026-11-03-google-auth-launch-gates.md) · [مزامنة حالة الدمج](sessions/2026-11-04-merge-state-sync.md) · **PR:** [#168](https://github.com/celiaelazamey-arch/phone-google/pull/168) **OPEN** (فتح فقط بطلب المالك، لا دمج؛ يعارضه في المعرفات #167/#166 — قرار المالك) · **الفرع:** `arena/1c90e07e-phone-google` · **الأساس:** `main@99f09f6` · `v0.3.0` حي · لا مراجعة بشرية موثقة، ولا مراقبة 60 دقيقة، ولا إطلاق عام.
 
 ## 4 نوفمبر 2026 — `GOOG-006`: `apps-script:sync` مبني ومختبَر (DEC-142)
 
