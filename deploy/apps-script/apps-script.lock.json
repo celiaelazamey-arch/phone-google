@@ -1,0 +1,10 @@
+{
+  "note": "بصمات تُقارَن في CI. أي تعديل في محرّر Apps Script يظهر انحرافًا حتى يُسحب ويُراجَع.",
+  "claspVersion": "3.4.1",
+  "files": {
+    "appsscript.json": "c96174ebfe4802f3b1fcd9723edefd255a657922a74a23d1d896bdd9488e1aa1",
+    "deep-check.gs": "b19711bcc0ca33626c6b050c6379d11c0414aeba7d360620c5ecc657d07e7ef9",
+    "keepalive.gs": "9c304747fef900fbdd9e01ca9ca0b9f52f9035970b2ffb172b7a7dd60c99d171",
+    "status-relay.gs": "da0479856c6290f8e0c26b7430220fb513a6be4000fc9196a9be12bdf4c97287"
+  }
+}

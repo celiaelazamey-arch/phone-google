@@ -119,6 +119,11 @@ jobs:
         env:
           CELIA_CONTINUITY_BASE: ${{ github.event.pull_request.base.sha }}
         run: npm run visual:first:check
+      # DEC-143: the Apps Script project deployed from a Google editor is a second copy of the
+      # truth. This gate makes any drift between it and this repository a failing check, so an edit
+      # made in Drive cannot silently outlive the file it came from.
+      - name: Apps Script project matches the repository (DEC-143)
+        run: npm run apps-script:check
       - name: Require handoff for implementation changes
         if: github.event_name == 'pull_request'
         env:
