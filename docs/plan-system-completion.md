@@ -3,6 +3,7 @@
 **المهمة:** `PLAN-002` · **التاريخ:** 2026-11-02 · **الإصدار المرجعي:** `0.3.0` (منشور immutable؛ `main@7596c27`) · **الإصدار السابق:** `v0.2.1` (مجمّد) · **الفرع:** `arena/00526a7b-phone-google`
 **مرجع الحالات الوحيد:** [BACKLOG](continuity/BACKLOG.md) · **الأساس:** [خطة 100%](plan-100-percent.md) (الأركان الثمانية) + [الخطة التنفيذية](executive-completion-plan.md)
 **هذه الوثيقة:** ترتيبٌ وبواباتٌ ومسارٌ حرج — لا حالة. كل حالة تعود إلى BACKLOG بدليل.
+> **الترتيب التنفيذي المرحلي:** [`plan-completion-execution-2026-11.md`](plan-completion-execution-2026-11.md) — `E0…E6` بخطوات وأوامر قبول؛ ترتيبٌ لا حالة، ويعيد استخدام معرّفات هذا السجل نفسه.
 
 > **السؤال:** «كيف يكتمل النظام بالكامل؟»
 > **الجواب:** الاكتمال ليس رقمًا واحدًا، بل **بوابتان**: `B1` إطلاق سليم (الأركان الثمانية بدليل حيّ)، و`B2` اكتمال وظيفي
@@ -79,7 +80,7 @@
 | `deps` | الاعتماديات | 5 prod · 2 dev | `package.json` | 🔗 |
 | `coverage_floor` | أرضية CI للتغطية | 89 / 71 / 82 | `test:coverage` | 🔗 |
 | `syntax_files` | الملفات المفحوصة نحويًا | 268 | نطاق `scripts/check.mjs` نفسه | 🔗 |
-| `continuity` | وثائق الاستمرارية / الروابط / المهام | 158 / 503 / 137 | `npm run check:continuity` | 🔗 |
+| `continuity` | وثائق الاستمرارية / الروابط / المهام | 159 / 507 / 137 | `npm run check:continuity` | 🔗 |
 | `sandbox` | العزل | off | `CELIA_AGENT_SANDBOX` في `src/agent/index.js` | 🔗 |
 | `egress` | الخروج | off | `CELIA_AGENT_EGRESS` في `src/agent/index.js` | 🔗 |
 | `tests` | اختبارات | 1305 · **1288 pass** · 0 fail · 17 skip بيئي مصرح | `npm test` + `check-test-skips --allow-env-gates` (2026-11-04؛ المتخطيات ليست نجاحًا) | 📅 |

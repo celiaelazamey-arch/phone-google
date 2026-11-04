@@ -21,7 +21,7 @@ async function list(dir) {
 const skillFiles = (await stat(path.join(root, '.agents/skills')).catch(() => null))?.isDirectory()
   ? await list('.agents/skills')
   : [];
-const files = ['AGENTS.md', 'CLAUDE.md', 'README.md', 'docs/2026-development-plan.md', 'docs/agent-runtime-plan.md', 'docs/agent-2026-execution-plan.md', 'docs/google-connect.md', 'docs/compatibility-contract.md', 'docs/free-hosting.md', ...skillFiles, ...await list(directory)];
+const files = ['AGENTS.md', 'CLAUDE.md', 'README.md', 'docs/2026-development-plan.md', 'docs/agent-runtime-plan.md', 'docs/agent-2026-execution-plan.md', 'docs/google-connect.md', 'docs/compatibility-contract.md', 'docs/free-hosting.md', 'docs/plan-completion-execution-2026-11.md', ...skillFiles, ...await list(directory)];
 const sources = new Map(await Promise.all(files.map(async (file) => [file, await readFile(path.join(root, file), 'utf8')])));
 let links = 0;
 for (const [file, content] of sources) {
