@@ -1775,11 +1775,12 @@ export function createAgentRuntime({
       //
       // An absent `expectedRevision` stays *permitted* rather than rejected: the repository's rule is
       // to preserve existing clients across contract changes, and `/plan` is a documented surface.
-      // But an omission is not free — the write is recorded as `precondition: 'none'` in the evidence
-      // chain and reported back as `preconditionApplied: false`, so an unguarded overwrite is visible
-      // in the audit trail instead of silent. The shipped UI always states the revision, so the two-tab
-      // guarantee holds for the product itself; a third-party client that omits it can still overwrite,
-      // and the record says so.
+      // But an omission is not free — the answer carries `preconditionApplied: false`, the durable step
+      // summary says «بلا شرط تزامن» in words, and the evidence input hashes `precondition: 'none'`.
+      // (The chain stores hashes only, so the step summary is the readable half; do not claim the ledger
+      // shows the flag.) An unguarded overwrite is therefore visible rather than silent. The shipped UI
+      // always states the revision, so the two-tab guarantee holds for the product itself; a third-party
+      // client that omits it can still overwrite, and the record says so.
       const storedBefore = parsePlanSummaryRecord(run.planSummary);
       const liveRevision = Math.max(
         storedBefore?.revision || 1,
@@ -1845,6 +1846,7 @@ export function createAgentRuntime({
           // DATA-002: the concurrency precondition is stated where a person can read it. The evidence
           // chain stores hashes only, so a claim "recorded in the ledger" would be unverifiable prose;
           // the step summary is durable and human-readable, which is what an audit actually reads.
+          // This text is part of the product's review surface — keep it accurate.
           (preconditionApplied
             ? ` [شرط التزامن: روجعت النسخة ${claimedRevision} وهي الحيّة.]`
             : ` [بلا شرط تزامن: لم تُذكر النسخة المعدَّلة، فالتعديل غير محميّ من كتابة تبويب أحدث.]`),

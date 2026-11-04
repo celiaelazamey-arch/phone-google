@@ -443,8 +443,9 @@ export function createAgentRouter({ agent, authorize, logger = console }) {
     }
     const note = typeof req.body?.note === 'string' ? req.body.note.slice(0, 500) : null;
     // DATA-002: the revision the caller actually edited. Accepted from the body or an `if-match`
-    // header (the same optimistic-concurrency idea as the signed artifact download); absent means
-    // "revision 1 only", so a stale tab cannot skip the guard by omitting it.
+    // header (the same optimistic-concurrency idea as the signed artifact download). Absent is
+    // *permitted* for client compatibility, not treated as "revision 1": the runtime then records the
+    // write as unguarded instead of refusing it. See `editPlan` for why, and DEC-138 for the trade-off.
     const expectedRevision = req.body?.expectedRevision ?? req.get('if-match') ?? null;
     try {
       const result = await current.editPlan(
