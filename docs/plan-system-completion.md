@@ -72,7 +72,7 @@
 
 | المفتاح | المؤشر | القيمة | كيف يُعاد | الربط |
 |---|---|---|---|---|
-| `open_tasks` | مهام مفتوحة | **67** (22 P0 · 31 P1 · 14 P2) | عدّ `BACKLOG` نفسه | 🔗 |
+| `open_tasks` | مهام مفتوحة | **66** (21 P0 · 31 P1 · 14 P2) | عدّ `BACKLOG` نفسه | 🔗 |
 | `grants` | الصلاحيات | 67 (`GRANT_IDS`) | `src/agent/access-policy.js` | 🔗 |
 | `agent_tools` | أدوات الوكيل | 18 (5 بموافقة) · صفر متصفح | `createDefaultTools()` | 🔗 |
 | `mcp_tools` | أدوات MCP | 12 مُعلنة | `MCP_TOOLS` في `src/celia-mcp.js` | 🔗 |
@@ -80,7 +80,7 @@
 | `deps` | الاعتماديات | 5 prod · 2 dev | `package.json` | 🔗 |
 | `coverage_floor` | أرضية CI للتغطية | 89 / 71 / 82 | `test:coverage` | 🔗 |
 | `syntax_files` | الملفات المفحوصة نحويًا | 275 | نطاق `scripts/check.mjs` نفسه | 🔗 |
-| `continuity` | وثائق الاستمرارية / الروابط / المهام | 163 / 523 / 137 | `npm run check:continuity` | 🔗 |
+| `continuity` | وثائق الاستمرارية / الروابط / المهام | 164 / 525 / 137 | `npm run check:continuity` | 🔗 |
 | `sandbox` | العزل | off | `CELIA_AGENT_SANDBOX` في `src/agent/index.js` | 🔗 |
 | `egress` | الخروج | off | `CELIA_AGENT_EGRESS` في `src/agent/index.js` | 🔗 |
 | `tests` | اختبارات | 1305 · **1288 pass** · 0 fail · 17 skip بيئي مصرح | `npm test` + `check-test-skips --allow-env-gates` (2026-11-04؛ المتخطيات ليست نجاحًا) | 📅 |
@@ -96,7 +96,7 @@
 | الحزمة | المهام (كل معرف مكتوب، لا اختصار) | العدد | الحجم |
 |---|---|---|---|
 | **W0** تسوية الحقيقة | — (لا معرف؛ عمل على السجل نفسه لا على مهمة) | — | S |
-| **W1** نزاهة النواة والبيانات | COMP-001 · COMP-002 · COMP-003 · DATA-001 · DATA-002 · SEC-004 | 6 | L |
+| **W1** نزاهة النواة والبيانات | COMP-001 · COMP-002 · COMP-003 · DATA-001 · SEC-004 | 5 | L |
 | **W2** قرارات المالك 🔑 | GOV-001 · REL-001 · REL-003 (`0.3.0` منشور؛ إثبات جسم Pages `version.json` المباشر باقٍ) · DATA-004 · MULTI-001 · SIE-001 · DIFF-001 · RES-001 · RES-002 · RES-003 · RES-005 | 11 | S (قرار + إثبات نشر) |
 | **W3** النشر والقنوات | HOST-003 · WA-005 · WA-007 · WA-008 · OPS-005 · OPS-002 · QA-004 · REL-004 | 8 | L |
 | **W4** قدرات الوكيل الكاملة | AGENT-001 · AGENT-002 · AGENT-003 · AGENT-004 · AGENT-005 · AGENT-008 · AGENT-009 · AGENT-010 · KB-001 · KB-002 · KB-003 · KB-004 · LEARN-001 · AI-001 · AI-002 · MCP-001 · MCP-002 | 17 | XL |
