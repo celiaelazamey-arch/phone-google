@@ -29,6 +29,7 @@
   // WA-008: only stable, server-defined reason codes are shown; never raw OAuth errors.
   const googleErrors = {
     google_oauth_not_configured: 'الدخول بحساب Google غير مهيأ على الخادم بعد.',
+    google_access_denied: 'لم تمنح Google الإذن. لم يتم تسجيل الدخول أو إنشاء حساب.',
     d1_not_bound: 'الخدمة غير جاهزة مؤقتًا. حاول بعد قليل.',
     google_identity_not_verified: 'لم تؤكد Google هذا البريد. اختر حسابًا موثّقًا.',
     google_email_already_registered: 'هذا البريد مسجّل بكلمة مرور. سجّل الدخول بكلمة المرور أولًا.',

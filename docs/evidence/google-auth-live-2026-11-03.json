@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "gateSet": "GA-F0…GA-F5",
+  "observedAt": "2026-11-03T21:26:15Z",
+  "target": "https://celia-phone-google.celiaelazamey.workers.dev",
+  "production": {
+    "version": "0.3.0",
+    "commit": "3bd53d667d9c54ecc6803dcf557a2e83ee6019b8",
+    "deployRun": "41684088925",
+    "knownGoodPromotionObserved": true
+  },
+  "collector": {
+    "liveNavigation": "Arena fetch_page",
+    "deploymentHistory": "gh run view 41684088925",
+    "limitation": "Direct Bash/Node requests to the sign-in route failed with ECONNRESET; no 302 status, response headers, or Set-Cookie value is claimed from those failed attempts."
+  },
+  "observations": {
+    "GA-F0": {
+      "result": "pass",
+      "route": "/auth/google/diagnostics",
+      "ok": true,
+      "clientId": "674007134899-6c4a7ltl59e9hf0q0g6342f2jpj0rnqv.apps.googleusercontent.com",
+      "redirectUri": "https://celia-phone-google.celiaelazamey.workers.dev/auth/google/callback",
+      "googleAccepted": true,
+      "googleReason": null,
+      "secretExposed": false
+    },
+    "GA-F1": {
+      "result": "pass_initiation_only",
+      "route": "/auth/google/signin",
+      "finalHost": "accounts.google.com",
+      "finalTitle": "Sign in - Google Accounts",
+      "responseType": "code",
+      "scope": "openid email profile",
+      "redirectUri": "https://celia-phone-google.celiaelazamey.workers.dev/auth/google/callback",
+      "statePresent": true,
+      "clientSecretPresent": false
+    },
+    "GA-F2-cookieless-callback": {
+      "result": "pass_specific_guard_only",
+      "request": "synthetic callback without an OAuth state cookie",
+      "error": "oauth_state_cookie_mismatch",
+      "tokenExchangeAttempted": false,
+      "accountOrSessionCreated": false
+    }
+  },
+  "redactedAndNotRetained": [
+    "OAuth state values",
+    "Google continuation, request, and replay navigation parameters",
+    "authorization codes",
+    "access, refresh, and ID tokens",
+    "Cookie and Set-Cookie values",
+    "client secrets"
+  ],
+  "notProven": [
+    "A real user completed Google consent and /api/account/me returned 200",
+    "The uncommitted denial fix and new verifier are deployed",
+    "GA-F4 owner review and merge",
+    "GA-F5 deployment and a complete 60-minute monitoring window"
+  ]
+}

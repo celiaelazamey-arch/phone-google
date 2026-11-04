@@ -126,6 +126,18 @@ jobs:
             --url https://celia-phone-google.celiaelazamey.workers.dev \
             --expect-commit "$CELIA_EXPECT_COMMIT" \
             --out .validation-artifacts/edge-live-acceptance.json
+      # GA-F0…GA-F3 / WA-010: prove the exact live Google redirect contract and the safe
+      # denial/CSRF/replay branches. A local HTML 200 is not accepted as a Google sign-in.
+      # The secret is compared in memory only; state/cookie/Location values never enter
+      # the artifact. Real consent, human review and 60-minute monitoring stay separate.
+      - name: Verify live Google OAuth start + security blockers (GA-F0…GA-F3)
+        if: steps.freshness.outputs.superseded != 'true'
+        env:
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+        run: |
+          node scripts/verify-google-auth.mjs \
+            --url https://celia-phone-google.celiaelazamey.workers.dev \
+            --out .validation-artifacts/google-auth-live.json
       # MAN-007: a green upload is not health. Only now that live acceptance passed for this
       # exact commit may the slice be marked known_good — that row is what a rollback targets.
       - name: Promote deployment slice to known_good (proof required)
@@ -139,12 +151,13 @@ jobs:
             --expect-commit "$CELIA_EXPECT_COMMIT" \
             --out .validation-artifacts/deployment-slice-promotion.json
       - name: Upload token-free Edge deployment evidence
-        if: always() && hashFiles('.validation-artifacts/edge-live-acceptance.json', '.validation-artifacts/deployment-slice.json', '.validation-artifacts/deployment-slice-promotion.json') != ''
+        if: always() && hashFiles('.validation-artifacts/edge-live-acceptance.json', '.validation-artifacts/google-auth-live.json', '.validation-artifacts/deployment-slice.json', '.validation-artifacts/deployment-slice-promotion.json') != ''
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: edge-deployment-evidence-${{ env.CELIA_EXPECT_COMMIT }}
           path: |
             .validation-artifacts/edge-live-acceptance.json
+            .validation-artifacts/google-auth-live.json
             .validation-artifacts/deployment-slice.json
             .validation-artifacts/deployment-slice-promotion.json
           retention-days: 30

@@ -175,6 +175,10 @@ npm start
 
 النطاقات المستخدمة: Gmail read-only، Drive read-only، Contacts read-only، وCalendar events (للقراءة وإنشاء موعد). لا يقرأ التطبيق مرفقات البريد ولا يرسل بريدًا إلكترونيًا.
 
+### دخول المستخدم العادي على الحافة وقبوله الحيّ
+
+مسار `/auth/google/signin` على Cloudflare Edge منفصل عن ربط Workspace للمالك: يطلب `openid email profile` فقط، ولا يحفظ رموز Google، ويفتح جلسة حساب ذاتي بعد التحقق من `sub` و`email_verified`. استخدم `GET /auth/google/diagnostics` لمعرفة قبول Google لعنوان العودة، ثم شغّل `npm run verify:google-auth` لإنتاج دليل منقّح لبدء التحويل وموانع HTTPS/الأسرار/الكوكي/CSRF ورفض الموافقة ومنع replay. نجاح هذا الفحص لا يثبت موافقة مستخدم حقيقية أو `/api/account/me=200` ولا يجيز الإطلاق؛ معايير `GA-F0…GA-F5` والفروق عن `PUB-001` موثقة في [بوابات قبول وإطلاق الدخول بحساب Google](docs/google-auth-launch-gates.md).
+
 ## إعداد WhatsApp Cloud API
 
 - أنشئ تطبيق Meta وWhatsApp Business Phone Number، واضبط `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` وإصدار Graph API مدعومًا في `WHATSAPP_API_VERSION`.
