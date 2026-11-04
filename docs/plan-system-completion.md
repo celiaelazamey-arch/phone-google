@@ -79,7 +79,7 @@
 | `deps` | الاعتماديات | 5 prod · 2 dev | `package.json` | 🔗 |
 | `coverage_floor` | أرضية CI للتغطية | 89 / 71 / 82 | `test:coverage` | 🔗 |
 | `syntax_files` | الملفات المفحوصة نحويًا | 268 | نطاق `scripts/check.mjs` نفسه | 🔗 |
-| `continuity` | وثائق الاستمرارية / الروابط / المهام | 157 / 495 / 137 | `npm run check:continuity` | 🔗 |
+| `continuity` | وثائق الاستمرارية / الروابط / المهام | 157 / 496 / 137 | `npm run check:continuity` | 🔗 |
 | `sandbox` | العزل | off | `CELIA_AGENT_SANDBOX` في `src/agent/index.js` | 🔗 |
 | `egress` | الخروج | off | `CELIA_AGENT_EGRESS` في `src/agent/index.js` | 🔗 |
 | `tests` | اختبارات | 1305 · **1288 pass** · 0 fail · 17 skip بيئي مصرح | `npm test` + `check-test-skips --allow-env-gates` (2026-11-04؛ المتخطيات ليست نجاحًا) | 📅 |
