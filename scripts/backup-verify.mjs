@@ -287,6 +287,10 @@ export async function runBackupVerify({
     // 2) الاستعادة إلى مخطط معزول — عبر SQL حقيقي، ثم إثبات بالقراءة من اتصال آخر
     await admin.query(`CREATE DATABASE ${q(restoreSchema)} CHARACTER SET utf8mb4`);
     created = true;
+    // The DDL runs on a connection with no default database, so the restored schema must be
+    // selected first — otherwise the CREATE TABLEs fail (measured: CI reached this line and threw).
+    // This also means restore order is explicit, not incidental.
+    await admin.query(`USE ${q(restoreSchema)}`);
     const schemaSql = await readFile(schemaSqlPath, 'utf8');
     for (const statement of schemaSql.split(/;\s*\n/).map((s) => s.trim()).filter(Boolean)) {
       await admin.query(statement);
@@ -333,6 +337,7 @@ export async function runBackupVerify({
     if (!keyOk) log('::error title=backup-verify::النسخة لا تُفكّ بمفتاحها — حفظ المفتاح خارج Render جزء من DATA-001');
   } catch (error) {
     report.error = scrub(error?.message ?? error, secrets);
+    report.failedStep = [...(report.steps ?? [])].reverse().find((step) => step.ok)?.step ?? 'startup';
     report.verdict = 'failed';
     log(`::error title=backup-verify::${report.error}`);
   } finally {
