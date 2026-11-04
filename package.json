@@ -87,7 +87,8 @@
     "memory:consolidate": "node scripts/memory-consolidate.mjs",
     "attention": "node scripts/attention.mjs",
     "delegate": "node scripts/delegation.mjs",
-    "reconcile:report": "node scripts/reconcile-report.mjs"
+    "reconcile:report": "node scripts/reconcile-report.mjs",
+    "backup:verify": "node scripts/backup-verify.mjs"
   },
   "dependencies": {
     "dotenv": "^18.0.9",
