@@ -34,7 +34,7 @@
 | 5 | الإصدار والحافة الدائمة | ⚠️ | PR #136 مدمج في `7596c27`; `v0.3.0` منشور immutable (`41399947570`). Edge `41400115739` أعلن حيًا `0.3.0@7596c27`, D1 durable و`known_good`; Pages `41399947941` أثبت 13/13 route على SHA نفسه. لم يقرأ probe جسم `version.json`؛ الإثبات المباشر لمحتواه باقٍ. `v0.2.1` محفوظ | فحص `version.json` الحي نصيًا على Pages مقابل `0.3.0` وSHA نفسه؛ ثم تسجيل الدليل، دون الخلط باكتمال النظام |
 | 6 | الخادم الخلفي الكامل (Express + MySQL) | ❌ | Render workflow (`41400115801`) نجح كفحص لكنه أفاد `not-configured`، بلا خدمة وبلا live URL؛ الحافة وحدها منشورة، فلا يُحسب ذلك نشرًا حيًا | `HOST-003` 🔑🌐 |
 | 7 | القنوات (Google / WhatsApp) | ❌ | تهيئة WhatsApp التقنية على الحافة متحققة حيًا (`41456011988` على `main@2b47d62`: `whatsapp-onboarding configured=true`، `optionalSecretBindings=3`، `totalSecretBindings=21`)؛ ربط الرقم الفعلي وإرسال/استقبال الرسائل وربط Google لم تُنفَّذ بعد | `GOOG-004/005` · `WA-005/007` 🔑🌐 |
-| 8 | الحماية والاستعادة | ⚠️ | سلسلة أدلة مُختبَرة. **حماية `main` مفعّلة جزئيًا**: ruleset `26270171` نشِط (منع الحذف · منع الكتابة بالقوة · تاريخ خطي · CodeQL errors/high) لكن `required_status_checks` فارغة ولا مراجعة بشرية — ونسخة MySQL غير مقيسة | `GOV-001` (الجزء الباقي) · `DATA-001` 🔑 |
+| 8 | الحماية والاستعادة | ⚠️ | سلسلة أدلة مُختبَرة. **حماية `main` أقوى مما كُتب سابقًا (قياس 2026-11-04، `DEC-134`)**: ruleset `26270171` (حذف · قوة · تاريخ خطي · CodeQL errors/high) **ورقم `26452705` «Main PR Gate» نشِط منذ 3 نوفمبر**: مراجعة واحدة مطلوبة + `required_status_checks=["Celia quality & resilience"]`. الفجوة الباقية: **`bypass_actors` بحساب المالك و`bypass_mode=always`** (وهو مسار دمج #159 بلا مراجعة)، وCodeQL ليس ضمن المطلوب، ونسخة MySQL غير مقيسة | `GOV-001` (تقييد التجاوز + إضافة CodeQL) · `DATA-001` 🔑 |
 
 **`B1` = 5.5 / 8.** لا يُعلن «100%» حتى تُغلق 6 و7 و8 بدليل خارجي (تشغيلة + تقرير)، لا بوصف.
 
@@ -79,8 +79,8 @@
 | `version` | الإصدار | 0.3.0 (منشور immutable؛ tag `v0.3.0` يستهدف `7596c27e`) | `src/version.js` + `package.json` + GitHub Release API | 🔗/📅 |
 | `deps` | الاعتماديات | 5 prod · 2 dev | `package.json` | 🔗 |
 | `coverage_floor` | أرضية CI للتغطية | 89 / 71 / 82 | `test:coverage` | 🔗 |
-| `syntax_files` | الملفات المفحوصة نحويًا | 268 | نطاق `scripts/check.mjs` نفسه | 🔗 |
-| `continuity` | وثائق الاستمرارية / الروابط / المهام | 159 / 507 / 137 | `npm run check:continuity` | 🔗 |
+| `syntax_files` | الملفات المفحوصة نحويًا | 269 | نطاق `scripts/check.mjs` نفسه | 🔗 |
+| `continuity` | وثائق الاستمرارية / الروابط / المهام | 160 / 511 / 137 | `npm run check:continuity` | 🔗 |
 | `sandbox` | العزل | off | `CELIA_AGENT_SANDBOX` في `src/agent/index.js` | 🔗 |
 | `egress` | الخروج | off | `CELIA_AGENT_EGRESS` في `src/agent/index.js` | 🔗 |
 | `tests` | اختبارات | 1305 · **1288 pass** · 0 fail · 17 skip بيئي مصرح | `npm test` + `check-test-skips --allow-env-gates` (2026-11-04؛ المتخطيات ليست نجاحًا) | 📅 |

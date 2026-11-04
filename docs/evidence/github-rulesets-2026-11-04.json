@@ -1,0 +1,113 @@
+{
+  "schema": 1,
+  "observedAt": "2026-11-04T08:28:49Z",
+  "collector": "gh api (GitHub REST) من بيئة الوكيل — قراءة فقط، بلا أسرار",
+  "repository": "repos/celiaelazamey-arch/phone-google",
+  "defaultBranch": "main",
+  "rulesets": [
+    {
+      "id": 26270171,
+      "name": "Main Branch Protection",
+      "enforcement": "active",
+      "targets": {
+        "exclude": [],
+        "include": [
+          "~DEFAULT_BRANCH"
+        ]
+      },
+      "createdAt": "2026-10-31T12:27:23.562Z",
+      "updatedAt": "2026-11-01T11:13:44.281Z",
+      "rules": [
+        {
+          "type": "deletion"
+        },
+        {
+          "type": "non_fast_forward"
+        },
+        {
+          "type": "copilot_code_review"
+        },
+        {
+          "type": "code_coverage"
+        },
+        {
+          "type": "code_scanning",
+          "tools": [
+            [
+              "CodeQL",
+              "high_or_higher",
+              "errors"
+            ]
+          ]
+        },
+        {
+          "type": "required_status_checks",
+          "required_status_checks": [],
+          "strict": false
+        },
+        {
+          "type": "required_deployments"
+        },
+        {
+          "type": "required_linear_history"
+        }
+      ],
+      "bypassActors": [],
+      "currentUserCanBypass": "never"
+    },
+    {
+      "id": 26452705,
+      "name": "Main PR Gate",
+      "enforcement": "active",
+      "targets": {
+        "exclude": [],
+        "include": [
+          "~DEFAULT_BRANCH"
+        ]
+      },
+      "createdAt": "2026-11-03T13:42:19.009Z",
+      "updatedAt": "2026-11-03T13:42:19.058Z",
+      "rules": [
+        {
+          "type": "deletion"
+        },
+        {
+          "type": "non_fast_forward"
+        },
+        {
+          "type": "pull_request",
+          "required_approving_review_count": 1,
+          "require_last_push_approval": false,
+          "allowed_merge_methods": [
+            "merge",
+            "squash",
+            "rebase"
+          ]
+        },
+        {
+          "type": "required_status_checks",
+          "required_status_checks": [
+            "Celia quality & resilience"
+          ],
+          "strict": false
+        }
+      ],
+      "bypassActors": [
+        {
+          "actor_id": 5,
+          "actor_type": "RepositoryRole",
+          "bypass_mode": "always"
+        }
+      ],
+      "currentUserCanBypass": "always"
+    }
+  ],
+  "mergeObservation": {
+    "pullRequest": 159,
+    "state": "MERGED",
+    "reviewDecision": "REVIEW_REQUIRED",
+    "mergedAt": "2026-11-04T07:33:53Z",
+    "mergedBy": "celiaelazamey-arch",
+    "note": "دُمج مع reviewDecision=REVIEW_REQUIRED، أي أن الدمج مرّ بمسار تجاوز (bypass) لا بمراجعة معتمدة."
+  }
+}

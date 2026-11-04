@@ -80,12 +80,12 @@
     <div class="stat"><b>128</b><small>وحدة برمجية</small></div>
     <div class="stat"><b>269</b><small>اعتمادية داخلية</small></div>
     <div class="stat"><b>16</b><small>مكوّنًا</small></div>
-    <div class="stat"><b style="color:var(--ok)">14</b><small>متحقق</small></div>
-    <div class="stat"><b style="color:var(--part)">2</b><small>جزئي</small></div>
+    <div class="stat"><b style="color:var(--ok)">15</b><small>متحقق</small></div>
+    <div class="stat"><b style="color:var(--part)">1</b><small>جزئي</small></div>
   </div>
 
   <h2 class="section">الخريطة — اضغط أي مكوّن لعرض علاقاته</h2>
-  <div class="chips" id="chips"><button type="button" class="chip ok" data-filter="implemented_verified">🟢 منفّذ ومتحقق <b>14</b></button><button type="button" class="chip unv" data-filter="implemented_unverified">🟠 منفّذ وغير متحقق <b>0</b></button><button type="button" class="chip part" data-filter="partial">🟡 جزئي <b>2</b></button><button type="button" class="chip prop" data-filter="proposed">🔵 مقترح <b>0</b></button><button type="button" class="chip miss" data-filter="not_implemented">🔴 غير منفّذ <b>0</b></button><button type="button" class="chip off" data-filter="disabled">⚪ موجود ومعطّل <b>0</b></button><button type="button" class="chip blocked" data-filter="blocked">⛔ محجوب <b>0</b></button><button type="button" class="chip" id="reset">إظهار الكل</button></div>
+  <div class="chips" id="chips"><button type="button" class="chip ok" data-filter="implemented_verified">🟢 منفّذ ومتحقق <b>15</b></button><button type="button" class="chip unv" data-filter="implemented_unverified">🟠 منفّذ وغير متحقق <b>0</b></button><button type="button" class="chip part" data-filter="partial">🟡 جزئي <b>1</b></button><button type="button" class="chip prop" data-filter="proposed">🔵 مقترح <b>0</b></button><button type="button" class="chip miss" data-filter="not_implemented">🔴 غير منفّذ <b>0</b></button><button type="button" class="chip off" data-filter="disabled">⚪ موجود ومعطّل <b>0</b></button><button type="button" class="chip blocked" data-filter="blocked">⛔ محجوب <b>0</b></button><button type="button" class="chip" id="reset">إظهار الكل</button></div>
   <div class="canvas" style="margin-top:10px"><svg viewBox="0 0 1334 526" width="1334" height="526" role="img" aria-label="خريطة معمارية حية لمكونات CeliaOS">
       <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#3b4b8f" /></marker></defs>
       <text class="band" x="16" y="72">التشغيل</text>
@@ -183,9 +183,9 @@
         <text class="n-title" x="14" y="26">Browser · Computer Use · MCP</text>
         <text class="n-sub" x="14" y="44">3 ملف · موصول بالمدخل · معطّل افتراضيًا</text>
       </g>
-      <g class="node part" data-id="data_layer" data-status="partial" transform="translate(548 174)" tabindex="0" role="button" aria-label="Data Layer — جزئي">
+      <g class="node ok" data-id="data_layer" data-status="implemented_verified" transform="translate(548 174)" tabindex="0" role="button" aria-label="Data Layer — منفّذ ومتحقق">
         <rect width="208" height="56" rx="12" />
-        <text class="n-mark" x="194" y="22" text-anchor="end">🟡</text>
+        <text class="n-mark" x="194" y="22" text-anchor="end">🟢</text>
         <text class="n-title" x="14" y="26">Data Layer</text>
         <text class="n-sub" x="14" y="44">3 ملف · موصول بالمدخل</text>
       </g>
@@ -277,10 +277,10 @@
         <ul class="files"><li class="mono">src/agent/web-fetch.js</li><li class="mono">src/agent/computer-policy.js</li><li class="mono">src/mcp-contract.js</li></ul>
         <p class="meta">اختبارات تطال هذه الوحدات: 3/3 · موصول من مدخل تنفيذي · <span class="off-flag">⚪ معطّل افتراضيًا</span></p>
       </article>
-      <article class="card part" data-id="data_layer" data-status="partial">
-        <header><h3>Data Layer</h3><span class="badge">🟡 جزئي</span></header>
+      <article class="card ok" data-id="data_layer" data-status="implemented_verified">
+        <header><h3>Data Layer</h3><span class="badge">🟢 منفّذ ومتحقق</span></header>
         <ul class="files"><li class="mono">src/db.js</li><li class="mono">src/mysql-config.js</li><li class="mono">src/schema-migrations.js</li></ul>
-        <p class="meta">اختبارات تطال هذه الوحدات: 2/3 · موصول من مدخل تنفيذي</p>
+        <p class="meta">اختبارات تطال هذه الوحدات: 3/3 · موصول من مدخل تنفيذي</p>
       </article>
       <article class="card ok" data-id="policy_approval" data-status="implemented_verified">
         <header><h3>Policy &amp; Approval</h3><span class="badge">🟢 منفّذ ومتحقق</span></header>
@@ -306,7 +306,7 @@
 
   <footer>
     <div>مُولَّد من <b class="mono">src/design/architecture-map.js</b> — لا يُحرَّر يدويًا؛ <span class="mono">npm run arch:map</span>.</div>
-    <div>14 متحقق · 0 غير متحقق · 2 جزئي · 0 غائب</div>
+    <div>15 متحقق · 0 غير متحقق · 1 جزئي · 0 غائب</div>
   </footer>
 
 <script>
