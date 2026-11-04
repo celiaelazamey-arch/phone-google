@@ -567,7 +567,54 @@ check('reconciliation-batch', 'المصالحة الجماعية والتقري�
   }
 });
 
-// ── 12. وكيل فرز المشكلات ────────────────────────────────────────────────
+// ── 12. تبويبان متزامنان (DATA-002) ───────────────────────────────────────
+check('two-tabs', 'تبويبان متزامنان — قرار واحد يفوز، والخاسر يُرفض بـ409 ولا يكتب فوق تقدم أحدث', async (self) => {
+  const driver = await createSqliteDriver({ path: tempPath('two-tabs.sqlite3') });
+  const store = createAgentStore({ driver });
+  try {
+    const thread = await store.createThread({ ownerId: 'owner', title: 'تبويبان' });
+    const { run } = await store.createRun({
+      threadId: thread.id,
+      ownerId: 'owner',
+      userMessageId: null,
+      clientMessageId: 'doctor-two-tabs-0001',
+      planner: 'doctor',
+      maxSteps: 5,
+      maxCostMicros: 1000
+    });
+    const step = await store.appendStep({ runId: run.id, kind: 'act', title: 'google.calendar_create_event' });
+    const { approval } = await store.requestApproval({
+      runId: run.id,
+      stepId: step.id,
+      toolName: 'google.calendar_create_event',
+      risk: 'external_effect',
+      idempotencyKey: `approval:${run.id}:doctor`
+    });
+    // Two tabs decide the same gate at the same time, with their own keys.
+    const results = await Promise.allSettled([
+      store.decideApproval({ approvalId: approval.id, decision: 'approved', actor: 'owner', decisionKey: 'doctor-tab-alpha-1' }),
+      store.decideApproval({ approvalId: approval.id, decision: 'approved', actor: 'owner', decisionKey: 'doctor-tab-bravo-2' })
+    ]);
+    const won = results.filter((item) => item.status === 'fulfilled');
+    const lost = results.filter((item) => item.status === 'rejected');
+    const conflict = lost[0]?.reason;
+    // The loser must be a named 409 conflict, never a 500: that was the measured defect.
+    const namedConflict = conflict?.code === 'approval_already_decided' && conflict?.status === 409;
+    const ok = won.length === 1 && lost.length === 1 && namedConflict && approval.decision === 'pending';
+    finish(
+      self,
+      ok ? 'works' : 'broken',
+      ok
+        ? 'فاز قرار واحد فقط، والخاسر تلقّى 409 مسمّى (لا 500)، والصفّ حُسم مرة واحدة'
+        : `فائز=${won.length} · خاسر=${lost.length} · رمز=${conflict?.code ?? '—'} · حالة=${conflict?.status ?? '—'}`,
+      { winners: won.length, losers: lost.length, conflictCode: conflict?.code ?? null, conflictStatus: conflict?.status ?? null }
+    );
+  } finally {
+    await store.close().catch(() => {});
+  }
+});
+
+// ── 13. وكيل فرز المشكلات ────────────────────────────────────────────────
 check('issue-triage', 'وكيل فرز المشكلات (issue-triage) — تصنيف محلي بلا شبكة', async (self) => {
   const critical = classifyIssue({ title: 'تسرب مفتاح API في سجلات الإنتاج', body: 'المفتاح ظهر في سجلات النشر ويمكن استغلاله. أمني وعاجل جدًا.' });
   const bug = classifyIssue({ title: 'الخادم يتعطل عند رفع ملف كبير', body: 'عند رفع ملف 40 ميغابايت يتوقف الخادم بخطأ 500 ويعود بعد إعادة التشغيل.' });

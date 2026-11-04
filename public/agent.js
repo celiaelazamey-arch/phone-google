@@ -872,9 +872,17 @@ async function decide(decision) {
   const buttons = [$('approve'), $('edit-plan'), $('reject')].filter(Boolean);
   buttons.forEach((button) => { button.disabled = true; });
   try {
+    // DATA-002: state the revision this tab actually read. Without it a second tab could overwrite a
+    // newer confirmed revision; with it the server answers 409 and names both revisions.
+    const expectedRevision = Number(state.plan?.revision) || null;
     const result = await api(`/api/agent/runs/${state.runId}/approval`, {
       method: 'POST',
-      body: JSON.stringify({ decision, note, ...(payload !== undefined ? { payload } : {}) })
+      body: JSON.stringify({
+        decision,
+        note,
+        ...(payload !== undefined ? { payload } : {}),
+        ...(decision === 'edited' && expectedRevision ? { expectedRevision } : {})
+      })
     });
     setAuthStatus(
       decision === 'approved'

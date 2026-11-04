@@ -20,6 +20,7 @@ const REQUIRED = [
   'memory-consolidation',
   'attention',
   'reconciliation-batch',
+  'two-tabs',
   'issue-triage',
   'planner-llm',
   'model-router',

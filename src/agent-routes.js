@@ -442,6 +442,11 @@ export function createAgentRouter({ agent, authorize, logger = console }) {
       return res.status(400).json({ error: 'invalid_client_message_id' });
     }
     const note = typeof req.body?.note === 'string' ? req.body.note.slice(0, 500) : null;
+    // DATA-002: the revision the caller actually edited. Accepted from the body or an `if-match`
+    // header (the same optimistic-concurrency idea as the signed artifact download). Absent is
+    // *permitted* for client compatibility, not treated as "revision 1": the runtime then records the
+    // write as unguarded instead of refusing it. See `editPlan` for why, and DEC-138 for the trade-off.
+    const expectedRevision = req.body?.expectedRevision ?? req.get('if-match') ?? null;
     try {
       const result = await current.editPlan(
         req.params.id,
@@ -449,7 +454,8 @@ export function createAgentRouter({ agent, authorize, logger = console }) {
           payload: req.body?.payload ?? null,
           summary: req.body?.summary ?? null,
           note,
-          idempotencyKey
+          idempotencyKey,
+          expectedRevision
         },
         current.status().ownerId
       );
@@ -485,7 +491,9 @@ export function createAgentRouter({ agent, authorize, logger = console }) {
           payload: req.body?.payload ?? null,
           summary: req.body?.summary ?? null,
           note,
-          idempotencyKey
+          idempotencyKey,
+          // An `edited` decision is an edit: it carries the same concurrency precondition.
+          expectedRevision: req.body?.expectedRevision ?? req.get('if-match') ?? null
         },
         current.status().ownerId
       );

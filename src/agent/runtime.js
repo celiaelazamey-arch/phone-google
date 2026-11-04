@@ -1721,7 +1721,7 @@ export function createAgentRuntime({
      */
     async editPlan(
       runId,
-      { payload = null, summary = null, note = null, idempotencyKey = null } = {},
+      { payload = null, summary = null, note = null, idempotencyKey = null, expectedRevision = null } = {},
       requesterId = ownerId
     ) {
       const run = await store.getRunForOwner(runId, requesterId);
@@ -1762,6 +1762,47 @@ export function createAgentRuntime({
       const pending = allApprovals.filter((approval) => approval.decision === APPROVAL_DECISION.pending);
       if (!pending.length) throw httpError(409, 'approval_request_missing', 'approval_request_missing');
       const currentApproval = pending[pending.length - 1];
+
+      // DATA-002 — «تبويبان لا يكتبان فوق تقدم أحدث».
+      //
+      // Two tabs on one thread both hold revision N. Without this check the later `POST /plan`
+      // silently replaced the earlier tab's *confirmed* revision: measured before the fix, tab B's
+      // save left tab A's payload nowhere in the durable state (only its hash in the evidence chain),
+      // which is exactly the "writes over newer progress" the acceptance row forbids.
+      //
+      // The client states the revision it edited. If the plan has moved on, the request is refused
+      // with 409 and both revisions are named, so the tab can re-read instead of overwriting.
+      //
+      // An absent `expectedRevision` stays *permitted* rather than rejected: the repository's rule is
+      // to preserve existing clients across contract changes, and `/plan` is a documented surface.
+      // But an omission is not free — the answer carries `preconditionApplied: false`, the durable step
+      // summary says «بلا شرط تزامن» in words, and the evidence input hashes `precondition: 'none'`.
+      // (The chain stores hashes only, so the step summary is the readable half; do not claim the ledger
+      // shows the flag.) An unguarded overwrite is therefore visible rather than silent. The shipped UI
+      // always states the revision, so the two-tab guarantee holds for the product itself; a third-party
+      // client that omits it can still overwrite, and the record says so.
+      const storedBefore = parsePlanSummaryRecord(run.planSummary);
+      const liveRevision = Math.max(
+        storedBefore?.revision || 1,
+        allApprovals.filter((approval) => approval.decision === APPROVAL_DECISION.edited).length + 1
+      );
+      const preconditionApplied = expectedRevision !== null && expectedRevision !== undefined;
+      let claimedRevision = null;
+      if (preconditionApplied) {
+        const claimed = Number(expectedRevision);
+        claimedRevision = claimed;
+        if (!Number.isInteger(claimed) || claimed < 1) {
+          throw httpError(400, 'invalid_expected_revision', 'invalid_expected_revision');
+        }
+        if (claimed !== liveRevision) {
+          throw httpError(
+            409,
+            'revision_conflict',
+            `revision_conflict: you edited revision ${claimed}, the plan is at revision ${liveRevision}; re-read the plan`
+          );
+        }
+      }
+
       const tool = tools.get(currentApproval.toolName);
       const requestedToolName =
         summary && typeof summary === 'object' && typeof summary.toolName === 'string' ? summary.toolName : null;
@@ -1801,7 +1842,14 @@ export function createAgentRuntime({
         title: `تعديل الخطة (مراجعة #${revision})`,
         summary:
           `حُفظ تعديل المالك (${requesterId}) على خطة ${tool.name} وأُعيد التحقق من السياسات بنجاح؛ ` +
-          `الخطة بانتظار الموافقة على النسخة المعدّلة.${memo ? ` ملاحظة: ${memo}` : ''}`,
+          `الخطة بانتظار الموافقة على النسخة المعدّلة.${memo ? ` ملاحظة: ${memo}` : ''}` +
+          // DATA-002: the concurrency precondition is stated where a person can read it. The evidence
+          // chain stores hashes only, so a claim "recorded in the ledger" would be unverifiable prose;
+          // the step summary is durable and human-readable, which is what an audit actually reads.
+          // This text is part of the product's review surface — keep it accurate.
+          (preconditionApplied
+            ? ` [شرط التزامن: روجعت النسخة ${claimedRevision} وهي الحيّة.]`
+            : ` [بلا شرط تزامن: لم تُذكر النسخة المعدَّلة، فالتعديل غير محميّ من كتابة تبويب أحدث.]`),
         toolName: tool.name
       });
 
@@ -1836,7 +1884,11 @@ export function createAgentRuntime({
           newPayloadHash,
           payload,
           actor: requesterId,
-          note: memo
+          note: memo,
+          // DATA-002: whether this write was guarded. `none` is an auditable fact, not a hidden default.
+          precondition: preconditionApplied ? 'revision' : 'none',
+          expectedRevision: preconditionApplied ? Number(expectedRevision) : null,
+          actualRevision: liveRevision
         },
         output: {
           outboxId: updatedOutbox.entry.id,
@@ -1891,7 +1943,9 @@ export function createAgentRuntime({
         approvals: detail.approvals,
         outbox: detail.outbox,
         resumed: false,
-        idempotentReplay: false
+        idempotentReplay: false,
+        preconditionApplied,
+        revision: liveRevision + 1
       };
     },
     /**
@@ -1901,11 +1955,12 @@ export function createAgentRuntime({
      */
     async approve(
       runId,
-      { decision, payload = null, summary = null, note = null, idempotencyKey = null } = {},
+      { decision, payload = null, summary = null, note = null, idempotencyKey = null, expectedRevision = null } = {},
       requesterId = ownerId
     ) {
       if (decision === APPROVAL_DECISION.edited) {
-        return runtime.editPlan(runId, { payload, summary, note, idempotencyKey }, requesterId);
+        // An edit through the approval route is still an edit: same concurrency precondition.
+        return runtime.editPlan(runId, { payload, summary, note, idempotencyKey, expectedRevision }, requesterId);
       }
       const run = await store.getRunForOwner(runId, requesterId);
       if (!run) throw httpError(404, 'run_not_found', 'run_not_found');
