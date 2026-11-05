@@ -404,6 +404,33 @@ test('L1-18 the module route is rate-limited for real: limit headers, then a mea
   assert.ok(rejected.at <= limit + 1, 'the enforced ceiling is the announced one');
 });
 
+/* ── L1-19: التقديم من الذاكرة لا يُنقص البايتات ولا يُسقط التفاوض الشرطي ──
+ * المسار يقرأ الوحدة مرة عند إنشاء الموجه (فلا وصول لنظام الملفات داخل المعالج — وهذا ما يزيل
+ * تنبيه CodeQL من أساسه). الثمن المقاس كان أن `res.send` لا يتفاوض على الطزاجة كما فعل `sendFile`:
+ * الطلب الشرطي أرجع 200 لا 304. أُعيد التفاوض ببصمة قوية، وهذا الحارس يثبّت الأمرين معًا. */
+test('L1-19 the in-memory module route serves the exact bytes and answers a conditional GET with 304', async (t) => {
+  const pool = createMemoryPool();
+  const config = loadCeliaMcpConfig({ CELIA_MCP_API_TOKEN: crypto.randomBytes(32).toString('hex') });
+  const server = createCeliaMcpApp({ pool, config }).listen(0, '127.0.0.1');
+  const baseUrl = await new Promise((resolve) => server.once('listening', () => resolve(`http://127.0.0.1:${server.address().port}`)));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+
+  const onDisk = readFileSync(path.join(root, 'public/agent-console.js'), 'utf8');
+  const response = await fetch(`${baseUrl}/agent-console.js`);
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('content-type') || '', /javascript/);
+  const served = await response.text();
+  assert.equal(served, onDisk, 'the served module is byte-identical to the file on disk');
+
+  const etag = response.headers.get('etag');
+  assert.ok(etag && etag.startsWith('"') && !etag.startsWith('W/'), 'a strong ETag is announced');
+  assert.equal(response.headers.get('cache-control'), 'no-cache', 'so a deploy cannot leave a stale module');
+
+  const revalidated = await fetch(`${baseUrl}/agent-console.js`, { headers: { 'if-none-match': etag } });
+  assert.equal(revalidated.status, 304, 'a conditional GET is answered without a body, as sendFile used to');
+  assert.equal((await revalidated.text()).length, 0, 'and it carries no bytes');
+});
+
 test('L1-16 the derived panel board equals the render of the real page and module', () => {
   const out = execFileSync(process.execPath, ['scripts/render-agent-console-panels.mjs', '--check'], {
     cwd: root,

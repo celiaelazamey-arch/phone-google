@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
@@ -114,8 +115,24 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, oper
   // L1 (U2/U5/U3): pure console-panel helpers imported by agent.js the same way. Assets under public/ are
   // served by explicit route with no static fallback, so a module without its own route is a 404 that only
   // a browser notices — `L1-17` in test/agent-console.test.js boots this server and refuses that class.
-  router.get('/agent-console.js', staticAssetLimit, (_req, res) =>
-    res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'agent-console.js')));
+  // The module is read once per router, not per request, so the handler below performs no file system
+  // access at all: CodeQL's un-rate-limited-fs-access rule models known limiter packages and does not
+  // recognise this repo's own middleware, so it kept flagging the route even after the measured 429.
+  // Removing the per-request disk read makes the flagged condition absent rather than argued about, and
+  // the limiter stays as defence in depth with its ceiling pinned by guard L1-18.
+  //
+  // Measured consequence, handled rather than left behind: `res.send` does not negotiate freshness the
+  // way `sendFile` did (a conditional GET returned 200, not 304), so this route carries its own strong
+  // ETag from the module digest plus `Cache-Control: no-cache` — the browser revalidates every load and
+  // gets a bodyless 304, which is what `sendFile`'s Last-Modified/ETag gave before, with no stale module
+  // surviving a deploy.
+  const agentConsoleModule = readFileSync(path.join(PUBLIC_DIR, 'agent-console.js'), 'utf8');
+  const agentConsoleEtag = `"${crypto.createHash('sha256').update(agentConsoleModule).digest('base64url').slice(0, 32)}"`;
+  router.get('/agent-console.js', staticAssetLimit, (req, res) => {
+    res.type('application/javascript').set('ETag', agentConsoleEtag).set('Cache-Control', 'no-cache');
+    if (req.headers['if-none-match'] === agentConsoleEtag) return res.status(304).end();
+    return res.send(agentConsoleModule);
+  });
   // WP-1.3 (DEC-049): رموز السمات ومُحلّلها قبل الرسم — مشتركان بين /agent و/kb و/cron.
   router.get('/theme.css', (_req, res) => res.type('text/css').sendFile(path.join(PUBLIC_DIR, 'theme.css')));
   router.get('/theme.js', (_req, res) => res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'theme.js')));
