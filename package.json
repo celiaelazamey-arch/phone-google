@@ -47,6 +47,8 @@
     "computer:permissions:check": "node scripts/render-computer-permissions.mjs --check",
     "access:policy": "node scripts/render-access-policy.mjs",
     "access:policy:check": "node scripts/render-access-policy.mjs --check",
+    "console:panels": "node scripts/render-agent-console-panels.mjs",
+    "console:panels:check": "node scripts/render-agent-console-panels.mjs --check",
     "visual:first": "node scripts/render-visual-first.mjs",
     "visual:first:check": "node scripts/check-visual-first.mjs",
     "arch:map": "node scripts/render-architecture-map.mjs",

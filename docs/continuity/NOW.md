@@ -12,9 +12,9 @@
 ## 2. التركيز النشط وسجل الحالة ([STATE.md](STATE.md))
 
 - **آخر مراجعة مسجّلة:** 5 نوفمبر 2026
-- **الجلسة النشطة:** D1 Backup & Recovery v2.7 — `LOCAL SIMULATED_PASS` (35/35 d1-verify, 1401/0/17) — `EXTERNAL GATE CLOSED` — التصحيحات A/B/C مضمنة — على الفرع `arena/241c4e6f-phone-google` (PR #169 OPEN) — `NETWORK=DENY` حتى موافقة E1 المحددة.
-- **آخر سجل جلسة مؤرَّخ:** [D1 LOCAL SIMULATED_PASS](sessions/2026-11-05-d1-local-simulated-pass.md)
-- **حجم [STATE.md](STATE.md) النشط:** 95 سطرًا (17495 بايت)
+- **الجلسة النشطة:** L1 — لوحات الواجهة الثلاث (U2 سجل المحادثات · U5 صندوق المهام · U3 معاينة المخرجات) — كود واختبارات فقط: صفر مسار `/api` جديد، صفر منطق خادم، صفر ترحيل، صفر شبكة — مع سطرين في `src/celia-ui.js` لمسار أصل `agent-console.js`: الأول فرضه فشل CI ‏(`404` ⇒ 20 اختبار متصفح) وأُصلح بالحارس `L1-17`، والثاني تحديد معدل بأدوات المستودع نفسها (`createRateLimiter`/`createRateLimit`، سقف 600/دقيقة) فرضه مانع بنيوي: ‏`gh pr merge --squash --admin` رُفض برسالة «CodeQL has detected 1 security relevant alert blocking this code from being merged» ⇒ الحارس `L1-18` يقيس `429` عند السقف المعلَن. ولأن استعلام CodeQL لا يتعرّف على وسيط المستودع نفسه (بقي التنبيه على `117-118` رغم `429` المقاس)، صارت الوحدة تُقرأ مرة عند إنشاء الموجه فلا وصول لنظام الملفات داخل المعالج أصلًا، وأُعيد التفاوض الشرطي الذي أسقطه ذلك (بصمة قوية + `no-cache` + ‏`304` مقاسة) وثبّته `L1-19` — على الفرع `arena/b0bfdd05-phone-google`. سبقتها: D1 `LOCAL SIMULATED_PASS` مدموجة في `main@9fbad1e` (PR #169) وخطة التشغيل الحقيقي مدموجة في `main@b115f77` (PR #170). `EXTERNAL GATE CLOSED` — `NETWORK=DENY` حتى موافقة E1 المحددة.
+- **آخر سجل جلسة مؤرَّخ:** [L1 لوحات الواجهة](sessions/2026-11-05-l1-console-panels.md)
+- **حجم [STATE.md](STATE.md) النشط:** 95 سطرًا (19927 بايت)
 - **الأرشيف التاريخي المحفوظ بلا حذف:**
 - [STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md) — الأساس `9f6f8b2` · **983 سطرًا** محفوظًا حرفيًا (بصمة `f2674637e82e…`)
 - [STATE-ARCHIVE-2026-11.md](STATE-ARCHIVE-2026-11.md) — الأساس `6b4bb2d` · **16 سطرًا** محفوظًا حرفيًا (بصمة `503e4ef77c5b…`)

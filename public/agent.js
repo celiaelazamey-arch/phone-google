@@ -9,6 +9,20 @@ import {
   stepNodeStatus,
   summarizeStepNodes
 } from './agent-trace.js';
+// L1 (U2/U5/U3): لوحات سجل المحادثات وصندوق المهام ومعاينة المخرجات — الدوال نقية
+// في `agent-console.js` فتُختبر في Node، وهنا الربط بالـDOM والمسارات القائمة فقط.
+import {
+  PREVIEW_REFUSALS,
+  THREAD_LIST_LIMIT,
+  escapeHtml as escapeConsole,
+  previewKind,
+  renderCsvPreview,
+  renderInbox,
+  renderMarkdownPreview,
+  renderTextPreview,
+  renderThreadDetail,
+  renderThreadList
+} from './agent-console.js';
 
 const $ = (id) => document.getElementById(id);
 const TOKEN_KEY = 'celia.agent.token';
@@ -26,7 +40,12 @@ let state = {
   approvals: [],
   verification: null,
   now: null,
-  nowTimer: null
+  nowTimer: null,
+  // L1 (U2/U5/U3): ما حمّلته اللوحات فعلًا — لا يُرسم شيء من خارج هذه الحقول.
+  threads: [],
+  threadDetail: null,
+  historyFilter: '',
+  inbox: null
 };
 let memoryEpoch = 0;
 
@@ -588,6 +607,23 @@ async function refreshArtifacts() {
       link.textContent = 'تنزيل (رابط موقّع، تحقق بالبصمة عند التسليم)';
       link.setAttribute('download', artifact.name);
       row.append(link);
+      // U3: قرار المعاينة يُتخذ من السجل (الاسم والحجم) قبل أي جلب، والرفض مسمّى لا صامت.
+      const decision = previewKind({ name: artifact.name, bytes: artifact.bytes });
+      const preview = document.createElement('button');
+      preview.type = 'button';
+      preview.className = 'ghost preview-toggle';
+      preview.dataset.artifactId = String(artifact.id ?? '');
+      preview.dataset.download = artifact.download?.path || '';
+      preview.dataset.mode = decision.mode;
+      preview.dataset.reason = decision.reason || '';
+      if (decision.mode === 'refused') {
+        preview.textContent = 'لا معاينة';
+        preview.title = PREVIEW_REFUSALS[decision.reason] || PREVIEW_REFUSALS.type_not_previewable;
+        preview.disabled = true;
+      } else {
+        preview.textContent = 'معاينة داخل الصفحة';
+      }
+      row.append(preview);
       item.append(row);
       list.append(item);
     }
@@ -602,6 +638,143 @@ async function refreshArtifacts() {
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+}
+
+/* ── L1 · U2 — سجل المحادثات في الواجهة (نصف DATA-002 الباقي) ────────────────
+ * المصدر الوحيد `GET /api/agent/threads` و`GET /api/agent/threads/:id` القائمان.
+ * لا مسار جديد ولا ترحيل: الجداول موجودة (`agent_threads`/`agent_messages`/`agent_runs`).
+ * ما لا سجل له لا يُرسم، وحدّ الخادم (آخر 20 خيطًا) معلن في الصفحة لا مخفي. */
+async function refreshHistory() {
+  const list = $('history-list');
+  const badge = $('history-badge');
+  if (!list || !badge || !state.token) return;
+  try {
+    const result = await api('/api/agent/threads');
+    state.threads = Array.isArray(result.threads) ? result.threads : [];
+    renderHistoryList();
+  } catch {
+    badge.textContent = 'تعذّر الجلب';
+    badge.className = 'pill warn';
+    list.innerHTML = '<li class="empty">تعذّر تحميل سجل الخيوط (الوكيل متوقف أو الرمز غير صالح).</li>';
+  }
+}
+
+function renderHistoryList() {
+  const list = $('history-list');
+  const badge = $('history-badge');
+  if (!list || !badge) return;
+  const rendered = renderThreadList({
+    threads: state.threads,
+    activeThreadId: state.threadId,
+    query: state.historyFilter
+  });
+  list.innerHTML = rendered.html;
+  badge.textContent = `${rendered.shown} / ${rendered.total}`;
+  badge.className = rendered.total ? 'pill ok' : 'pill idle';
+  if ($('history-limit')) $('history-limit').textContent = String(THREAD_LIST_LIMIT);
+}
+
+async function loadThreadDetail(threadId) {
+  const panel = $('history-detail');
+  if (!panel) return;
+  try {
+    const detail = await api(`/api/agent/threads/${encodeURIComponent(threadId)}`);
+    state.threadDetail = detail;
+    panel.innerHTML = renderThreadDetail(detail);
+  } catch (error) {
+    state.threadDetail = null;
+    panel.innerHTML = `<p class="empty">تعذّر تحميل سجل الخيط: ${escapeConsole(error.message)}</p>`;
+  }
+}
+
+/* ── L1 · U5 — صندوق المهام من طابور الانتباه القائم ───────────────────────────
+ * `GET /api/agent/attention` يعيد الترتيب والشدّة والبصمة؛ اللوحة تجمّع فقط.
+ * لا إعادة رتبة ولا تخفيف شدة ولا إسقاط بند — وثابت `checkQueue` في الخادم يحرسها. */
+async function refreshInbox() {
+  const list = $('inbox-list');
+  const badge = $('inbox-badge');
+  const summary = $('inbox-summary');
+  if (!list || !badge || !state.token) return;
+  try {
+    const queue = await api('/api/agent/attention');
+    state.inbox = queue;
+    const { html, view } = renderInbox(queue);
+    list.innerHTML = html;
+    badge.textContent = view.owed ? `${view.owed} مستحق` : `${view.total}`;
+    badge.className = view.owed ? 'pill warn' : view.total ? 'pill ok' : 'pill idle';
+    if ($('inbox-flags')) {
+      $('inbox-flags').textContent = `sends=${view.sends} · tracksRead=${view.tracksRead}`;
+    }
+    if (summary) {
+      summary.textContent = view.total
+        ? `المجموع ${view.total} · المستحق ${view.owed} · البصمة ${String(view.digest ?? '—').slice(0, 12)} · ${view.clear ? 'لا شيء حرج' : 'يوجد بند غير معلوماتي'}`
+        : 'لا شيء ينتظرك — الطابور فارغ وفق السجل نفسه.';
+    }
+  } catch {
+    state.inbox = null;
+    badge.textContent = 'تعذّر الجلب';
+    badge.className = 'pill warn';
+    list.innerHTML = '<li class="empty">تعذّر تحميل صندوق المهام (الوكيل متوقف أو الرمز غير صالح).</li>';
+    if (summary) summary.textContent = 'لا ملخص — الجلب فشل، ولا يُخترع رقم.';
+  }
+}
+
+/* ── L1 · U3 — معاينة المخرجات داخل الصفحة عبر الرابط الموقّع نفسه ─────────────
+ * لا تخزين ثانٍ ولا رفع بصمة جديدة: البايتات تُقرأ من `/artifacts/:id/download`
+ * (التوقيع هو التفويض)، والخادم يعيد حساب البصمة فيرفض العبث قبل أن نرى شيئًا.
+ * HTML/SVG مرفوض رفضًا مسمّى — لا innerHTML لحمولة ملف ناتج ولا iframe. */
+async function openArtifactPreview(button) {
+  const panel = $('artifact-preview');
+  const body = $('preview-body');
+  const note = $('preview-note');
+  const title = $('preview-title');
+  if (!panel || !body || !note || !title) return;
+  const mode = button.dataset.mode;
+  const reason = button.dataset.reason || '';
+  const path = button.dataset.download || '';
+  title.textContent = `معاينة — ${button.closest('li')?.querySelector('b')?.textContent || 'ملف ناتج'}`;
+  panel.hidden = false;
+  if (mode === 'refused' || !path) {
+    note.textContent = PREVIEW_REFUSALS[reason] || PREVIEW_REFUSALS.type_not_previewable;
+    body.innerHTML = '<p class="empty">لا معاينة لهذا النوع — التنزيل الموقّع متاح أعلاه.</p>';
+    return;
+  }
+  note.textContent = 'جارٍ الجلب عبر الرابط الموقّع…';
+  body.innerHTML = '';
+  try {
+    const response = await fetch(path, { headers: { accept: '*/*' } });
+    if (!response.ok) {
+      const code = response.status === 409 ? 'digest_mismatch' : 'fetch_failed';
+      note.textContent = `${PREVIEW_REFUSALS[code]} (HTTP ${response.status})`;
+      body.innerHTML = '<p class="empty">لم تُعرض أي بايتات.</p>';
+      return;
+    }
+    const text = await response.text();
+    if (mode === 'markdown') {
+      const rendered = renderMarkdownPreview(text);
+      body.innerHTML = rendered.html || '<p class="empty">الملف فارغ.</p>';
+      note.textContent = `Markdown subset مغلق: هرم كامل أولًا ثم أربع قواعد ضيقة.${rendered.truncated ? ' النص مقتطع عند سقف العرض؛ الكامل في التنزيل.' : ''}`;
+    } else if (mode === 'csv') {
+      const rendered = renderCsvPreview(text);
+      body.innerHTML = rendered.html;
+      note.textContent = `معروض ${rendered.rows} من ${rendered.totalRows} صفًّا (السقف ${String(rendered.totalRows)}).${rendered.truncated ? ' الباقي في التنزيل.' : ''}`;
+    } else {
+      const rendered = renderTextPreview(text);
+      body.innerHTML = rendered.html;
+      note.textContent = `نص خام مُهرَّب بالكامل — لا تلوين ولا تفسير.${rendered.truncated ? ' مقتطع عند سقف العرض.' : ''}`;
+    }
+  } catch {
+    note.textContent = PREVIEW_REFUSALS.fetch_failed;
+    body.innerHTML = '<p class="empty">لم تُعرض أي بايتات.</p>';
+  }
+}
+
+function closeArtifactPreview() {
+  const panel = $('artifact-preview');
+  if (!panel) return;
+  panel.hidden = true;
+  if ($('preview-body')) $('preview-body').innerHTML = '';
+  if ($('preview-note')) $('preview-note').textContent = '';
 }
 
 function renderMemory(memory = { summaries: [], facts: [] }) {
@@ -840,6 +1013,8 @@ async function refreshDetail() {
     renderEvidence(detail.evidence || [], detail.evidenceChain || null, detail.verification || null);
     // B2: فشل جلب artifacts لا يُسقط تحديث التفاصيل — القسم يعلن تعذره بنفسه.
     refreshArtifacts();
+    // L1 · U5: صندوق المهام يُعاد من الطابور نفسه عند كل انتقال حالة، لا من عدّاد محلي.
+    refreshInbox();
     // الخطوات في التفاصيل تحمل الأزمنة المُثبَتة (WP-1.1)؛ تحل محل ما وصل عبر البث.
     state.plan = detail.plan || null;
     state.approvals = detail.approvals || [];
@@ -1026,8 +1201,21 @@ async function connect() {
     if (status.enabled) {
       await refreshThreadsList();
       await refreshMemory();
+      // L1: لوحتا سجل المحادثات وصندوق المهام تُحمَّلان مع الاتصال نفسه.
+      await Promise.all([refreshHistory(), refreshInbox()]);
+      if (state.threadId) await loadThreadDetail(state.threadId);
     } else {
       renderMemory();
+      // الوكيل متوقف: اللوحتان تعلنان ذلك بصدق بدل ترك «…» معلّقة.
+      for (const [id, text] of [['history-list', 'الوكيل متوقف — لا سجل يُعرض.'], ['inbox-list', 'الوكيل متوقف — لا طابور يُعرض.']]) {
+        const el = $(id);
+        if (el) el.innerHTML = `<li class="empty">${text}</li>`;
+      }
+      for (const [id, label] of [['history-badge', 'متوقف'], ['inbox-badge', 'متوقف']]) {
+        const el = $(id);
+        if (el) { el.textContent = label; el.className = 'pill idle'; }
+      }
+      if ($('inbox-summary')) $('inbox-summary').textContent = 'لا ملخص — الوكيل متوقف، ولا يُخترع رقم.';
     }
   } catch (error) {
     setAuthStatus(error.status === 401 ? 'رمز غير صحيح (401).' : `تعذّر الاتصال: ${error.message}`, 'bad');
@@ -1054,6 +1242,9 @@ $('new-thread').addEventListener('click', async () => {
     setRunState('idle');
     $('cancel').disabled = true;
     await refreshThreadsList();
+    // L1 · U2: السجل يعكس الخيط الجديد فورًا — لا قائمة قديمة بجانب حالة جديدة.
+    await refreshHistory();
+    if ($('history-detail')) $('history-detail').innerHTML = '<p class="empty">اختر خيطًا لعرض سجلّه.</p>';
     setAuthStatus('خيط جديد جاهز.', 'ok');
   } catch (error) {
     setAuthStatus(`تعذّر إنشاء الخيط: ${error.message}`, 'bad');
@@ -1069,6 +1260,10 @@ if ($('thread-select')) {
     try {
       const detail = await api(`/api/agent/threads/${nextThreadId}`);
       $('thread-title-input').value = detail.thread?.title || 'مهمة';
+      // L1 · U2: اللوحة الجانبية تعرض سجل الخيط نفسه الذي اختير من القائمة.
+      state.threadDetail = detail;
+      if ($('history-detail')) $('history-detail').innerHTML = renderThreadDetail(detail);
+      renderHistoryList();
       const latestRun = detail.runs?.[0] || null;
       if (latestRun) {
         state.runId = latestRun.id;
@@ -1098,6 +1293,10 @@ if ($('delete-thread')) {
       $('delivery').hidden = true;
       setRunState('idle');
       await refreshThreadsList();
+      // L1 · U2: الحذف يظهر في السجل فورًا — لا خيط محذوف يبقى معروضًا.
+      await refreshHistory();
+      state.threadDetail = null;
+      if ($('history-detail')) $('history-detail').innerHTML = '<p class="empty">اختر خيطًا لعرض سجلّه.</p>';
       setAuthStatus('حُذف الخيط وجميع سجلاته التابعة.', 'ok');
     } catch (error) {
       setAuthStatus(`تعذّر حذف الخيط: ${error.message}`, 'bad');
@@ -1167,6 +1366,55 @@ $('cancel').addEventListener('click', async () => {
   }
 });
 
+/* ── L1: مستمعو اللوحات الثلاث — تفويض حدث واحد لكل قائمة، بلا مستمع لكل بند ── */
+if ($('history-filter')) {
+  $('history-filter').addEventListener('input', (event) => {
+    state.historyFilter = event.target.value || '';
+    renderHistoryList();
+  });
+}
+
+if ($('history-list')) {
+  $('history-list').addEventListener('click', async (event) => {
+    const button = event.target.closest('.thread-open');
+    if (!button) return;
+    const threadId = button.dataset.threadId;
+    if (!threadId) return;
+    const select = $('thread-select');
+    if (select && [...select.options].some((option) => option.value === threadId)) {
+      // نفس مسار القائمة القائمة تمامًا: لا منطق استئناف ثانٍ ولا حالة موازية.
+      select.value = threadId;
+      select.dispatchEvent(new Event('change'));
+      return;
+    }
+    state.threadId = threadId;
+    renderHistoryList();
+    await loadThreadDetail(threadId);
+  });
+}
+
+if ($('history-detail')) {
+  $('history-detail').addEventListener('click', async (event) => {
+    const button = event.target.closest('.run-open');
+    const runId = button?.dataset.runId;
+    if (!runId) return;
+    state.runId = runId;
+    closeArtifactPreview();
+    await refreshDetail();
+    setAuthStatus(`عُرض تشغيل ${String(runId).slice(0, 8)} من سجل الخيط.`, 'ok');
+  });
+}
+
+if ($('artifacts')) {
+  $('artifacts').addEventListener('click', (event) => {
+    const button = event.target.closest('.preview-toggle');
+    if (!button || button.disabled) return;
+    openArtifactPreview(button);
+  });
+}
+
+if ($('preview-close')) $('preview-close').addEventListener('click', closeArtifactPreview);
+
 const STATIC_HOST =
   document.documentElement.dataset.celiaStatic === 'true' || /\.github\.io$/i.test(location.hostname);
 if (STATIC_HOST) {
@@ -1178,6 +1426,22 @@ if (STATIC_HOST) {
   $('run').disabled = true;
   emptySteps();
   resetGovernancePanels();
+  // L1: النسخة الثابتة لا تملك سجلًّا ولا طابورًا — تُعلن ذلك بدل «…» معلّقة توحي بجلب.
+  for (const [id, text] of [
+    ['history-list', 'نسخة ثابتة — لا سجل محادثات هنا (يحتاج خدمة Node).'],
+    ['inbox-list', 'نسخة ثابتة — لا صندوق مهام هنا (يحتاج خدمة Node).'],
+    ['history-detail', '<p class="empty">نسخة ثابتة — لا تفاصيل خيط.</p>']
+  ]) {
+    const el = $(id);
+    if (el) el.innerHTML = id === 'history-detail' ? text : `<li class="empty">${text}</li>`;
+  }
+  for (const [id, label] of [['history-badge', 'نسخة ثابتة'], ['inbox-badge', 'نسخة ثابتة']]) {
+    const el = $(id);
+    if (el) { el.textContent = label; el.className = 'pill idle'; }
+  }
+  if ($('inbox-summary')) $('inbox-summary').textContent = 'لا ملخص — نسخة ثابتة بلا خادم.';
+  if ($('history-filter')) $('history-filter').disabled = true;
+  closeArtifactPreview();
 } else if (state.token) {
   $('token').value = state.token;
   connect();

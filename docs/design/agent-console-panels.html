@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>لوحات L1 — الدليل البصري المشتق | سيليا</title>
+<style>
+:root { color-scheme: dark light; }
+body { margin: 0; padding: 1.5rem; font-family: system-ui, sans-serif; line-height: 1.7; }
+header { border-bottom: 1px solid currentColor; padding-bottom: .5rem; margin-bottom: 1rem; }
+h1 { font-size: 1.2rem; margin: 0 0 .25rem; }
+h2 { font-size: 1rem; margin: 0 0 .35rem; }
+p { margin: .25rem 0; }
+code { font-family: ui-monospace, monospace; font-size: .85em; }
+ul { margin: .25rem 0 .6rem; padding-inline-start: 1.2rem; }
+li { margin: .1rem 0; }
+.panels { display: grid; gap: 1rem; }
+.panel { border: 1px solid currentColor; border-radius: 12px; padding: .75rem 1rem; }
+.source { opacity: .8; font-size: .85rem; }
+table { border-collapse: collapse; font-size: .85rem; }
+th, td { border: 1px solid currentColor; padding: .25rem .5rem; text-align: start; }
+footer { margin-top: 1rem; font-size: .8rem; opacity: .8; }
+</style>
+</head>
+<body>
+<header>
+<h1>لوحات L1 — سجل المحادثات · صندوق المهام · معاينة المخرجات</h1>
+<p>هذه اللوحة <strong>مشتقة</strong> من <code>public/agent.html</code> و<code>public/agent-console.js</code> بأمر
+<code>node scripts/render-agent-console-panels.mjs</code>؛ ولا تُحرَّر يدويًا: <code>--check</code> يقارن البايتات
+ويسقط عند أي انحراف. الإصدار <code>1.0</code>.</p>
+</header>
+<main>
+    <div class="panels">
+      <section class="panel">
+        <h2>U2 — سجل المحادثات</h2>
+        <p class="source">المصدر: <code>GET /api/agent/threads · GET /api/agent/threads/:id</code></p>
+        <ul class="ids"><li><code>#history-title</code></li><li><code>#history-badge</code></li><li><code>#history-limit</code></li><li><code>#history-filter</code></li><li><code>#history-list</code></li><li><code>#history-detail</code></li></ul>
+        <ul class="limits"><li>القائمة آخر 20 خيطًا — حدّ listThreads في الخادم، معلن في الصفحة نفسها</li><li>التصفية محلية في ما حُمِّل فقط (عنوان أو بادئة معرّف) مع إعلان سبب التطابق</li><li>الرسائل المعروضة من agent_messages؛ دور غير مسمّى يُطبع كما هو ولا يُخترع رد</li><li>تشغيلات الخيط أول 10 مع إعلان الباقي — لا قائمة تدّعي الكمال</li><li>استئناف الخيط يمرّ بمعالج thread-select القائم نفسه: لا منطق ثانٍ ولا حالة موازية</li></ul>
+      </section>
+      <section class="panel">
+        <h2>U5 — صندوق المهام</h2>
+        <p class="source">المصدر: <code>GET /api/agent/attention</code></p>
+        <ul class="ids"><li><code>#inbox-title</code></li><li><code>#inbox-badge</code></li><li><code>#inbox-flags</code></li><li><code>#inbox-list</code></li><li><code>#inbox-summary</code></li></ul>
+        <ul class="limits"><li>الترتيب والشدّة كما رتّبهما الخادم — التجميع لا يعيد رتبة ولا يخفّف شدة</li><li>البصمة (digest) تُحمل كما هي ولا تُعاد محليًا</li><li>كل بند يعرض معرّف دليله وزمن انتظاره؛ next=none لا يُرسم كفعل</li><li>القراءة معلنة: sends=false · tracksRead=false</li><li>إجمالي الخادم يُعرض حتى لو قلّت البنود — لا اتفاق صامت</li></ul>
+      </section>
+      <section class="panel">
+        <h2>U3 — معاينة</h2>
+        <p class="source">المصدر: <code>GET /api/agent/runs/:id/artifacts · GET /api/agent/artifacts/:id/download</code></p>
+        <ul class="ids"><li><code>#artifact-preview</code></li><li><code>#preview-title</code></li><li><code>#preview-close</code></li><li><code>#preview-note</code></li></ul>
+        <ul class="limits"><li>قرار المعاينة من الاسم والحجم في السجل قبل أي جلب — ملف ضخم لا يُنزَّل أصلًا</li><li>لا تخزين ثانٍ ولا بصمة جديدة: البايتات من الرابط الموقّع نفسه</li><li>HTML/SVG/JS/CSS مرفوضة رفضًا مسمّى — لا innerHTML لحمولة ناتجة ولا iframe</li><li>كل معروض يُهرَّب أولًا؛ Markdown subset مغلق (عناوين h4..h6، عريض، شفرة، قوائم)</li><li>رفض الخادم بالبصمة (409) يعني صفر بايتات معروضة</li></ul>
+      </section>
+    </div>
+    <h2>المسارات المستعملة (مشتقة من public/agent.js)</h2>
+    <ul><li><code>/api/agent/attention</code></li><li><code>/api/agent/memory</code></li><li><code>/api/agent/runs</code></li><li><code>/api/agent/status</code></li><li><code>/api/agent/threads</code></li></ul>
+    <h2>سقوف المعاينة (كما في الوحدة)</h2>
+    <table>
+      <thead><tr><th>الثابت</th><th>القيمة في المصدر</th></tr></thead>
+      <tbody>
+        <tr><td><code>PREVIEW_MAX_BYTES</code></td><td><code>262_144</code></td></tr>
+        <tr><td><code>PREVIEW_MAX_TEXT_CHARS</code></td><td><code>60_000</code></td></tr>
+        <tr><td><code>PREVIEW_MAX_CSV_ROWS</code></td><td><code>200</code></td></tr>
+        <tr><td><code>MESSAGE_MAX_CHARS</code></td><td><code>1_200</code></td></tr>
+        <tr><td><code>THREAD_LIST_LIMIT</code></td><td><code>20</code></td></tr>
+      </tbody>
+    </table>
+    <h2>أنواع تُعاين وأنواع تُرفض</h2>
+    <p>تُعاين: <code>md</code> · <code>markdown</code> · <code>csv</code> · <code>txt</code> · <code>log</code> · <code>json</code></p>
+    <p>تُرفض: <code>html</code> · <code>htm</code> · <code>svg</code> · <code>xhtml</code> · <code>xml</code> · <code>js</code> · <code>mjs</code> · <code>css</code></p>
+    <h2>أكواد الرفض المسماة</h2>
+    <ul><li><code>html_not_rendered</code></li><li><code>type_not_previewable</code></li><li><code>too_large_for_preview</code></li><li><code>unknown_size</code></li><li><code>name_has_no_extension</code></li><li><code>fetch_failed</code></li><li><code>digest_mismatch</code></li></ul>
+    <h2>شدّات الطابور المعروضة</h2>
+    <ul><li><code>decision</code></li><li><code>ambiguous</code></li><li><code>failure</code></li><li><code>info</code></li></ul>
+    <h2>حلقات التركيز المرئية في الأنماط الجديدة</h2>
+    <ul><li><code>.history:focus-visible</code></li><li><code>.inbox:focus-visible</code></li><li><code>.history-detail:focus-visible</code></li></ul>
+</main>
+<footer>
+<p>المصادر: <code>public/agent.html</code> · <code>public/agent.js</code> · <code>public/agent-console.js</code> · <code>public/agent.css</code>. لا ساعة حائط في المخرَج:
+نفس الكود يعيد نفس البايتات. الاختبار <code>test/agent-console.test.js</code> (L1-16) يفرض المطابقة.</p>
+</footer>
+</body>
+</html>

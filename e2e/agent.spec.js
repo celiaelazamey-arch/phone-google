@@ -245,6 +245,31 @@ async function mockAgentApi(page) {
     if (pathname.endsWith('/api/agent/threads') && method === 'GET') {
       return json(route, { threads: threadCreated ? [{ id: 'thr-e2e', title: 'مهمة جديدة', createdAt: at(0) }] : [] });
     }
+    // L1: الصفحة صارت تقرأ سجل الخيط وطابور الانتباه في مسارها العادي، وكلاهما مسار
+    // قائم في الخادم. بلا تثبيت لهما يعود 500 ⇒ CONSOLE_ERROR ⇒ diagnostics غير فارغة
+    // ⇒ تسقط اختبارات لا علاقة لها باللوحات. الجسمان على عقد الخادم نفسه.
+    if (/\/threads\/thr-e2e$/.test(pathname) && method === 'GET') {
+      return json(route, {
+        thread: { id: 'thr-e2e', ownerId: 'owner', title: 'مهمة جديدة', status: 'active', createdAt: at(0), updatedAt: at(0) },
+        messages: [{ id: 'm-e2e', threadId: 'thr-e2e', role: 'user', content: 'مهمة الاختبار', clientMessageId: 'c-e2e', createdAt: at(0) }],
+        runs: []
+      });
+    }
+    if (pathname.endsWith('/api/agent/attention') && method === 'GET') {
+      return json(route, {
+        version: '1',
+        now: at(0),
+        total: 0,
+        counts: { decision: 0, ambiguous: 0, failure: 0, info: 0 },
+        owed: 0,
+        clear: true,
+        items: [],
+        dropped: [],
+        sends: false,
+        tracksRead: false,
+        digest: 'mockdigest0000'
+      });
+    }
     if (pathname.endsWith('/api/agent/threads') && method === 'POST') {
       threadCreated = true;
       return json(route, { thread: { id: 'thr-e2e', title: 'مهمة جديدة', createdAt: at(0) } }, 201);
@@ -535,6 +560,234 @@ test.describe('سمات الواجهة (WP-1.3، UX-003): تتبع النظام 
       expect(await transitionOf('#connect')).toBe('0s');
       expect(await transitionOf('.bar-fill')).toBe('0s');
       expect(await page.evaluate(() => getComputedStyle(document.documentElement).scrollBehavior)).toBe('auto');
+      expect(diagnostics, diagnostics.join('\n')).toEqual([]);
+    } finally {
+      await flush(testInfo);
+    }
+  });
+});
+
+/**
+ * L1 (U2 · U5 · U3) — لوحات الواجهة الثلاث في متصفح حقيقي.
+ *
+ * الخادم معترض بمسارات موجودة فعلًا (`/threads`, `/threads/:id`, `/attention`,
+ * `/runs/:id/artifacts`, `/artifacts/:id/download`) — لا مسار جديد اخترعته الواجهة.
+ * الهدف منطق الصفحة الحقيقي: ما يُرسم من السجل فقط، والرفض المسمّى، وبلا تمرير أفقي.
+ */
+const L1_THREADS = [
+  { id: 'thr-a1', ownerId: 'owner', title: 'تقرير المبيعات الأسبوعي', status: 'active', createdAt: at(0), updatedAt: at(5000) },
+  { id: 'thr-b2', ownerId: 'owner', title: 'مراجعة حالة النظام', status: 'active', createdAt: at(0), updatedAt: at(1000) }
+];
+const L1_DETAIL = {
+  thread: L1_THREADS[0],
+  messages: [
+    { id: 'm1', threadId: 'thr-a1', role: 'user', content: 'جهّز تقرير المبيعات <b>بدون</b> أرقام مخترعة', clientMessageId: 'c1', createdAt: at(100) },
+    { id: 'm2', threadId: 'thr-a1', role: 'ghost_role', content: 'دور غير مسمّى يبقى كما هو', clientMessageId: null, createdAt: at(200) }
+  ],
+  runs: [{ id: 'run-done', threadId: 'thr-a1', ownerId: 'owner', status: 'succeeded', planner: 'demo', planSummary: 'ثلاث خطوات', limits: LIMITS, usage: { steps: 3, costMicros: 0, tokens: 0 } }]
+};
+const L1_ATTENTION = {
+  version: '1',
+  now: at(6000),
+  total: 2,
+  counts: { decision: 1, ambiguous: 1, failure: 0, info: 0 },
+  owed: 2,
+  clear: false,
+  items: [
+    { id: 'approval:ap-1', reason: 'approval_pending', severity: 'decision', ar: 'موافقة تنتظر قرارك', en: 'an approval is waiting for you', runId: 'run-done', since: at(3000), waitingMs: 300000, title: null, evidence: { approvalId: 'ap-1' }, next: 'decide', source: 'approval_pending' },
+    { id: 'run:run-done', reason: 'outbox_unknown', severity: 'ambiguous', ar: 'أثر خارجي غير محسوم', en: 'an external effect is unresolved', runId: 'run-done', since: at(3500), waitingMs: 2500, title: null, evidence: { outboxId: 'ob-1' }, next: 'reconcile', source: 'outbox_unknown' }
+  ],
+  dropped: [],
+  sends: false,
+  tracksRead: false,
+  digest: 'e2edigest0001'
+};
+const L1_ARTIFACTS = {
+  enabled: true,
+  urlTtlMs: 900000,
+  artifacts: [
+    { id: 'art-md', runId: 'run-done', name: 'report.md', bytes: 96, sha256: 'c'.repeat(64), createdAt: at(4200), download: { path: '/api/agent/artifacts/art-md/download?exp=99999999999999&sig=' + 'd'.repeat(64), exp: 99999999999999, expiresAt: '2026-12-30T00:00:00.000Z' } },
+    { id: 'art-html', runId: 'run-done', name: 'page.html', bytes: 64, sha256: 'e'.repeat(64), createdAt: at(4300), download: { path: '/api/agent/artifacts/art-html/download?exp=99999999999999&sig=' + 'f'.repeat(64), exp: 99999999999999, expiresAt: '2026-12-30T00:00:00.000Z' } }
+  ]
+};
+
+async function mockConsolePanels(page) {
+  // العدّ داخل المثبت نفسه: `route.continue()` في مسار ثانٍ يذهب إلى الشبكة الحقيقية
+  // بدل السقوط إلى المثبت (تلك كانت `fallback`)، فكانت المعاينة تجلب 404 بلا h4.
+  const calls = { artMd: 0, artHtml: 0 };
+  const json = (route, body, status = 200) =>
+    route.fulfill({ status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' }, body: JSON.stringify(body) });
+  await page.route('**/api/agent/**', async (route) => {
+    const request = route.request();
+    const pathname = new URL(request.url()).pathname;
+    const method = request.method();
+    if (pathname.endsWith('/api/agent/status')) {
+      return json(route, { enabled: true, mode: 'sqlite', dialect: 'sqlite', planner: 'demo', verifier: 'rules-v1', approvalGate: true, connectors: [], limits: LIMITS, tools: [], durable: true, note: 'e2e L1' });
+    }
+    if (pathname.endsWith('/api/agent/memory') && method === 'GET') return json(route, { summaries: [], facts: [] });
+    if (pathname.endsWith('/api/agent/threads') && method === 'GET') return json(route, { threads: L1_THREADS });
+    if (pathname.endsWith('/api/agent/threads/thr-a1') && method === 'GET') return json(route, L1_DETAIL);
+    if (pathname.endsWith('/api/agent/attention') && method === 'GET') return json(route, L1_ATTENTION);
+    if (method === 'GET' && /\/runs\/run-done$/.test(pathname)) return json(route, finishedDetail);
+    if (method === 'GET' && /\/runs\/[^/]+\/artifacts$/.test(pathname)) return json(route, L1_ARTIFACTS);
+    if (pathname.includes('/artifacts/art-md/download')) {
+      calls.artMd += 1;
+      return route.fulfill({ status: 200, headers: { 'content-type': 'text/markdown; charset=utf-8' }, body: '# عنوان التقرير\n\nنص **عريض** و`شفرة`\n\n- بند\n' });
+    }
+    if (pathname.includes('/artifacts/art-html/download')) {
+      calls.artHtml += 1;
+      return route.fulfill({ status: 200, headers: { 'content-type': 'text/html; charset=utf-8' }, body: '<script>window.__injected = 1</script>' });
+    }
+    return json(route, { error: `unmocked ${method} ${pathname}` }, 500);
+  });
+  return { calls };
+}
+
+test.describe('لوحات L1 في /agent: سجل المحادثات (U2) · صندوق المهام (U5) · معاينة المخرجات (U3)', () => {
+  test('السجل يعرض الخيوط ورسائلها من المسارات القائمة، والتصفية محلية وصادقة، وبلا تمرير أفقي ولا انتهاك WCAG', async ({ page }, testInfo) => {
+    const { diagnostics, flush } = attachChromiumDiagnostics(page);
+    try {
+      await mockConsolePanels(page);
+      await page.setViewportSize({ width: 320, height: 720 });
+      await page.goto(`${LIVE}/agent`, { waitUntil: 'networkidle' });
+      await page.fill('#token', TOKEN);
+      await page.click('#connect');
+      await expect(page.locator('#auth-status')).toContainText('متصل');
+
+      // U2: الخيطان كما في السجل، والحدّ المعلن هو حدّ الخادم نفسه.
+      await expect(page.locator('#history-badge')).toHaveText('2 / 2');
+      await expect(page.locator('#history-list .thread-open')).toHaveCount(2);
+      await expect(page.locator('#history-limit')).toHaveText('20');
+      await expect(page.locator('#history-list')).toContainText('تقرير المبيعات الأسبوعي');
+
+      // اختيار خيط يمرّ بمسار التفاصيل القائم — الرسائل تُعرض مُهرَّبة، والدور غير
+      // المسمّى يُطبع كما هو، ولا يُخترع رد وكيل.
+      await page.click('#history-list .thread-open[data-thread-id="thr-a1"]');
+      await expect(page.locator('#history-detail')).toContainText('جهّز تقرير المبيعات');
+      await expect(page.locator('#history-detail')).toContainText('ghost_role');
+      const injected = await page.locator('#history-detail b').count();
+      expect(injected, 'message markup is escaped, not parsed').toBe(0);
+
+      // التصفية محلية في ما حُمِّل، والفشل يُعلن نطاقه لا يخفيه.
+      await page.fill('#history-filter', 'مبيعات');
+      await expect(page.locator('#history-list .thread-open')).toHaveCount(1);
+      await expect(page.locator('#history-badge')).toHaveText('1 / 2');
+      await page.fill('#history-filter', 'لا يوجد كهذا');
+      await expect(page.locator('#history-list')).toContainText('لا خيط يطابق');
+      await expect(page.locator('#history-list')).toContainText('ضمن آخر 2 خيطًا محمّلًا');
+      await page.fill('#history-filter', '');
+
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+      );
+      expect(overflow).toBeLessThanOrEqual(1);
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await expectNoA11yViolations(page);
+      expect(diagnostics, diagnostics.join('\n')).toEqual([]);
+    } finally {
+      await flush(testInfo);
+    }
+  });
+
+  test('صندوق المهام يجمّع بلا إعادة ترتيب ولا تخفيف شدة، ويعرض معرّف الدليل وsends/tracksRead كما هي', async ({ page }, testInfo) => {
+    const { diagnostics, flush } = attachChromiumDiagnostics(page);
+    try {
+      await mockConsolePanels(page);
+      await page.setViewportSize({ width: 320, height: 720 });
+      await page.goto(`${LIVE}/agent`, { waitUntil: 'networkidle' });
+      await page.fill('#token', TOKEN);
+      await page.click('#connect');
+      await expect(page.locator('#auth-status')).toContainText('متصل');
+
+      await expect(page.locator('#inbox-badge')).toHaveText('2 مستحق');
+      const groups = page.locator('#inbox-list .inbox-group');
+      await expect(groups).toHaveCount(2);
+      // ترتيب الخادم (decision قبل ambiguous) survives التجميع.
+      await expect(groups.nth(0)).toContainText('قرار مطلوب · 1');
+      await expect(groups.nth(1)).toContainText('غير محسوم · 1');
+      await expect(page.locator('#inbox-list')).toContainText('approval:ap-1');
+      await expect(page.locator('#inbox-list')).toContainText('approvalId=ap-1');
+      await expect(page.locator('#inbox-list')).toContainText('منتظر 5 دقيقة');
+      // البند الثاني انتظر 2.5 ثانية: أقل من دقيقة تُسمّى كذلك، لا «0 دقيقة».
+      await expect(page.locator('#inbox-list')).toContainText('منتظر أقل من دقيقة');
+      await expect(page.locator('#inbox-flags')).toHaveText('sends=false · tracksRead=false');
+      await expect(page.locator('#inbox-summary')).toContainText('المجموع 2');
+      await expect(page.locator('#inbox-summary')).toContainText('e2edigest000');
+
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+      );
+      expect(overflow).toBeLessThanOrEqual(1);
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await expectNoA11yViolations(page);
+      expect(diagnostics, diagnostics.join('\n')).toEqual([]);
+    } finally {
+      await flush(testInfo);
+    }
+  });
+
+  test('معاينة المخرجات: Markdown يُعرض مُهرَّبًا داخل الصفحة، وHTML يُرفض رفضًا مسمّى قبل أي جلب', async ({ page }, testInfo) => {
+    const { diagnostics, flush } = attachChromiumDiagnostics(page);
+    try {
+      // المثبت يخدم run-done والمخرجات وتواقيعها، ويعود بعدّاد تنزيلات داخلي.
+      const { calls } = await mockConsolePanels(page);
+      await page.setViewportSize({ width: 320, height: 720 });
+      await page.goto(`${LIVE}/agent`, { waitUntil: 'networkidle' });
+      await page.fill('#token', TOKEN);
+      await page.click('#connect');
+      await expect(page.locator('#auth-status')).toContainText('متصل');
+      await page.click('#history-list .thread-open[data-thread-id="thr-a1"]');
+      await expect(page.locator('#artifacts-badge')).toHaveText('2');
+
+      // الرفض قبل الجلب: الزر معطّل وعليه السبب المسمّى، ولا طلب يخرج.
+      const refused = page.locator('.preview-toggle[data-artifact-id="art-html"]');
+      await expect(refused).toBeDisabled();
+      await expect(refused).toHaveText('لا معاينة');
+      await expect(refused).toHaveAttribute('data-reason', 'html_not_rendered');
+
+      // المسموح يُعرض داخل الصفحة عبر الرابط الموقّع نفسه.
+      await page.click('.preview-toggle[data-artifact-id="art-md"]');
+      await expect(page.locator('#artifact-preview')).toBeVisible();
+      await expect(page.locator('#preview-body h4')).toHaveText('عنوان التقرير');
+      await expect(page.locator('#preview-body strong')).toHaveText('عريض');
+      await expect(page.locator('#preview-body code')).toHaveText('شفرة');
+      await expect(page.locator('#preview-note')).toContainText('Markdown subset مغلق');
+      expect(await page.locator('#preview-body h1, #preview-body h2, #preview-body h3').count()).toBe(0);
+      // الرابط الموقّع مصدر البايتات الوحيد، والمرفوض لم يُجلب أصلًا (0 وليس 1).
+      expect(calls.artMd, 'the signed download route is the only byte source').toBe(1);
+      expect(calls.artHtml, 'refused extensions never reach the network').toBe(0);
+
+      await page.click('#preview-close');
+      await expect(page.locator('#artifact-preview')).toBeHidden();
+
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+      );
+      expect(overflow).toBeLessThanOrEqual(1);
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await expectNoA11yViolations(page);
+      expect(diagnostics, diagnostics.join('\n')).toEqual([]);
+    } finally {
+      await flush(testInfo);
+    }
+  });
+
+  test('النسخة الثابتة تعلن أن اللوحتين بلا خادم بدل «…» معلّقة توحي بجلب', async ({ page }, testInfo) => {
+    const { diagnostics, flush } = attachChromiumDiagnostics(page);
+    try {
+      await page.setViewportSize({ width: 320, height: 720 });
+      await page.goto(`${STATIC}/agent.html`, { waitUntil: 'networkidle' });
+      await expect(page.locator('#history-badge')).toHaveText('نسخة ثابتة');
+      await expect(page.locator('#inbox-badge')).toHaveText('نسخة ثابتة');
+      await expect(page.locator('#history-list')).toContainText('لا سجل محادثات هنا');
+      await expect(page.locator('#inbox-list')).toContainText('لا صندوق مهام هنا');
+      await expect(page.locator('#inbox-summary')).toContainText('نسخة ثابتة بلا خادم');
+      await expect(page.locator('#history-filter')).toBeDisabled();
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+      );
+      expect(overflow).toBeLessThanOrEqual(1);
+      await expectNoA11yViolations(page);
       expect(diagnostics, diagnostics.join('\n')).toEqual([]);
     } finally {
       await flush(testInfo);
