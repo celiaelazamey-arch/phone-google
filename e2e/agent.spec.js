@@ -245,6 +245,31 @@ async function mockAgentApi(page) {
     if (pathname.endsWith('/api/agent/threads') && method === 'GET') {
       return json(route, { threads: threadCreated ? [{ id: 'thr-e2e', title: 'مهمة جديدة', createdAt: at(0) }] : [] });
     }
+    // L1: الصفحة صارت تقرأ سجل الخيط وطابور الانتباه في مسارها العادي، وكلاهما مسار
+    // قائم في الخادم. بلا تثبيت لهما يعود 500 ⇒ CONSOLE_ERROR ⇒ diagnostics غير فارغة
+    // ⇒ تسقط اختبارات لا علاقة لها باللوحات. الجسمان على عقد الخادم نفسه.
+    if (/\/threads\/thr-e2e$/.test(pathname) && method === 'GET') {
+      return json(route, {
+        thread: { id: 'thr-e2e', ownerId: 'owner', title: 'مهمة جديدة', status: 'active', createdAt: at(0), updatedAt: at(0) },
+        messages: [{ id: 'm-e2e', threadId: 'thr-e2e', role: 'user', content: 'مهمة الاختبار', clientMessageId: 'c-e2e', createdAt: at(0) }],
+        runs: []
+      });
+    }
+    if (pathname.endsWith('/api/agent/attention') && method === 'GET') {
+      return json(route, {
+        version: '1',
+        now: at(0),
+        total: 0,
+        counts: { decision: 0, ambiguous: 0, failure: 0, info: 0 },
+        owed: 0,
+        clear: true,
+        items: [],
+        dropped: [],
+        sends: false,
+        tracksRead: false,
+        digest: 'mockdigest0000'
+      });
+    }
     if (pathname.endsWith('/api/agent/threads') && method === 'POST') {
       threadCreated = true;
       return json(route, { thread: { id: 'thr-e2e', title: 'مهمة جديدة', createdAt: at(0) } }, 201);
@@ -587,6 +612,9 @@ const L1_ARTIFACTS = {
 };
 
 async function mockConsolePanels(page) {
+  // العدّ داخل المثبت نفسه: `route.continue()` في مسار ثانٍ يذهب إلى الشبكة الحقيقية
+  // بدل السقوط إلى المثبت (تلك كانت `fallback`)، فكانت المعاينة تجلب 404 بلا h4.
+  const calls = { artMd: 0, artHtml: 0 };
   const json = (route, body, status = 200) =>
     route.fulfill({ status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' }, body: JSON.stringify(body) });
   await page.route('**/api/agent/**', async (route) => {
@@ -600,12 +628,19 @@ async function mockConsolePanels(page) {
     if (pathname.endsWith('/api/agent/threads') && method === 'GET') return json(route, { threads: L1_THREADS });
     if (pathname.endsWith('/api/agent/threads/thr-a1') && method === 'GET') return json(route, L1_DETAIL);
     if (pathname.endsWith('/api/agent/attention') && method === 'GET') return json(route, L1_ATTENTION);
+    if (method === 'GET' && /\/runs\/run-done$/.test(pathname)) return json(route, finishedDetail);
     if (method === 'GET' && /\/runs\/[^/]+\/artifacts$/.test(pathname)) return json(route, L1_ARTIFACTS);
     if (pathname.includes('/artifacts/art-md/download')) {
+      calls.artMd += 1;
       return route.fulfill({ status: 200, headers: { 'content-type': 'text/markdown; charset=utf-8' }, body: '# عنوان التقرير\n\nنص **عريض** و`شفرة`\n\n- بند\n' });
+    }
+    if (pathname.includes('/artifacts/art-html/download')) {
+      calls.artHtml += 1;
+      return route.fulfill({ status: 200, headers: { 'content-type': 'text/html; charset=utf-8' }, body: '<script>window.__injected = 1</script>' });
     }
     return json(route, { error: `unmocked ${method} ${pathname}` }, 500);
   });
+  return { calls };
 }
 
 test.describe('لوحات L1 في /agent: سجل المحادثات (U2) · صندوق المهام (U5) · معاينة المخرجات (U3)', () => {
@@ -694,11 +729,8 @@ test.describe('لوحات L1 في /agent: سجل المحادثات (U2) · صن
   test('معاينة المخرجات: Markdown يُعرض مُهرَّبًا داخل الصفحة، وHTML يُرفض رفضًا مسمّى قبل أي جلب', async ({ page }, testInfo) => {
     const { diagnostics, flush } = attachChromiumDiagnostics(page);
     try {
-      await mockConsolePanels(page);
-      // U3 يحتاج تشغيلًا: نعترض تفاصيل التشغيل المنتهي نفسه المستعمل في بقية الاختبارات.
-      await page.route('**/api/agent/runs/run-done', (route) =>
-        route.fulfill({ status: 200, headers: { 'content-type': 'application/json' }, body: JSON.stringify(finishedDetail) })
-      );
+      // المثبت يخدم run-done والمخرجات وتواقيعها، ويعود بعدّاد تنزيلات داخلي.
+      const { calls } = await mockConsolePanels(page);
       await page.setViewportSize({ width: 320, height: 720 });
       await page.goto(`${LIVE}/agent`, { waitUntil: 'networkidle' });
       await page.fill('#token', TOKEN);
@@ -708,11 +740,6 @@ test.describe('لوحات L1 في /agent: سجل المحادثات (U2) · صن
       await expect(page.locator('#artifacts-badge')).toHaveText('2');
 
       // الرفض قبل الجلب: الزر معطّل وعليه السبب المسمّى، ولا طلب يخرج.
-      let downloadCalls = 0;
-      await page.route('**/api/agent/artifacts/**', (route) => {
-        downloadCalls += 1;
-        return route.continue();
-      });
       const refused = page.locator('.preview-toggle[data-artifact-id="art-html"]');
       await expect(refused).toBeDisabled();
       await expect(refused).toHaveText('لا معاينة');
@@ -726,7 +753,9 @@ test.describe('لوحات L1 في /agent: سجل المحادثات (U2) · صن
       await expect(page.locator('#preview-body code')).toHaveText('شفرة');
       await expect(page.locator('#preview-note')).toContainText('Markdown subset مغلق');
       expect(await page.locator('#preview-body h1, #preview-body h2, #preview-body h3').count()).toBe(0);
-      expect(downloadCalls, 'the signed download route is the only byte source').toBe(1);
+      // الرابط الموقّع مصدر البايتات الوحيد، والمرفوض لم يُجلب أصلًا (0 وليس 1).
+      expect(calls.artMd, 'the signed download route is the only byte source').toBe(1);
+      expect(calls.artHtml, 'refused extensions never reach the network').toBe(0);
 
       await page.click('#preview-close');
       await expect(page.locator('#artifact-preview')).toBeHidden();
