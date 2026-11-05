@@ -199,7 +199,7 @@ export async function runAppsScriptSync({
   const localSnapshot = await snapshotTree(localDir);
   const loginExists = existsSync(path.join(homedir, '.clasprc.json'));
   const workExists = existsSync(workDir);
-  const scriptId = await readScriptId(workDir, args.scriptId, env);
+  const scriptId = await readScriptId(workDir, args.scriptId);
   report.scriptId = maskScriptId(scriptId);
   const prereq = assessPrerequisites({ mode: args.mode, localExists: Boolean(localSnapshot), workExists, loginExists, scriptId });
   report.prerequisites = prereq;
