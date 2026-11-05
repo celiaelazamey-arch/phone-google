@@ -196,3 +196,98 @@ export function summarizeStepNodes(steps = [], runStatus = null) {
   });
   return counts;
 }
+
+/**
+ * U4 (L2) — شجرة الخطة المشتقة من سجل `agent_steps` وحده (بوابة DEC-030: لا خدمة اسمًا فقط).
+ *
+ * ما هو مُشتق وما هو مُسجَّل:
+ * - العقدة تُرسم فقط إن كانت خطوة مسجّلة (فهرس رقمي + عنوان). ما بلا سجل يُدرج في `dropped` بسببه
+ *   ولا يُرسم — لا خطوة متوقّعة ولا عنصر نائب.
+ * - التبعية (`dependsOn`) هي **ترتيب التسجيل**: `store.appendStep` يسند `step_index = MAX(step_index)+1`
+ *   داخل التشغيل، فالخطوة التالية لا تُسجَّل قبل السابقة. ليست مخططًا أعلنه المخطط، ولا تُعرض كذلك.
+ * - ابن «استدعاء الأداة» يُرسم فقط حين يوجد سجله (`toolRunId` أو `toolRunStatus` أو `durationMs`
+ *   المُثبَتة من `agent_tool_runs`)، وحالته من `stepNodeStatus` نفسها — لا جدول حالات موازٍ.
+ */
+export const STEP_TREE_EDGE = Object.freeze({ sequence: 'sequence', toolRun: 'tool_run' });
+
+export const STEP_TREE_EDGE_LABELS = Object.freeze({
+  sequence: 'بعد الخطوة السابقة في السجل',
+  tool_run: 'استدعاء الأداة المسجّل لهذه الخطوة'
+});
+
+export function buildStepTree(steps = [], { runStatus = null } = {}) {
+  const list = Array.isArray(steps) ? steps : [];
+  const dropped = [];
+  const byIndex = new Map();
+  for (const raw of list) {
+    if (!raw || typeof raw !== 'object') {
+      dropped.push({ reason: 'not_a_step', index: null, title: null });
+      continue;
+    }
+    if (typeof raw.index !== 'number' || !Number.isFinite(raw.index)) {
+      dropped.push({ reason: 'no_index', index: null, title: typeof raw.title === 'string' ? raw.title : null });
+      continue;
+    }
+    if (typeof raw.title !== 'string' || !raw.title.trim()) {
+      dropped.push({ reason: 'no_title', index: raw.index, title: null });
+      continue;
+    }
+    byIndex.set(raw.index, raw); // آخر كتابة تفوز، كما في rememberStep في الصفحة
+  }
+  const ordered = [...byIndex.values()].sort((a, b) => a.index - b.index);
+  const nodes = [];
+  ordered.forEach((step, position) => {
+    const isLast = position === ordered.length - 1;
+    const status = stepNodeStatus(step, { runStatus, isLast });
+    const dependsOn = position === 0 ? null : ordered[position - 1].index;
+    const toolRecorded = typeof step.toolRunId === 'string'
+      || typeof step.toolRunStatus === 'string'
+      || (typeof step.durationMs === 'number' && Number.isFinite(step.durationMs));
+    nodes.push({
+      key: `step:${step.index}`,
+      role: 'step',
+      depth: 0,
+      index: step.index,
+      id: typeof step.id === 'string' ? step.id : null,
+      kind: typeof step.kind === 'string' ? step.kind : null,
+      title: step.title,
+      summary: typeof step.summary === 'string' ? step.summary : null,
+      toolName: typeof step.toolName === 'string' ? step.toolName : null,
+      toolRunId: typeof step.toolRunId === 'string' ? step.toolRunId : null,
+      toolRunStatus: typeof step.toolRunStatus === 'string' ? step.toolRunStatus : null,
+      durationMs: typeof step.durationMs === 'number' && Number.isFinite(step.durationMs) ? step.durationMs : null,
+      status,
+      dependsOn,
+      edge: dependsOn === null ? null : STEP_TREE_EDGE.sequence,
+      toolRecorded
+    });
+    if (!toolRecorded) return;
+    const measured = typeof step.durationMs === 'number' && Number.isFinite(step.durationMs);
+    nodes.push({
+      key: `tool:${step.index}`,
+      role: 'tool_run',
+      depth: 1,
+      index: step.index,
+      id: typeof step.toolRunId === 'string' ? step.toolRunId : null,
+      kind: null, // نوع الابن ليس حقلًا مسجَّلًا، فلا يُختلق
+      title: typeof step.toolName === 'string' && step.toolName ? step.toolName : 'استدعاء أداة',
+      // المدة المُثبَتة تبقى على عقدة الخطوة (السطر «الزمن:» في الأب)؛ الابن لا يكررها.
+      summary: null,
+      toolName: typeof step.toolName === 'string' ? step.toolName : null,
+      toolRunId: typeof step.toolRunId === 'string' ? step.toolRunId : null,
+      toolRunStatus: typeof step.toolRunStatus === 'string' ? step.toolRunStatus : null,
+      durationMs: measured ? step.durationMs : null,
+      status: stepNodeStatus({ kind: 'act', toolRunStatus: typeof step.toolRunStatus === 'string' ? step.toolRunStatus : null }, { runStatus: null, isLast: false }),
+      dependsOn: step.index,
+      edge: STEP_TREE_EDGE.toolRun,
+      toolRecorded: true
+    });
+  });
+  return {
+    nodes,
+    dropped,
+    steps: ordered.length,
+    drawn: nodes.filter((n) => n.depth === 0).length,
+    toolRuns: nodes.filter((n) => n.depth === 1).length
+  };
+}
