@@ -105,7 +105,7 @@
                 </div>
                 <div class="telemetry-item">
                   <span class="t-label">حماية التشفير</span>
-                  <span class="t-val ok">AES-256-GCM + HMAC</span>
+                  <span class="t-val ok"><abbr title="معيار التشفير المتقدم بمفتاح 256 بت ونمط GCM">AES-256-GCM</abbr> + <abbr title="رمز توثيق الرسائل المعتمد على التجزئة">HMAC</abbr></span>
                 </div>
                 <div class="telemetry-item">
                   <span class="t-label">التكلفة التشغيلية</span>
@@ -251,7 +251,7 @@
                   </div>
                 </div>
                 <div class="phone-wa-messages" id="wa-chat-feed">
-                  <div class="wa-sys-notice">الرسائل محمية بتحقق HMAC-SHA256 وسياسة الموافقة المزدوجة.</div>
+                  <div class="wa-sys-notice">الرسائل محمية بتحقق <abbr title="رمز توثيق الرسائل المعتمد على التجزئة مع SHA-256">HMAC-SHA256</abbr> وسياسة الموافقة المزدوجة.</div>
                 </div>
                 <div class="phone-wa-footer">
                   <input type="text" id="wa-sim-text" value="مرحبًا، ما هي مواعيد العمل وكيف يمكنني حجز موعد؟" placeholder="اكتب رسالة واردة من العميل..." />
@@ -268,14 +268,14 @@
                     <input type="text" id="wa-sim-phone" value="+201065217834" dir="ltr" />
                   </div>
                   <div class="toggles-row">
-                    <label class="check-card">
+                    <label class="check-row">
                       <input type="checkbox" id="wa-opt-in" checked />
                       <div>
                         <strong>موافقة واتساب الأساسية (optedIn)</strong>
                         <span>تسمح بالمراسلة الفردية داخل نافذة 24 ساعة</span>
                       </div>
                     </label>
-                    <label class="check-card">
+                    <label class="check-row">
                       <input type="checkbox" id="wa-ai-opt-in" checked />
                       <div>
                         <strong>موافقة الذكاء الاصطناعي المنفصلة (aiOptedIn)</strong>
@@ -285,7 +285,7 @@
                   </div>
                   <div class="btn-row">
                     <button type="button" class="primary-btn" id="btn-wa-save-consent">حفظ الموافقة عبر أداة MCP</button>
-                    <button type="button" class="ghost-btn" id="btn-wa-run-crypto">فحص تشفير AES-256-GCM</button>
+                    <button type="button" class="ghost-btn" id="btn-wa-run-crypto">فحص تشفير <abbr title="معيار التشفير المتقدم بمفتاح 256 بت ونمط GCM">AES-256-GCM</abbr></button>
                   </div>
                 </div>
 
@@ -371,15 +371,15 @@
               <audio id="celia-voice-player" controls hidden style="margin-top:10px;width:100%;max-width:440px;"></audio>
               <div id="secrets-readiness-panel" style="margin-top:14px;">
                 <div class="kv-grid" id="secrets-readiness-grid">
-                  <div class="kv-item"><span dir="ltr">AGENETROUTERAPI_KEY</span><span class="kv-val">مربوط بالخادم (عبر Bearer)</span></div>
-                  <div class="kv-item"><span dir="ltr">AI_GATEWAY_API_KEY</span><span class="kv-val">مربوط بالخادم (عبر Bearer)</span></div>
-                  <div class="kv-item"><span dir="ltr">CELIA_MCP_API_TOKEN</span><span class="kv-val">حارس مصادقة المالك</span></div>
-                  <div class="kv-item"><span dir="ltr">CELIA_VOICE_ID</span><span class="kv-val">هوية صوت سيليا</span></div>
-                  <div class="kv-item"><span dir="ltr">DEEPSEEK_API_KEY</span><span class="kv-val">مربوط بالخادم (عبر Bearer)</span></div>
-                  <div class="kv-item"><span dir="ltr">ELEVENLABS_API_KEY</span><span class="kv-val">توليد الصوت العربي TTS</span></div>
-                  <div class="kv-item"><span dir="ltr">FIGMA_ACCESS_TOKEN</span><span class="kv-val">قراءة ملفات التصميم</span></div>
-                  <div class="kv-item"><span dir="ltr">GEMINI_API_KEY</span><span class="kv-val">المزود السحابي الأساسي</span></div>
-                  <div class="kv-item"><span dir="ltr">YOUR_CODATA_API_KEY</span><span class="kv-val">موصل مساحة Codata (قراءة)</span></div>
+                  <div class="kv-item"><span dir="ltr"><code>AGENETROUTERAPI_KEY</code></span><span class="kv-val">مربوط بالخادم (عبر Bearer)</span></div>
+                  <div class="kv-item"><span dir="ltr"><code>AI_GATEWAY_API_KEY</code></span><span class="kv-val">مربوط بالخادم (عبر Bearer)</span></div>
+                  <div class="kv-item"><span dir="ltr"><code>CELIA_MCP_API_TOKEN</code></span><span class="kv-val">حارس مصادقة المالك</span></div>
+                  <div class="kv-item"><span dir="ltr"><code>CELIA_VOICE_ID</code></span><span class="kv-val">هوية صوت سيليا</span></div>
+                  <div class="kv-item"><span dir="ltr"><code>DEEPSEEK_API_KEY</code></span><span class="kv-val">مربوط بالخادم (عبر Bearer)</span></div>
+                  <div class="kv-item"><span dir="ltr"><code>ELEVENLABS_API_KEY</code></span><span class="kv-val">توليد الصوت العربي TTS</span></div>
+                  <div class="kv-item"><span dir="ltr"><code>FIGMA_ACCESS_TOKEN</code></span><span class="kv-val">قراءة ملفات التصميم</span></div>
+                  <div class="kv-item"><span dir="ltr"><code>GEMINI_API_KEY</code></span><span class="kv-val">المزود السحابي الأساسي</span></div>
+                  <div class="kv-item"><span dir="ltr"><code>YOUR_CODATA_API_KEY</code></span><span class="kv-val">موصل مساحة Codata (قراءة)</span></div>
                 </div>
               </div>
             </div>
@@ -405,7 +405,7 @@
 
         <div class="drawer-tabs">
           <button type="button" class="drawer-tab active" data-dtab="preview">المخرج التفاعلي</button>
-          <button type="button" class="drawer-tab" data-dtab="trace">سجل JSON-RPC الحي</button>
+          <button type="button" class="drawer-tab" data-dtab="trace">سجل <abbr title="نداء الإجراءات عن بعد بترميز JSON">JSON-RPC</abbr> الحي</button>
           <button type="button" class="drawer-tab" data-dtab="config">ملف ربط MCP</button>
         </div>
 

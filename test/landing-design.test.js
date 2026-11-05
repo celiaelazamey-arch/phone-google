@@ -23,12 +23,46 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 const HTML = read('public/landing.html');
 const CSS = read('public/landing.css');
 
-/** كتلة الرموز الأولى في الملف. */
+/** كتلة الرموز الأولى في الملف — تقبل قائمة محددات (`:root, :root:not([data-theme]) {`). */
 function tokenBlock(css) {
-  const start = css.indexOf(':root {');
-  assert.ok(start >= 0, 'landing.css defines a :root token block');
+  const head = /^:root[^{]*\{/m.exec(css);
+  assert.ok(head, 'landing.css defines a :root token block');
+  const start = head.index;
   return css.slice(start, css.indexOf('\n}', start));
 }
+
+/* L2/U9: ألوان landing.css هُجرت إلى رموز theme.css (THM-02)، فقياس التباين يجب أن يتبع
+ * السلسلة بدل أن يبحث عن حرف لم يعد موجودًا. التوقعات (4.5:1 و3:1) لم تتغير. */
+const THEME = read('public/theme.css');
+function themeToken(name) {
+  const hits = [...THEME.matchAll(new RegExp(`^\\s*${name}:\\s*([^;]+);`, 'gm'))].map((m) => m[1].trim());
+  assert.ok(hits.length >= 1, `${name} is defined in theme.css`);
+  return hits[0];
+}
+function parseColour(value) {
+  const hex = /^#([0-9a-f]{3,8})$/i.exec(value.trim());
+  if (hex) {
+    let x = hex[1];
+    if (x.length === 3) x = x.split('').map((c) => c + c).join('');
+    return [parseInt(x.slice(0, 2), 16), parseInt(x.slice(2, 4), 16), parseInt(x.slice(4, 6), 16), 1];
+  }
+  const rgb = /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s/]+([\d.]+))?\s*\)$/i.exec(value.trim());
+  if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3]), rgb[4] === undefined ? 1 : Number(rgb[4])];
+  return null;
+}
+/** لون متغيّر في كتلة رموز landing.css، مُحلَّلًا عبر theme.css إن كان استدلالًا. */
+function solidOf(tokens, name) {
+  const decl = tokens.match(new RegExp(`${name}:\\s*([^;]+);`))?.[1]?.trim();
+  assert.ok(decl, `${name} is defined`);
+  const direct = parseColour(decl);
+  if (direct) return direct;
+  const ref = /^var\((--t-[a-z0-9-]+)\)$/.exec(decl);
+  assert.ok(ref, `${name} is a solid colour or a token reference, got: ${decl}`);
+  const resolved = parseColour(themeToken(ref[1]));
+  assert.ok(resolved, `${ref[1]} resolves to a solid colour in theme.css`);
+  return resolved;
+}
+const hexOf = ([r, g, b]) => `#${[r, g, b].map((n) => Math.round(n).toString(16).padStart(2, '0')).join('')}`;
 
 /** ما بعد كتلة الرموز: القواعد التي يجب ألا تحمل قيمًا حرفية. */
 function rulesAfterTokens(css) {
@@ -98,20 +132,14 @@ test('LND-05 overflow-x: clip على html وbody معًا', () => {
 
 test('LND-06 تباين نص الزر الأساسي ≥ 4.5:1 عند كل محطات التدرّج', () => {
   const tokens = tokenBlock(CSS);
-  const ink = tokens.match(/--on-accent:\s*(#[0-9a-fA-F]{3,8})/)?.[1];
-  assert.ok(ink, '--on-accent is defined');
-  const stops = ['--accent-ink-1', '--accent-ink-2', '--accent-ink-3'].map((name) => {
-    const value = tokens.match(new RegExp(`${name}:\\s*(#[0-9a-fA-F]{3,8})`))?.[1];
-    assert.ok(value, `${name} is defined`);
-    return value;
-  });
+  const ink = hexOf(solidOf(tokens, '--on-accent'));
+  const stops = ['--accent-ink-1', '--accent-ink-2', '--accent-ink-3'].map((name) => hexOf(solidOf(tokens, name)));
   for (const stop of stops) {
     const ratio = contrast(ink, stop);
     assert.ok(ratio >= 4.5, `button ink on ${stop} is ${ratio.toFixed(2)}:1, below 4.5:1`);
   }
   // الحقل يحتاج حدّه 3:1 على الأقل against ما يحيط به.
-  const edge = tokens.match(/--field-edge:\s*(#[0-9a-fA-F]{3,8})/)?.[1];
-  assert.ok(edge, '--field-edge is defined');
+  const edge = hexOf(solidOf(tokens, '--field-edge'));
   assert.ok(contrast(edge, '#1a1c22') >= 3, 'field edge clears 3:1 against its fill');
 });
 

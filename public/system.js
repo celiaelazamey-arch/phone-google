@@ -77,7 +77,7 @@
         ? "تخزين دائم · نسخ احتياطي مستقل مطلوب"
         : "تجريبي؛ تُفقد البيانات عند الإغلاق";
     $("schema").textContent =
-      `SCHEMA ${data.release.database.schema} / DECLARED`;
+      `Schema ${data.release.database.schema} / declared`;
     $("updated").textContent = new Date(data.generatedAt).toLocaleTimeString(
       "ar-EG",
       { hour: "2-digit", minute: "2-digit", second: "2-digit" },

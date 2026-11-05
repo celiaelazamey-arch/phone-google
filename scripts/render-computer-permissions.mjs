@@ -121,7 +121,7 @@ export function buildHtml() {
         (entry) => `          <article class="cap" data-status="${status}">
             <h4>${esc(entry.ar)}</h4>
             <p class="scope">${esc(entry.scope)}</p>
-            <p class="gate"><span>البوابة</span> ${esc(entry.gate)}</p>
+            <p class="gate"><span>البوابة</span> <code>${esc(entry.gate)}</code></p>
             <div class="flags">
               <span class="flag ${entry.wired ? 'on' : 'off'}">${entry.wired ? 'موصولة' : 'غير موصولة'}</span>
               <span class="flag ${entry.tested ? 'on' : 'off'}">${entry.tested ? 'مختبَرة' : 'بلا اختبار'}</span>
