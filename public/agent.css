@@ -234,7 +234,61 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .steps { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.5rem; max-height: 380px; overflow-y: auto; }
 /* منطقة تمرير يجب أن تصل إليها لوحة المفاتيح (axe: scrollable-region-focusable) — الحلقة مرئية عند التركيز. */
-.steps:focus-visible, .approvals:focus-visible, .evidence:focus-visible, .outbox:focus-visible, .memory-list:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 8px; }
+.steps:focus-visible, .approvals:focus-visible, .evidence:focus-visible, .outbox:focus-visible, .memory-list:focus-visible,
+.history:focus-visible, .inbox:focus-visible, .history-detail:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 8px; }
+
+/* ── L1 · U2 — سجل المحادثات: خيوط من `agent_threads` ورسائل من `agent_messages` ──
+ * كل الألوان رموز من theme.css (DSN-002)، وكل صندوق `min-width: 0` مع `overflow-wrap`
+ * حتى لا يدفع المحتوى الصفحة أفقيًا عند 320px (بوابة e2e تقيس التمرير الأفقي). */
+.history { list-style: none; margin: 0.35rem 0 0.6rem; padding: 0; display: grid; gap: 0.45rem; max-height: 280px; overflow-y: auto; }
+.history li { min-width: 0; }
+.history .empty { color: var(--muted); border: 1px dashed var(--line); border-radius: 12px; padding: 0.6rem; text-align: center; font-size: 0.82rem; }
+.thread-item[aria-current="true"] .thread-open { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--card)); }
+.thread-open { width: 100%; min-width: 0; display: grid; gap: 0.25rem; text-align: start; border: 1px solid var(--line); border-radius: 12px; padding: 0.55rem 0.7rem; background: color-mix(in srgb, var(--field) 65%, transparent); color: inherit; font: inherit; cursor: pointer; }
+.thread-open:hover { border-color: var(--accent); }
+.t-title { font-size: 0.86rem; font-weight: 600; overflow-wrap: anywhere; }
+.t-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; color: var(--muted); font-size: 0.72rem; min-width: 0; overflow-wrap: anywhere; }
+.t-id, .r-id { font-family: ui-monospace, monospace; font-size: 0.7rem; overflow-wrap: anywhere; }
+.tag { border: 1px solid var(--line); border-radius: 999px; padding: 0.05rem 0.4rem; font-size: 0.68rem; color: var(--muted); }
+.history-detail { min-width: 0; border-top: 1px solid var(--line); padding-top: 0.6rem; max-height: 320px; overflow-y: auto; }
+.history-detail h3 { margin: 0.5rem 0 0.3rem; font-size: 0.85rem; }
+.history-detail .count { color: var(--muted); font-weight: 400; font-size: 0.75rem; }
+.history-detail .empty { color: var(--muted); font-size: 0.8rem; }
+.messages, .thread-runs { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.msg { min-width: 0; display: grid; gap: 0.15rem; border: 1px solid var(--line); border-radius: 12px; padding: 0.5rem 0.65rem; background: color-mix(in srgb, var(--field) 45%, transparent); }
+.msg .who { font-size: 0.72rem; color: var(--muted); }
+.msg .body { font-size: 0.84rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg time, .run-item time { color: var(--muted); font-size: 0.68rem; }
+.run-open { width: 100%; min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.4rem; text-align: start; border: 1px solid var(--line); border-radius: 12px; padding: 0.45rem 0.6rem; background: color-mix(in srgb, var(--field) 55%, transparent); color: inherit; font: inherit; cursor: pointer; }
+.run-open:hover { border-color: var(--accent); }
+.r-plan { font-size: 0.78rem; color: var(--muted); overflow-wrap: anywhere; }
+
+/* ── L1 · U5 — صندوق المهام: تجميع بلا إعادة ترتيب ولا تخفيف شدة ── */
+.inbox { list-style: none; margin: 0.35rem 0 0.5rem; padding: 0; display: grid; gap: 0.55rem; max-height: 300px; overflow-y: auto; }
+.inbox .empty { color: var(--muted); border: 1px dashed var(--line); border-radius: 12px; padding: 0.6rem; text-align: center; font-size: 0.82rem; }
+.inbox-group { min-width: 0; display: grid; gap: 0.35rem; }
+.inbox-group > ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+.inbox-item { min-width: 0; display: grid; gap: 0.15rem; border: 1px solid var(--line); border-radius: 12px; padding: 0.5rem 0.65rem; background: color-mix(in srgb, var(--field) 50%, transparent); font-size: 0.82rem; }
+.i-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.4rem; min-width: 0; overflow-wrap: anywhere; }
+.inbox-item .meta { color: var(--muted); font-size: 0.72rem; overflow-wrap: anywhere; }
+.inbox-item code { font-size: 0.7rem; overflow-wrap: anywhere; }
+
+/* ── L1 · U3 — معاينة المخرجات: هرم كامل أولًا، ولا HTML ناتج يُحقن أبدًا ── */
+.preview { min-width: 0; margin-top: 0.6rem; border: 1px solid var(--line); border-radius: 14px; padding: 0.7rem; background: color-mix(in srgb, var(--bg-soft) 70%, transparent); }
+.preview[hidden] { display: none; }
+.preview h3 { margin: 0; font-size: 0.9rem; overflow-wrap: anywhere; }
+.preview .hint { margin: 0.3rem 0 0.5rem; }
+.preview-toggle { margin-inline-start: 0.5rem; padding: 0.25rem 0.55rem; font-size: 0.75rem; }
+.preview-toggle:disabled { cursor: not-allowed; opacity: 0.65; }
+#preview-body { min-width: 0; max-height: 340px; overflow: auto; font-size: 0.84rem; }
+#preview-body .empty { color: var(--muted); }
+#preview-body p { margin: 0.3rem 0; overflow-wrap: anywhere; }
+#preview-body ul { margin: 0.3rem 0; padding-inline-start: 1.2rem; }
+#preview-body h4, #preview-body h5, #preview-body h6 { margin: 0.6rem 0 0.25rem; font-size: 0.88rem; }
+.preview .raw { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.76rem; }
+.csv { width: 100%; border-collapse: collapse; font-size: 0.76rem; }
+.csv th, .csv td { border: 1px solid var(--line); padding: 0.3rem 0.45rem; text-align: start; overflow-wrap: anywhere; }
+.csv th { background: color-mix(in srgb, var(--field) 70%, transparent); font-weight: 600; }
 .steps li {
   border: 1px solid var(--line);
   border-radius: 12px;

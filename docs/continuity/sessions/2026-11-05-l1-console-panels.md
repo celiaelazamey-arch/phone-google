@@ -1,0 +1,67 @@
+# تسليم جلسة — 2026-11-05 — L1: لوحات الواجهة الثلاث (U2 سجل المحادثات · U5 صندوق المهام · U3 معاينة المخرجات)
+
+## المهمة والتفويض
+
+- **طلب المالك (حرفي):** «خطط للتشغيل الحقيقي بواجهه تنافس كلود ومانوس 2026» ثم «نفذ L1 — كود متاح بلا أي قرار: سجل المحادثات في الواجهة (نصف `DATA-002` الباقي) + صندوق المهام من طابور الانتباه القائم + معاينة المخرجات داخل الصفحة. إضافي فقط، بلا ترحيل جديد وبلا شبكة، مع اختبارات متصفح وبوابات خضراء».
+- **المرجع المعتمد:** [خطة التشغيل الحقيقي وواجهة 2026](../../plan-live-operation-ui-2026.md) §3 موجة `L1` — المسار (أ) المتاح بلا قرار مالك.
+- **المسموح:** `public/agent.{html,js,css}` + وحدة نقية جديدة + مولّد لوحة مشتقة + اختبارات. **المحظور:** أي مسار `/api` جديد، أي ترحيل، أي شبكة، أي تغيير سلوك قائم، أي حذف، أي بند خامس في `CHANGELOG → Unreleased` (`PRG-07` يثبّت أربعة).
+- **قرارات المالك لم تُحسم:** `GOV-001` · `HOST-003` · `DATA-004` · `DES-002` · `AGENT-004` · `REL-001`/`REL-004` كلها باقية — لذا `L3/L4/L5/L6` لم تُفتح، ولا شيء في هذه الجلسة يلمسها.
+
+## واقع البداية
+
+- **الفرع:** `arena/b0bfdd05-phone-google` على `b115f77` (= `origin/main` بعد دمج PR #170)، نظيف.
+- **عائق بيئي قيس ولم يُرقَّع:** `node_modules` فارغة في مساحة العمل الجديدة ⇒ أول `npm test` أعطى 1201/59 فشلًا بسبب `ERR_MODULE_NOT_FOUND: express`. أُعيد `npm ci` (106 حزم) قبل أي استنتاج، فعاد المقياس 1418 · 1401 pass · 0 fail · 17 skipped.
+- **ما كان موجودًا قبل هذه الجلسة:** `GET /api/agent/threads` و`/threads/:id` (يعيد `{thread, messages, runs}`) و`GET /api/agent/attention` (طابور مرتّب بالشدّة ثم الأقدم، ببصمة و`sends:false`/`tracksRead:false`) و`GET /api/agent/runs/:id/artifacts` + التنزيل الموقّع. القائمة `#thread-select` وحدها كانت تعرض الخيوط — **بلا سجل محادثات في الواجهة**، وهو النصف الذي نصّ صفّ `DATA-002` على أنه «لم يُنفَّذ».
+- **بوابات مرصودة قبل الكتابة:** `MASTER_VISUALS.length === 11` (فلا تُضاف لوحة إلى السجل البصري) · `build:edge-ui` يغلّف `whatsapp.*` و`theme.*` فقط (فلا يؤثر تغيير `agent.*` فيه) · `design:audit` أداة يدوية بلا خطوة CI · `PRG-07` أربعة بنود.
+
+## ما تغير فعليًا
+
+| الملف | الغرض |
+|---|---|
+| `public/agent-console.js` **(جديد)** | وحدة نقية بلا DOM عند الاستيراد (نمط `agent-trace.js`): `filterThreads`/`renderThreadList`/`renderThreadDetail` (U2) · `groupAttention`/`renderInbox` (U5) · `previewKind`/`renderMarkdownPreview`/`renderCsvPreview`/`renderTextPreview` + `PREVIEW_REFUSALS` (U3). ثلاث قواعد: لا اختراع، لا تلطيف، لا حقن |
+| `public/agent.html` | قسمان جديدان `history-card` (`#history-list` · `#history-detail` · `#history-filter` · `#history-badge`) و`inbox-card` (`#inbox-list` · `#inbox-badge` · `#inbox-summary` · `#inbox-flags`) + حاوية `#artifact-preview` (`#preview-body`/`#preview-note`/`#preview-close`). حدّ الخادم «آخر 20 خيطًا» مكتوب في الصفحة نفسها |
+| `public/agent.js` | استيراد الوحدة + `refreshHistory`/`renderHistoryList`/`loadThreadDetail`/`refreshInbox`/`openArtifactPreview`/`closeArtifactPreview`، مربوطة بمسارات قائمة فقط: `connect()` · `refreshDetail()` · إنشاء/تبديل/حذف الخيط · تفويض حدث واحد لكل قائمة. استئناف الخيط من اللوحة يمرّ بمعالج `thread-select` نفسه (لا منطق ثانٍ ولا حالة موازية). وفي النسخة الثابتة تعلن اللوحتان «بلا خادم» بدل `…` معلّقة |
+| `public/agent.css` | أنماط اللوحات برموز `theme.css` فقط (صفر لون حرفي، صفر `rgb()`) + `min-width:0` و`overflow-wrap:anywhere` لكل صندوق (حراسة 320px) + توسيع قاعدة `focus-visible` القائمة لتشمل `.history`/`.inbox`/`.history-detail` |
+| `scripts/render-agent-console-panels.mjs` **(جديد)** | مولّد حتمي للوحة البصرية من `public/` نفسها — بلا ساعة حائط وبلا شبكة؛ `--check` يقارن البايتات |
+| `docs/design/agent-console-panels.html` **(جديد، مولّد)** | الدليل البصري المشتق: المعرّفات الفعلية، المسارات المستعملة، السقوف كما في الوحدة، أنواع تُعاين/تُرفض، أكواد الرفض، شدّات الطابور، حلقات التركيز |
+| `package.json` | أمران فقط: `console:panels` و`console:panels:check` — لا اعتمادية جديدة |
+| `test/agent-console.test.js` **(جديد)** | `L1-01…L1-16`: الهرم يُهرَّب · حالات فارغة صادقة · حدّ الخادم معلن والتصفية محلية · الخيط النشط واحد · اقتطاع الرسالة مُعلن · تشغيلات أول 10 مع إعلان الباقي · التجميع لا يعيد رتبة ولا يخفّف شدة ولا يسقط بندًا (مع طفرة سلبية: إجمالي الخادم يُعرض حتى لو قلّت البنود) · أربع شدّات فقط · قرار المعاينة من السجل قبل الجلب · Markdown subset مغلق (h1⇒h4، `script`/`img` تُهرَّب) · CSV باقتباسات وسقف صفوف · نص خام · بصمة لا تُجمَّل · اللوحات موصولة ولا مسار مخترع · رموز فقط بلا emoji · اللوحة المشتقة مطابقة |
+| `e2e/agent.spec.js` | 4 اختبارات متصفح جديدة (× مشروعَي `desktop`/`mobile` = 8) بمسارات قائمة معترضة: سجل وتصفية واقتطاع و`ghost_role` · صندوق مهام بترتيب الخادم ومعرّف دليل و`digest` · معاينة Markdown داخل الصفحة ورفض HTML قبل أي جلب (عدّاد طلبات يثبت أن الجلب واحد) · النسخة الثابتة تعلن حدودها. وكلها تقيس 320px بلا تمرير أفقي وaxe نظيف وصفر خطأ تشخيصي |
+| `docs/continuity/BACKLOG.md` | تصحيح ما صار قديمًا في صفّ `DATA-002`: نصفه الباقي «سجل محادثات في الواجهة (لم يُنفَّذ)` ⇒ نُفِّذ في L1 بوصف ما بُني وأدلته. الحالة `متحقق` لم تتغير ولا مهمة فُتحت أو أُغلقت |
+| `docs/plan-system-completion.md` | `syntax_files` 281→**284** (ثلاثة ملفات JS جديدة) · `continuity` حُدّث إلى القياس الحيّ بعد هذه السجلات |
+
+**ما لم يُلمس عمدًا:** `src/**` (صفر تغيير — لا مسار جديد ولا منطق خادم) · `sql/**` و`workers/**/migrations` (صفر ترحيل) · `.github/workflows` · `CHANGELOG.md` · `src/design/visual-registry.js` · إصدار `0.3.0`.
+
+## الفحوص
+
+| الأمر | النتيجة |
+|---|---|
+| `node --test test/agent-console.test.js` | **16/16 PASS** |
+| `npm run console:panels:check` | **مطابق** — `docs/design/agent-console-panels.html` = render(4 مصادر)، 7261 بايت |
+| `npm run check` | **284** ملفًا (281 + 3) |
+| `npm test` | **1434 · 1417 pass · 0 fail · 17 skipped** (قبل: 1418/1401/0/17) |
+| `npm run check:continuity` | القياس الحيّ مسجّل في `plan-system-completion.md §2` صفّ `continuity` |
+| `npm run plan:check` · `measure` | أخضر · 66 مهمة مفتوحة (21 P0·31 P1·14 P2) · 7 موجات · **0 انحراف** |
+| البوابات المولّدة | `visual:first:check` · `arch:map:check` · `atlas:check` · `now:check` · `build:manifest:check` · `build:edge-ui:check` · `access:policy:check` · `computer:permissions:check` · `copilot:diagram:check` — كلها PASS |
+| `npm audit --audit-level=high` | 0 ثغرات |
+| `npx playwright test --list` | اختبارات `agent.spec.js` 16 ⇒ **24** (الجديدة مسجّلة في المشروعين) |
+
+**خلل كشفه الفحص وأُصلح قبل الدفع:** ربط هذا السجل من `BACKLOG.md` قبل إنشاء الملف ⇒ `broken local link` ⇒ `check:continuity` فشل ⇒ `plan:check` قرأ `-1/-1/-1` ⇒ سقطت `MEAS-01/02` و`PSC-01/11` (4 فشل). أُصلح بإنشاء السجل ثم إعادة القياس، لا بإضعاف البوابة.
+
+## الدليل البصري
+
+- **[لوحة اللوحات الثلاث المشتقة](../../design/agent-console-panels.html)** — دليل مولّد من `public/agent.html` و`public/agent-console.js` و`public/agent.js` و`public/agent.css` بأمر `npm run console:panels`، وبوابة `console:panels:check` تمنع تحريره يدويًا؛ والاختبار `L1-16` يفرض المطابقة داخل `npm test`. تعرض اللوحة المعرّفات الفعلية والمسارات المستعملة والسقوف وأكواد الرفض والشدّات وحلقات التركيز.
+- **حدّ معلن بلا تجميل:** لا لقطة شاشة في هذه الجلسة — متصفحات Playwright غير قابلة للتثبيت في هذا الرمل (المنافذ مقيودة بـ`registry.npmjs.org`/`github.com`/`pypi.org` فقط)؛ لذلك اختبارات المتصفح الثمانية **مسجّلة ومكتوبة ولم تُشغَّل محليًا**؛ حكمها يعود إلى وظيفة `RTL dashboard · desktop / mobile / accessibility` في CI. ما قيس محليًا هو الوحدات الستة عشر والاشتقاق والبوابات المولّدة، ولا يُدّعى غير ذلك.
+
+## الحفظ والتسليم
+
+- **الدفع:** التغييرات على `arena/b0bfdd05-phone-google` فوق `b115f77` — PR جديد بعد الدفع. لا دمج ولا `--admin` في هذه الجلسة (لم يُطلب).
+- **الإنتاج والبيانات والأسرار:** صفر لمس — لا `src/`، لا ترحيل، لا شبكة، لا مزوّد، لا سرّ مطبوع. `sandbox=off` و`egress=off` كما هما في `measure`.
+- **البوابتان لم تتحركا بالادعاء:** `B1 = 5.5/8` و`B2 = 2.5/6` كما هما؛ ما تغيّر هو `L6` (القياس واللوحة) و`U2/U3/U5` عملًا لا رقمًا — ولا يُرفع أي مؤشر اكتمال قبل قبول CI الحيّ.
+
+## الاستئناف
+
+- **الخطوة التالية بالضبط:** دفع الفرع وفتح PR ومراقبة `RTL dashboard` في CI؛ إن سقط أي من الاختبارات الثمانية يُصلح السبب (لا يُحذف الاختبار ولا يُخفَّف التوقع) حتى يخضر.
+- **ثم `L2` (متاح بلا قرار):** هجرة أوراق CSS الست (`styles/system/protocol/computer/deploy/landing`) إلى رموز `theme.css` وإنزال `DSN-002` من 43 ساكن/4 حيّ إلى 0/0، وعرض الخطة المشتق من `agent_steps` (`U4`) — مع احترام قائمة `THM-02` التي تنكمش فقط و`npm run build:edge-ui` بعد أي تعديل في `theme.css` أو `styles.css`.
+- **المحجوب بقرار مالك (لا يُفتح من هنا):** `L3` يحتاج `GOV-001` (مفتاح + ميزانية) · `L4` يحتاج `HOST-003` · `L5` يحتاج لوحات Meta/Google · `L6` يحتاج قرارات `DES-002` الثلاثة وقرار `AGENT-004` · `L7` يحتاج `REL-001`/`REL-004`.
+- **تأكيد السجلات:** هذا السجل + `STATE.md` محدّثان + `NOW.md` مولّد؛ `open_tasks` يبقى **66** — لا موجة جديدة ولا مهمة مفتوحة أو مغلقة.

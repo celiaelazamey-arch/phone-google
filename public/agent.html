@@ -118,6 +118,36 @@
       <p class="hint">كل نقرة تُنشئ <code>client_message_id</code> واحدًا؛ النقر المكرر يعيد نفس التشغيل ولا يضاعفه.</p>
     </section>
 
+    <section class="card history-card" aria-labelledby="history-title">
+      <div class="row">
+        <h2 id="history-title">سجل المحادثات</h2>
+        <span id="history-badge" class="pill idle">…</span>
+      </div>
+      <p class="hint">الخيوط كما هي في <code>agent_threads</code> ورسائلها كما هي في <code>agent_messages</code> — لا يُعرض ما لا سجل له. القائمة آخر <span id="history-limit">20</span> خيطًا بترتيب آخر تحديث (حدّ الخادم)، والتصفية محلية في ما حُمِّل فقط.</p>
+      <label class="field">
+        <span>تصفية بالعنوان أو بادئة المعرّف</span>
+        <input id="history-filter" type="search" maxlength="80" autocomplete="off" placeholder="اكتب جزءًا من العنوان…">
+      </label>
+      <ol id="history-list" class="history" aria-label="سجل الخيوط (قائمة قابلة للتمرير)" tabindex="0">
+        <li class="empty">اتصل لعرض الخيوط المحفوظة.</li>
+      </ol>
+      <div id="history-detail" class="history-detail" aria-live="polite">
+        <p class="empty">اختر خيطًا لعرض سجلّه.</p>
+      </div>
+    </section>
+
+    <section class="card inbox-card" aria-labelledby="inbox-title">
+      <div class="row">
+        <h2 id="inbox-title">صندوق المهام</h2>
+        <span id="inbox-badge" class="pill idle">…</span>
+      </div>
+      <p class="hint">مشتق من طابور الانتباه نفسه (<code>GET /api/agent/attention</code>): كل بند يحمل معرّف دليله، والترتيب والشدّة كما رتّبهما الخادم — لا تُخفَّف شدة ولا يُسقط بند. هذه قراءة: <span id="inbox-flags">لا إرسال ولا تتبع قراءة</span>.</p>
+      <ul id="inbox-list" class="inbox" aria-label="صندوق المهام (قائمة قابلة للتمرير)" tabindex="0">
+        <li class="empty">اتصل لعرض ما ينتظرك.</li>
+      </ul>
+      <p class="hint" id="inbox-summary" role="status">لا ملخص بعد.</p>
+    </section>
+
     <section class="card run" aria-labelledby="run-title">
       <div class="row">
         <h2 id="run-title">التشغيل</h2>
@@ -217,6 +247,14 @@
       <ul id="artifacts" class="outbox" aria-live="polite" aria-label="الملفات الناتجة (قائمة قابلة للتمرير)" tabindex="0">
         <li class="empty">لا ملفات ناتجة بعد.</li>
       </ul>
+      <div id="artifact-preview" class="preview" aria-live="polite" hidden>
+        <div class="row">
+          <h3 id="preview-title">معاينة</h3>
+          <button id="preview-close" class="ghost" type="button">إغلاق المعاينة</button>
+        </div>
+        <p class="hint" id="preview-note"></p>
+        <div id="preview-body"></div>
+      </div>
     </section>
   </main>
 
