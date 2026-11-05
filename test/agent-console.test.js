@@ -371,6 +371,39 @@ test('L1-17 every ES module the page imports is served by an explicit route (no 
   assert.match(moduleSource, /export function previewKind/, 'the served module is the real one');
 });
 
+/* ── L1-18: سقف مسار الوحدة مقاس لا مزخرف ──
+ * CodeQL يرفض وصول نظام ملفات بلا تحديد معدل داخل معالج مسار (CWE-770)، وقاعدة المستودع
+ * (ruleset) تمنع الدمج عند أي تنبيه أمني جديد — فالتنبيه مانع بنيوي لا رأي. هذا الحارس يثبت أن
+ * السقف حقيقي: ترويسات الحد على أول طلب، ثم 429 فعلي عند السقف المعلَن. بلا هذا الاختبار
+ * يمكن حذف الوسيط فيعود التنبيه ويسقط الدمج، أو يبقى السقف رقمًا لا يفعله أحد. */
+test('L1-18 the module route is rate-limited for real: limit headers, then a measured 429', async (t) => {
+  const pool = createMemoryPool();
+  const config = loadCeliaMcpConfig({ CELIA_MCP_API_TOKEN: crypto.randomBytes(32).toString('hex') });
+  const server = createCeliaMcpApp({ pool, config }).listen(0, '127.0.0.1');
+  const baseUrl = await new Promise((resolve) => server.once('listening', () => resolve(`http://127.0.0.1:${server.address().port}`)));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+
+  const first = await fetch(`${baseUrl}/agent-console.js`);
+  assert.equal(first.status, 200, 'the module is still served');
+  assert.match(first.headers.get('content-type') || '', /javascript/, 'as JavaScript');
+  const limit = Number(first.headers.get('ratelimit-limit'));
+  assert.ok(Number.isInteger(limit) && limit >= 1, 'the route announces a real ceiling');
+  assert.equal(Number(first.headers.get('ratelimit-remaining')), limit - 1, 'one page load costs exactly one unit');
+  await first.text();
+
+  let rejected = null;
+  for (let i = 1; i <= limit + 2; i += 1) {
+    const response = await fetch(`${baseUrl}/agent-console.js`);
+    if (response.status !== 200) { rejected = { at: i + 1, response }; break; }
+    await response.text();
+  }
+  assert.ok(rejected, `the ceiling is enforced within ${limit + 2} requests, not left unbounded`);
+  assert.equal(rejected.response.status, 429, 'exceeding it is a 429');
+  assert.ok(Number(rejected.response.headers.get('retry-after')) >= 1, 'with Retry-After');
+  assert.equal((await rejected.response.json()).error, 'rate_limited', 'and a named reason');
+  assert.ok(rejected.at <= limit + 1, 'the enforced ceiling is the announced one');
+});
+
 test('L1-16 the derived panel board equals the render of the real page and module', () => {
   const out = execFileSync(process.execPath, ['scripts/render-agent-console-panels.mjs', '--check'], {
     cwd: root,

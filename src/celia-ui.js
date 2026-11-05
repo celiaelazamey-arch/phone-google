@@ -6,14 +6,34 @@ import { DEFAULT_POLICY } from './gemini.js';
 import { createMemoryPool } from './memory-pool.js';
 import { decryptJson, encryptJson, hashOAuthState, isValidE164, isWithinCustomerWindow, verifyWhatsAppSignature } from './security.js';
 import { runDocumentAutomationBenchmark } from './agent/automation/index.js';
+import { createRateLimit, createRateLimiter, RATE_LIMIT_DEFAULTS } from './rate-limit.js';
 
 const PUBLIC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../public');
+
+// L1: ceiling for the rate-limited static module route below (see the comment there). One page load
+// costs exactly one unit, so 600/minute per client is roughly ten times the worst page-load rate the
+// browser suite produces; it never fires in tests and still bounds repeated disk reads (CWE-770).
+const STATIC_ASSET_LIMIT = 600;
+const STATIC_ASSET_WINDOW_MS = 60_000;
 
 export { generateLocalPolicyReply } from './policy.js';
 import { generateLocalPolicyReply } from './policy.js';
 
 export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, operations, config }) {
   const router = express.Router();
+  // L1: this repo's own limiter primitives, so the asset route below is rate-limited without inventing a
+  // second mechanism. Window and maxKeys follow CELIA_RATE_LIMIT_* when configured; the ceiling is the
+  // documented static-asset constant because loadRateLimitConfig has no asset profile. It is attached
+  // unconditionally (not gated by rateLimit.enabled) since the ruleset blocks a merge on any new
+  // un-rate-limited file system access in a handler.
+  const staticAssetLimit = createRateLimit({
+    limiter: createRateLimiter({
+      limit: STATIC_ASSET_LIMIT,
+      windowMs: Number.isInteger(config?.rateLimit?.windowMs) ? config.rateLimit.windowMs : STATIC_ASSET_WINDOW_MS,
+      maxKeys: Number.isInteger(config?.rateLimit?.maxKeys) ? config.rateLimit.maxKeys : RATE_LIMIT_DEFAULTS.maxKeys
+    }),
+    scope: 'static-asset'
+  });
   const sandboxPool = createMemoryPool();
   const ephemeralLabKey = crypto.randomBytes(32).toString('base64');
   const ephemeralWebhookSecret = crypto.randomBytes(24).toString('hex');
@@ -94,7 +114,8 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, oper
   // L1 (U2/U5/U3): pure console-panel helpers imported by agent.js the same way. Assets under public/ are
   // served by explicit route with no static fallback, so a module without its own route is a 404 that only
   // a browser notices — `L1-17` in test/agent-console.test.js boots this server and refuses that class.
-  router.get('/agent-console.js', (_req, res) => res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'agent-console.js')));
+  router.get('/agent-console.js', staticAssetLimit, (_req, res) =>
+    res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'agent-console.js')));
   // WP-1.3 (DEC-049): رموز السمات ومُحلّلها قبل الرسم — مشتركان بين /agent و/kb و/cron.
   router.get('/theme.css', (_req, res) => res.type('text/css').sendFile(path.join(PUBLIC_DIR, 'theme.css')));
   router.get('/theme.js', (_req, res) => res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'theme.js')));
