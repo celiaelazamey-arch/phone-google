@@ -118,10 +118,12 @@ test('THM-01 every theme passes computed WCAG contrast for the text/background p
 
 test('THM-02 grep gate: no fixed colour outside theme.css in the migrated stylesheets; the not-yet-migrated list only shrinks', () => {
   // قائمة صريحة لما لم يُهاجَر بعد (تنكمش فقط — إضافة اسم هنا تراجع يجب تبريره في DECISIONS).
-  const NOT_YET_MIGRATED = new Set(['landing.css', 'fonts.css']);
+  // L2/U9: هُجرت landing.css (112 إعلانًا إلى 49 رمز --t-lnd-shell-*) وثبت أن fonts.css بلا لون ثابت أصلًا،
+  // فالقائمة صارت فارغة. القاعدة أن هذه القائمة تنكمش فقط؛ أي اسم يُعاد إليها تراجع يُبرَّر في DECISIONS.
+  const NOT_YET_MIGRATED = new Set();
   const cssFiles = fs.readdirSync(PUBLIC_DIR).filter((f) => f.endsWith('.css'));
   const migrated = cssFiles.filter((f) => f !== 'theme.css' && !NOT_YET_MIGRATED.has(f));
-  assert.deepEqual(migrated.sort(), ['agent.css', 'computer.css', 'cron.css', 'deploy.css', 'kb.css', 'protocol.css', 'styles.css', 'system.css', 'whatsapp.css']);
+  assert.deepEqual(migrated.sort(), ['agent.css', 'computer.css', 'cron.css', 'deploy.css', 'fonts.css', 'kb.css', 'landing.css', 'protocol.css', 'styles.css', 'system.css', 'whatsapp.css']);
   for (const file of NOT_YET_MIGRATED) assert.ok(cssFiles.includes(file), `${file} still exists (drop it from the list otherwise)`);
 
   const fixedColour = /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(|\b(?:white|black|red|green|blue|yellow|orange|gray|grey|silver|navy|teal|purple|pink)\b(?=\s*[;,)!])/i;
@@ -252,7 +254,7 @@ test('THM-03 theme.js resolves before paint: stored choice applied, invalid/miss
 });
 
 test('THM-04 pages with the switcher load theme.js before any stylesheet and import theme.css; no switcher on a page whose CSS ignores the tokens', () => {
-  const SINGLE_IDENTITY = ['computer-permissions.html', 'computer.html', 'deploy.html', 'index.html', 'live.html', 'protocol.html', 'skills.html', 'system.html'];
+  const SINGLE_IDENTITY = ['computer-permissions.html', 'computer.html', 'deploy.html', 'index.html', 'landing.html', 'live.html', 'protocol.html', 'skills.html', 'system.html'];
   const htmlFiles = fs.readdirSync(PUBLIC_DIR).filter((f) => f.endsWith('.html'));
   const themed = [];
   for (const file of htmlFiles) {
@@ -280,7 +282,23 @@ test('THM-04 pages with the switcher load theme.js before any stylesheet and imp
     assert.match(html, /<select data-theme-switcher aria-label="/, `${file}: switcher is labelled`);
     assert.ok(html.match(/data-theme-switcher/g).length === 1, `${file}: exactly one switcher`);
   }
-  assert.deepEqual(themed.sort(), ['agent.html', 'computer-permissions.html', 'computer.html', 'cron.html', 'deploy.html', 'index.html', 'kb.html', 'live.html', 'protocol.html', 'skills.html', 'system.html', 'whatsapp.html']);
+  assert.deepEqual(themed.sort(), ['agent.html', 'computer-permissions.html', 'computer.html', 'cron.html', 'deploy.html', 'index.html', 'kb.html', 'landing.html', 'live.html', 'protocol.html', 'skills.html', 'system.html', 'whatsapp.html']);
+});
+
+/* ── THM-07 (L2/U9): كل رمز تقرأه ورقة صفحة معرَّف فعلًا في theme.css ──
+ * THM-02 تمنع اللون الثابت خارج theme.css، لكنها لا تمنع الاسم المكتوب خطأً: ‏`var(--t-lnd-shel-bg)`
+ * بلا تعريف لا يُفشل أي اختبار، بل يصير إعلانًا غير صالح يلاحظه المتصفح وحده. هذا الحارس يغلق ذلك الصنف. */
+test('THM-07 every --t-* token a page sheet reads is defined in theme.css (no dangling reference)', () => {
+  const theme = read('theme.css');
+  const defined = new Set([...theme.matchAll(/(--t-[a-z0-9-]+)\s*:/g)].map((m) => m[1]));
+  assert.ok(defined.size > 100, `theme.css defines the token set (got ${defined.size})`);
+  const sheets = fs.readdirSync(PUBLIC_DIR).filter((f) => f.endsWith('.css') && f !== 'theme.css');
+  const dangling = [];
+  for (const file of sheets) {
+    const css = read(file).replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const m of css.matchAll(/var\(\s*(--t-[a-z0-9-]+)/g)) if (!defined.has(m[1])) dangling.push(`${file} reads ${m[1]}`);
+  }
+  assert.deepEqual(dangling, [], `every token reference resolves: ${dangling.join(', ')}`);
 });
 
 test('THM-05 the live UI server serves /theme.css and /theme.js by explicit route (the pages reference both)', async (t) => {

@@ -7,35 +7,36 @@
    CSP-safe: every asset, including fonts, is self-hosted.
    ============================================================ */
 
-:root {
+:root,
+:root:not([data-theme]) {
   color-scheme: dark;
-  --bg: #0b0c10;
-  --bg-2: #101218;
-  --surface: rgba(255, 255, 255, 0.045);
-  --surface-strong: rgba(255, 255, 255, 0.075);
-  --border: rgba(255, 255, 255, 0.09);
-  --border-strong: rgba(255, 255, 255, 0.18);
-  --text: #f5f4f2;
-  --muted: #a8aebd;
-  --faint: #8790a3;
-  --coral: #d97757;
-  --coral-2: #e88a6b;
-  --emerald: #10b981;
-  --violet: #8b5cf6;
-  --cyan: #38bdf8;
-  --amber: #f59e0b;
-  --grad: linear-gradient(120deg, #f4b79c 0%, #d97757 52%, #b8552f 100%);
+  --bg: var(--t-lnd-shell-bg);
+  --bg-2: var(--t-lnd-shell-bg-2);
+  --surface: color-mix(in srgb, var(--t-lnd-shell-base-paper) 4.5%, transparent);
+  --surface-strong: color-mix(in srgb, var(--t-lnd-shell-base-paper) 7.5%, transparent);
+  --border: color-mix(in srgb, var(--t-lnd-shell-base-paper) 9%, transparent);
+  --border-strong: color-mix(in srgb, var(--t-lnd-shell-base-paper) 18%, transparent);
+  --text: var(--t-lnd-shell-text);
+  --muted: var(--t-lnd-shell-muted);
+  --faint: var(--t-lnd-shell-faint);
+  --coral: var(--t-lnd-shell-coral);
+  --coral-2: var(--t-lnd-shell-coral-2);
+  --emerald: var(--t-lnd-shell-emerald);
+  --violet: var(--t-lnd-shell-violet);
+  --cyan: var(--t-lnd-shell-cyan);
+  --amber: var(--t-lnd-shell-amber);
+  --grad: linear-gradient(120deg, var(--t-lnd-shell-grad-1) 0%, var(--t-lnd-shell-base-coral) 52%, var(--t-lnd-shell-grad-3) 100%);
   /* Ink on a coral fill. Pure #fff was 2.64-4.14:1 on the old button ramp,
      under the 4.5 the 16.5px bold label needs; this pair clears it at every stop. */
-  --on-accent: #fff8f4;
-  --accent-ink-1: #a94a26;
-  --accent-ink-2: #9c4322;
-  --accent-ink-3: #8a3a1d;
-  --field-edge: #767d8f;      /* 4.1:1 against the field fill, above the 3:1 floor */
-  --field-placeholder: #9aa3b5;
-  --grad-soft: linear-gradient(135deg, rgba(217, 119, 87, .22), rgba(139, 92, 246, .16) 55%, rgba(16, 185, 129, .14));
-  --shadow: 0 24px 60px rgba(0, 0, 0, .5);
-  --shadow-card: 0 10px 34px rgba(0, 0, 0, .34);
+  --on-accent: var(--t-lnd-shell-on-accent);
+  --accent-ink-1: var(--t-lnd-shell-accent-ink-1);
+  --accent-ink-2: var(--t-lnd-shell-accent-ink-2);
+  --accent-ink-3: var(--t-lnd-shell-accent-ink-3);
+  --field-edge: var(--t-lnd-shell-field-edge);      /* 4.1:1 against the field fill, above the 3:1 floor */
+  --field-placeholder: var(--t-lnd-shell-field-placeholder);
+  --grad-soft: linear-gradient(135deg, color-mix(in srgb, var(--t-lnd-shell-base-coral) 22%, transparent), color-mix(in srgb, var(--t-lnd-shell-base-violet) 16%, transparent) 55%, color-mix(in srgb, var(--t-lnd-shell-base-emerald) 14%, transparent));
+  --shadow: 0 24px 60px color-mix(in srgb, var(--t-lnd-shell-base-ink) 50%, transparent);
+  --shadow-card: 0 10px 34px color-mix(in srgb, var(--t-lnd-shell-base-ink) 34%, transparent);
   --r-lg: 24px;
   --r-md: 18px;
   --r-sm: 12px;
@@ -43,93 +44,93 @@
   --ease: cubic-bezier(.22, .85, .28, 1);
 
   /* One home for colour: role-named tokens, duplicates merged (Hallmark gate 48). */
-  --coral-a4: rgba(217, 119, 87, .4);
-  --sky-a85: rgba(56, 189, 248, .85);
-  --black: #111;
-  --coral-a5: rgba(217,119,87,.5);
-  --violet-a42: rgba(139,92,246,.42);
-  --emerald-a3: rgba(16,185,129,.3);
-  --white-a035: rgba(255,255,255,.035);
-  --black-2: #000;
-  --bg-a62: rgba(11, 12, 16, .62);
-  --bg-a86: rgba(11, 12, 16, .86);
-  --black-a35: rgba(0,0,0,.35);
-  --white-a14: rgba(255,255,255,.14);
-  --coral-a25: rgba(217,119,87,.25);
-  --coral-a8: rgba(217,119,87,.8);
-  --coral-3: #ffb59d;
-  --coral-a14: rgba(217,119,87,.14);
-  --coral-a2: rgba(217,119,87,.2);
-  --coral-a35: rgba(217,119,87,.35);
-  --white-a25: rgba(255,255,255,.25);
-  --white-a08: rgba(255,255,255,.08);
-  --white-a03: rgba(255,255,255,.03);
-  --emerald-a5: rgba(16,185,129,.5);
-  --emerald-a0: rgba(16,185,129,0);
-  --emerald-a4: rgba(16,185,129,.4);
-  --emerald-a12: rgba(16,185,129,.12);
-  --bg-3: #1b1e28;
-  --bg-4: #0e1016;
-  --white-a12: rgba(255,255,255,.12);
-  --bg-5: #050608;
-  --violet-2: #a5b4fc;
-  --violet-a5: rgba(139,92,246,.5);
-  --violet-a14: rgba(139,92,246,.14);
-  --slate: #202c33;
-  --emerald-2: #005c4b;
-  --white-a75: rgba(255,255,255,.75);
-  --slate-2: #8696a0;
-  --emerald-3: #6ee7b7;
-  --emerald-a13: rgba(16,185,129,.13);
-  --coral-4: #f0a184;
-  --sky: #7dd3fc;
-  --sky-a18: rgba(56,189,248,.18);
-  --emerald-a18: rgba(16,185,129,.18);
-  --white-a022: rgba(255,255,255,.022);
-  --black-a45: rgba(0,0,0,.45);
-  --white-a055: rgba(255,255,255,.055);
-  --white-a02: rgba(255,255,255,.02);
-  --coral-a13: rgba(217,119,87,.13);
-  --coral-a16: rgba(217,119,87,.16);
-  --emerald-a14: rgba(16,185,129,.14);
-  --violet-3: #c4b5fd;
-  --violet-a16: rgba(139,92,246,.16);
-  --amber-2: #fcd34d;
-  --amber-a15: rgba(245,158,11,.15);
-  --sky-a14: rgba(56,189,248,.14);
-  --black-a25: rgba(0,0,0,.25);
-  --emerald-a55: rgba(16,185,129,.55);
-  --white-a05: rgba(255,255,255,.05);
-  --white-a015: rgba(255,255,255,.015);
-  --coral-a85: rgba(217,119,87,.85);
-  --violet-a6: rgba(167,139,250,.6);
-  --coral-a3: rgba(217,119,87,.3);
-  --black-a28: rgba(0,0,0,.28);
-  --emerald-a16: rgba(16,185,129,.16);
-  --emerald-a45: rgba(16,185,129,.45);
-  --slate-3: #c9d4e8;
-  --coral-a55: rgba(217,119,87,.55);
-  --coral-a08: rgba(217,119,87,.08);
-  --coral-a6: rgba(217,119,87,.6);
-  --amber-a1: rgba(245,158,11,.1);
-  --amber-a28: rgba(245,158,11,.28);
-  --slate-4: #e8e6e1;
-  --coral-a9: rgba(217,119,87,.9);
-  --violet-a65: rgba(167,139,250,.65);
-  --emerald-a2: rgba(16,185,129,.2);
-  --coral-a65: rgba(217,119,87,.65);
-  --violet-a07: rgba(139,92,246,.07);
-  --coral-a18: rgba(217,119,87,.18);
-  --sky-a13: rgba(56,189,248,.13);
-  --bg-a55: rgba(8,9,13,.55);
-  --sky-a7: rgba(56,189,248,.7);
-  --sky-a15: rgba(56,189,248,.15);
-  --rose-a8: rgba(244,63,94,.8);
-  --rose-a14: rgba(244,63,94,.14);
-  --rose: #fda4af;
-  --emerald-a1: rgba(16,185,129,.1);
-  --black-a3: rgba(0,0,0,.3);
-  --bg-a97: rgba(16,18,24,.97);
+  --coral-a4: color-mix(in srgb, var(--t-lnd-shell-base-coral) 40%, transparent);
+  --sky-a85: color-mix(in srgb, var(--t-lnd-shell-base-sky) 85%, transparent);
+  --ink-solid: var(--t-lnd-shell-ink-solid);
+  --coral-a5: color-mix(in srgb, var(--t-lnd-shell-base-coral) 50%, transparent);
+  --violet-a42: color-mix(in srgb, var(--t-lnd-shell-base-violet) 42%, transparent);
+  --emerald-a3: color-mix(in srgb, var(--t-lnd-shell-base-emerald) 30%, transparent);
+  --white-a035: color-mix(in srgb, var(--t-lnd-shell-base-paper) 3.5%, transparent);
+  --black-2: var(--t-lnd-shell-black-2);
+  --bg-a62: color-mix(in srgb, var(--t-lnd-shell-base-canvas) 62%, transparent);
+  --bg-a86: color-mix(in srgb, var(--t-lnd-shell-base-canvas) 86%, transparent);
+  --black-a35: color-mix(in srgb, var(--t-lnd-shell-base-ink) 35%, transparent);
+  --white-a14: color-mix(in srgb, var(--t-lnd-shell-base-paper) 14%, transparent);
+  --coral-a25: color-mix(in srgb, var(--t-lnd-shell-base-coral) 25%, transparent);
+  --coral-a8: color-mix(in srgb, var(--t-lnd-shell-base-coral) 80%, transparent);
+  --coral-3: var(--t-lnd-shell-coral-3);
+  --coral-a14: color-mix(in srgb, var(--t-lnd-shell-base-coral) 14%, transparent);
+  --coral-a2: color-mix(in srgb, var(--t-lnd-shell-base-coral) 20%, transparent);
+  --coral-a35: color-mix(in srgb, var(--t-lnd-shell-base-coral) 35%, transparent);
+  --white-a25: color-mix(in srgb, var(--t-lnd-shell-base-paper) 25%, transparent);
+  --white-a08: color-mix(in srgb, var(--t-lnd-shell-base-paper) 8%, transparent);
+  --white-a03: color-mix(in srgb, var(--t-lnd-shell-base-paper) 3%, transparent);
+  --emerald-a5: color-mix(in srgb, var(--t-lnd-shell-base-emerald) 50%, transparent);
+  --emerald-a0: color-mix(in srgb, var(--t-lnd-shell-base-emerald) 0%, transparent);
+  --emerald-a4: color-mix(in srgb, var(--t-lnd-shell-base-emerald) 40%, transparent);
+  --emerald-a12: color-mix(in srgb, var(--t-lnd-shell-base-emerald) 12%, transparent);
+  --bg-3: var(--t-lnd-shell-bg-3);
+  --bg-4: var(--t-lnd-shell-bg-4);
+  --white-a12: color-mix(in srgb, var(--t-lnd-shell-base-paper) 12%, transparent);
+  --bg-5: var(--t-lnd-shell-bg-5);
+  --violet-2: var(--t-lnd-shell-violet-2);
+  --violet-a5: color-mix(in srgb, var(--t-lnd-shell-base-violet) 50%, transparent);
+  --violet-a14: color-mix(in srgb, var(--t-lnd-shell-base-violet) 14%, transparent);
+  --slate: var(--t-lnd-shell-slate);
+  --emerald-2: var(--t-lnd-shell-emerald-2);
+  --white-a75: color-mix(in srgb, var(--t-lnd-shell-base-paper) 75%, transparent);
+  --slate-2: var(--t-lnd-shell-slate-2);
+  --emerald-3: var(--t-lnd-shell-emerald-3);
+  --emerald-a13: color-mix(in srgb, var(--t-lnd-shell-base-emerald) 13%, transparent);
+  --coral-4: var(--t-lnd-shell-coral-4);
+  --sky: var(--t-lnd-shell-sky);
+  --sky-a18: color-mix(in srgb, var(--t-lnd-shell-base-sky) 18%, transparent);
+  --emerald-a18: color-mix(in srgb, var(--t-lnd-shell-base-emerald) 18%, transparent);
+  --white-a022: color-mix(in srgb, var(--t-lnd-shell-base-paper) 2.2%, transparent);
+  --black-a45: color-mix(in srgb, var(--t-lnd-shell-base-ink) 45%, transparent);
+  --white-a055: color-mix(in srgb, var(--t-lnd-shell-base-paper) 5.5%, transparent);
+  --white-a02: color-mix(in srgb, var(--t-lnd-shell-base-paper) 2%, transparent);
+  --coral-a13: color-mix(in srgb, var(--t-lnd-shell-base-coral) 13%, transparent);
+  --coral-a16: color-mix(in srgb, var(--t-lnd-shell-base-coral) 16%, transparent);
+  --emerald-a14: color-mix(in srgb, var(--t-lnd-shell-base-emerald) 14%, transparent);
+  --violet-3: var(--t-lnd-shell-violet-3);
+  --violet-a16: color-mix(in srgb, var(--t-lnd-shell-base-violet) 16%, transparent);
+  --amber-2: var(--t-lnd-shell-amber-2);
+  --amber-a15: color-mix(in srgb, var(--t-lnd-shell-base-amber) 15%, transparent);
+  --sky-a14: color-mix(in srgb, var(--t-lnd-shell-base-sky) 14%, transparent);
+  --black-a25: color-mix(in srgb, var(--t-lnd-shell-base-ink) 25%, transparent);
+  --emerald-a55: color-mix(in srgb, var(--t-lnd-shell-base-emerald) 55%, transparent);
+  --white-a05: color-mix(in srgb, var(--t-lnd-shell-base-paper) 5%, transparent);
+  --white-a015: color-mix(in srgb, var(--t-lnd-shell-base-paper) 1.5%, transparent);
+  --coral-a85: color-mix(in srgb, var(--t-lnd-shell-base-coral) 85%, transparent);
+  --violet-a6: color-mix(in srgb, var(--t-lnd-shell-base-iris) 60%, transparent);
+  --coral-a3: color-mix(in srgb, var(--t-lnd-shell-base-coral) 30%, transparent);
+  --black-a28: color-mix(in srgb, var(--t-lnd-shell-base-ink) 28%, transparent);
+  --emerald-a16: color-mix(in srgb, var(--t-lnd-shell-base-emerald) 16%, transparent);
+  --emerald-a45: color-mix(in srgb, var(--t-lnd-shell-base-emerald) 45%, transparent);
+  --slate-3: var(--t-lnd-shell-slate-3);
+  --coral-a55: color-mix(in srgb, var(--t-lnd-shell-base-coral) 55%, transparent);
+  --coral-a08: color-mix(in srgb, var(--t-lnd-shell-base-coral) 8%, transparent);
+  --coral-a6: color-mix(in srgb, var(--t-lnd-shell-base-coral) 60%, transparent);
+  --amber-a1: color-mix(in srgb, var(--t-lnd-shell-base-amber) 10%, transparent);
+  --amber-a28: color-mix(in srgb, var(--t-lnd-shell-base-amber) 28%, transparent);
+  --slate-4: var(--t-lnd-shell-slate-4);
+  --coral-a9: color-mix(in srgb, var(--t-lnd-shell-base-coral) 90%, transparent);
+  --violet-a65: color-mix(in srgb, var(--t-lnd-shell-base-iris) 65%, transparent);
+  --emerald-a2: color-mix(in srgb, var(--t-lnd-shell-base-emerald) 20%, transparent);
+  --coral-a65: color-mix(in srgb, var(--t-lnd-shell-base-coral) 65%, transparent);
+  --violet-a07: color-mix(in srgb, var(--t-lnd-shell-base-violet) 7%, transparent);
+  --coral-a18: color-mix(in srgb, var(--t-lnd-shell-base-coral) 18%, transparent);
+  --sky-a13: color-mix(in srgb, var(--t-lnd-shell-base-sky) 13%, transparent);
+  --bg-a55: color-mix(in srgb, var(--t-lnd-shell-base-code) 55%, transparent);
+  --sky-a7: color-mix(in srgb, var(--t-lnd-shell-base-sky) 70%, transparent);
+  --sky-a15: color-mix(in srgb, var(--t-lnd-shell-base-sky) 15%, transparent);
+  --rose-a8: color-mix(in srgb, var(--t-lnd-shell-base-rose) 80%, transparent);
+  --rose-a14: color-mix(in srgb, var(--t-lnd-shell-base-rose) 14%, transparent);
+  --rose: var(--t-lnd-shell-rose);
+  --emerald-a1: color-mix(in srgb, var(--t-lnd-shell-base-emerald) 10%, transparent);
+  --black-a3: color-mix(in srgb, var(--t-lnd-shell-base-ink) 30%, transparent);
+  --bg-a97: color-mix(in srgb, var(--t-lnd-shell-base-elevated) 97%, transparent);
 
   /* Type slots: the Arabic body face and the mono used for code. */
   --font-arabic: "IBM Plex Sans Arabic", -apple-system, BlinkMacSystemFont, "Segoe UI", Tahoma, sans-serif;
@@ -165,7 +166,7 @@ body {
 
 .skip-link {
   position: fixed; inset-block-start: -60px; inset-inline-start: 16px; z-index: 200;
-  background: var(--on-accent); color: var(--black); padding: 8px 16px; border-radius: 10px;
+  background: var(--on-accent); color: var(--ink-solid); padding: 8px 16px; border-radius: 10px;
   font-weight: 700; text-decoration: none; transition: inset-block-start .25s var(--ease);
 }
 .skip-link:focus { inset-block-start: 14px; }
@@ -526,7 +527,7 @@ p { margin: 0; }
 .lead-form input::placeholder { color: var(--field-placeholder); }
 .lead-form input:disabled, .lead-form button:disabled { opacity: .6; cursor: not-allowed; }
 .btn:disabled, .btn[aria-disabled="true"] { opacity: .6; cursor: not-allowed; transform: none; box-shadow: none; }
-.lead-form input:focus { border-color: var(--sky-a7); box-shadow: 0 0 0 4px var(--sky-a15); }
+.lead-form input:focus { box-shadow: 0 0 0 4px var(--sky-a15); }
 .lead-form input:focus-visible { outline: 2px solid var(--sky-a7); outline-offset: 2px; }
 .lead-form input.invalid { border-color: var(--rose-a8); box-shadow: 0 0 0 4px var(--rose-a14); }
 .form-error { color: var(--rose); font-size: .9rem; font-weight: 700; }

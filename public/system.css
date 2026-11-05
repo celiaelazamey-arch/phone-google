@@ -38,7 +38,7 @@ button {
   cursor: pointer;
 }
 button:disabled {
-  cursor: wait;
+  cursor: not-allowed;
   opacity: 0.95;
 }
 button:focus-visible,
@@ -47,11 +47,11 @@ a:focus-visible {
   outline-offset: 5px;
 }
 button:disabled {
+  cursor: not-allowed;
   opacity: 0.6;
 }
 .mono,
 pre,
-.eyebrow,
 .step-number {
   font-family: var(--t-font-mono);
   direction: ltr;
@@ -88,7 +88,6 @@ pre,
 .brand small {
   display: block;
   font-size: 9px;
-  letter-spacing: 2.5px;
   color: var(--muted);
   font-family: var(--t-font-mono);
   margin-top: 3px;
@@ -226,7 +225,6 @@ pre,
 .side-bottom > .mono {
   font-size: 8px;
   color: var(--t-sys-muted);
-  letter-spacing: 0.5px;
 }
 main {
   padding: 26px 44px 0;
@@ -271,14 +269,6 @@ main {
   gap: 50px;
   padding: 10px 0 38px;
   align-items: center;
-}
-.eyebrow {
-  font-size: 9px;
-  letter-spacing: 1.6px;
-  color: var(--mint);
-  display: flex;
-  align-items: center;
-  gap: 10px;
 }
 .line {
   width: 20px;
@@ -733,7 +723,6 @@ h1 > span {
     11px "JetBrains Mono",
     monospace;
   color: var(--t-sys-muted-strong);
-  letter-spacing: 0.5px;
 }
 .release-card ul {
   padding: 0;
@@ -802,7 +791,6 @@ h1 > span {
 .compatibility strong {
   font-size: 13px;
   color: var(--t-sys-muted-strong);
-  letter-spacing: 1px;
 }
 .compatibility small {
   font-size: 10px;
@@ -828,7 +816,6 @@ h1 > span {
 .step-number {
   font-size: 9px;
   color: var(--t-sys-mint-muted);
-  letter-spacing: 1px;
 }
 .runbook-card h3 {
   font-size: 14px;
@@ -928,7 +915,6 @@ footer {
 footer > .mono {
   margin-inline-start: auto;
   font-size: 8px;
-  letter-spacing: 0.8px;
 }
 .skip-link {
   position: absolute;
@@ -1189,10 +1175,6 @@ footer > .mono {
   }
   .section-heading h2 {
     font-size: 18px;
-  }
-  .eyebrow {
-    font-size: 8px;
-    letter-spacing: 1px;
   }
   .subtle-pill {
     font-size: 8px;

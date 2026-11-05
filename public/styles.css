@@ -1303,7 +1303,7 @@ a.nav-pill {
   margin-bottom: 12px;
 }
 
-.check-card {
+.check-row {
   display: flex;
   align-items: flex-start;
   gap: 10px;
@@ -1315,12 +1315,12 @@ a.nav-pill {
   cursor: pointer;
 }
 
-.check-card strong {
+.check-row strong {
   display: block;
   font-size: 0.83rem;
 }
 
-.check-card span {
+.check-row span {
   font-size: 0.74rem;
   color: var(--text-muted);
 }

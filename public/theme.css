@@ -1,3 +1,4 @@
+/* Hallmark · audit · Celia theme tokens · genre modern-minimal · scope component · the only sheet allowed to hold literal colours (THM-02) */
 /*
  * رموز السمات المشتركة (WP-1.3، UX-003، DEC-049) — المصدر الوحيد للألوان في الصفحات التي تستوردها.
  *
@@ -385,4 +386,58 @@ body {
   --t-lnd-pulse-mid: rgba(16, 185, 129, 0.15);
   --t-lnd-pulse-ring: rgba(16, 185, 129, 0.35);
   --t-lnd-log-text: #cbd5e1;
+
+  /* ورقة صفحة الهبوط (landing.css) — قيمها الحرفية نفسها، مهاجَرة إلى هنا بحسب THM-02. */
+  /* الاسم shell يفصلها عمدًا عن --t-lnd-* المسمّاة أعلاه: تلك تقرأها صفحات الاستوديو وتتغيّر مع السمة، */
+  /* وهذه هوية صفحة الهبوط الواحدة (لا مبدّل سمة على landing.html) فلا يجوز أن تنقلب بـ prefers-color-scheme. */
+  /* الشفافيات المشتقة تُصنع في الورقة بـ color-mix من رموز base أدناه، لا بأرقام. */
+  --t-lnd-shell-bg: #0b0c10;
+  --t-lnd-shell-bg-2: #101218;
+  --t-lnd-shell-text: #f5f4f2;
+  --t-lnd-shell-muted: #a8aebd;
+  --t-lnd-shell-faint: #8790a3;
+  --t-lnd-shell-coral: #d97757;
+  --t-lnd-shell-coral-2: #e88a6b;
+  --t-lnd-shell-emerald: #10b981;
+  --t-lnd-shell-violet: #8b5cf6;
+  --t-lnd-shell-cyan: #38bdf8;
+  --t-lnd-shell-amber: #f59e0b;
+  --t-lnd-shell-on-accent: #fff8f4;
+  --t-lnd-shell-accent-ink-1: #a94a26;
+  --t-lnd-shell-accent-ink-2: #9c4322;
+  --t-lnd-shell-accent-ink-3: #8a3a1d;
+  --t-lnd-shell-field-edge: #767d8f;
+  --t-lnd-shell-field-placeholder: #9aa3b5;
+  --t-lnd-shell-ink-solid: #111;
+  --t-lnd-shell-black-2: #000;
+  --t-lnd-shell-coral-3: #ffb59d;
+  --t-lnd-shell-bg-3: #1b1e28;
+  --t-lnd-shell-bg-4: #0e1016;
+  --t-lnd-shell-bg-5: #050608;
+  --t-lnd-shell-violet-2: #a5b4fc;
+  --t-lnd-shell-slate: #202c33;
+  --t-lnd-shell-emerald-2: #005c4b;
+  --t-lnd-shell-slate-2: #8696a0;
+  --t-lnd-shell-emerald-3: #6ee7b7;
+  --t-lnd-shell-coral-4: #f0a184;
+  --t-lnd-shell-sky: #7dd3fc;
+  --t-lnd-shell-violet-3: #c4b5fd;
+  --t-lnd-shell-amber-2: #fcd34d;
+  --t-lnd-shell-slate-3: #c9d4e8;
+  --t-lnd-shell-slate-4: #e8e6e1;
+  --t-lnd-shell-rose: #fda4af;
+  --t-lnd-shell-grad-1: #f4b79c;
+  --t-lnd-shell-grad-3: #b8552f;
+  --t-lnd-shell-base-paper: #ffffff;
+  --t-lnd-shell-base-coral: #d97757;
+  --t-lnd-shell-base-sky: #38bdf8;
+  --t-lnd-shell-base-violet: #8b5cf6;
+  --t-lnd-shell-base-emerald: #10b981;
+  --t-lnd-shell-base-canvas: #0b0c10;
+  --t-lnd-shell-base-ink: #000000;
+  --t-lnd-shell-base-amber: #f59e0b;
+  --t-lnd-shell-base-iris: #a78bfa;
+  --t-lnd-shell-base-code: #08090d;
+  --t-lnd-shell-base-rose: #f43f5e;
+  --t-lnd-shell-base-elevated: #101218;
 }

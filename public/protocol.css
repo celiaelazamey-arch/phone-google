@@ -90,14 +90,6 @@ button:focus-visible,
   font-size: 0.95rem;
 }
 
-.eyebrow {
-  margin: 0;
-  font-size: 0.78rem;
-  color: var(--accent-gold);
-  letter-spacing: 0.04em;
-  font-weight: 700;
-}
-
 .topbar h1 {
   margin: 0.15rem 0 0;
   font-size: 1.2rem;

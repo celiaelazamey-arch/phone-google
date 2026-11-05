@@ -1,8 +1,10 @@
 /* مساحة الوكيل — M1. الرمز يبقى في sessionStorage لهذه التبويبة فقط. */
 import {
   STEP_NODE_LABELS,
+  STEP_TREE_EDGE_LABELS,
   STAGE_NODE_LABELS,
   budgetRatios,
+  buildStepTree,
   formatMs,
   nowLabel,
   stageNodes,
@@ -246,55 +248,130 @@ function rememberStep(step) {
   }
 }
 
-function buildStepItem(step, position) {
+/* U4 (L2): شجرة الخطة مشتقة من سجل `agent_steps` وحده عبر `buildStepTree` (بوابة DEC-030).
+ * العمود الفقري يبقى `li[data-index][data-node]` كما ترهنه e2e/agent.spec.js، وأبناء استدعاءات
+ * الأداة يحملون `data-tool-for` بدل `data-index` كي لا يطابق المحدد نفسه عقدتين. */
+function buildToolItem(node) {
   const item = document.createElement('li');
-  item.dataset.index = String(step.index);
-  const node = stepNodeStatus(step, { runStatus: state.runStatus, isLast: position === state.steps.length - 1 });
-  item.dataset.node = node;
+  item.className = 'tool-node';
+  item.dataset.toolFor = String(node.index);
+  item.dataset.node = node.status;
+  item.dataset.depth = '1';
   const head = document.createElement('div');
   head.className = 'head';
   const title = document.createElement('b');
-  title.textContent = `${step.index}. ${step.title}`;
+  title.textContent = node.title;
+  const edge = document.createElement('span');
+  edge.className = 'kind';
+  edge.textContent = STEP_TREE_EDGE_LABELS[node.edge] || '';
+  head.append(title, edge);
+  item.append(head);
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  const pill = document.createElement('span');
+  pill.className = `pill node-${node.status}`;
+  pill.textContent = STEP_NODE_LABELS[node.status] || node.status;
+  meta.append(pill);
+  if (node.toolRunId) {
+    const ref = document.createElement('span');
+    ref.className = 'time';
+    ref.textContent = `سجل الاستدعاء: ${node.toolRunId}`;
+    meta.append(ref);
+  }
+  item.append(meta);
+  return item;
+}
+
+function buildStepItem(node, position, total) {
+  const item = document.createElement('li');
+  item.dataset.index = String(node.index);
+  item.dataset.node = node.status;
+  item.dataset.depth = '0';
+  if (node.dependsOn !== null) item.dataset.depends = String(node.dependsOn);
+  const head = document.createElement('div');
+  head.className = 'head';
+  const title = document.createElement('b');
+  title.textContent = `${node.index}. ${node.title}`;
   const kind = document.createElement('span');
   kind.className = 'kind';
-  kind.textContent = step.kind;
+  kind.textContent = node.kind || '';
   head.append(title, kind);
   item.append(head);
-  if (step.summary) {
+  if (node.summary) {
     const summary = document.createElement('p');
     summary.className = 'summary';
-    summary.textContent = step.summary;
+    summary.textContent = node.summary;
     item.append(summary);
   }
   const meta = document.createElement('div');
   meta.className = 'meta';
   const pill = document.createElement('span');
-  pill.className = `pill node-${node}`;
-  pill.textContent = STEP_NODE_LABELS[node] || node;
-  const time = document.createElement('span');
-  time.className = 'time';
-  const measured = typeof step.durationMs === 'number';
-  time.textContent = `الزمن: ${formatMs(step.durationMs)}`;
-  time.title = measured
-    ? `مُثبَت من استدعاء الأداة ${step.toolRunId || ''}`.trim()
-    : step.kind === 'act'
-      ? `لا مدة مُثبَتة بعد (حالة الاستدعاء: ${step.toolRunStatus || 'لم يبدأ'})`
+  pill.className = `pill node-${node.status}`;
+  pill.textContent = STEP_NODE_LABELS[node.status] || node.status;
+  meta.append(pill);
+  if (node.dependsOn !== null) {
+    const dep = document.createElement('span');
+    dep.className = 'dep';
+    dep.textContent = `تعتمد على ${node.dependsOn} من ${total - 1}`;
+    dep.title = 'التبعية مشتقة من ترتيب التسجيل في agent_steps، لا من مخطط أعلنه المخطط';
+    meta.append(dep);
+  }
+  {
+    // الصدق نفسه الذي كان قبل الشجرة: لا مدة مُثبَتة ⇒ «—» لا رقم مخمّن.
+    // يبقى هذا السطر على عقدة الخطوة دائمًا (e2e/agent.spec.js:351 و369 و371 ترهنه في الأب).
+    const time = document.createElement('span');
+    time.className = 'time';
+    time.textContent = `الزمن: ${formatMs(node.durationMs)}`;
+    time.title = node.kind === 'act'
+      ? `لا مدة مُثبَتة بعد (حالة الاستدعاء: ${node.toolRunStatus || 'لم يبدأ'})`
       : 'المخزن يسجّل وقت كتابة هذه الخطوة لا مدتها';
-  meta.append(pill, time);
-  if (step.toolName && step.kind !== 'act') {
+    meta.append(time);
+  }
+  if (node.toolName && node.kind !== 'act') {
     const tool = document.createElement('span');
-    tool.textContent = `الأداة: ${step.toolName}`;
+    tool.textContent = `الأداة: ${node.toolName}`;
     meta.append(tool);
   }
   item.append(meta);
   return item;
 }
 
+/* سطر الأدلة تحت الشجرة: كم خطوة مسجّلة رُسمت، وكم استدعاء أداة بسجل، وما لم يُرسم ولماذا. */
+function setStepsSummary(tree) {
+  const line = $('steps-summary');
+  if (!line) return;
+  const parts = [`${tree.steps} خطوة مسجّلة في agent_steps`];
+  if (tree.toolRuns) parts.push(`${tree.toolRuns} استدعاء أداة بسجل`);
+  if (tree.dropped.length) {
+    const reasons = [...new Set(tree.dropped.map((d) => d.reason))].join('، ');
+    parts.push(`${tree.dropped.length} لم تُرسم (${reasons})`);
+  }
+  parts.push('التبعية هي ترتيب التسجيل');
+  line.textContent = `${parts.join(' · ')}.`;
+}
+
 function rerenderStepNodes() {
   const list = $('steps');
-  if (!list || !state.steps.length) return;
+  if (!list) return;
+  const tree = buildStepTree(state.steps, { runStatus: state.runStatus });
   list.innerHTML = '';
-  state.steps.forEach((step, position) => list.append(buildStepItem(step, position)));
+  setStepsSummary(tree);
+  if (!tree.nodes.length) {
+    list.innerHTML = '<li class="empty">لم تُسجَّل خطوة في agent_steps بعد، فلا تُرسم شجرة.</li>';
+    return;
+  }
+  const spine = tree.nodes.filter((node) => node.depth === 0);
+  spine.forEach((node, position) => {
+    const item = buildStepItem(node, position, spine.length);
+    const children = tree.nodes.filter((child) => child.depth === 1 && child.dependsOn === node.index);
+    if (children.length) {
+      const branch = document.createElement('ul');
+      branch.className = 'branch';
+      for (const child of children) branch.append(buildToolItem(child));
+      item.append(branch);
+    }
+    list.append(item);
+  });
 }
 
 function renderStep(step) {
@@ -317,6 +394,7 @@ function applySettledStep(settledStep) {
 function emptySteps() {
   state.steps = [];
   $('steps').innerHTML = '<li class="empty">لم تبدأ أي خطوة بعد.</li>';
+  setStepsSummary(buildStepTree([], { runStatus: null }));
   renderTree(null, null);
   renderNow(null);
   setUsage({}, null);

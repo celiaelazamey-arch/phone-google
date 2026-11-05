@@ -123,7 +123,7 @@
         <h2 id="history-title">سجل المحادثات</h2>
         <span id="history-badge" class="pill idle">…</span>
       </div>
-      <p class="hint">الخيوط كما هي في <code>agent_threads</code> ورسائلها كما هي في <code>agent_messages</code> — لا يُعرض ما لا سجل له. القائمة آخر <span id="history-limit">20</span> خيطًا بترتيب آخر تحديث (حدّ الخادم)، والتصفية محلية في ما حُمِّل فقط.</p>
+      <p class="hint">الخيوط كما هي في <code>agent_threads</code> ورسائلها كما هي في <code>agent_messages</code>، لا يُعرض ما لا سجل له. القائمة آخر <span id="history-limit">20</span> خيطًا بترتيب آخر تحديث (حدّ الخادم)، والتصفية محلية في ما حُمِّل فقط.</p>
       <label class="field">
         <span>تصفية بالعنوان أو بادئة المعرّف</span>
         <input id="history-filter" type="search" maxlength="80" autocomplete="off" placeholder="اكتب جزءًا من العنوان…">
@@ -141,7 +141,7 @@
         <h2 id="inbox-title">صندوق المهام</h2>
         <span id="inbox-badge" class="pill idle">…</span>
       </div>
-      <p class="hint">مشتق من طابور الانتباه نفسه (<code>GET /api/agent/attention</code>): كل بند يحمل معرّف دليله، والترتيب والشدّة كما رتّبهما الخادم — لا تُخفَّف شدة ولا يُسقط بند. هذه قراءة: <span id="inbox-flags">لا إرسال ولا تتبع قراءة</span>.</p>
+      <p class="hint">مشتق من طابور الانتباه نفسه (<code>GET /api/agent/attention</code>): كل بند يحمل معرّف دليله، والترتيب والشدّة كما رتّبهما الخادم، لا تُخفَّف شدة ولا يُسقط بند. هذه قراءة: <span id="inbox-flags">لا إرسال ولا تتبع قراءة</span>.</p>
       <ul id="inbox-list" class="inbox" aria-label="صندوق المهام (قائمة قابلة للتمرير)" tabindex="0">
         <li class="empty">اتصل لعرض ما ينتظرك.</li>
       </ul>
@@ -168,7 +168,7 @@
       <ol id="plan-tree" class="tree" aria-label="شجرة الخطة">
         <li class="empty">لا تظهر شجرة الخطة إلا بعد بدء تشغيل.</li>
       </ol>
-      <p class="hint tree-hint" id="steps-summary">خطوات التنفيذ تظهر أدناه مع زمن كل استدعاء أداة كما أثبته المخزن؛ «…» تعني أن لا قياس (قرار، تسليم، أو استدعاء لم يُحسم). التكلفة تُسجَّل على مستوى التشغيل لا لكل خطوة.</p>
+      <p class="hint tree-hint" id="steps-summary">شجرة التنفيذ مشتقة من سجل agent_steps: كل خطوة مسجّلة عقدة، وتبعيتها هي ترتيب التسجيل، واستدعاء الأداة ابن لعقدته حين يوجد سجله. ما بلا سجل لا يُرسم.</p>
       <ol id="steps" class="steps" aria-live="polite" aria-label="خطوات التنفيذ (قائمة قابلة للتمرير)" tabindex="0"></ol>
       <pre id="delivery" class="delivery" hidden></pre>
 

@@ -6,6 +6,8 @@
  *        duration that is a multiple of the clock tick.
  * TRC-03 detail()/GET /runs/:id expose `now` and `toolRunStatus`; the SSE snapshot carries the same `now`.
  * TRC-04 public/agent-trace.js (the page's pure logic): node status, now label, budget ratios, stage nodes.
+ * TRC-05 buildStepTree (U4/L2): the plan tree is derived from recorded agent_steps only — a step with no record
+ *        is dropped, never drawn, and a tool-run child exists only when its own record does.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -24,12 +26,14 @@ import { createMemoryPool } from '../src/memory-pool.js';
 import { createFakeCalendar, createTempStore } from './support/agent-fixtures.js';
 import {
   budgetRatios,
+  buildStepTree,
   formatMs,
   nowLabel,
   stageNodes,
   stepNodeStatus,
   summarizeStepNodes,
-  STEP_NODE
+  STEP_NODE,
+  STEP_TREE_EDGE
 } from '../public/agent-trace.js';
 
 const T0 = Date.parse('2026-10-29T10:00:00.000Z');
@@ -319,4 +323,81 @@ test('TRC-04 public/agent-trace.js derives node states, the now line and budget 
   assert.equal(unverified[3].status, 'done');
   assert.equal(unverified[3].note, 'الحكم: UNKNOWN', 'a non-PASS verdict stays visible on the node');
   assert.deepEqual(stageNodes(null, null), []);
+});
+
+test('TRC-05 buildStepTree draws only what agent_steps recorded (U4)', () => {
+  const recorded = [
+    { id: 's3', index: 3, kind: 'observe', title: 'قراءة النتيجة', summary: null, toolName: null },
+    { id: 's1', index: 1, kind: 'decide', title: 'قرار السياسة', summary: null, toolName: null },
+    {
+      id: 's2', index: 2, kind: 'act', title: 'استدعاء الحالة', toolName: 'celia_status',
+      toolRunId: 'tr-1', toolRunStatus: 'succeeded', durationMs: 1200
+    }
+  ];
+  const tree = buildStepTree(recorded, { runStatus: 'succeeded' });
+
+  // العمود الفقري هو ترتيب التسجيل، لا ترتيب الوارد
+  assert.deepEqual(tree.nodes.filter((n) => n.depth === 0).map((n) => n.index), [1, 2, 3]);
+  assert.deepEqual([tree.steps, tree.drawn, tree.toolRuns, tree.dropped.length], [3, 3, 1, 0]);
+
+  // التبعية مشتقة من السجل: الأولى بلا أب، وكل تالية تعتمد على السابقة المسجّلة
+  const [first, second, third] = tree.nodes.filter((n) => n.depth === 0);
+  assert.equal(first.dependsOn, null);
+  assert.equal(first.edge, null);
+  assert.equal(second.dependsOn, 1);
+  assert.equal(second.edge, STEP_TREE_EDGE.sequence);
+  assert.equal(third.dependsOn, 2);
+
+  // الحالة لكل خطوة مشتقة من stepNodeStatus نفسها (لا جدول موازٍ)
+  assert.equal(second.status, STEP_NODE.done, 'act + toolRunStatus succeeded');
+  assert.equal(second.toolRecorded, true);
+  assert.equal(first.status, STEP_NODE.recorded, 'a decide step carries no invented status');
+
+  // ابن استدعاء الأداة: يوجد بسجله، ويحمل مدته المُثبَتة، ولا يُختلق له kind
+  const child = tree.nodes.find((n) => n.depth === 1);
+  assert.equal(child.role, 'tool_run');
+  assert.equal(child.edge, STEP_TREE_EDGE.toolRun);
+  assert.equal(child.dependsOn, 2);
+  assert.equal(child.kind, null, 'the child has no recorded kind, so it claims none');
+  assert.equal(child.title, 'celia_status');
+  assert.equal(child.summary, null, 'the measured duration stays on the step node; the child does not duplicate it');
+  assert.equal(child.durationMs, 1200, 'but it carries the recorded number');
+  assert.equal(child.status, STEP_NODE.done);
+
+  // طفرة سلبية: خطوة act بلا سجل استدعاء ⇒ لا ابن (لا عقدة مخمّنة)
+  const bare = buildStepTree([{ index: 1, kind: 'act', title: 'نية بلا سجل', toolName: 'celia_status' }], { runStatus: 'succeeded' });
+  assert.equal(bare.nodes.length, 1, 'no tool-run node is invented');
+  assert.equal(bare.nodes[0].toolRecorded, false);
+  assert.equal(bare.nodes[0].durationMs, null);
+  assert.equal(bare.toolRuns, 0);
+
+  // طفرة سلبية: صفوف ناقصة تُدرج في dropped بأسبابها ولا تُرسم
+  const dirty = buildStepTree(
+    [{ index: 1, kind: 'decide', title: 'مسجّلة' }, { kind: 'act', title: 'بلا فهرس' }, { index: 2, kind: 'act' }, null, 'x'],
+    {}
+  );
+  assert.equal(dirty.nodes.length, 1, 'only the recorded step is drawn');
+  assert.deepEqual(dirty.dropped.map((d) => d.reason).sort(), ['no_index', 'no_title', 'not_a_step', 'not_a_step']);
+  assert.equal(dirty.steps, 1);
+
+  // تكرار الفهرس: عقدة واحدة، وآخر كتابة تفوز (كما في rememberStep)
+  const dup = buildStepTree(
+    [{ index: 1, kind: 'act', title: 'قبل' }, { index: 1, kind: 'act', title: 'بعد', toolRunStatus: 'failed' }],
+    {}
+  );
+  assert.equal(dup.nodes.filter((n) => n.depth === 0).length, 1);
+  assert.equal(dup.nodes[0].title, 'بعد');
+  assert.equal(dup.nodes[0].status, STEP_NODE.failed);
+
+  // اشتقاق «بانتظار» القائم يبقى كما هو: الأخيرة فقط تحت waiting_approval
+  const waiting = buildStepTree(
+    [{ index: 1, kind: 'act', title: 'أ', toolRunStatus: 'succeeded' }, { index: 2, kind: 'act', title: 'ب' }],
+    { runStatus: 'waiting_approval' }
+  );
+  assert.equal(waiting.nodes.find((n) => n.depth === 0 && n.index === 2).status, STEP_NODE.waiting);
+  assert.equal(waiting.nodes.find((n) => n.depth === 0 && n.index === 1).status, STEP_NODE.done);
+
+  // مدخلات غير مصفوفة ⇒ شجرة فارغة صادقة، لا استثناء
+  const empty = buildStepTree(null, {});
+  assert.deepEqual([empty.nodes.length, empty.steps, empty.dropped.length], [0, 0, 0]);
 });

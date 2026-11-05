@@ -22,6 +22,9 @@
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="preload" href="./fonts/ibm-plex-sans-arabic-arabic-400-normal.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="./fonts/ibm-plex-sans-arabic-arabic-700-normal.woff2" as="font" type="font/woff2" crossorigin />
+  <!-- L2/U9: landing.css صار يقرأ رموز --t-lnd-shell-* من theme.css (THM-02)، فالورقة تُحمَّل أولًا.
+       بلا مبدّل سمة هنا: هوية واحدة بحسب DEC-080، وtheme.css يسبق fonts.css منعًا للوميض (THM-04). -->
+  <link rel="stylesheet" href="./theme.css" />
   <link rel="stylesheet" href="./fonts.css" />
   <link rel="stylesheet" href="./landing.css" />
 </head>
