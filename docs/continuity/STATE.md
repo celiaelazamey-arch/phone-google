@@ -1,10 +1,10 @@
 # الحالة الحالية — ابدأ من هنا
 
-> **حفظ التاريخ بلا حذف (`DEC-052` / `CONT-004`):** هذه نافذة الاستئناف النشطة؛ السجل التراكمي الكامل حتى ما بعد PR #84 (`main@738d832` / `9f6f8b2` — 983 سطرًا / 142,150 بايت) محفوظ حرفيًا في **[STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md)** وبصمته محروسة بـ`R0-02`، وأقسام 31 أكتوبر–3 نوفمبر المنقولة عند `6b4bb2d` و`a1d3f7b` و`0dff3bd` و`7051fd0` و`3bd53d6` و`50f2171` و`09c8d4c` (كتلتان: `ي` و`ك`) في **[STATE-ARCHIVE-2026-11.md](STATE-ARCHIVE-2026-11.md)**. القراءة السريعة المشتقة: **[NOW.md](NOW.md)** (`npm run now`).
+> **حفظ التاريخ بلا حذف (`DEC-052` / `CONT-004`):** هذه نافذة الاستئناف النشطة؛ السجل التراكمي الكامل حتى ما بعد PR #84 (`main@738d832` / `9f6f8b2` — 983 سطرًا / 142,150 بايت) محفوظ حرفيًا في **[STATE-ARCHIVE-2026-10.md](STATE-ARCHIVE-2026-10.md)** وبصمته محروسة بـ`R0-02`، وأقسام 31 أكتوبر–3 نوفمبر المنقولة (كتلتان: `ي` و`ك`، وأساس كل كتلة مثبّت فيها ومحروس بـ`SA-01`) في **[STATE-ARCHIVE-2026-11.md](STATE-ARCHIVE-2026-11.md)**. القراءة السريعة المشتقة: **[NOW.md](NOW.md)** (`npm run now`).
 
 **آخر مراجعة:** 5 نوفمبر 2026
-**نوع الجلسة الحالية:** L1 — لوحات الواجهة الثلاث (U2 سجل المحادثات · U5 صندوق المهام · U3 معاينة المخرجات) — **مدموجة في `main@22d49a3` (PR #171)**. كود واختبارات: صفر مسار `/api` جديد، صفر منطق وكيل أو مخزن أو مخرجات، صفر ترحيل، صفر شبكة، صفر اعتمادية جديدة؛ والتغيير في `src/` محصور في `src/celia-ui.js` بتقديم أصل ثابت واحد (`/agent-console.js`): مسار صريح فرضه `404` متصفحِي، وتحديد معدل بأدوات المستودع (سقف 600/دقيقة)، وقراءة الوحدة مرة عند إنشاء الموجه مع بصمة قوية و`304` — حراسها `L1-17…L1-19` — فرضها **مانع بنيوي**: ‏`--squash --admin` رُفض أولًا برسالة CodeQL عن تنبيه أمني مانع، والاستعلام لا يتعرّف على وسيط المستودع نفسه فبقي التنبيه رغم `429` مقاس. التفصيل وقياساته في [سجل الجلسة](sessions/2026-11-05-l1-console-panels.md). والجلسة التالية `L2` (‏`U9` هجرة أوراق CSS الست ثم `U4` عرض الخطة) بحسب [الخطة](../plan-live-operation-ui-2026.md). سبقتها D1 في `main@9fbad1e` (#169) والخطة في `main@b115f77` (#170). `EXTERNAL GATE CLOSED` — `NETWORK=DENY` حتى موافقة E1 المحددة.
-**السجل:** [L1 لوحات الواجهة](sessions/2026-11-05-l1-console-panels.md) · [D1 LOCAL SIMULATED_PASS](sessions/2026-11-05-d1-local-simulated-pass.md) · [مزامنة Apps Script](sessions/2026-11-04-goog-006-apps-script-sync.md) · [مزامنة حالة الدمج](sessions/2026-11-04-merge-state-sync.md) · **PR:** [#171](https://github.com/celiaelazamey-arch/phone-google/pull/171) **MERGED** (`22d49a3` في `2026-11-05T12:09:36Z` بـ`--squash --admin` **بأمر المالك الصريح** — **تجاوز سابع مسجَّل** في سلسلة #159·#162·#164·#169·#170، وصفر مراجعات بشرية (المؤلف هو المتعاون الوحيد)؛ ما تُجاوز هو شرط المراجعة وحده؛ الفحوص كلها خضراء على الرأس `e48e413` — ‏`CodeQL: pass` بصفر تنبيه جديد و`RTL dashboard: pass`) · [#170](https://github.com/celiaelazamey-arch/phone-google/pull/170) **MERGED** (`b115f77`) · [#169](https://github.com/celiaelazamey-arch/phone-google/pull/169) **MERGED** (`9fbad1e`) · **الفرع:** `arena/b0bfdd05-phone-google` · **الأساس:** `22d49a3` (=origin/main) · `v0.3.0` حي · `281→284` ملفًا · اختبارات المتصفح الثمانية **حُكمت من CI لا محليًا** (لا متصفحات في الرمل؛ سقطت `RTL dashboard` ثلاث مرات بأسباب مُسمّاة ثم اخضرّت) · **الرابطان أُعيد نشرهما من `22d49a3`:** [Pages](https://celiaelazamey-arch.github.io/phone-google/) ← `42024781712` **success** · [Edge](https://celia-phone-google.celiaelazamey.workers.dev) ← `42025035624` **success** · لا مراجعة بشرية موثقة، ولا مراقبة 60 دقيقة، ولا إطلاق عام.
+**نوع الجلسة الحالية:** L2 — الصدق البصري (`U9` هجرة الأوراق + `DSN-002` صفر ساكن + `U4` عرض الخطة المشتق) — **منفَّذة ومتحقَّقة محليًا على `arena/e055d6db-phone-google` (`aa3a024` + `50ecb8a`)، لم تُدمج بعد**: ‏`landing.css` يقرأ `--t-lnd-shell-*` حصرًا (112 إعلانًا · 49 رمزًا · **0 اختلاف لوني**)، و`THM-02` **فارغة** مع حارس `THM-07` جديد · الدين الساكن **45 ⇒ 0 FAIL بصفر كبت** (`floor` لا تُعفى أبدًا) · شجرة الخطة من `agent_steps` وحدها: التبعية ترتيب التسجيل، وابن الأداة بسجله فقط، وما بلا سجل في `dropped` ولا يُرسم. سبقتها L1 في `main@22d49a3` (#171، **تجاوز سابع**) وتفصيلها في سجلّها المرتبط أدناه، وقبلها D1 `9fbad1e` (#169) والخطة `b115f77` (#170). `NETWORK=DENY` حتى موافقة E1 المحددة.
+**السجل:** [L2 الصدق البصري](sessions/2026-11-05-l2-visual-honesty.md) · [L1 لوحات الواجهة](sessions/2026-11-05-l1-console-panels.md) · [D1 LOCAL SIMULATED_PASS](sessions/2026-11-05-d1-local-simulated-pass.md) · [مزامنة Apps Script](sessions/2026-11-04-goog-006-apps-script-sync.md) · [مزامنة حالة الدمج](sessions/2026-11-04-merge-state-sync.md) · **PR:** [#171](https://github.com/celiaelazamey-arch/phone-google/pull/171) **MERGED** (`22d49a3` في `2026-11-05T12:09:36Z` بـ`--squash --admin` **بأمر المالك الصريح** — **تجاوز سابع مسجَّل** في سلسلة #159·#162·#164·#169·#170، وصفر مراجعات بشرية (المؤلف هو المتعاون الوحيد)؛ ما تُجاوز هو شرط المراجعة وحده؛ الفحوص خضراء على الرأس `e48e413` — ‏`CodeQL: pass` بصفر تنبيه جديد) · [#170](https://github.com/celiaelazamey-arch/phone-google/pull/170) **MERGED** (`b115f77`) · [#169](https://github.com/celiaelazamey-arch/phone-google/pull/169) **MERGED** (`9fbad1e`) · **الفرع:** `arena/e055d6db-phone-google` (وسابقه `arena/b0bfdd05-phone-google` = `428cced`) · **الأساس:** `22d49a3` (=origin/main) · `v0.3.0` حي · `281→284` ملفًا · اختبارات المتصفح **حُكمت من CI لا محليًا** (لا متصفحات في الرمل؛ تفصيلها في سجلّ L1) · **الرابطان أُعيد نشرهما من `22d49a3`:** [Pages](https://celiaelazamey-arch.github.io/phone-google/) ← `42024781712` **success** · [Edge](https://celia-phone-google.celiaelazamey.workers.dev) ← `42025035624` **success** · لا مراجعة بشرية موثقة، ولا مراقبة 60 دقيقة، ولا إطلاق عام.
 
 ## 4 نوفمبر 2026 — `GOOG-006`: `apps-script:sync` مبني ومختبَر (DEC-142)
 
@@ -68,23 +68,24 @@
 
 ## 0. خط الأساس والدرجة
 
-- **الإصدار:** `v0.2.1` · `schema=1` · Node `>=22`. **لا ترقية إصدار ولا ترحيل جديد في هذه الشريحة.**
-- **الجودة (بعد هذه الدفعة):** `npm test` **1149 اختبارًا / 1133 ناجحًا / 0 فشل / 16 skipped**، و`check` 236 ملفًا؛ والبوابات المرافقة ناجحة.
+- **الإصدار:** `v0.3.0` حي · `schema=1` · Node `>=22`. **لا ترقية إصدار ولا ترحيل جديد في هذه الشريحة.**
+- **الجودة (بعد هذه الدفعة):** `npm test` **1439 / 1423 / 0 / 16** · `check` **284** ملفًا · التصميم الساكن **0 FAIL** بصفر كبت · البصري **4 FAIL** على 13 صفحة (لم يُعَد، يحتاج متصفحًا).
 - **السلّم:** S1/A4 ✅ · S5: C1-a ✅ · C1-b ✅ · C2-a ✅ · **C2-b (`web.search`) مؤجّلة** بقرار المالك · C3/C4 موقوفة على بيئة بلا Chromium.
 
 ## 1. حدود هذه الدفعة
 
-1. **لا تغيير سلوك مرئي بلا تحقق بصري:** القيم المنقولة مطابقة بايتًا لقيمها الأصلية.
-2. **`theme.css` وحده يحمل اللون الحرفي**؛ و`landing.css`/`fonts.css` خارج البوابة بقائمة ratchet تنكمش فقط (THM-02).
-3. **الملفات المولّدة لا تُحرَّر مباشرة** (`computer-permissions.html`، `whatsapp-ui.generated.js`).
-4. **الإيجابيات الكاذبة مسجّلة لا معمَّمة** (قواعد 67 و49 و73).
+1. **لا تغيير مرئي بلا دليل:** الهجرة طابقت كل لون بايتًا، وإصلاحات التصميم مشتقة من قواعد الأداة لا من ذوق.
+2. **`theme.css` وحده يحمل اللون الحرفي**؛ و`THM-02` **فارغة** وتنكمش فقط، و`THM-07` يحرس المراجع المعلّقة، وإعادة أي اسم تُبرَّر في DECISIONS.
+3. **المولَّد لا يُحرَّر مباشرة:** `computer-permissions.html` · `whatsapp-ui.generated.js` · `system.manifest.json` · `agent-console-panels.html` · `NOW.md` — تُعاد توليدتها من مصادرها.
+4. **الإيجابيات الكاذبة مسجّلة لا معمَّمة** (67 و49 و73)، والإعفاء مرفوض (`floor`).
 
 ## 2. الاستئناف والفحوص
 
-1. ابقَ على فرع الجلسة المعيَّن؛ اقرأ [سجل الهجرة](sessions/2026-10-31-color-tokens-migration.md) قبل تعديل أي `public/*.css`.
-2. **قاعدة التسمية:** لا تُسمِّ رمزًا بكلمة لون؛ الاسم يصف الدور (`--t-sheen`). والشفافية بـ`color-mix` من رمز لا برقم.
+1. ابقَ على فرع الجلسة؛ اقرأ [سجل الهجرة](sessions/2026-10-31-color-tokens-migration.md) و[سجل L2](sessions/2026-11-05-l2-visual-honesty.md) قبل تعديل أي `public/*.css`.
+2. **قاعدة التسمية:** لا تُسمِّ رمزًا بكلمة لون؛ الاسم يصف الدور (`--t-lnd-shell-base-paper`)، والشفافية بـ`color-mix` من رمز لا برقم.
 3. صفحة تستورد `theme.css` بلا مبدّل ⇒ تُضاف إلى `SINGLE_IDENTITY` في `test/theme-tokens.test.js` (THM-04).
-4. بعد تعديل `theme.css` أو `styles.css`: `npm run build:edge-ui` وإلا فشل `VER-07`.
+4. بعد `theme.css`/`whatsapp.css`: `build:edge-ui` ثم `build:manifest`؛ وبعد `agent.{html,js,css}`: `console:panels`؛ وبعد `computer-policy.js`: `computer:permissions`.
+5. **قياس التصميم:** `node vendor/hallmark/scripts/sloplint.mjs public --json` (لا `design:audit`).
 
 ```sh
 git branch --show-current && git status --short && git log -3 --oneline
