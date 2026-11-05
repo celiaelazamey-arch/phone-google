@@ -12,11 +12,9 @@ import {
 // L1 (U2/U5/U3): لوحات سجل المحادثات وصندوق المهام ومعاينة المخرجات — الدوال نقية
 // في `agent-console.js` فتُختبر في Node، وهنا الربط بالـDOM والمسارات القائمة فقط.
 import {
-  CONSOLE_VERSION,
   PREVIEW_REFUSALS,
   THREAD_LIST_LIMIT,
   escapeHtml as escapeConsole,
-  groupAttention,
   previewKind,
   renderCsvPreview,
   renderInbox,
