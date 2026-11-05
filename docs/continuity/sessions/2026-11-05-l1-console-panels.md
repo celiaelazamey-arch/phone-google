@@ -104,3 +104,38 @@
 - **ثم `L2` (متاح بلا قرار):** هجرة أوراق CSS الست (`styles/system/protocol/computer/deploy/landing`) إلى رموز `theme.css` وإنزال `DSN-002` من 43 ساكن/4 حيّ إلى 0/0، وعرض الخطة المشتق من `agent_steps` (`U4`) — مع احترام قائمة `THM-02` التي تنكمش فقط و`npm run build:edge-ui` بعد أي تعديل في `theme.css` أو `styles.css`.
 - **المحجوب بقرار مالك (لا يُفتح من هنا):** `L3` يحتاج `GOV-001` (مفتاح + ميزانية) · `L4` يحتاج `HOST-003` · `L5` يحتاج لوحات Meta/Google · `L6` يحتاج قرارات `DES-002` الثلاثة وقرار `AGENT-004` · `L7` يحتاج `REL-001`/`REL-004`.
 - **تأكيد السجلات:** هذا السجل + `STATE.md` محدّثان + `NOW.md` مولّد؛ `open_tasks` يبقى **66** — لا موجة جديدة ولا مهمة مفتوحة أو مغلقة.
+
+## ما بعد الدمج: ‏`main@22d49a3` والرابطان
+
+**الدمج (من GitHub لا من السجل):** ‏`PR #171` **MERGED** في `2026-11-05T12:09:36Z` بواسطة `celiaelazamey-arch`، ‏`mergeCommit=22d49a3`، الرأس `e48e413`، ‏7 commits. الشكل `--squash --admin` **بأمر المالك الصريح في هذه الجلسة** («Please merge the pull request») — **تجاوز سابع مسجَّل** في سلسلة #159 · #162 (الثالث) · #164 (الرابع) · #169 (الخامس) · #170 (السادس)، و`reviewDecision = REVIEW_REQUIRED` و`mergeStateStatus = BLOCKED` لأن المؤلف هو المتعاون الوحيد وGitHub يرفض الموافقة الذاتية. **ما تُجاوِز هو شرط المراجعة البشرية وحده**: كل الفحوص كانت خضراء على الرأس قبل الدمج.
+
+**الرسالة الحرفية للمانع البنيوي (محاولة الدمج الأولى على `be1532a`):**
+
+```
+Message: Repository rule violations found
+
+CodeQL has detected 1 security relevant alert blocking this code from being merged.
+```
+
+‏`--admin` لا يرفعها: الـruleset يجعل `bypass_mode=always` لحساب المالك لا لتكامل CI. هذا هو الدليل على أن تنبيه CodeQL الأمني هنا **مانع دمج** لا فحص أحمر يُتجاوز.
+
+**فحوص الرأس `e48e413` قبل الدمج:** ‏`CodeQL: pass` — «No new alerts in code changed by this pull request»، صفر annotation · `Analyze JavaScript/TypeScript: pass` · `RTL dashboard · desktop / mobile / accessibility: pass` · `Node 22` و`Node 24 · tests & failure recovery: pass` (بوابة handoff اجتيزت) · `MySQL 8.4 · persistence / N−1 / backup restore: pass` · `Node 24 container smoke: pass` · `Ubuntu-Slim governance smoke: pass` · `Ubuntu 26.04 canary: pass` · `Python 3.11 Spider: pass` · والمتخطّيان بالتصميم `Optional external provider availability probes` (‏`NETWORK=DENY`) و`audit`.
+
+**النشر من `main@22d49a3` — بتشغيلاته لا بوصفه:**
+
+| التشغيلة | الوظيفة | النتيجة |
+|---|---|---|
+| `42024781712` | `Deploy (GitHub Pages)` | **success** ⇒ [https://celiaelazamey-arch.github.io/phone-google/](https://celiaelazamey-arch.github.io/phone-google/) |
+| `42025035624` | `Deploy (Cloudflare Edge)` | **success** ⇒ [https://celia-phone-google.celiaelazamey.workers.dev](https://celia-phone-google.celiaelazamey.workers.dev) |
+| `42025035594` | `Render full backend (free) — deploy & verify` | **success** |
+| `42024781786` | `Celia quality & resilience` (على `main`) | **success** |
+| `42024781750` | `Code scanning (CodeQL)` (على `main`) | **success** |
+| `42024781758` | `Publish verified release` | **success** |
+| `42025035578` | `Quality failure notify (main)` | **success** (أي لا فشل يُبلَّغ) |
+| `42024781631` | `Service reality audit` | **skipped** بالتصميم |
+
+**مزامنة السجل بعد الدمج وقياسها:** ‏`STATE.md` حُدِّث (‏`#171 MERGED (22d49a3)` · الأساس `22d49a3` · حكم CI على اختبارات المتصفح · الرابطان بتشغيلتيهما · الجلسة التالية `L2`)، وضُغط رأسه لأن إضافة نص كانت ستكسر حدّ 20 KB: الحجم قبل التحرير **19927** بايتًا (أي 73 بايتًا تحت السقف)، وبعد أول تحرير **21834** ⇒ سقطت `SA-02` و`R0-02` برسالة «STATE.md حجمه 20450 بايت» ثم 20028، فأُعيدت الصياغة مضغوطة مع إحالة التفصيل إلى هذا السجل — **بلا حذف قسم تاريخي وبلا تعديل أي توقّع في أي اختبار** (البديل كان أرشفة كتلة حادية عشرة وتعديل عدّ `SA-03` المقفل على «عشر كتل»، وهو أثقل وأخطر من الضغط). الحجم النهائي **19847 بايتًا** و`test/state-archive-2026-11.test.js` + `test/r0-continuity-2026.test.js` ⇒ **9/9**. ‏`NOW.md` أُعيد توليده (**15808 بايت**) لأن `R0-05` يفشل على `NOW` متقادم.
+
+**القياس النهائي على الفرع بعد المزامنة:** ‏`npm test` **1437 · 1420 pass · 0 fail · 17 skipped** · `check` **284 ملفًا** · `console:panels:check` مطابق (7261 بايت) · `arch:map:check` ‏16/129/15 · `visual:first:check` متفقة · `check:continuity` ‏168/538/138 · `plan:check` **PASS · 66 مهمة** · `measure` **PASS · 0 انحراف**.
+
+**ما لم يتغيّر بالدمج:** ‏`B1 = 5.5/8` و`B2 = 2.5/6` كما هما، و66 مهمة مفتوحة (21 P0 · 31 P1 · 14 P2)، و`L5 = 0/17`، والعزل off، و`DATA-001` ما زالت `SIMULATED_PASS`، و`NETWORK=DENY` حتى موافقة E1 المحددة. لا يُعلن «مكتمل» قبل `0 P0 ∧ B1=8/8` بدليل خارجي حيّ `∧ B2≥5/6` مع `L5≥5 active ∧ CMAT≥10/12`.
