@@ -80,7 +80,7 @@
 | `deps` | الاعتماديات | 5 prod · 2 dev | `package.json` | 🔗 |
 | `coverage_floor` | أرضية CI للتغطية | 89 / 71 / 82 | `test:coverage` | 🔗 |
 | `syntax_files` | الملفات المفحوصة نحويًا | 281 | نطاق `scripts/check.mjs` نفسه | 🔗 |
-| `continuity` | وثائق الاستمرارية / الروابط / المهام | 167 / 533 / 138 | `npm run check:continuity` | 🔗 |
+| `continuity` | وثائق الاستمرارية / الروابط / المهام | 167 / 534 / 138 | `npm run check:continuity` | 🔗 |
 | `sandbox` | العزل | off | `CELIA_AGENT_SANDBOX` في `src/agent/index.js` | 🔗 |
 | `egress` | الخروج | off | `CELIA_AGENT_EGRESS` في `src/agent/index.js` | 🔗 |
 | `tests` | اختبارات | 1305 · **1288 pass** · 0 fail · 17 skip بيئي مصرح | `npm test` + `check-test-skips --allow-env-gates` (2026-11-04؛ المتخطيات ليست نجاحًا) | 📅 |
@@ -349,6 +349,7 @@ W2 🔑 (متوازٍ) ── HOST-003 ─▶ W3 ──▶ لا شيء بعده�
 ## 12 · المراجع
 
 - [خطة 100% — الأركان الثمانية](plan-100-percent.md)
+- [خطة التشغيل الحقيقي وواجهة 2026 — `R1..R7` و`U1..U10` و`L0..L7`](plan-live-operation-ui-2026.md)
 - [الخطة التنفيذية لسدّ الفجوات](executive-completion-plan.md)
 - [حالة المهام — المرجع الوحيد](continuity/BACKLOG.md)
 - [خطة الشركة والمهارات](design/ai-company-executive-plan.md) · [سياسة التفعيل](design/skill-activation-policy.md)
