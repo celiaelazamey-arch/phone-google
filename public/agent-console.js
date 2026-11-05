@@ -206,6 +206,17 @@ export function groupAttention(queue) {
   };
 }
 
+/**
+ * زمن الانتظار كما يُقال لصاحب القرار. `0 دقيقة` صياغة رديئة كشفها فشل CI: أقل من
+ * دقيقة تُسمّى بأقل من دقيقة، ولا يُلفَّف رقم غير صالح إلى صفر يوحي بأن البند جديد.
+ */
+export function waitingLabel(waitingMs) {
+  const ms = Number(waitingMs);
+  if (!Number.isFinite(ms) || ms <= 0) return null;
+  if (ms < 60_000) return 'أقل من دقيقة';
+  return `${Math.round(ms / 60_000)} دقيقة`;
+}
+
 export function renderInbox(queue) {
   const view = groupAttention(queue);
   if (!view.total) {
@@ -223,11 +234,12 @@ export function renderInbox(queue) {
             .map(([key, value]) => `${escapeHtml(key)}=${escapeHtml(value)}`)
             .join(' · ');
           const next = item?.next && item.next !== 'none' ? ` <span class="tag">${escapeHtml(String(item.next))}</span>` : '';
+          const waiting = waitingLabel(item?.waitingMs);
           return `<li class="inbox-item">
             <span class="i-head"><b>${escapeHtml(item?.ar || item?.reason || 'بند')}</b>${next}</span>
             <span class="meta">${escapeHtml(item?.en || '')}</span>
             <span class="meta">المعرّف: <code>${escapeHtml(String(item?.id ?? '—'))}</code>${evidence ? ` · ${evidence}` : ''}${
-              item?.waitingMs ? ` · منتظر ${Math.round(Number(item.waitingMs) / 60000)} دقيقة` : ''
+              waiting ? ` · منتظر ${waiting}` : ''
             }</span>
           </li>`;
         })

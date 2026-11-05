@@ -569,7 +569,7 @@ const L1_ATTENTION = {
   owed: 2,
   clear: false,
   items: [
-    { id: 'approval:ap-1', reason: 'approval_pending', severity: 'decision', ar: 'موافقة تنتظر قرارك', en: 'an approval is waiting for you', runId: 'run-done', since: at(3000), waitingMs: 3000, title: null, evidence: { approvalId: 'ap-1' }, next: 'decide', source: 'approval_pending' },
+    { id: 'approval:ap-1', reason: 'approval_pending', severity: 'decision', ar: 'موافقة تنتظر قرارك', en: 'an approval is waiting for you', runId: 'run-done', since: at(3000), waitingMs: 300000, title: null, evidence: { approvalId: 'ap-1' }, next: 'decide', source: 'approval_pending' },
     { id: 'run:run-done', reason: 'outbox_unknown', severity: 'ambiguous', ar: 'أثر خارجي غير محسوم', en: 'an external effect is unresolved', runId: 'run-done', since: at(3500), waitingMs: 2500, title: null, evidence: { outboxId: 'ob-1' }, next: 'reconcile', source: 'outbox_unknown' }
   ],
   dropped: [],
@@ -673,6 +673,8 @@ test.describe('لوحات L1 في /agent: سجل المحادثات (U2) · صن
       await expect(page.locator('#inbox-list')).toContainText('approval:ap-1');
       await expect(page.locator('#inbox-list')).toContainText('approvalId=ap-1');
       await expect(page.locator('#inbox-list')).toContainText('منتظر 5 دقيقة');
+      // البند الثاني انتظر 2.5 ثانية: أقل من دقيقة تُسمّى كذلك، لا «0 دقيقة».
+      await expect(page.locator('#inbox-list')).toContainText('منتظر أقل من دقيقة');
       await expect(page.locator('#inbox-flags')).toHaveText('sends=false · tracksRead=false');
       await expect(page.locator('#inbox-summary')).toContainText('المجموع 2');
       await expect(page.locator('#inbox-summary')).toContainText('e2edigest000');

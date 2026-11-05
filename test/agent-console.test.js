@@ -36,7 +36,8 @@ import {
   renderTextPreview,
   renderThreadDetail,
   renderThreadList,
-  shortHash
+  shortHash,
+  waitingLabel
 } from '../public/agent-console.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -192,6 +193,17 @@ test('L1-07 the inbox groups without re-ranking, softening or dropping', () => {
   assert.match(rendered.html, /run:r1/, 'every item keeps its evidence id');
   assert.match(rendered.html, /approvalId=a1/);
   assert.match(rendered.html, /منتظر 3 دقيقة/);
+  // زمن الانتظار يُقال لصاحب القرار: أقل من دقيقة تُسمّى كذلك، ولا تُلفَّف إلى «0 دقيقة».
+  assert.equal(waitingLabel(180_000), '3 دقيقة');
+  assert.equal(waitingLabel(59_999), 'أقل من دقيقة');
+  assert.equal(waitingLabel(3_000), 'أقل من دقيقة');
+  assert.equal(waitingLabel(0), null, 'zero is not a wait');
+  assert.equal(waitingLabel(-5), null, 'a negative wait is not dressed as a fresh item');
+  assert.equal(waitingLabel(Number.NaN), null);
+  assert.equal(waitingLabel(90_000), '2 دقيقة', 'rounded to the nearest minute, stated as such');
+  const subMinute = renderInbox({ total: 1, items: [{ id: 'x', reason: 'r', severity: 'info', ar: 'بند', en: 'i', waitingMs: 3_000 }] }).html;
+  assert.match(subMinute, /منتظر أقل من دقيقة/);
+  assert.ok(!subMinute.includes('منتظر 0 دقيقة'), 'the wording CI caught never returns');
   assert.ok(!rendered.html.includes('>none<'), 'a "none" next-step is not rendered as an action');
   assert.equal(rendered.view.items === undefined, true, 'the view is a grouping, not a rewritten queue');
 
