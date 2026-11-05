@@ -9,8 +9,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createCeliaMcpApp, loadCeliaMcpConfig } from '../src/celia-mcp.js';
+import { createMemoryPool } from '../src/memory-pool.js';
 
 import {
   CONSOLE_VERSION,
@@ -324,7 +327,38 @@ test('L1-15 the new styles use theme tokens only and no emoji icon sneaks in', (
   assert.ok(!emoji.test(css));
 });
 
-/* ── L1-16: اللوحة البصرية مشتقة ومطابقة — لا تُحسَّن يدويًا ─────────────────── */
+/* ── L1-17: كل وحدة تستوردها الصفحة مخدومة بمسار صريح — لا 404 يلاحظه المتصفح وحده ──
+ * أصول `public/` تُخدَم بمسار صريح بلا static fallback (سابقة `TRC-03b`). وحدة جديدة
+ * بلا مسار = 404 = خطأ console يسقط كل اختبارات المتصفح. هذا الحارس يفشل في Node. */
+test('L1-17 every ES module the page imports is served by an explicit route (no browser-only 404)', async (t) => {
+  const pool = createMemoryPool();
+  const config = loadCeliaMcpConfig({ CELIA_MCP_API_TOKEN: crypto.randomBytes(32).toString('hex') });
+  const server = createCeliaMcpApp({ pool, config }).listen(0, '127.0.0.1');
+  const baseUrl = await new Promise((resolve) => server.once('listening', () => resolve(`http://127.0.0.1:${server.address().port}`)));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+
+  // المسارات مشتقة من الاستيراد الفعلي في الصفحة — لا قائمة مكتوبة يدًا تقادُم.
+  const pageJs = await (await fetch(`${baseUrl}/agent.js`)).text();
+  const imported = [...pageJs.matchAll(/from '\.\/([A-Za-z0-9._-]+\.js)'/g)].map((match) => match[1]);
+  assert.ok(imported.includes('agent-console.js'), 'the page really imports the new module');
+  assert.ok(imported.includes('agent-trace.js'), 'and the trace module it already imported');
+
+  for (const name of imported) {
+    const response = await fetch(`${baseUrl}/${name}`);
+    assert.equal(response.status, 200, `/${name} must be served by an explicit route`);
+    assert.match(response.headers.get('content-type') || '', /javascript/, `/${name} must be JavaScript`);
+    assert.ok((await response.text()).length > 100, `/${name} must not be an empty body`);
+  }
+
+  // اللوحتان موجودتان في الصفحة التي يخدمها الخادم نفسه، لا في ملف محلي فقط.
+  const pageHtml = await (await fetch(`${baseUrl}/agent`)).text();
+  for (const id of ['history-list', 'history-detail', 'history-filter', 'inbox-list', 'inbox-badge', 'artifact-preview', 'preview-body']) {
+    assert.ok(pageHtml.includes(`id="${id}"`), `served /agent carries #${id}`);
+  }
+  const moduleSource = await (await fetch(`${baseUrl}/agent-console.js`)).text();
+  assert.match(moduleSource, /export function previewKind/, 'the served module is the real one');
+});
+
 test('L1-16 the derived panel board equals the render of the real page and module', () => {
   const out = execFileSync(process.execPath, ['scripts/render-agent-console-panels.mjs', '--check'], {
     cwd: root,

@@ -91,6 +91,10 @@ export function createCeliaUiRouter({ createMcpHandler, buildStatusSummary, oper
   router.get('/agent.js', (_req, res) => res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'agent.js')));
   // WP-1.2: pure trace helpers imported by agent.js as an ES module (also unit-tested in Node).
   router.get('/agent-trace.js', (_req, res) => res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'agent-trace.js')));
+  // L1 (U2/U5/U3): pure console-panel helpers imported by agent.js the same way. Assets under public/ are
+  // served by explicit route with no static fallback, so a module without its own route is a 404 that only
+  // a browser notices — `L1-17` in test/agent-console.test.js boots this server and refuses that class.
+  router.get('/agent-console.js', (_req, res) => res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'agent-console.js')));
   // WP-1.3 (DEC-049): رموز السمات ومُحلّلها قبل الرسم — مشتركان بين /agent و/kb و/cron.
   router.get('/theme.css', (_req, res) => res.type('text/css').sendFile(path.join(PUBLIC_DIR, 'theme.css')));
   router.get('/theme.js', (_req, res) => res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'theme.js')));
