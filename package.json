@@ -94,7 +94,7 @@
     "apps-script:sync": "node scripts/apps-script-sync.mjs"
   },
   "dependencies": {
-    "dotenv": "^18.0.9",
+    "dotenv": "^18.0.10",
     "express": "^5.1.0",
     "googleapis": "^188.0.0",
     "helmet": "^8.1.0",
